@@ -1,0 +1,12 @@
+[submodule "3rd/skynet"]
+	path = 3rd/skynet
+	url = git@github.com:cloudwu/skynet.git
+[submodule "3rd/lua-openai"]
+	path = 3rd/lua-openai
+	url = git@github.com:leafo/lua-openai.git
+[submodule "3rd/lua-cjson"]
+	path = 3rd/lua-cjson
+	url = https://github.com/openresty/lua-cjson.git
+[submodule "3rd/tableshape"]
+	path = 3rd/tableshape
+	url = https://github.com/leafo/tableshape.git

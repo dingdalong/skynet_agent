@@ -1,0 +1,22 @@
+{
+    "runtime.version": "Lua 5.5",
+    "workspace.library": [
+        "src/lualib",
+        "3rd/lua-openai",
+        "3rd/tableshape",
+        "${3rd}/skynet/library",
+        "${3rd}/busted/library",
+        "${3rd}/luassert/library"
+    ],
+    "workspace.checkThirdParty": "Apply",
+    "workspace.ignoreDir": [
+        ".vscode",
+        "luaclib",
+        "cservice",
+        "logs"
+    ],
+    "diagnostics.neededFileStatus": {
+        "codestyle-check": "Any"
+    },
+    "diagnostics.globals": []
+}

@@ -1,0 +1,8 @@
+.env
+.DS_Store
+*.log
+*.pid
+*.dSYM/
+luaclib/
+cservice/
+logs/

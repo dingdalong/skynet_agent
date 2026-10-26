@@ -1,0 +1,13 @@
+include "config.path"
+
+-- preload = "./examples/preload.lua"	-- run preload.lua before every lua service run
+thread = 8
+--logger = "./logs/skynet.log"
+logpath = "."
+harbor = 0
+start = "main"                -- main script
+bootstrap = "snlua bootstrap" -- The service for bootstrap
+-- snax_interface_g = "snax_g"
+cpath = skynet_root .. "cservice/?.so"
+enablessl = true
+-- daemon = "./skynet.pid"
