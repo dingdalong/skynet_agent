@@ -20,6 +20,11 @@ local function request_options(sink)
 end
 
 describe("openai.skynet_http", function()
+    it("加载 provider 时不会加载 LuaSocket 网络模块", function()
+        luassert.is_nil(package.loaded["socket.http"])
+        luassert.is_nil(package.loaded["socket.core"])
+    end)
+
     it("把 LuaSocket 风格请求转发给 Skynet httpc", function()
         local fake = FakeHttp.new({
             status = 200,
@@ -68,6 +73,20 @@ describe("openai.skynet_http", function()
 
         luassert.is_nil(ok)
         luassert.matches("stream failed", assert(err))
+        luassert.is_true(fake.closed)
+    end)
+
+    it("sink 返回错误时关闭响应流", function()
+        local fake = FakeHttp.new({
+            chunks = { "chunk" },
+        })
+        local provider = skynet_http.new(fake:as_httpc())
+        local ok, err = provider:request(request_options(function()
+            return nil, "sink rejected"
+        end))
+
+        luassert.is_nil(ok)
+        luassert.matches("sink rejected", assert(err))
         luassert.is_true(fake.closed)
     end)
 

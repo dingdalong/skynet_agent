@@ -9,10 +9,11 @@
 ```dotenv
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_API_KEY=your-api-key
+DEEPSEEK_MODEL=deepseek-flash
 ```
 
-`.env` 使用 shell 兼容语法，只在本机保存，不提交真实密钥。默认模型是 `deepseek-flash`。
-Skynet 运行日志写入 `logs/skynet.log`，模型文本只输出到 stdout，错误写入 stderr。
+`.env` 使用 shell 兼容语法，只在本机保存，不提交真实密钥。
+Skynet 运行日志写入 `logs/skynet.log`，对话内容输出到 stdout，错误写入 stderr。
 
 ## 构建与运行
 

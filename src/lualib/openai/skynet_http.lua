@@ -16,7 +16,15 @@ local cjson = require("cjson")
 ---@field close fun(self: openai.skynet_http.ResponseStream)
 
 ---@class openai.skynet_http.Httpc
----@field request_stream fun(self: openai.skynet_http.Httpc, method: string, target: string, path: string, recv_headers: openai.skynet_http.Headers?, headers: openai.skynet_http.Headers, body: string?): openai.skynet_http.ResponseStream|nil
+---@field request_stream fun(
+---     self: openai.skynet_http.Httpc,
+---     method: string,
+---     target: string,
+---     path: string,
+---     recv_headers: openai.skynet_http.Headers?,
+---     headers: openai.skynet_http.Headers,
+---     body: string?
+--- ): openai.skynet_http.ResponseStream|nil
 
 ---@class openai.skynet_http.Provider
 ---@field httpc openai.skynet_http.Httpc
@@ -47,35 +55,55 @@ local function read_source(source)
     return table.concat(chunks)
 end
 
+---@param headers openai.skynet_http.Headers?
+---@return openai.skynet_http.Headers
+local function request_headers(headers)
+    local result = {}
+    for name, value in pairs(headers or {}) do
+        local lower_name = name:lower()
+        -- Host 和 Content-Length 必须由 Skynet 根据实际请求重算。
+        if lower_name ~= "host" and lower_name ~= "content-length" then
+            result[name] = value
+        end
+    end
+    return result
+end
+
+---@param sink ltn12.Sink
+---@return integer|nil
+---@return string|nil
+local function write_sink(sink)
+    local ok, err = sink(nil)
+    if ok == nil then
+        return nil, err or "HTTP response sink 结束失败"
+    end
+    return ok
+end
+
 ---@param options openai.skynet_http.RequestOptions
----@return 1|nil status_code
----@return any status_or_error 成功时为 HTTP 状态码，失败时为错误字符串
----@return table<string, string>|nil headers
+---@return integer|nil
+---@return any
+---@return table<string, string>|nil
 function Provider:request(options)
     assert(type(options) == "table", "HTTP request options 必须是 table")
+    assert(type(options.url) == "string" and options.url ~= "", "HTTP request URL 不能为空")
+    assert(type(options.method) == "string" and options.method ~= "", "HTTP request method 不能为空")
 
     local parsed, parse_error = parse_url(options.url)
     if not parsed then
-        return nil, parse_error
+        return nil, "解析 HTTP URL 失败: " .. tostring(parse_error)
     end
 
     local body, source_error = read_source(options.source)
     if source_error then
-        return nil, "读取请求体失败: " .. tostring(source_error)
+        return nil, "读取 HTTP 请求体失败: " .. tostring(source_error)
     end
 
-    local headers = {}
-    for name, value in pairs(options.headers or {}) do
-        local lower_name = name:lower()
-        -- Host 和 Content-Length 由 Skynet httpc 根据实际请求重算。
-        if lower_name ~= "content-length" and lower_name ~= "host" then
-            headers[name] = value
-        end
-    end
+    local headers = request_headers(options.headers)
     headers.Host = parsed.authority
+
     if body then
         local decoded_ok, decoded = pcall(cjson.decode, body)
-        -- SSE 请求必须显式声明 Accept，否则部分网关会缓冲完整响应。
         if decoded_ok and type(decoded) == "table" and decoded.stream == true then
             headers.Accept = "text/event-stream"
         end
@@ -87,7 +115,7 @@ function Provider:request(options)
     end
     local target = parsed.scheme .. "://" .. parsed.authority
 
-    local ok, stream = pcall(
+    local request_ok, stream = pcall(
         self.httpc.request_stream,
         options.method,
         target,
@@ -96,11 +124,11 @@ function Provider:request(options)
         headers,
         body
     )
-    if not ok then
-        return nil, stream
+    if not request_ok then
+        return nil, "Skynet HTTP 请求失败: " .. tostring(stream)
     end
     if not stream then
-        return nil, "Skynet httpc 没有返回响应流"
+        return nil, "Skynet HTTP 没有返回响应流"
     end
 
     local status = stream.status
@@ -108,17 +136,23 @@ function Provider:request(options)
     local stream_ok, stream_error = xpcall(function()
         for chunk in stream do
             if chunk and chunk ~= "" and options.sink then
-                options.sink(chunk)
+                local sink_ok, sink_error = options.sink(chunk)
+                if sink_ok == nil then
+                    error(sink_error or "HTTP response sink 写入失败", 0)
+                end
             end
         end
         if options.sink then
-            options.sink(nil)
+            local final_ok, final_error = write_sink(options.sink)
+            if final_ok == nil then
+                error(final_error or "HTTP response sink 结束失败", 0)
+            end
         end
     end, debug.traceback)
 
     pcall(stream.close, stream)
     if not stream_ok then
-        return nil, stream_error
+        return nil, "读取 Skynet HTTP 响应失败: " .. tostring(stream_error)
     end
 
     return 1, status, response_headers
@@ -136,11 +170,10 @@ function module.new(httpc)
 end
 
 ---@param options openai.skynet_http.RequestOptions
----@return 1|nil status_code
----@return any status_or_error 成功时为 HTTP 状态码，失败时为错误字符串
----@return table<string, string>|nil headers
+---@return integer|nil
+---@return any
+---@return table<string, string>|nil
 function module.request(options)
-    -- 默认 Provider 直接复用 Skynet 自带的 httpc，不引入 LuaSocket。
     return module.new(require("http.httpc")):request(options)
 end
 
