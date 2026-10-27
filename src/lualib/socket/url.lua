@@ -1,8 +1,20 @@
+-- lua-openai 只需要 parse 和 escape，因此不复制 LuaSocket 的完整 URL 实现。
+---@class socket.url.ParsedUrl
+---@field scheme string 仅支持 HTTP 或 HTTPS
+---@field host string
+---@field port integer
+---@field path string
+---@field query? string
+---@field authority string
+
 local default_ports = {
     http = 80,
     https = 443,
 }
 
+---@param url string
+---@return socket.url.ParsedUrl|nil
+---@return string|nil
 local function parse(url)
     if type(url) ~= "string" then
         return nil, "URL 必须是字符串"
@@ -19,6 +31,7 @@ local function parse(url)
     end
 
     local authority, path_and_query = remainder:match("^([^/?#]*)(.*)$")
+    -- 不解析 URL 凭据，避免 userinfo 被误写进 HTTP Host 头。
     if not authority or authority == "" or authority:find("@", 1, true) then
         return nil, "URL 的 host 无效"
     end
@@ -90,6 +103,8 @@ local function parse(url)
     }
 end
 
+---@param value any
+---@return string
 local function escape(value)
     return (tostring(value):gsub("([^A-Za-z0-9_%.%-~])", function(character)
         return string.format("%%%02X", string.byte(character))

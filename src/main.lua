@@ -4,12 +4,15 @@ local deepseek = require("openai.deepseek")
 local INSTRUCTIONS = "你是一个简洁、可靠的中文助手。"
 local INPUT = "请用一句话介绍你自己。"
 
+---@param method string
+---@param message any
 local function fail(method, message)
     io.stderr:write(string.format("[main] %s 失败: %s\n", method, tostring(message)))
     io.stderr:flush()
     os.exit(1)
 end
 
+-- 该服务只执行一次演示请求，输出流式文本后结束。
 skynet.start(function()
     local api_key = os.getenv("DEEPSEEK_API_KEY")
     local base_url = os.getenv("DEEPSEEK_BASE_URL")
@@ -20,6 +23,8 @@ skynet.start(function()
     if not base_url or base_url == "" then
         fail("读取配置", "DEEPSEEK_BASE_URL 未设置")
     end
+    ---@cast api_key string
+    ---@cast base_url string
 
     local ok, client_or_err = pcall(deepseek.new, api_key, {
         base_url = base_url,
@@ -27,6 +32,7 @@ skynet.start(function()
     if not ok then
         fail("创建客户端", client_or_err)
     end
+    ---@cast client_or_err openai.deepseek.Client
 
     local wrote_text = false
     local final_response, request_error = client_or_err:stream_response(INPUT, {

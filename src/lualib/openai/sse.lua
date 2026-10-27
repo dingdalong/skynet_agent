@@ -1,5 +1,19 @@
 local cjson = require("cjson")
 
+---@class openai.sse.Event
+---@field type? string
+---@field delta? string
+---@field response? table
+---@field error? string|table
+---@field message? string
+
+---@alias openai.sse.OnEvent fun(event: openai.sse.Event)
+
+---@class openai.sse.Parser
+---@field feed fun(self: openai.sse.Parser, chunk: string?, err: string?): string?
+
+---@param on_event openai.sse.OnEvent
+---@return openai.sse.Parser
 local function new_parser(on_event)
     assert(type(on_event) == "function", "on_event 必须是函数")
 
@@ -30,11 +44,14 @@ local function new_parser(on_event)
             end
             on_event(event)
         end
+        -- SSE 的 [DONE] 只表示传输结束，不是 Responses API 的业务事件。
         event_name = nil
     end
 
+    ---@param line string
     local function process_line(line)
         if line == "" then
+            -- 空行表示一个完整 SSE 事件已经到齐。
             dispatch()
             return
         end
@@ -59,6 +76,7 @@ local function new_parser(on_event)
     end
 
     local function consume_lines()
+        -- CR 和 LF 可能分处两个网络 chunk，行尾不完整时留到下一次 feed 再处理。
         while #buffer > 0 do
             local line_end = buffer:find("[\r\n]")
             if not line_end then
@@ -81,6 +99,9 @@ local function new_parser(on_event)
 
     local parser = {}
 
+    ---@param chunk string?
+    ---@param err string?
+    ---@return string?
     function parser:feed(chunk, err)
         if err then
             error("SSE 流读取失败: " .. tostring(err), 0)
@@ -105,9 +126,12 @@ local function new_parser(on_event)
         return chunk
     end
 
+    ---@cast parser openai.sse.Parser
     return parser
 end
 
+---@param on_event openai.sse.OnEvent
+---@return ltn12.Filter
 local function create_stream_filter(on_event)
     local parser = new_parser(on_event)
     return function(chunk, err)
