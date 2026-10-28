@@ -41,6 +41,13 @@ while IFS= read -r file; do
 		report "$file: 禁止 CRLF 行尾"
 	fi
 
+	if [ "${file##*.}" = "lua" ]; then
+		long_line=$(awk 'length($0) > 120 { print FNR; exit }' "$file")
+		if [ -n "$long_line" ]; then
+			report "$file:$long_line: 行长度超过 120 字符"
+		fi
+	fi
+
 	case "$file" in
 		*.md)
 			;;

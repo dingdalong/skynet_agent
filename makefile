@@ -49,7 +49,7 @@ BUSTED_CPATH := ./luaclib/?.so
 
 help:
 	@printf '%s\n' \
-		"Skynet DeepSeek agent" \
+		"Skynet LLM agent" \
 		"" \
 		"构建:" \
 		"  make build      当前平台构建（Linux/macOS/FreeBSD）" \

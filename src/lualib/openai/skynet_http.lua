@@ -10,25 +10,30 @@ local cjson = require("cjson")
 ---@field source? ltn12.Source
 ---@field sink? ltn12.Sink
 
+---@alias openai.skynet_http.Options openai.skynet_http.RequestOptions
+
 ---@class openai.skynet_http.ResponseStream
 ---@field status integer
 ---@field header? table<string, string>
 ---@field close fun(self: openai.skynet_http.ResponseStream)
 
 ---@class openai.skynet_http.Httpc
----@field request_stream fun(
----     self: openai.skynet_http.Httpc,
----     method: string,
----     target: string,
----     path: string,
----     recv_headers: openai.skynet_http.Headers?,
----     headers: openai.skynet_http.Headers,
----     body: string?
---- ): openai.skynet_http.ResponseStream|nil
+local Httpc = {}
+
+---@param method string
+---@param target string
+---@param path string
+---@param recv_headers openai.skynet_http.Headers?
+---@param headers openai.skynet_http.Headers
+---@param body string?
+---@return openai.skynet_http.ResponseStream|nil
+function Httpc.request_stream(method, target, path, recv_headers, headers, body)
+    error("Skynet Httpc 只能用于接口声明", 0)
+end
 
 ---@class openai.skynet_http.Provider
 ---@field httpc openai.skynet_http.Httpc
----@field request fun(self: openai.skynet_http.Provider, options: openai.skynet_http.RequestOptions): integer?, any, table<string, string>|nil
+---@field request fun(self: openai.skynet_http.Provider, options: openai.skynet_http.Options): integer?, any, table?
 
 local Provider = {}
 Provider.__index = Provider

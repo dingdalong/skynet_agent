@@ -7,12 +7,12 @@ describe("socket.url", function()
     it("解析默认 HTTP 和 HTTPS 端口", function()
         luassert.are.same({
             scheme = "https",
-            host = "api.deepseek.com",
+            host = "llm.example.com",
             port = 443,
             path = "/responses",
             query = nil,
-            authority = "api.deepseek.com",
-        }, url.parse("https://api.deepseek.com/responses"))
+            authority = "llm.example.com",
+        }, url.parse("https://llm.example.com/responses"))
 
         luassert.are.same({
             scheme = "http",

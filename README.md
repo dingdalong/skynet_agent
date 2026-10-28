@@ -12,6 +12,8 @@ DEEPSEEK_API_KEY=your-api-key
 DEEPSEEK_MODEL=deepseek-flash
 ```
 
+当前接入的是 DeepSeek Provider；上层对话逻辑统一依赖 LLM Provider 接口，后续可以增加其他 LLM 实现。
+
 `.env` 使用 shell 兼容语法，只在本机保存，不提交真实密钥。
 Skynet 运行日志写入 `logs/skynet.log`，对话内容输出到 stdout，错误写入 stderr。
 

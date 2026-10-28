@@ -8,7 +8,7 @@ local luassert = assert
 local function request_options(sink)
     return {
         method = "POST",
-        url = "https://api.deepseek.com/responses?trace=1",
+        url = "https://llm.example.com/responses?trace=1",
         headers = {
             Authorization = "Bearer secret",
             ["Content-Length"] = "999",
@@ -42,9 +42,9 @@ describe("openai.skynet_http", function()
 
         local captured = fake.requests[1]
         luassert.are.equal("POST", captured.method)
-        luassert.are.equal("https://api.deepseek.com", captured.target)
+        luassert.are.equal("https://llm.example.com", captured.target)
         luassert.are.equal("/responses?trace=1", captured.path)
-        luassert.are.equal("api.deepseek.com", captured.headers.Host)
+        luassert.are.equal("llm.example.com", captured.headers.Host)
         luassert.are.equal("text/event-stream", captured.headers.Accept)
         luassert.is_nil(captured.headers["Content-Length"])
         luassert.are.equal('{"input":"hello","stream":true}', captured.body)
