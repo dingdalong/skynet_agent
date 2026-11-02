@@ -1,5 +1,7 @@
 local cjson = require("cjson")
 
+local MODULE_NAME = "openai.sse"
+
 ---@class openai.sse.Event
 ---@field type? string
 ---@field delta? string
@@ -7,20 +9,25 @@ local cjson = require("cjson")
 ---@field error? string|table
 ---@field message? string
 
----@alias openai.sse.OnEvent fun(event: openai.sse.Event)
-
 ---@class openai.sse.Parser
----@field on_event openai.sse.OnEvent
+---@field on_event fun(event: openai.sse.Event)
 ---@field buffer string
 ---@field data_lines string[]
 ---@field event_name string?
 ---@field finished boolean
----@field feed fun(self: openai.sse.Parser, chunk: string?, err: string?): string?
 
-local Parser = {}
-Parser.__index = Parser
+local sse = {
+    Parser = {},
+}
+sse.Parser.__index = sse.Parser
 
----@param on_event openai.sse.OnEvent
+local function current_module()
+    local loaded = package.loaded[MODULE_NAME]
+    assert(type(loaded) == "table", "openai.sse 尚未加载")
+    return loaded
+end
+
+---@param parser openai.sse.Parser
 local function dispatch(parser)
     if #parser.data_lines == 0 then
         parser.event_name = nil
@@ -101,7 +108,7 @@ end
 ---@param chunk string?
 ---@param err string?
 ---@return string?
-function Parser:feed(chunk, err)
+function sse.Parser:feed(chunk, err)
     if err then
         error("SSE 流读取失败: " .. tostring(err), 0)
     end
@@ -125,30 +132,27 @@ function Parser:feed(chunk, err)
     return chunk
 end
 
----@param on_event openai.sse.OnEvent
+---@param on_event fun(event: openai.sse.Event)
 ---@return openai.sse.Parser
-local function new_parser(on_event)
+function sse.new_parser(on_event)
     assert(type(on_event) == "function", "on_event 必须是函数")
+    local parser_class = current_module().Parser
     return setmetatable({
         on_event = on_event,
         buffer = "",
         data_lines = {},
         event_name = nil,
         finished = false,
-    }, Parser)
+    }, parser_class)
 end
 
----@param on_event openai.sse.OnEvent
----@return ltn12.Filter
-local function create_stream_filter(on_event)
-    local parser = new_parser(on_event)
+---@param on_event fun(event: openai.sse.Event)
+---@return openai.ltn12.Filter
+function sse.create_stream_filter(on_event)
+    local parser = current_module().new_parser(on_event)
     return function(chunk, err)
         return parser:feed(chunk, err)
     end
 end
 
-return {
-    Parser = Parser,
-    new_parser = new_parser,
-    create_stream_filter = create_stream_filter,
-}
+return sse

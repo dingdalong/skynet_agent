@@ -1,6 +1,6 @@
 local skynet = require("skynet")
 
-local deepseek = require("llm.deepseek")
+local llm = require("llm.base")
 
 local INSTRUCTIONS = "你是一个简洁、可靠的中文助手。"
 local FIRST_INPUT = "请记住：项目使用的脚本语言是 Lua。"
@@ -20,12 +20,12 @@ local function write_text_delta(delta)
     io.stdout:flush()
 end
 
----@param provider llm.Provider
+---@param client table
 ---@param input llm.Message[]
 ---@return string|nil
 ---@return string|nil
-local function stream_turn(provider, input)
-    local assistant_text, request_error = provider:stream_response(input, write_text_delta)
+local function stream_turn(client, input)
+    local assistant_text, request_error = llm.stream_responses(client, input, write_text_delta)
     if not assistant_text then
         return nil, request_error
     end
@@ -34,7 +34,7 @@ local function stream_turn(provider, input)
     return assistant_text
 end
 
--- 当前 DeepSeek Provider 不使用 previous_response_id；两轮请求通过完整本地历史衔接。
+-- 当前 LLM 客户端不使用 previous_response_id；两轮请求通过完整本地历史衔接。
 skynet.start(function()
     local api_key = os.getenv("DEEPSEEK_API_KEY")
     local base_url = os.getenv("DEEPSEEK_BASE_URL")
@@ -53,20 +53,19 @@ skynet.start(function()
     ---@cast base_url string
     ---@cast model string
 
-    local ok, provider_or_error = pcall(deepseek.new, {
+    local ok, client_or_error = pcall(llm.new, {
         api_key = api_key,
         base_url = base_url,
         model = model,
     })
     if not ok then
-        fail("创建 DeepSeek Provider", provider_or_error)
+        fail("创建 LLM 客户端", client_or_error)
     end
-    ---@cast provider_or_error llm.Provider
-    local provider = provider_or_error
+    ---@cast client_or_error table
+    local client = client_or_error
 
     skynet.error(string.format(
-        "[main] LLM Provider 初始化完成 provider=%s base_url=%s model=%s",
-        provider.name,
+        "[main] LLM 客户端初始化完成 base_url=%s model=%s",
         base_url,
         model
     ))
@@ -75,7 +74,7 @@ skynet.start(function()
         { role = "system", content = INSTRUCTIONS },
         { role = "user", content = FIRST_INPUT },
     }
-    local first_text, first_error = stream_turn(provider, input)
+    local first_text, first_error = stream_turn(client, input)
     if not first_text then
         fail("请求第一轮 Responses API", first_error)
     end
@@ -83,7 +82,7 @@ skynet.start(function()
     input[#input + 1] = { role = "assistant", content = first_text }
     input[#input + 1] = { role = "user", content = SECOND_INPUT }
 
-    local second_text, second_error = stream_turn(provider, input)
+    local second_text, second_error = stream_turn(client, input)
     if not second_text then
         fail("请求第二轮 Responses API", second_error)
     end

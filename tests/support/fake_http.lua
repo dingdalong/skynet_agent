@@ -41,14 +41,6 @@ function FakeHttp:request(options)
     return 1, self.status, self.headers
 end
 
-function FakeHttp:as_provider()
-    return {
-        request = function(options)
-            return self:request(options)
-        end,
-    }
-end
-
 function FakeHttp:as_httpc()
     return {
         request_stream = function(...)

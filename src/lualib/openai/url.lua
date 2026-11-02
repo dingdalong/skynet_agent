@@ -1,6 +1,5 @@
--- lua-openai 只需要 parse 和 escape，因此不复制 LuaSocket 的完整 URL 实现。
----@class socket.url.ParsedUrl
----@field scheme string 仅支持 HTTP 或 HTTPS
+---@class openai.url.ParsedUrl
+---@field scheme string
 ---@field host string
 ---@field port integer
 ---@field path string
@@ -12,15 +11,17 @@ local default_ports = {
     https = 443,
 }
 
----@param url string
----@return socket.url.ParsedUrl|nil
+local url = {}
+
+---@param value string
+---@return openai.url.ParsedUrl|nil
 ---@return string|nil
-local function parse(url)
-    if type(url) ~= "string" then
+function url._parse(value)
+    if type(value) ~= "string" then
         return nil, "URL 必须是字符串"
     end
 
-    local scheme, remainder = url:match("^([%a][%w+.-]*)://(.*)$")
+    local scheme, remainder = value:match("^([%a][%w+.-]*)://(.*)$")
     if not scheme then
         return nil, "URL 缺少协议"
     end
@@ -105,13 +106,23 @@ end
 
 ---@param value any
 ---@return string
-local function escape(value)
+function url._escape(value)
     return (tostring(value):gsub("([^A-Za-z0-9_%.%-~])", function(character)
         return string.format("%%%02X", string.byte(character))
     end))
 end
 
-return {
-    parse = parse,
-    escape = escape,
-}
+---@param value string
+---@return openai.url.ParsedUrl|nil
+---@return string|nil
+function url.parse(value)
+    return url._parse(value)
+end
+
+---@param value any
+---@return string
+function url.escape(value)
+    return url._escape(value)
+end
+
+return url

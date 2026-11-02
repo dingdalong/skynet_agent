@@ -1,33 +1,35 @@
+local skynet_compat = require("openai.skynet_compat")
+
 ---@alias llm.OnTextDelta fun(delta: string)
 
 ---@class llm.Message
 ---@field role string
 ---@field content string|table
 
----@class llm.Provider
----@field name string
-local Provider = {}
-Provider.__index = Provider
+---@class llm.Config
+---@field api_key string
+---@field base_url string
+---@field model string
 
----@class llm.ResponsesClient
-local ResponsesClient = {}
+---@param config llm.Config
+---@return table
+local function new_client(config)
+    assert(type(config) == "table", "LLM 配置必须是 table")
 
----@param input llm.Message[]
----@param opts table?
----@param on_event fun(event: openai.sse.Event)?
----@return integer?
----@return any
----@return table<string, string>?
-function ResponsesClient:create_response(input, opts, on_event)
-    error("LLM ResponsesClient 只能用于接口声明", 0)
-end
+    local api_key = config.api_key
+    local base_url = config.base_url
+    local model = config.model
+    assert(type(api_key) == "string" and api_key ~= "", "LLM API Key 不能为空")
+    assert(type(base_url) == "string" and base_url ~= "", "LLM base_url 不能为空")
+    assert(type(model) == "string" and model ~= "", "LLM model 不能为空")
+    base_url = base_url:gsub("/+$", "")
 
----@param input llm.Message[]
----@param on_text_delta llm.OnTextDelta
----@return string|nil
----@return string|nil
-function Provider:stream_response(input, on_text_delta)
-    error("LLM Provider 必须实现 stream_response", 0)
+    skynet_compat.install()
+    local client = require("openai").new(api_key)
+    client.config.http_provider = "openai.skynet_compat"
+    client.api_base = base_url
+    client.default_model = model
+    return client
 end
 
 ---@param status integer|string|nil
@@ -78,7 +80,7 @@ local function terminal_error(event)
     return "LLM 返回错误事件: " .. tostring(detail or "未知错误")
 end
 
----@param client llm.ResponsesClient
+---@param client table
 ---@param input llm.Message[]
 ---@param on_text_delta llm.OnTextDelta
 ---@return string|nil
@@ -133,6 +135,6 @@ local function stream_responses(client, input, on_text_delta)
 end
 
 return {
-    Provider = Provider,
+    new = new_client,
     stream_responses = stream_responses,
 }

@@ -12,7 +12,8 @@ DEEPSEEK_API_KEY=your-api-key
 DEEPSEEK_MODEL=deepseek-flash
 ```
 
-当前接入的是 DeepSeek Provider；上层对话逻辑统一依赖 LLM Provider 接口，后续可以增加其他 LLM 实现。
+当前接入的是 DeepSeek；`llm.base.new` 负责构造 OpenAI 兼容客户端，
+`llm.base.stream_responses` 统一处理 Responses API 流事件。
 
 `.env` 使用 shell 兼容语法，只在本机保存，不提交真实密钥。
 Skynet 运行日志写入 `logs/skynet.log`，对话内容输出到 stdout，错误写入 stderr。
@@ -42,7 +43,7 @@ end)
 开发环境启动 `debug_console` 后，可以直接发送模块名：
 
 ```text
-dbgcmd .agent HOTFIX llm.deepseek openai.sse
+dbgcmd .agent HOTFIX llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
 ```
 
 文件监听工具基于 POSIX 文件时间和内容校验，不需要额外的 Lua C 模块：

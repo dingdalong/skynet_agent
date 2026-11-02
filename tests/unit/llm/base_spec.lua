@@ -1,9 +1,19 @@
 local cjson = require("cjson")
-local deepseek = require("llm.deepseek")
+local llm = require("llm.base")
 local FakeHttp = require("tests.support.fake_http")
 ---@type luassert
 ---@diagnostic disable-next-line: assign-type-mismatch
 local luassert = assert
+
+local original_httpc
+
+before_each(function()
+    original_httpc = package.loaded["http.httpc"]
+end)
+
+after_each(function()
+    package.loaded["http.httpc"] = original_httpc
+end)
 
 ---@param value table
 ---@return string
@@ -23,19 +33,19 @@ local function completed_event()
     })
 end
 
----@param http_provider table
----@return llm.Provider
-local function new_provider(http_provider)
-    return deepseek.new({
+---@param fake_http table
+---@return table
+local function new_client(fake_http)
+    package.loaded["http.httpc"] = fake_http:as_httpc()
+    return llm.new({
         api_key = "secret",
         base_url = "https://api.deepseek.com/",
         model = "deepseek-flash",
-        http_provider = http_provider,
     })
 end
 
-describe("llm.deepseek", function()
-    it("通过 LLM Provider 接口返回流式文本", function()
+describe("llm.base", function()
+    it("构造 OpenAI 兼容客户端并返回流式文本", function()
         local fake = FakeHttp.new({
             chunks = {
                 event({ type = "response.output_text.delta", delta = "你" }),
@@ -43,10 +53,10 @@ describe("llm.deepseek", function()
                 completed_event(),
             },
         })
-        local provider = new_provider(fake:as_provider())
+        local client = new_client(fake)
         local deltas = {}
 
-        local text, err = provider:stream_response({
+        local text, err = llm.stream_responses(client, {
             { role = "system", content = "保持简洁" },
             { role = "user", content = "介绍自己" },
         }, function(delta)
@@ -54,15 +64,17 @@ describe("llm.deepseek", function()
         end)
 
         luassert.is_nil(err)
-        luassert.are.equal("deepseek", provider.name)
-        luassert.are.equal(deepseek.Client, getmetatable(provider))
+        luassert.are.equal("openai.skynet_compat", client.config.http_provider)
+        luassert.are.equal("https://api.deepseek.com", client.api_base)
+        luassert.are.equal("deepseek-flash", client.default_model)
         luassert.are.equal("你好", text)
         luassert.are.same({ "你", "好" }, deltas)
 
-        local captured = fake.request_options
-        luassert.are.equal("https://api.deepseek.com/responses", captured.url)
+        local captured = fake.requests[1]
+        luassert.are.equal("https://api.deepseek.com", captured.target)
+        luassert.are.equal("/responses", captured.path)
         luassert.are.equal("Bearer secret", captured.headers.Authorization)
-        local payload = cjson.decode(fake.request_body)
+        local payload = cjson.decode(captured.body)
         luassert.are.equal("deepseek-flash", payload.model)
         luassert.is_true(payload.stream)
         luassert.is_nil(payload.previous_response_id)
@@ -75,9 +87,9 @@ describe("llm.deepseek", function()
                 cjson.encode({ error = { message = "invalid api key" } }),
             },
         })
-        local provider = new_provider(fake:as_provider())
+        local client = new_client(fake)
 
-        local text, err = provider:stream_response({
+        local text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -101,8 +113,8 @@ describe("llm.deepseek", function()
                 }),
             },
         })
-        local provider = new_provider(incomplete:as_provider())
-        local text, err = provider:stream_response({
+        local client = new_client(incomplete)
+        local text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -121,8 +133,8 @@ describe("llm.deepseek", function()
                 }),
             },
         })
-        provider = new_provider(failed:as_provider())
-        text, err = provider:stream_response({
+        client = new_client(failed)
+        text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -138,8 +150,8 @@ describe("llm.deepseek", function()
                 }),
             },
         })
-        provider = new_provider(error_event:as_provider())
-        text, err = provider:stream_response({
+        client = new_client(error_event)
+        text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -152,9 +164,9 @@ describe("llm.deepseek", function()
         local fake = FakeHttp.new({
             chunks = { completed_event() },
         })
-        local provider = new_provider(fake:as_provider())
+        local client = new_client(fake)
 
-        local text, err = provider:stream_response({
+        local text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -169,9 +181,9 @@ describe("llm.deepseek", function()
                 event({ type = "response.output_text.delta", delta = "partial" }),
             },
         })
-        local provider = new_provider(fake:as_provider())
+        local client = new_client(fake)
 
-        local text, err = provider:stream_response({
+        local text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
         end)
@@ -186,9 +198,9 @@ describe("llm.deepseek", function()
                 event({ type = "response.output_text.delta", delta = "partial" }),
             },
         })
-        local provider = new_provider(fake:as_provider())
+        local client = new_client(fake)
 
-        local text, err = provider:stream_response({
+        local text, err = llm.stream_responses(client, {
             { role = "user", content = "hello" },
         }, function()
             error("consumer failed")
@@ -201,14 +213,38 @@ describe("llm.deepseek", function()
         luassert.is_not_matches("secret", error_message)
     end)
 
-    it("DeepSeek 配置缺少必填字段时拒绝创建", function()
-        ---@diagnostic disable-next-line: missing-fields
-        local ok, err = pcall(deepseek.new, {
-            api_key = "secret",
-            base_url = "https://api.deepseek.com",
-        })
-
+    it("LLM 配置无效时使用通用错误", function()
+        local ok, err = pcall(llm.new, "invalid")
         luassert.is_false(ok)
-        luassert.matches("DeepSeek model 不能为空", tostring(assert(err)))
+        luassert.matches("LLM 配置必须是 table", tostring(assert(err)))
+
+        local cases = {
+            {
+                config = {
+                    base_url = "https://api.deepseek.com",
+                    model = "deepseek-flash",
+                },
+                error = "LLM API Key 不能为空",
+            },
+            {
+                config = {
+                    api_key = "secret",
+                    model = "deepseek-flash",
+                },
+                error = "LLM base_url 不能为空",
+            },
+            {
+                config = {
+                    api_key = "secret",
+                    base_url = "https://api.deepseek.com",
+                },
+                error = "LLM model 不能为空",
+            },
+        }
+        for _, test_case in ipairs(cases) do
+            ok, err = pcall(llm.new, test_case.config)
+            luassert.is_false(ok)
+            luassert.matches(test_case.error, tostring(assert(err)))
+        end
     end)
 end)

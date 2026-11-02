@@ -1,47 +1,28 @@
-local url = require("socket.url")
-local cjson = require("cjson")
+local ltn12 = require("openai.ltn12")
+local url = require("openai.url")
+
+---@alias openai.skynet_compat.Headers table<string, string|number>
+
+---@class openai.skynet_compat.RequestOptions
+---@field url string
+---@field method string
+---@field headers? openai.skynet_compat.Headers
+---@field source? openai.ltn12.Source
+---@field sink? openai.ltn12.Sink
+
+---@class openai.skynet_compat.ResponseStream
+---@field status integer
+---@field header? table<string, string>
+---@field close fun(self: openai.skynet_compat.ResponseStream)
 
 local module = {}
 
----@alias openai.skynet_http.Headers table<string, string|number>
-
----@class openai.skynet_http.RequestOptions
----@field url string
----@field method string
----@field headers? openai.skynet_http.Headers
----@field source? ltn12.Source
----@field sink? ltn12.Sink
-
----@alias openai.skynet_http.Options openai.skynet_http.RequestOptions
-
----@class openai.skynet_http.ResponseStream
----@field status integer
----@field header? table<string, string>
----@field close fun(self: openai.skynet_http.ResponseStream)
-
----@class openai.skynet_http.Httpc
-local Httpc = {}
-
----@param method string
----@param target string
----@param path string
----@param recv_headers openai.skynet_http.Headers?
----@param headers openai.skynet_http.Headers
----@param body string?
----@return openai.skynet_http.ResponseStream|nil
-function Httpc.request_stream(method, target, path, recv_headers, headers, body)
-    error("Skynet Httpc 只能用于接口声明", 0)
+function module.install()
+    package.loaded["ltn12"] = ltn12
+    package.loaded["socket.url"] = url
 end
 
----@class openai.skynet_http.Provider
----@field httpc openai.skynet_http.Httpc
----@field request fun(self: openai.skynet_http.Provider, options: openai.skynet_http.Options): integer?, any, table?
-
-local Provider = {}
-Provider.__index = Provider
-module.Provider = Provider
-
----@param source ltn12.Source?
+---@param source openai.ltn12.Source?
 ---@return string|nil
 ---@return string|nil
 local function read_source(source)
@@ -63,8 +44,8 @@ local function read_source(source)
     return table.concat(chunks)
 end
 
----@param headers openai.skynet_http.Headers?
----@return openai.skynet_http.Headers
+---@param headers openai.skynet_compat.Headers?
+---@return openai.skynet_compat.Headers
 local function request_headers(headers)
     local result = {}
     for name, value in pairs(headers or {}) do
@@ -77,7 +58,7 @@ local function request_headers(headers)
     return result
 end
 
----@param sink ltn12.Sink
+---@param sink openai.ltn12.Sink
 ---@return integer|nil
 ---@return string|nil
 local function write_sink(sink)
@@ -88,11 +69,11 @@ local function write_sink(sink)
     return ok
 end
 
----@param options openai.skynet_http.RequestOptions
+---@param options openai.skynet_compat.RequestOptions
 ---@return integer|nil
 ---@return any
 ---@return table<string, string>|nil
-function Provider:request(options)
+function module.request(options)
     assert(type(options) == "table", "HTTP request options 必须是 table")
     assert(type(options.url) == "string" and options.url ~= "", "HTTP request URL 不能为空")
     assert(type(options.method) == "string" and options.method ~= "", "HTTP request method 不能为空")
@@ -110,21 +91,15 @@ function Provider:request(options)
     local headers = request_headers(options.headers)
     headers.Host = parsed.authority
 
-    if body then
-        local decoded_ok, decoded = pcall(cjson.decode, body)
-        if decoded_ok and type(decoded) == "table" and decoded.stream == true then
-            headers.Accept = "text/event-stream"
-        end
-    end
-
     local path = parsed.path
     if parsed.query then
         path = path .. "?" .. parsed.query
     end
     local target = parsed.scheme .. "://" .. parsed.authority
+    local httpc = require("http.httpc")
 
     local request_ok, stream = pcall(
-        self.httpc.request_stream,
+        httpc.request_stream,
         options.method,
         target,
         path,
@@ -164,23 +139,6 @@ function Provider:request(options)
     end
 
     return 1, status, response_headers
-end
-
----@param httpc openai.skynet_http.Httpc
----@return openai.skynet_http.Provider
-function module.new(httpc)
-    assert(type(httpc) == "table", "httpc 必须是 table")
-    return setmetatable({
-        httpc = httpc,
-    }, Provider)
-end
-
----@param options openai.skynet_http.RequestOptions
----@return integer|nil
----@return any
----@return table<string, string>|nil
-function module.request(options)
-    return module.new(require("http.httpc")):request(options)
 end
 
 return module
