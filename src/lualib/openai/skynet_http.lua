@@ -1,5 +1,7 @@
-local parse_url = require("socket.url").parse
+local url = require("socket.url")
 local cjson = require("cjson")
+
+local module = {}
 
 ---@alias openai.skynet_http.Headers table<string, string|number>
 
@@ -37,6 +39,7 @@ end
 
 local Provider = {}
 Provider.__index = Provider
+module.Provider = Provider
 
 ---@param source ltn12.Source?
 ---@return string|nil
@@ -94,7 +97,7 @@ function Provider:request(options)
     assert(type(options.url) == "string" and options.url ~= "", "HTTP request URL 不能为空")
     assert(type(options.method) == "string" and options.method ~= "", "HTTP request method 不能为空")
 
-    local parsed, parse_error = parse_url(options.url)
+    local parsed, parse_error = url.parse(options.url)
     if not parsed then
         return nil, "解析 HTTP URL 失败: " .. tostring(parse_error)
     end
@@ -162,8 +165,6 @@ function Provider:request(options)
 
     return 1, status, response_headers
 end
-
-local module = {}
 
 ---@param httpc openai.skynet_http.Httpc
 ---@return openai.skynet_http.Provider

@@ -9,6 +9,14 @@ local function event_data(event)
 end
 
 describe("openai.sse", function()
+    it("使用可热更新的共享 Parser 类表", function()
+        local parser = sse.new_parser(function()
+        end)
+
+        luassert.are.equal(sse.Parser, getmetatable(parser))
+        luassert.are.equal(sse.Parser.feed, parser.feed)
+    end)
+
     it("处理跨 chunk、CRLF 和连续事件", function()
         local events = {}
         local filter = sse.create_stream_filter(function(event)

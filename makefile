@@ -43,7 +43,7 @@ endif
 BUSTED_LPATH := ./src/lualib/?.lua;./src/lualib/?/init.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
 BUSTED_CPATH := ./luaclib/?.so
 
-.PHONY: help build check check-format test test-live cjson \
+.PHONY: help build check check-format test test-hotfix-watch test-hotfix-runtime test-live cjson \
 	linux macosx freebsd mingw check-openssl mingw-cjson mingw-tls \
 	clean cleanall
 
@@ -143,7 +143,13 @@ test-live: build
 check-format:
 	@"$(PROJECT_ROOT)/tools/check_format.sh"
 
-check: check-format test
+test-hotfix-watch:
+	@"$(PROJECT_ROOT)/tests/integration/hotfix_watch_smoke.sh"
+
+test-hotfix-runtime:
+	@"$(PROJECT_ROOT)/tests/integration/hotfix_runtime_smoke.sh"
+
+check: check-format test test-hotfix-watch test-hotfix-runtime
 
 clean:
 	@-$(MAKE) -C "$(SKYNET_DIR)" clean

@@ -55,6 +55,7 @@ describe("llm.deepseek", function()
 
         luassert.is_nil(err)
         luassert.are.equal("deepseek", provider.name)
+        luassert.are.equal(deepseek.Client, getmetatable(provider))
         luassert.are.equal("你好", text)
         luassert.are.same({ "你", "好" }, deltas)
 

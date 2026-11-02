@@ -35,6 +35,7 @@ describe("openai.skynet_http", function()
         local output = {}
         local ok, status, headers = provider:request(request_options(ltn12.sink.table(output)))
 
+        luassert.are.equal(skynet_http.Provider, getmetatable(provider))
         luassert.are.equal(1, ok)
         luassert.are.equal(200, status)
         luassert.are.equal("text/event-stream", assert(headers)["content-type"])

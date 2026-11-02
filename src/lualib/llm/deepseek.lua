@@ -3,6 +3,8 @@ local llm = require("llm.base")
 
 local DEFAULT_HTTP_PROVIDER = "openai.skynet_http"
 
+local module = {}
+
 ---@alias llm.deepseek.HttpProvider string|table
 
 ---@class llm.deepseek.Config
@@ -11,16 +13,18 @@ local DEFAULT_HTTP_PROVIDER = "openai.skynet_http"
 ---@field model string
 ---@field http_provider? llm.deepseek.HttpProvider
 
----@class llm.deepseek.Provider: llm.Provider
+---@class llm.deepseek.Client: llm.Provider
 ---@field name string
 ---@field base_url string
 ---@field model string
 ---@field http_client llm.ResponsesClient
 
+---@type llm.deepseek.Client
 local Client = setmetatable({}, {
     __index = llm.Provider,
 })
 Client.__index = Client
+module.Client = Client
 
 ---@param input llm.Message[]
 ---@param on_text_delta llm.OnTextDelta
@@ -29,8 +33,6 @@ Client.__index = Client
 function Client:stream_response(input, on_text_delta)
     return llm.stream_responses(self.http_client, input, on_text_delta)
 end
-
-local module = {}
 
 ---@param config llm.deepseek.Config
 ---@return llm.Provider
@@ -76,7 +78,7 @@ function module.new(config)
         model = model,
         http_client = http_client,
     }, Client)
-    ---@cast provider llm.Provider
+    ---@cast provider llm.deepseek.Client
     return provider
 end
 
