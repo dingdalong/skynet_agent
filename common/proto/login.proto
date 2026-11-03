@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package skynet.agent.v1;
+
+import "common.proto";
+
+message LoginReq {}
+
+message LoginRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  SessionSnapshot snapshot = 4;
+}

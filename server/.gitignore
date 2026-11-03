@@ -1,0 +1,7 @@
+.env
+*.log
+*.pid
+*.dSYM/
+cservice/
+logs/
+luaclib/

@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package skynet.agent.v1;
+
+import "common.proto";
+
+message SessionCreateReq {}
+
+message SessionCreateRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  SessionSummary session = 4;
+  repeated ChatMessage messages = 5;
+}
+
+message SessionSelectReq {
+  string session_id = 2;
+}
+
+message SessionSelectRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  string session_id = 4;
+  repeated ChatMessage messages = 5;
+}
+
+message MessageSendReq {
+  string session_id = 2;
+  string text = 3;
+}
+
+enum MessageStatus {
+  MESSAGE_STATUS_UNSPECIFIED = 0;
+  MESSAGE_STATUS_STREAMING = 1;
+  MESSAGE_STATUS_COMPLETED = 2;
+  MESSAGE_STATUS_CANCELLED = 3;
+}
+
+message MessageSendRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  string session_id = 4;
+  string delta = 5;
+  ChatMessage message = 6;
+  MessageStatus status = 7;
+}
+
+message MessageCancelReq {
+  uint32 target_message_id = 2;
+}
+
+message MessageCancelRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+}

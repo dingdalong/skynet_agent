@@ -2,162 +2,151 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
 PROJECT_ROOT := $(CURDIR)
-SKYNET_DIR := $(PROJECT_ROOT)/3rd/skynet
-LUA_DIR := $(SKYNET_DIR)/3rd/lua
-CJSON_DIR := $(PROJECT_ROOT)/3rd/lua-cjson
-LUACLIB_DIR := $(PROJECT_ROOT)/luaclib
+SERVER_DIR := $(PROJECT_ROOT)/server
+CLIENT_DIR := $(PROJECT_ROOT)/client
 
-CC ?= cc
-BUSTED ?= busted
-UNAME_S := $(shell uname -s)
-MINGW_CC ?= x86_64-w64-mingw32-gcc
-
-ifeq ($(UNAME_S),Darwin)
-OPENSSL_PREFIX ?= $(shell brew --prefix openssl 2>/dev/null)
-DETECTED_PLATFORM := macosx
-CJSON_CFLAGS := -fPIC -pthread -DMULTIPLE_THREADS
-CJSON_LDFLAGS := -bundle -undefined dynamic_lookup -pthread
-else ifeq ($(UNAME_S),FreeBSD)
-OPENSSL_PREFIX ?= /usr/local
-DETECTED_PLATFORM := freebsd
-CJSON_CFLAGS := -fPIC -pthread -DMULTIPLE_THREADS
-CJSON_LDFLAGS := -shared -pthread
-else ifeq ($(UNAME_S),Linux)
-DETECTED_PLATFORM := linux
-CJSON_CFLAGS := -fPIC -pthread -DMULTIPLE_THREADS
-CJSON_LDFLAGS := -shared -pthread
-else
-DETECTED_PLATFORM := unsupported
-CJSON_CFLAGS := -fPIC -pthread -DMULTIPLE_THREADS
-CJSON_LDFLAGS := -shared -pthread
-endif
-
-ifeq ($(strip $(OPENSSL_PREFIX)),)
-OPENSSL_INCLUDE_DIR ?= /usr/include
-OPENSSL_LIB_DIR ?= /usr/lib
-else
-OPENSSL_INCLUDE_DIR ?= $(OPENSSL_PREFIX)/include
-OPENSSL_LIB_DIR ?= $(OPENSSL_PREFIX)/lib
-endif
-
-BUSTED_LPATH := ./src/lualib/?.lua;./src/lualib/?/init.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
-BUSTED_CPATH := ./luaclib/?.so
-
-.PHONY: help build check check-format test test-hotfix-watch test-hotfix-runtime test-live cjson \
-	linux macosx freebsd mingw check-openssl mingw-cjson mingw-tls \
-	clean cleanall
+.PHONY: server-status server-stop server-force-stop help build test check check-format clean cleanall check-all \
+	proto-generate proto-check \
+	server-build server-test server-check server-check-format server-start \
+	server-test-protobuf-shared server-test-agent-gateway server-test-hotfix-watch \
+	server-test-hotfix-runtime server-test-live server-clean server-cleanall \
+	server-test-service-runtime server-test-service-control \
+	ui-install ui-dev ui-desktop ui-storybook ui-check ui-check-format ui-build \
+	ui-build-desktop ui-e2e e2e
 
 help:
 	@printf '%s\n' \
-		"Skynet LLM agent" \
+		"Skynet Agent" \
 		"" \
-		"构建:" \
-		"  make build      当前平台构建（Linux/macOS/FreeBSD）" \
-		"  make linux      Linux 构建" \
-		"  make macosx     macOS 构建" \
-		"  make freebsd    FreeBSD 构建" \
-		"  make mingw      MinGW 交叉构建" \
+		"服务端:" \
+		"  make server-build                构建当前平台 Skynet 服务端" \
+		"  make server-test                 运行服务端单元测试" \
+		"  make server-check                运行服务端完整检查" \
+		"  make server-test-agent-gateway   运行假模型与四服务网关聊天测试" \
+		"  make server-start                使用 server/.env 启动服务端" \
+		"  make server-status               查询服务状态（CONTROL_PORT 可覆盖端口）" \
+		"  make server-stop                 关闭服务端进程" \
+		"  make server-force-stop           显式强制关闭服务端进程（含启动阶段）" \
+		"  make server-test-service-runtime 验证服务生命周期、RPC 与热修" \
+		"  make server-test-service-control 验证状态查询和进程关闭" \
+		"  make server-test-live            通过网关调用真实 DeepSeek" \
+		"  make server-clean                清理服务端编译产物" \
 		"" \
-		"检查:" \
-		"  make test       离线 Busted 单元测试" \
-		"  make test-live  调用真实 DeepSeek Responses API" \
-		"  make check      格式检查 + 离线单元测试" \
+		"客户端:" \
+		"  make proto-generate               从 common/proto 生成客户端协议代码" \
+		"  make proto-check                  检查共享 proto 与生成代码一致" \
+		"  make ui-install                  安装前端和桌面端依赖" \
+		"  make ui-dev                      启动 Web 开发服务器" \
+		"  make ui-desktop                  启动 Tauri 桌面客户端" \
+		"  make ui-check                    检查设计系统、客户端和 Storybook" \
+		"  make ui-build                    构建 Web 客户端" \
+		"  make ui-build-desktop            构建 macOS/桌面安装包" \
+		"  make ui-e2e                      运行快速 Mock UI 端到端测试" \
+		"  make e2e                         运行 Chromium 全链路端到端测试" \
 		"" \
-		"清理:" \
-		"  make clean      删除编译产物" \
-		"  make cleanall   删除编译产物及第三方增量产物"
+		"组合:" \
+		"  make check-all                   执行服务端检查和客户端检查" \
+		"  make check-format                检查两端源码格式" \
+		"  make build                       构建服务端，保持原有语义"
 
-build:
-ifeq ($(DETECTED_PLATFORM),unsupported)
-	@printf '%s\n' "当前系统不受支持，请显式选择 linux、macosx、freebsd 或 mingw" >&2
-	@exit 1
-else
-	@$(MAKE) $(DETECTED_PLATFORM)
-endif
+build: server-build
 
-check-openssl:
-	@if [ ! -f "$(OPENSSL_INCLUDE_DIR)/openssl/ssl.h" ]; then \
-		printf '%s\n' "未找到 OpenSSL 头文件，请设置 OPENSSL_PREFIX 或 OPENSSL_INCLUDE_DIR" >&2; \
-		exit 1; \
-	fi
+test: server-test
 
-linux macosx freebsd: check-openssl
-	@$(MAKE) -C "$(SKYNET_DIR)" "$@" \
-		TLS_MODULE=ltls \
-		TLS_INC="$(OPENSSL_INCLUDE_DIR)" \
-		TLS_LIB="$(OPENSSL_LIB_DIR)"
-	@$(MAKE) cjson
+check: server-check
 
-cjson:
-	@mkdir -p "$(LUACLIB_DIR)"
-	@$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
-	@$(MAKE) -C "$(CJSON_DIR)" \
-		TARGET="$(LUACLIB_DIR)/cjson.so" \
-		CC="$(CC)" \
-		LUA_INCLUDE_DIR="$(LUA_DIR)" \
-		CJSON_CFLAGS="$(CJSON_CFLAGS)" \
-		CJSON_LDFLAGS="$(CJSON_LDFLAGS)"
+check-format: server-check-format ui-check-format
 
-mingw: check-openssl mingw-tls
-	@$(MAKE) mingw-cjson
+clean: server-clean
 
-mingw-cjson:
-	@mkdir -p "$(LUACLIB_DIR)"
-	@$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
-	@$(MAKE) -C "$(CJSON_DIR)" \
-		TARGET="$(LUACLIB_DIR)/cjson.so" \
-		CC="$(MINGW_CC)" \
-		LUA_INCLUDE_DIR="$(LUA_DIR)" \
-		CJSON_CFLAGS="-DMULTIPLE_THREADS -pthread -DDISABLE_INVALID_NUMBERS" \
-		CJSON_LDFLAGS="-shared -pthread -Wl,--allow-shlib-undefined" \
-		LDFLAGS="-L$(LUA_DIR) -llua54"
+cleanall: server-cleanall
 
-mingw-tls:
-	@$(MAKE) -C "$(SKYNET_DIR)" -f mingw.mk all CC="$(MINGW_CC)"
-	@mkdir -p "$(SKYNET_DIR)/luaclib"
-	@$(MINGW_CC) -g -O2 -Wall -std=gnu99 \
-		-I"$(LUA_DIR)" \
-		-I"$(SKYNET_DIR)/skynet-src" \
-		-I"$(SKYNET_DIR)/3rd/compat-mingw" \
-		-include "$(SKYNET_DIR)/3rd/compat-mingw/compat.h" \
-		-I"$(OPENSSL_INCLUDE_DIR)" \
-		-fPIC --shared \
-		-Wl,--export-all-symbols,--enable-auto-import,--allow-shlib-undefined,--unresolved-symbols=ignore-all \
-		"$(SKYNET_DIR)/lualib-src/ltls.c" \
-		-o "$(SKYNET_DIR)/luaclib/ltls.so" \
-		-L"$(LUA_DIR)" -llua54 \
-		-L"$(SKYNET_DIR)" -lskynet \
-		-L"$(OPENSSL_LIB_DIR)" -lssl -lcrypto \
-		-lws2_32 -lcrypt32 -static-libgcc
+check-all: server-check ui-check
 
-test: cjson
-	@command -v "$(BUSTED)" >/dev/null 2>&1 || { \
-		printf '%s\n' "未找到 busted，请先运行 luarocks install busted" >&2; \
-		exit 1; \
-	}
-	@"$(BUSTED)" --lpath="$(BUSTED_LPATH)" --cpath="$(BUSTED_CPATH)" tests/unit
+proto-generate:
+	@pnpm --dir "$(CLIENT_DIR)" proto:generate
 
-test-live: build
-	@"$(PROJECT_ROOT)/tests/integration/live_smoke.sh"
+proto-check:
+	@pnpm --dir "$(CLIENT_DIR)" proto:check
 
-check-format:
-	@"$(PROJECT_ROOT)/tools/check_format.sh"
+server-build:
+	@$(MAKE) -C "$(SERVER_DIR)" build
 
-test-hotfix-watch:
-	@"$(PROJECT_ROOT)/tests/integration/hotfix_watch_smoke.sh"
+server-test:
+	@$(MAKE) -C "$(SERVER_DIR)" test
 
-test-hotfix-runtime:
-	@"$(PROJECT_ROOT)/tests/integration/hotfix_runtime_smoke.sh"
+server-check:
+	@$(MAKE) -C "$(SERVER_DIR)" check
 
-check: check-format test test-hotfix-watch test-hotfix-runtime
+server-check-format:
+	@$(MAKE) -C "$(SERVER_DIR)" check-format
 
-clean:
-	@-$(MAKE) -C "$(SKYNET_DIR)" clean
-	@-$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
-	@rm -f "$(LUACLIB_DIR)/cjson.so"
-	@-rmdir "$(LUACLIB_DIR)" 2>/dev/null || true
+server-start:
+	@"$(SERVER_DIR)/start.sh"
 
-cleanall:
-	@-$(MAKE) -C "$(SKYNET_DIR)" cleanall
-	@-$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
-	@rm -rf "$(LUACLIB_DIR)"
+server-test-protobuf-shared:
+	@$(MAKE) -C "$(SERVER_DIR)" test-protobuf-shared
+
+server-status:
+	@"$(SERVER_DIR)/control.sh" status $(CONTROL_PORT)
+
+server-stop:
+	@"$(SERVER_DIR)/control.sh" stop $(CONTROL_PORT)
+
+server-force-stop:
+	@"$(SERVER_DIR)/control.sh" force-stop $(CONTROL_PORT)
+
+server-test-agent-gateway:
+	@$(MAKE) -C "$(SERVER_DIR)" test-agent-gateway
+
+server-test-hotfix-watch:
+	@$(MAKE) -C "$(SERVER_DIR)" test-hotfix-watch
+
+server-test-hotfix-runtime:
+	@$(MAKE) -C "$(SERVER_DIR)" test-hotfix-runtime
+
+server-test-service-runtime:
+	@$(MAKE) -C "$(SERVER_DIR)" test-service-runtime
+
+server-test-service-control:
+	@$(MAKE) -C "$(SERVER_DIR)" test-service-control
+
+server-test-live:
+	@$(MAKE) -C "$(SERVER_DIR)" test-live
+
+server-clean:
+	@$(MAKE) -C "$(SERVER_DIR)" clean
+
+server-cleanall:
+	@$(MAKE) -C "$(SERVER_DIR)" cleanall
+
+ui-install:
+	@pnpm --dir "$(CLIENT_DIR)" install
+
+ui-dev:
+	@pnpm --dir "$(CLIENT_DIR)" dev
+
+ui-desktop:
+	@pnpm --dir "$(CLIENT_DIR)" dev:desktop
+
+ui-storybook:
+	@pnpm --dir "$(CLIENT_DIR)" storybook
+
+ui-check:
+	@pnpm --dir "$(CLIENT_DIR)" check
+	@pnpm --dir "$(CLIENT_DIR)" --filter @skynet/design-system build-storybook
+
+ui-check-format:
+	@"$(CLIENT_DIR)/tools/check_format.sh"
+
+ui-build:
+	@pnpm --dir "$(CLIENT_DIR)" build
+
+ui-build-desktop:
+	@pnpm --dir "$(CLIENT_DIR)" build:desktop
+
+ui-e2e:
+	@pnpm --dir "$(CLIENT_DIR)" test:e2e
+
+e2e:
+	@pnpm --dir "$(CLIENT_DIR)" test:e2e:full

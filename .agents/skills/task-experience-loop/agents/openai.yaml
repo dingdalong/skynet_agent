@@ -1,0 +1,6 @@
+interface:
+  display_name: "任务经验闭环"
+  short_description: "Capture verified fixes and prevent repeated mistakes"
+  default_prompt: "Use $task-experience-loop to reuse prior lessons and record verified fixes while completing this task."
+policy:
+  allow_implicit_invocation: true

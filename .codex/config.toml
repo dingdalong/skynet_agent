@@ -1,0 +1,3 @@
+# 本项目使用统一电脑操作插件验证 Web 与 macOS 客户端。
+[plugins."unified-computer-use@openai-bundled"]
+enabled = true

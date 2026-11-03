@@ -2,67 +2,254 @@
 
 基于 Skynet 的 Agent。
 
+## 跨平台客户端
+
+客户端使用 Vue 3、TypeScript、Tauri 2 和 `@skynet/design-system`。Web 与 macOS 共享同一套界面，
+Windows、Linux、iOS、Android 通过相同平台适配层扩展。整个客户端采用 Beautiful UI Vue 的设计语言，
+共享本地 Inter、JetBrains Mono 字体及基础组件，通过设计 Token 统一主题；宿主行为遵循平台规范，无障碍以 WCAG 2.2 AA 为底线。
+
+前端代码、依赖和产物统一位于 `client/`，Skynet 服务端及第三方子模块统一位于 `server/`。
+根目录提供以下统一命令：
+
+```bash
+make ui-install
+make ui-dev
+make proto-generate
+make server-build
+make server-start
+make ui-e2e
+make e2e
+```
+
+Web 开发监听端口见 [`client/vite.config.ts`](client/vite.config.ts)，启动后终端会显示访问地址。
+后台需要先启动 Agent WebSocket 网关：
+
+```bash
+make server-start
+```
+
+macOS 客户端使用：
+
+```bash
+make ui-desktop
+```
+
+设计规范位于 [`docs/design`](docs/design)，组件与视觉样例通过以下命令查看：
+
+```bash
+make ui-storybook
+```
+
+客户端连接地址通过 `client/.env.local` 的 `VITE_AGENT_WS_URL` 覆盖，配置示例见
+[`client/.env.example`](client/.env.example)。网关监听地址由服务端渠道配置指定。
+生产环境必须在反向代理终止 TLS，并使用 `wss://`。
+WebSocket 使用二进制 Protobuf 消息；共享 schema 位于 `common/proto`，客户端生成代码位于
+`client/src/protocol/generated/`。
+
 ## 配置
 
-将 `.env.example` 复制为 `.env`，填写 DeepSeek 配置：
+将 `server/.env.example` 复制为 `server/.env`，填写 DeepSeek API Key 并选择渠道：
 
 ```dotenv
-DEEPSEEK_BASE_URL=https://api.deepseek.com
+SKYNET_CFG_CHANNEL=develop
 DEEPSEEK_API_KEY=your-api-key
-DEEPSEEK_MODEL=deepseek-flash
 ```
+
+服务器运行参数位于 `server/etc/cfg`。`init.lua` 会按 `SKYNET_CFG_CHANNEL` 加载
+`channel/<name>.lua`，再与 `common.lua` 深度合并并统一校验；未设置渠道时使用 `develop`。
+监听地址、端口、WebSocket 路径、服务实例数、登录超时、模型请求超时、
+对话消息限制和模型参数都从这里配置。超时字段以 `_ticks` 结尾，单位为厘秒。
+三类服务实例数默认取 Skynet 工作线程数，渠道配置可以分别覆盖。
 
 当前接入的是 DeepSeek；`llm.base.new` 负责构造 OpenAI 兼容客户端，
 `llm.base.stream_responses` 统一处理 Responses API 流事件。
 
-`.env` 使用 shell 兼容语法，只在本机保存，不提交真实密钥。
-Skynet 运行日志写入 `logs/skynet.log`，对话内容输出到 stdout，错误写入 stderr。
+`server/.env` 使用 shell 兼容语法，只保存本机密钥和渠道选择，不提交真实密钥。
+Skynet 运行日志写入 `server/logs/skynet.log`，网关日志输出到 stdout 和 stderr。模型密钥只由
+Skynet 进程读取，不进入客户端。
+
+## 模型连续对话
+
+`agent.conversation` 导出 Conversation 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
+构造时传入的 system prompt 会作为首条 `role=system` 消息发送，不使用 Responses API 的
+顶层 `instructions` 参数。
+
+```lua
+local Conversation = require("agent.conversation")
+
+local conversation = Conversation:new({
+    api_key = api_key,
+    base_url = base_url,
+    model = model,
+    request_timeout_ticks = request_timeout_ticks,
+}, "你是一个简洁、可靠的中文助手。")
+
+local text, err = conversation:chat("介绍一下 Lua", function(delta)
+    io.write(delta)
+end)
+```
+
+运行时可通过 `conversation:set_llm(llm_config)` 更新配置。切换后已有历史保持不变，
+下一次 `chat` 使用新配置重新创建 LLM 客户端。同一个 Conversation 对象的 `chat` 和 `set_llm`
+需要由调用方串行执行。
+
+## Agent WebSocket 网关
+
+默认启动模式是 WebSocket 网关。客户端协议、并发、取消与安全边界见
+[`docs/architecture/AGENT_GATEWAY.md`](docs/architecture/AGENT_GATEWAY.md)。
+
+`main` 统一创建、初始化和回收服务，固定单例 `gateway` 监听端口并分发连接；
+`websocket`、`logind` 和 `client` 分别组成工作池。
+三类工作池默认按 Skynet 工作线程数启动实例，也可在渠道配置中分别覆盖为 1 到 32。
+生产反向代理配置 WSS 后转发到 `agent_gateway.socket` 指定的地址和端口。
+
+客户端连接后先发送 `LoginReq`。连接未绑定 client 服务时，`websocket` 同步调用 `logind` 完成登录；
+`logind` 分配 client 服务、调用 `client.open` 获取会话快照，再同步调用 `websocket` 的通用绑定和响应
+接口发送 `LoginRes`。绑定后所有消息直接转交该 client 服务。一个连接固定使用同一个 client 服务，单个 client 服务
+可以承载多个连接。
+
+`client` 表示客户端业务承载服务，`connection` 表示单条连接上下文，`session` 表示聊天会话，
+`Conversation` 表示模型调用与历史管理对象。`Agent` 保留给智能体业务，`user` 保留给用户身份；
+当前尚未引入独立的智能体实体或用户账号。服务池实例数表示承载容量。
+
+协议按公共、登录和 Agent 会话拆分在 `common/proto`。每个 WebSocket 二进制消息由 9 字节头
+和 Protobuf args 组成：压缩标志、消息 ID、完整消息类型名的 FNV-1a 32 位哈希。WebSocket
+本身提供消息边界、长度和分帧重组，因此不增加应用层长度字段。当前不启用业务压缩，压缩标志
+必须为 0。消息 ID 在连接内严格递增，普通响应复用请求 ID，流式回答的所有帧复用原发送请求 ID。
+当前 WebSocket 入站消息上限为 256 KiB，客户端文本输入限制由 `etc/cfg` 配置；附件和大文件
+后续使用独立 HTTP 数据通道，不把大块数据塞入单个 WebSocket 消息。
+
+修改 proto 后重新生成单个客户端协议模块并检查一致性：
+
+```bash
+make proto-generate
+make proto-check
+```
+
+## Protobuf 编解码
+
+`helper.protobuf` 接收 schema 目录，并加载目录第一层的全部 `.proto`：
+
+```lua
+local protobuf = require("helper.protobuf")
+
+protobuf.load("schemas")
+
+local data = protobuf.encode("agent.Message", {
+    text = "hello",
+    count = 1,
+})
+local message = protobuf.decode("agent.Message", data)
+```
+
+文件按名称排序后通过标准 import 关系一次加载。目录中存在 `pb.bytes` 时只加载该预编译
+FileDescriptorSet，不再扫描或校验 proto；`pb.bytes` 必须使用 `--include_imports` 生成。
+多个 proto 仍编译为这一个预编译文件。接口失败采用 Lua error，需要捕获时由调用方使用
+`pcall`。
+
+`main` 显式加载 `protocol.agent_gateway_schema_dir`，并在进程生命周期内持有唯一共享 schema。
+其他服务在初始化时调用 `helper.protobuf.attach()` 接入只读 schema，不能再次加载或修改它。
+`network.protocol` 独立负责 9 字节帧与类型哈希映射，每个 WebSocket 服务都在自己的 VM 中创建和
+初始化该协议对象。模块 require 本身不加载文件或切换 Protobuf 状态。
+
+schema、helper 公开接口或 `pb.so` 发生变化时必须重启进程。共享 schema 的持有者不能提前退出。
+
+## 服务基础层与管理
+
+业务服务共用 `src/service/init.lua`，入口调用 `service.start(SERVICE_NAME)`。
+业务类通过 `commands` 声明命令白名单，
+方法接收包含 `source`、`session` 的上下文。基础层统一处理初始化、状态、关闭、异常和热修注册。
+内部消息统一经过 `rpc`，固定使用 Lua 协议，调用返回 `状态码, 业务结果...`。
+`rpc.call` 带默认超时，`call_no_timeout` 持续等待远端完成，`send` 用于异步发送。
+RPC 不自动重试；超时只结束调用方等待，不代表远端工作已经取消。启动和关闭统一使用无超时调用。
+
+`main` 先开放本机控制台，再按 `client → logind → websocket → gateway` 初始化，依赖全部就绪后
+才开放业务监听。初始化期间只额外允许显式强制关闭命令。
+服务注册为 `.client_1`、`.logind_1`、`.websocket_1` 等，网关注册为 `.gateway`。
+启动失败会清理已创建服务；关闭时逆序停止接入、关闭连接、取消生成，并等待在途命令和后台请求收尾。
+启动和关闭均不设超时，重复关闭等待同一次清理结果。清理完成后统一退出进程，成功退出码为 0，
+失败为 1。异常情况下可以显式强制关闭，跳过清理并以退出码 1 结束进程。
+服务重启由外部进程管理器负责。
+
+模型响应流支持主动取消；连接建立或等待响应头期间先标记取消，取得响应流后立即释放，
+模型请求本身的超时仍然生效，关服等待不另设截止时间。
+
+```bash
+make server-status
+make server-stop
+make server-force-stop
+```
+
+管理命令通过仅监听回环地址的 Skynet 控制台访问 `.main`；控制台端口由
+`runtime.control_port` 配置。命令可以用 `CONTROL_PORT=<端口>` 覆盖连接目标。
+`stop` 的控制台响应只表示命令已接收；进程退出码表示最终清理结果。
+`force-stop` 可在启动卡住、正常运行或关服等待期间由异常处理脚本显式调用，不会自动触发。
+也可直接执行 `server/control.sh force-stop <控制台端口>`。
+
+服务端以服务为主体组织：`src/service/<name>/<name>.lua` 返回服务稳定类表，使用服务名作为唯一模块名。
+Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader 提供的 `SERVICE_NAME` 加载业务主体。
+`gateway`、`websocket`、`logind`、`client` 分别管理接入、连接、登录和会话业务。
+
+`src/lualib/` 保存服务创建的对象和公共模块：`client/` 保存连接上下文，`agent/` 保存模型对话对象，`network/` 保存协议对象，
+`base/` 提供生命周期、RPC、日志与热修，`helper/` 提供 Protobuf、服务池和开发渠道热修监听。
+`src/main.lua` 通过 `node.init(callback)` 定制业务 schema、服务数量、依赖顺序和初始化参数。
+`node` 在回调前启动公共服务，业务启动完成后进入就绪状态，统一处理服务登记、状态查询和进程关闭。
+未来其他节点可在各自的 main 中传入启动回调，复用相同的公共流程。
+回调接收节点实例，使用 `instance:launch(name, count, params, registered_name)` 创建并初始化服务，
+默认注册名为 `.<name>_<index>`；单实例可显式指定名称，例如网关的 `.gateway`。
+
+`base/` 已加入模块搜索路径，基础模块直接使用 `require("class")`、`require("rpc")` 等短名加载。
+统一预加载脚本在每个服务 VM 启动时加载 `luaext.table`，将复制工具扩展到标准库，业务代码直接调用
+`table.copy` 和 `table.deep_copy`。Busted 使用同一预加载脚本作为 helper，在加载测试前初始化扩展。
 
 ## 热更新
 
 热更新只用于修复缺陷。功能、公开接口、持久数据格式和第三方库升级仍通过重启发布。
-当前 `main` 是一次性演示服务，不启用热更新；以下接入方式面向后续长期服务。
-
-长期服务在启动时注册热更新调试命令：
-
-```lua
-local skynet = require("skynet")
-local hotfix = require("base.hotfix")
-
-skynet.start(function()
-    hotfix.install_debug_command()
-    -- 初始化长期服务
-end)
-```
+基于 `service` 启动的服务会自动注册热修调试命令。
 
 长期对象只在实例字段保存数据，方法放在模块返回的共享类表中。已有实例的 metatable 必须指向该稳定类表，
 不得在实例字段或长期闭包中缓存方法函数。完整编码约束见 [`AGENTS.md`](AGENTS.md)。
 
 已经进入执行的方法继续运行旧字节码；热修完成后的新方法调用使用新实现。服务、对象和数据不会重建。
+`node.Node` 导出的公共运行期方法可通过 `dbgcmd .main HOTFIX node` 修复缺陷。
+主入口回调只在启动时执行，不保存到节点实例；业务编排与公共启动流程的调整通过重启生效。
 
-开发环境启动 `debug_console` 后，可以直接发送模块名：
+`develop` 渠道在业务服务启动完成后自动监听 `server/src`，保存兼容的方法修改即可热修，
+无需额外运行监听脚本。节点每 500ms 比较源码内容，连续保存稳定至少 200ms 后合并为一个批次。
+监听覆盖 `.main` 和节点登记的全部已就绪服务实例，运行期通过 `Node:launch` 创建的实例也会加入后续批次；
+其他渠道不自动监听。首次启用监听器需重启进程。
+
+库文件转换为对应模块名，基础目录使用短模块名，服务主体使用服务名，例如
+`lualib/client/connection.lua` 对应 `client.connection`，`lualib/base/rpc.lua` 对应 `rpc`，
+`service/websocket/websocket.lua` 对应 `websocket`。主入口、公共服务入口、热修器、监听器自身、
+预加载脚本和 `luaext/` 不进入热修；这些代码以及配置、schema、新增或删除文件的变更通过重启生效。
+
+通知服务前，节点先编译整批源码，包括此前失败保留的模块。预检查只检查语法，不执行模块顶层；
+任一文件编译失败，整个批次都不分发，修正后保存会连同其它待更新文件一起重试。
+编译通过后，各 VM 继续执行模块、校验返回值与结构兼容性，整批通过才原位替换方法。
+某实例校验失败或响应超时，会保留该实例的整个待更新批次，后续源码变更时合并重试；静止文件不会重复刷错。
+
+服务只返回结果，节点统一记录一次实际更新的文件列表，路径去重并排序；未加载模块不会出现在更新列表中，
+全部跳过时不记录成功日志。预检查或服务更新失败也只由节点汇总一次，包含文件位置或失败实例及原因；
+部分成功时明确标记“部分更新”。各 VM 的更新结果独立，不保证跨 VM 同时生效。
+关闭节点时先停止监听并等待当前批次结束，再回收业务服务。
+
+也可以通过 `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .agent HOTFIX llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
+dbgcmd .client_1 HOTFIX client client.connection agent.conversation llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
 ```
 
-文件监听工具基于 POSIX 文件时间和内容校验，不需要额外的 Lua C 模块：
-
-```bash
-./tools/watch_hotfix.sh .agent 8000
-```
-
-服务地址使用 Skynet 注册名（以 `.` 开头）或数字地址（以 `:` 开头）。watcher 默认监听
-`src/lualib/**/*.lua`；连续保存会合并为一次热更新。模块加载、方法集合或数据字段校验失败时，
-服务保留旧实现。
+服务地址使用 Skynet 注册名（以 `.` 开头）或数字地址（以 `:` 开头）。手动命令只更新指定 VM，
+模块未加载时会返回 `skipped`，不能据此判断其他服务实例已经更新。
 
 ## 构建与运行
 
 构建前需安装 OpenSSL(版本3以上) 开发文件；MinGW 交叉构建还需指向 MinGW 版本的 OpenSSL。
 
 ```bash
-make build
-./start.sh
+make server-build
+make server-start
 ```
 
 ## 测试
@@ -70,16 +257,45 @@ make build
 单元测试使用 Busted，需要提前运行 `luarocks install busted`：
 
 ```bash
-make check
+make server-check
 ```
 
-`make check` 同时运行单元测试、watcher 烟雾测试和真实 Skynet 进程测试；`make test` 只运行
-Busted 单元测试。
+`make server-check` 同时运行单元测试、Protobuf 跨 VM、服务生命周期与 RPC、管理命令、
+热修和假模型全链路测试；`make server-test` 只运行 Busted 单元测试。
 
-真实接口冒烟测试会读取 `.env` 并消耗少量 API 额度：
+`make server-test-hotfix-watch` 在隔离源码副本中启动开发渠道，建立真实 WebSocket 连接后保存方法修改，
+验证前置编译、单次文件日志、全部实例自动更新、会话历史保留和失败批次重试。
+
+确定性网关测试会启动本地假模型和四服务网关，覆盖登录、建会话、流式聊天、上下文、取消、
+供应商失败、停滞流超时和协议错误：
 
 ```bash
-make test-live
+make server-test-agent-gateway
 ```
+
+`make ui-e2e` 使用前端 Mock 二进制通道快速验证 Chromium、WebKit 和移动视口布局。`make e2e`
+使用真实 WebSocket、Skynet 网关和本地假模型，仅在 Chromium 桌面验证完整聊天链路：
+
+```bash
+make ui-e2e
+make e2e
+```
+
+全链路测试使用 `server/etc/cfg/channel/test.lua` 与本地假模型，不调用付费模型。
+执行前需要已完成服务端构建，并已安装客户端依赖和 Playwright 浏览器。
+
+真实接口冒烟测试通过正式 WebSocket 网关调用模型，会读取 `server/.env` 并消耗少量 API 额度：
+
+```bash
+make server-test-live
+```
+
+前端、设计系统和 Storybook 检查：
+
+```bash
+make ui-check
+```
+
+`make ui-check` 同时检查共享 proto 与客户端生成代码是否一致。
 
 静态诊断统一使用 VS Code 的 sumneko.lua 插件；`.luarc.json` 固定 Lua 5.5 并启用代码风格检查。

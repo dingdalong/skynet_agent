@@ -1,0 +1,9 @@
+packages:
+  - packages/design-system
+
+storeDir: .pnpm-store
+
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true

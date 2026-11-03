@@ -16,6 +16,10 @@ trim_trailing_whitespace = false
 indent_style = space
 indent_size = 2
 
+[*.{css,html,js,mjs,json,proto,ts,vue,yaml,yml}]
+indent_style = space
+indent_size = 2
+
 [{makefile,Makefile}]
 indent_style = tab
 indent_size = 4

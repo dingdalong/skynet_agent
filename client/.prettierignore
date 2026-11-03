@@ -1,0 +1,14 @@
+.pnpm-store/
+dist/
+playwright-report/
+src-tauri/gen/
+src-tauri/target/
+test-results/
+coverage/
+node_modules/
+packages/design-system/dist/
+packages/design-system/storybook-static/
+packages/design-system/src/styles/tokens.css
+packages/design-system/src/styles/tokens.ts
+src/protocol/generated/
+pnpm-lock.yaml

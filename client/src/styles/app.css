@@ -1,0 +1,19 @@
+:root {
+  background: var(--sk-canvas);
+}
+
+body {
+  overflow: hidden;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+@media (max-width: 759px) {
+  html,
+  body,
+  #app {
+    overscroll-behavior: none;
+  }
+}

@@ -1,22 +1,37 @@
 {
     "runtime.version": "Lua 5.5",
+    "runtime.path": [
+        "?.lua",
+        "?/init.lua",
+        "?/?.lua"
+    ],
     "workspace.library": [
-        "src/lualib",
-        "3rd/lua-openai",
-        "3rd/tableshape",
+        "server/src/lualib",
+        "server/src/lualib/base",
+        "server/src/service",
+        "server/3rd/lua-openai",
+        "server/3rd/lua-protobuf",
+        "server/3rd/tableshape",
         "${3rd}/skynet/library",
         "${3rd}/busted/library",
-        "${3rd}/luassert/library"
+        "${3rd}/luassert/library",
+        "${3rd}/lfs/library"
     ],
     "workspace.checkThirdParty": "Apply",
     "workspace.ignoreDir": [
         ".vscode",
-        "luaclib",
-        "cservice",
-        "logs"
+        "client/.pnpm-store",
+        "client/node_modules",
+        "client/src-tauri/target",
+        "server/cservice",
+        "server/logs",
+        "server/luaclib"
     ],
     "diagnostics.neededFileStatus": {
         "codestyle-check": "Any"
     },
-    "diagnostics.globals": []
+    "diagnostics.globals": [
+        "lfs",
+        "SERVICE_NAME"
+    ]
 }

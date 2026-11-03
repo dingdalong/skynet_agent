@@ -3,6 +3,5 @@
 *.log
 *.pid
 *.dSYM/
-luaclib/
-cservice/
-logs/
+client/.env.local
+.agents/experience/
