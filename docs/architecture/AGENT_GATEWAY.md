@@ -150,7 +150,9 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `send_response(connection_id, message_id, name, args)`：编码并串行写入；写完返回 `true`。
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
-client 服务以 WebSocket 的消息来源地址校验连接归属，通过白名单分发业务请求。
+WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
+client 服务以 WebSocket 的消息来源地址校验连接归属，再按协议短消息名调用 User 的同名方法。
+命名与分发规则见[隐式约定](../../隐式约定.md)。
 未知业务请求（包括重复登录）以 1008 关闭，处理异常以 1011 关闭。
 
 ## 配置与传输

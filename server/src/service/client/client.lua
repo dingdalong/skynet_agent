@@ -19,12 +19,6 @@ local ClientService = class()
 
 ClientService.commands = { open = "open", handle_request = "handle_request", disconnect = "disconnect" }
 ClientService.closing_commands = { disconnect = true }
-ClientService.requests = {
-    UserSnapshotReq = "UserSnapshotReq",
-    SessionCreateReq = "SessionCreateReq",
-    MessageSendReq = "MessageSendReq",
-    MessageCancelReq = "MessageCancelReq",
-}
 
 function ClientService:ctor()
     self.users = {}
@@ -75,13 +69,13 @@ function ClientService:handle_request(context, id, message_id, name, args)
         log.info("client", "handle_request", "连接来源无效 connection=%s source=%s", id, context.source)
         return
     end
-    local method = self.requests[name]
-    if not method then
+    local method = state.user[name]
+    if type(method) ~= "function" then
         log.info("client", "handle_request", "未知请求 connection=%s name=%s", id, name)
         rpc.send(state.websocket_address, "close_connection", id, codes.websocket_policy_violation, "未知请求")
         return
     end
-    local ok, response = xpcall(function() return state.user[method](state.user, args) end, debug.traceback)
+    local ok, response = xpcall(function() return method(state.user, args) end, debug.traceback)
     if not ok then
         log.failure("client", "handle_request connection=" .. id, response)
         rpc.send(state.websocket_address, "close_connection", id, codes.websocket_internal_error, "请求处理失败")

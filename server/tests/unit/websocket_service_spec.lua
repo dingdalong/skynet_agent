@@ -1,5 +1,6 @@
 local Scope = require("tests.support.modules")
 local codes = require("enum.error_code")
+local hash = require("helper.hash")
 local protobuf = require("helper.protobuf")
 local Protocol = require("network.protocol")
 
@@ -146,11 +147,21 @@ describe("websocket", function()
         { "短帧", "bad", "binary", 1007 },
         { "零 ID", codec:encode_msg(0, "LoginReq", {}), "binary", 1007 },
         { "响应方向", codec:encode_msg(1, "LoginRes", {}), "binary", 1008 },
+        { "通知方向", codec:encode_msg(1, "MessageDeltaNtf", {}), "binary", 1008 },
+        { "普通数据类型", codec:encode_msg(1, "UserSnapshot", {}), "binary", 1008 },
+        { "未知协议", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.UnknownReq")), "binary", 1007 },
+        { "内部快照方法", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.snapshot")), "binary", 1007 },
+        {
+            "内部生成方法",
+            string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1._run_request")), "binary", 1007,
+        },
     }) do
         it("拒绝" .. case[1], function()
-            accept(1)
+            local connection = accept(1)
+            instance:bind_client({}, connection.id, 30)
             handles[1].message(1, case[2], case[3])
             assert.are.equal(case[4], closed[1][2])
+            assert.same({ { 30, "disconnect", connection.id } }, sent)
         end)
     end
     it("接入即开始超时，成功绑定的连接不超时", function()

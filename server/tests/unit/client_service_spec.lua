@@ -46,6 +46,68 @@ describe("用户与客户端服务", function()
         service:handle_request({ source = 100 }, connection or "a", 2, "MessageSendReq", args)
     end
 
+    it("按协议原名分发业务请求并关联响应", function()
+        local snapshot = service:open(nil, "a", 100, "alice")
+        local function request(id, name, response_name, args)
+            service:handle_request({ source = 100 }, "a", id, name, args)
+            local response = events[#events]
+            assert.are.equal(100, response.address)
+            assert.are.equal("send_response", response.command)
+            assert.are.equal("a", response.args[1])
+            assert.are.equal(id, response.args[2])
+            assert.are.equal(response_name, response.args[3])
+            assert.are.equal(codes.succ, response.args[4].ret)
+            return response.args[4]
+        end
+        assert.same(snapshot, request(41, "UserSnapshotReq", "UserSnapshotRes", {}).snapshot)
+        local created = request(42, "SessionCreateReq", "SessionCreateRes", {}).session
+        assert.are_not.equal(snapshot.sessions[1].id, created.id)
+        local sent = request(43, "MessageSendReq", "MessageSendRes", {
+            session_id = created.id, text = "新会话的问题",
+        })
+        assert.are.equal("新会话的问题", sent.session.messages[1].content)
+        assert.are.equal(status.streaming, sent.session.messages[2].status)
+        request(44, "MessageCancelReq", "MessageCancelRes", {
+            session_id = created.id, run_id = sent.session.run_id,
+        })
+        assert.is_true(service.users.alice.sessions[created.id].request.cancelled)
+        assert.is_true(coroutine.resume(tasks[1]))
+    end)
+
+    for _, name in ipairs({ "UnknownReq", "LoginReq" }) do
+        it("拒绝用户不支持的请求 " .. name, function()
+            service:open(nil, "a", 100, "alice")
+            events = {}
+            service:handle_request({ source = 100 }, "a", 2, name, {})
+            assert.same({ {
+                address = 100, command = "close_connection",
+                args = table.pack("a", codes.websocket_policy_violation, "未知请求"),
+            } }, events)
+        end)
+    end
+
+    it("同名成员不是函数时按未知请求拒绝", function()
+        service:open(nil, "a", 100, "alice")
+        require("user").UserSnapshotReq = {}
+        events = {}
+        service:handle_request({ source = 100 }, "a", 2, "UserSnapshotReq", {})
+        assert.same({ {
+            address = 100, command = "close_connection",
+            args = table.pack("a", codes.websocket_policy_violation, "未知请求"),
+        } }, events)
+    end)
+
+    it("处理方法异常时关闭连接且不发送业务响应", function()
+        service:open(nil, "a", 100, "alice")
+        require("user").UserSnapshotReq = function() error("请求处理异常") end
+        events = {}
+        service:handle_request({ source = 100 }, "a", 2, "UserSnapshotReq", {})
+        assert.same({ {
+            address = 100, command = "close_connection",
+            args = table.pack("a", codes.websocket_internal_error, "请求处理失败"),
+        } }, events)
+    end)
+
     it("同名共享用户，异名隔离，断线只移除订阅", function()
         local a = service:open(nil, "a", 100, "alice")
         local b = service:open(nil, "b", 200, "alice")
