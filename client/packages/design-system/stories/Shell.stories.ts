@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
 import ChatPage from '../../../src/features/chat/ChatPage.vue'
+import { createBrowserChatRuntime } from '../../../src/services/browser-chat-runtime'
 import { useChatStore } from '../../../src/stores/chat'
 import { useTheme } from '../../../src/composables/useTheme'
 import { ChatClient } from '../../../src/services/chat-client'
@@ -18,7 +19,7 @@ export const Desktop: Story = {
   render: (_args, context) => ({
     components: { ChatPage },
     setup() {
-      useChatStore().setTransport(new ChatClient(new MockAgentChannel()))
+      useChatStore().setRuntime(createBrowserChatRuntime(new ChatClient(new MockAgentChannel())))
       useTheme().setTheme(context.globals.theme === 'dark' ? 'dark' : 'light')
     },
     template: '<ChatPage />',

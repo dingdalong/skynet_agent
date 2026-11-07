@@ -605,3 +605,64 @@
 - 证据：182 项单测与 protobuf 跨 VM、网关、自动热修、热修运行时、服务运行时及关服检查通过。
 - Done right：沿真实入口确认校验职责；用网络入口测试约束内部方法不可达，避免重新引入重复登记表。
 - Seen: 1× (2026-11-07; task: 20261107T132610-protocol-name-dispatch.md)
+
+### L-043: App 依靠推送同步数据，取消面向用户的页面刷新
+
+- 类型：Success
+- 状态：Superseded
+- 范围：Tauri, Vue, WebSocket, 平台快捷键
+- 触发：用户观察到 App reload 断开长连接，并确认 App 不需要手动刷新。
+- 根因：页面 JavaScript 持有的 WS 随完整文档重载销毁；业务数据已经通过推送和快照自动同步。
+- 解法：按用户决定，在 App 根组件安装宿主专用刷新快捷键拦截，卸载时清理；保留 Web 原生刷新、
+  开发工具重载和现有断线恢复，不新增刷新请求或改变连接所有权。
+- 证据：90 项客户端单测及 2 项设计系统单测、10 项真实网关全链路、70 项 UI 回归通过；独立 macOS
+  release App 经过刷新组合键后保留输入和草稿，生成持续完成，退出前始终为 1 条连接和 1 次登录。
+- Done right：连接回归只统计业务网关，排除 Vite 的 HMR 连接；原生验证使用独立 App 与假模型，
+  验证后重新构建默认地址的正式 App 和 DMG，核对打包二进制与 release 二进制哈希一致。
+- Seen: 1× (2026-11-07; task: 20261107T134716-app-reload-policy.md)
+- 备注：2026-11-07 用户指出右键 Reload 仍会重载，确认连接与本地状态迁入 Rust；快捷键拦截方案已移除，
+  当前规则见 L-044。以上证据仅对应当时的快捷键实现。
+
+### L-044: App 页面重载只替换订阅，连接与协议状态由 Rust 核心统一持有
+
+- 类型：Success
+- 状态：Verified
+- 范围：Tauri, Vue, WebSocket, Protobuf, 页面生命周期
+- 触发：App 页面重载导致 WS 断开，屏蔽快捷键仍不能覆盖右键、原生或脚本重载入口。
+- 根因：socket、登录、递增请求编号及 pending 都由页面持有，完整文档重载会销毁所有者。
+- 解法：应用级 Rust 核心统一管理连接、请求、重连、服务端缓存及按窗口保存的草稿和选择；
+  Vue 重建后重新订阅，旧页面使用订阅编号隔离；原生菜单隐藏 Reload，内部重载保留，Web 刷新保持原样。
+- 证据：macOS 独立原生夹具执行 5 次真实文档加载，包含发送待确认时重载及 location.reload，
+  重载期间只有 1 条 WS 和 1 次登录，草稿与选择恢复；失败重试、取消、真实断线重连及切换用户通过。
+  核心通过 11 项 Rust 测试，客户端通过 64 项测试，Web 真实网关 9 项及 UI 70 项回归通过。
+- Done right：原生夹具使用独立 App 标识及假模型；直接记录网关帧的连接、请求编号和类型，
+  同时校验持续递增编号、无重复登录及不重放命令。首次文档加载前固定测试登录偏好，避免与自动恢复竞争。
+- Seen: 1× (2026-11-07; task: 20261107T150358-native-chat-core.md)
+- 产物检查：签名会修改二进制；签名后的包与 release 按 Mach-O UUID 比对，并独立验证 bundle 签名与 DMG 校验和。
+- 备注：当前原生运行验证为 macOS；其他平台仍需各自验证宿主菜单和原生集成。
+
+### L-045: Tauri 页面回调依赖的状态必须先于窗口创建登记
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Tauri, managed state, on_page_load, 初始化顺序
+- 触发：在 setup 中 manage 核心，同时在 on_page_load 中访问该核心。
+- 根因：首个 WebView 的 Started 回调可能早于 setup，state 查询会因尚未 manage 而 panic。
+- 解法：先创建核心并通过 Builder.manage 登记，再构建窗口；setup 仅初始化依赖原生 App 的菜单过滤。
+- 证据：真实原生夹具启动复现缺失 managed state 的 panic；调整登记顺序后正常启动并通过完整原生重载测试。
+- Done right：使用真实原生启动验证生命周期，不能仅以 Rust 编译或模拟 isTauri 的浏览器测试代替。
+- Seen: 1× (2026-11-07; task: 20261107T150358-native-chat-core.md)
+
+### L-046: macOS 本地 App 打包后单独验证 bundle 签名
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Tauri, macOS, 本地构建, codesign, DMG
+- 触发：Tauri 构建成功，包内二进制与 release 哈希一致，但完整 App 签名校验失败。
+- 根因：链接器的二进制 ad-hoc 签名没有覆盖 App 的 Info.plist 和资源，构建成功不代表 bundle 签名完整。
+- 解法：本地测试包使用 `APPLE_SIGNING_IDENTITY=- pnpm build:desktop`，由 Tauri 完成包签名后再生成 DMG。
+- 证据：原产物 `codesign --verify --deep --strict` 失败；重建后同一检查通过，签名后的包与 release
+  Mach-O UUID 一致，DMG 校验和验证通过。
+- Done right：分别验证构建、bundle 签名和磁盘镜像；签名前后不要求整个文件哈希相同。
+- Seen: 1× (2026-11-07; task: 20261107T150358-native-chat-core.md)
+- 备注：此处只验证本地 ad-hoc 签名，未执行 Apple 公证或对外发布。

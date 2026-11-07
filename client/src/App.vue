@@ -5,9 +5,11 @@ import UserLogin from './features/chat/components/UserLogin.vue'
 import { useChatStore } from './stores/chat'
 const store = useChatStore()
 onMounted(() => {
-  if (store.username) void store.connect()
+  void store.attach()
 })
-onBeforeUnmount(() => store.disconnect())
+onBeforeUnmount(() => {
+  store.detach()
+})
 </script>
 
 <template>

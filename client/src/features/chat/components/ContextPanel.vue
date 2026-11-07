@@ -52,7 +52,7 @@ const connectionLabel = computed(() => {
 
     <section class="boundary-note">
       <h3>数据边界</h3>
-      <p>会话按用户名保留，刷新或断线后自动恢复；服务器重启会清空数据。</p>
+      <p>会话按用户名保留并自动同步，断线后自动恢复；服务器重启会清空数据。</p>
     </section>
   </aside>
 </template>

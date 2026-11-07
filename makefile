@@ -12,7 +12,7 @@ CLIENT_DIR := $(PROJECT_ROOT)/client
 	server-test-hotfix-runtime server-test-live server-clean server-cleanall \
 	server-test-service-runtime server-test-service-control \
 	ui-install ui-dev ui-desktop ui-storybook ui-check ui-check-format ui-build \
-	ui-build-desktop ui-e2e e2e
+	ui-build-desktop ui-e2e ui-e2e-native ui-check-native e2e
 
 help:
 	@printf '%s\n' \
@@ -42,6 +42,8 @@ help:
 		"  make ui-build                    构建 Web 客户端" \
 		"  make ui-build-desktop            构建 macOS/桌面安装包" \
 		"  make ui-e2e                      运行快速 Mock UI 端到端测试" \
+		"  make ui-check-native             检查 Rust 客户端核心与协议" \
+		"  make ui-e2e-native                验证 macOS 原生页面重载与长连接" \
 		"  make e2e                         运行 Chromium 全链路端到端测试" \
 		"" \
 		"组合:" \
@@ -150,3 +152,9 @@ ui-e2e:
 
 e2e:
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e:full
+
+ui-check-native:
+	@pnpm --dir "$(CLIENT_DIR)" check:native
+
+ui-e2e-native:
+	@pnpm --dir "$(CLIENT_DIR)" test:native

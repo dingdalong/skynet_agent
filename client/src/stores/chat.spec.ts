@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useChatStore } from './chat'
+import { createBrowserChatRuntime } from '../services/browser-chat-runtime'
 import type {
   ChatSession,
   ChatTransport,
@@ -69,7 +70,7 @@ function fixture() {
       }),
   }
   const store = useChatStore()
-  store.setTransport(transport)
+  store.setRuntime(createBrowserChatRuntime(transport))
   return {
     store,
     transport,

@@ -41,7 +41,8 @@ make ui-storybook
 ```
 
 客户端连接地址通过 `client/.env.local` 的 `VITE_AGENT_WS_URL` 覆盖，配置示例见
-[`client/.env.example`](client/.env.example)。网关监听地址由服务端渠道配置指定。
+[`client/.env.example`](client/.env.example)。桌面启动与构建读取同一套 Vite 环境配置；原生连接地址
+在构建时注入，修改后需重启桌面开发进程或重新构建安装包。网关监听地址由服务端渠道配置指定。
 生产环境必须在反向代理终止 TLS，并使用 `wss://`。
 WebSocket 使用二进制 Protobuf 消息；共享 schema 位于 `common/proto`，客户端生成代码位于
 `client/src/protocol/generated/`。
@@ -103,7 +104,10 @@ end)
 三类工作池默认按 Skynet 工作线程数启动实例，也可在渠道配置中分别覆盖为 1 到 32。
 生产反向代理配置 WSS 后转发到 `agent_gateway.socket` 指定的地址和端口。
 
-客户端首次输入用户名，后续 reload、重开和断线重连自动恢复该用户名。`logind` 按用户名固定路由
+客户端首次输入用户名，后续重开和断线重连自动恢复该用户名。App 由 Rust 核心持有 WebSocket、
+登录会话、请求编号和本地缓存，界面重载后重新订阅，连接、草稿和会话选择继续保留；退出 App 后
+清空本地内存缓存。App 隐藏 Reload 菜单，数据变化自动同步。Web 保留浏览器刷新，页面重载后
+重建连接并恢复服务器数据。`logind` 按用户名固定路由
 到 `client` 服务，并绑定存活连接。相同用户名共享用户数据，允许多个 App、浏览器或标签页同时在线。
 当前仅用用户名识别用户，不提供密码认证。用户名区分大小写，长度为 1–32 个 Unicode 字符。
 
@@ -302,3 +306,7 @@ make ui-check
 `make ui-check` 同时检查共享 proto 与客户端生成代码是否一致。
 
 静态诊断统一使用 VS Code 的 sumneko.lua 插件；`.luarc.json` 固定 Lua 5.5 并启用代码风格检查。
+
+原生客户端使用 `make ui-check-native` 检查 Rust 核心与共享协议，使用 `make ui-e2e-native` 在 macOS
+上运行独立 WebView 重载夹具。夹具使用本机假模型和隔离 App，不调用真实模型；覆盖页面重载、
+草稿、请求编号、失败重试、取消、断线重连及切换用户。

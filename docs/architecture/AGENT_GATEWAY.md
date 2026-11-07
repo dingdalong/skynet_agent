@@ -4,7 +4,7 @@
 
 Web 和 Tauri 客户端通过 WebSocket 连接 Skynet。模型对话、会话历史、模型配置和 API Key
 都位于服务端，以 `user` 为所有者，服务器重启前保留。客户端输入用户名进入，同名共享数据并实时同步；
-刷新、断线和退出只改变网络连接，不删除会话或停止生成。用户名识别不提供密码认证，数据暂不落盘。
+页面重载、断线和退出均不删除会话或停止生成；App 页面重载复用 Rust 核心中的连接。用户名识别不提供密码认证，数据暂不落盘。
 
 ## 术语与职责
 
@@ -210,21 +210,29 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 ## 客户端请求与取消
 
-客户端按三层组织：`WebSocketChannel` 管 socket，`RequestClient` 管编解码、消息 ID、pending、
-超时和连接代次，`ChatClient` 把协议转换为业务对象。store 只使用业务 API，不解析 Protobuf。
-Mock 实现二进制通道，复用相同的编解码和请求管理。
+客户端通过 `ChatRuntime` 统一数据层接口，Vue store 只维护界面投影和展示用派生值。
+App 使用应用级 Rust 核心管理 WS、登录、请求编号、pending、超时、重连和会话缓存，通过 Tauri
+命令和有序 Channel 与页面通信。核心在窗口创建前注册；页面加载和卸载只替换订阅，不关闭连接。
+快照与订阅由同一核心串行编排，重载期间的请求和推送继续处理，页面恢复不自动重放业务命令。
 
-`connect(username)` 返回用户快照；`snapshot`、`createSession`、`sendMessage`、`cancelRun`
+Web 的浏览器数据层保留三层协议实现：`WebSocketChannel` 管 socket，`RequestClient` 管编解码、
+消息 ID、pending、超时和连接代次，`ChatClient` 转换业务对象。Mock 复用相同的二进制协议。
+Rust 的 Protobuf 类型在构建时从 `common/proto` 生成，使用相同的二进制协议向量验证。
+
+浏览器 `ChatTransport` 的 `connect(username)` 返回用户快照；`snapshot`、`createSession`、`sendMessage`、`cancelRun`
 返回普通 Promise。主动更新通过 `subscribeUpdates` 订阅，连接状态通过 `subscribeConnection` 订阅。
-超时、损坏响应或类型错配关闭连接并拒绝等待请求；业务错误只拒绝对应请求。
+Rust 核心同样按请求编号配对响应。超时、损坏响应或类型错配关闭连接并结束等待请求；
+业务错误只结束对应请求并展示错误。
 旧 socket、旧登录和旧命令的迟到结果不能修改新连接状态。
 
 客户端先安装快照基线，再按会话版本合并登录期间缓冲的更新。重复和旧版本无副作用；
 增量出现缺口时拉取完整快照，期间继续缓冲。完整会话状态可以跨版本直接覆盖较旧记录。
 服务端快照复制可变消息，保证版本与内容对应。
 
-选中会话按用户名保存在当前页面的 sessionStorage，用户名保存在 localStorage。
-草稿只保留页面内存，各端互不干扰；会话选择不修改服务端用户数据。
+用户名保存在本地偏好中，作为冷启动恢复提示；App 运行期间以 Rust 核心的用户身份为准。
+App 的草稿、错误展示和会话选择按窗口保存在核心内存，重载后恢复，窗口关闭或退出 App 时清理。
+Web 的会话选择按用户名保存在 sessionStorage，草稿仅保留页面内存。各端的选择和草稿互不干扰，
+不修改服务端用户数据。
 断线保留已有展示，自动重连后取回用户数据，不自动重放发送命令。存储不可用时仍可输入用户名进入。
 服务器重启后用户 ID 改变，客户端清除旧缓存并使用新快照。
 
