@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Adapted from Beautiful UI Vue: /agent/components/chat-page.vue.txt.
 import { SkButton, SkEmptyState, SkIconButton } from '@skynet/design-system'
-import { ArrowDown, Menu, PanelRight, Plus, Sparkles, SunMoon } from 'lucide-vue-next'
+import { ArrowDown, Menu, PanelRight, Plus, Sparkles, SunMoon, UserRound } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getPlatformCapabilities } from '../../platform/capabilities'
 import { useChatStore } from '../../stores/chat'
@@ -120,13 +120,11 @@ onMounted(() => {
   mediaQuery.addEventListener('change', updateViewport)
   window.visualViewport?.addEventListener('resize', updateViewport)
   document.addEventListener('keydown', onKeydown, true)
-  void store.connect()
 })
 onBeforeUnmount(() => {
   mediaQuery.removeEventListener('change', updateViewport)
   window.visualViewport?.removeEventListener('resize', updateViewport)
   document.removeEventListener('keydown', onKeydown, true)
-  store.disconnect()
 })
 </script>
 
@@ -165,10 +163,17 @@ onBeforeUnmount(() => {
           <span v-else class="chat-product__mark" aria-hidden="true">S</span>
           <div>
             <h2 tabindex="-1">{{ title }}</h2>
-            <p>{{ subtitle }}</p>
+            <p>{{ store.username }} · {{ subtitle }}</p>
           </div>
         </div>
         <div class="chat-product__header-actions">
+          <SkIconButton
+            label="切换用户"
+            :title="`当前用户：${store.username}`"
+            @click="store.switchUser"
+          >
+            <UserRound :size="18" aria-hidden="true" />
+          </SkIconButton>
           <SkIconButton label="切换明暗主题" @click="toggleTheme"
             ><SunMoon :size="18" aria-hidden="true"
           /></SkIconButton>
@@ -228,7 +233,7 @@ onBeforeUnmount(() => {
           compact
           multiline
           variant="Rounded"
-          :disabled="store.connectionState !== 'connected'"
+          :disabled="store.connectionState !== 'connected' || store.sessionBusy"
           :can-send="store.canSend"
           :run-state="store.runState"
           @send="sendMessage"

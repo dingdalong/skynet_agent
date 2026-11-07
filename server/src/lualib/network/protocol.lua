@@ -1,8 +1,7 @@
 local protobuf = require("helper.protobuf")
 local pb = require("pb")
 
-local FNV_OFFSET_BASIS = 2166136261
-local FNV_PRIME = 16777619
+local hashing = require("helper.hash")
 local UINT32_MASK = 0xffffffff
 local HEADER_FORMAT = ">BI4I4"
 ---@class network.Protocol
@@ -18,16 +17,6 @@ function M:ctor()
     self.short_name_to_full_name = {}
 end
 
----@param value string
----@return integer
-local function fnv1a32(value)
-    local hash = FNV_OFFSET_BASIS
-    for index = 1, #value do
-        hash = ((hash ~ value:byte(index)) * FNV_PRIME) & UINT32_MASK
-    end
-    return hash
-end
-
 function M:init()
     protobuf.attach()
     self.hash_to_name = {}
@@ -37,7 +26,7 @@ function M:init()
     for full_name, short_name, protobuf_type in pb.types() do
         if protobuf_type == "message" then
             local normalized_name = full_name:gsub("^%.", "")
-            local hash = fnv1a32(normalized_name)
+            local hash = hashing.fnv1a32(normalized_name)
             local hash_type_name = self.hash_to_name[hash]
             assert(
                 not hash_type_name or hash_type_name == normalized_name,
@@ -82,7 +71,7 @@ function M:encode_msg(message_id, name, args)
     local type_name = self.name_to_type[name] or self.short_name_to_full_name[name]
     assert(type_name, "未知 protobuf 消息类型: " .. tostring(name))
     local args_bin = protobuf.encode(type_name, args)
-    return string.pack(HEADER_FORMAT, 0, message_id, fnv1a32(type_name)) .. args_bin
+    return string.pack(HEADER_FORMAT, 0, message_id, hashing.fnv1a32(type_name)) .. args_bin
 end
 
 ---解码完整 WebSocket 业务帧。
@@ -102,7 +91,5 @@ function M:decode_msg(data)
 
     return message_id, short_name, protobuf.decode(type_name, data:sub(offset))
 end
-
-M.fnv1a32 = fnv1a32
 
 return M

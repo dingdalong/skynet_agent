@@ -46,7 +46,9 @@ else
         if mode == "login" then
             local logind = instance:launch("logind", 1, { client_services = { instance.services[2].address } })[1]
             skynet.fork(function()
-                local code, handled = rpc.call(logind, "handle_request", "login", 1, "LoginReq", {})
+                local code, handled = rpc.call(
+                    logind, "handle_request", "login", 1, "LoginReq", { username = "shutdown" }
+                )
                 assert(code == codes.succ and handled)
                 login_completed = true
             end)

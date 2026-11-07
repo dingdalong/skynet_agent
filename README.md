@@ -103,19 +103,22 @@ end)
 三类工作池默认按 Skynet 工作线程数启动实例，也可在渠道配置中分别覆盖为 1 到 32。
 生产反向代理配置 WSS 后转发到 `agent_gateway.socket` 指定的地址和端口。
 
-客户端连接后先发送 `LoginReq`。连接未绑定 client 服务时，`websocket` 同步调用 `logind` 完成登录；
-`logind` 分配 client 服务、调用 `client.open` 获取会话快照，再同步调用 `websocket` 的通用绑定和响应
-接口发送 `LoginRes`。绑定后所有消息直接转交该 client 服务。一个连接固定使用同一个 client 服务，单个 client 服务
-可以承载多个连接。
+客户端首次输入用户名，后续 reload、重开和断线重连自动恢复该用户名。`logind` 按用户名固定路由
+到 `client` 服务，并绑定存活连接。相同用户名共享用户数据，允许多个 App、浏览器或标签页同时在线。
+当前仅用用户名识别用户，不提供密码认证。用户名区分大小写，长度为 1–32 个 Unicode 字符。
 
-`client` 表示客户端业务承载服务，`connection` 表示单条连接上下文，`session` 表示聊天会话，
-`Conversation` 表示模型调用与历史管理对象。`Agent` 保留给智能体业务，`user` 保留给用户身份；
-当前尚未引入独立的智能体实体或用户账号。服务池实例数表示承载容量。
+`client` 是业务承载服务；`connection` 只表示网络连接；`user` 持有会话、消息、模型上下文和任务；
+`session` 是聊天会话，`Conversation` 管理模型调用与已成功提交的历史。断线不删除数据、不取消生成，
+服务器重启前可随时按用户名取回。数据暂不落盘，服务器重启后清空。
+
+各端独立选择会话、编辑草稿。会话与消息实时同步，同一会话串行生成，不同会话可以并发。
+任一端可停止任务。失败、停止和部分回答保留在展示历史中，只有成功轮次提交模型上下文；
+最新失败轮次可原位重试。切换用户仅离开当前用户，不删除其服务器数据或取消后台生成。
 
 协议按公共、登录和 Agent 会话拆分在 `common/proto`。每个 WebSocket 二进制消息由 9 字节头
 和 Protobuf args 组成：压缩标志、消息 ID、完整消息类型名的 FNV-1a 32 位哈希。WebSocket
 本身提供消息边界、长度和分帧重组，因此不增加应用层长度字段。当前不启用业务压缩，压缩标志
-必须为 0。消息 ID 在连接内严格递增，普通响应复用请求 ID，流式回答的所有帧复用原发送请求 ID。
+必须为 0。消息 ID 在连接内严格递增，普通响应复用请求 ID，主动推送使用 ID 0；生成任务使用独立的业务 `run_id`。
 当前 WebSocket 入站消息上限为 256 KiB，客户端文本输入限制由 `etc/cfg` 配置；附件和大文件
 后续使用独立 HTTP 数据通道，不把大块数据塞入单个 WebSocket 消息。
 
@@ -190,7 +193,7 @@ make server-force-stop
 Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader 提供的 `SERVICE_NAME` 加载业务主体。
 `gateway`、`websocket`、`logind`、`client` 分别管理接入、连接、登录和会话业务。
 
-`src/lualib/` 保存服务创建的对象和公共模块：`client/` 保存连接上下文，`agent/` 保存模型对话对象，`network/` 保存协议对象，
+`src/lualib/` 保存服务创建的对象和公共模块：`user.lua` 保存用户业务状态，`agent/` 保存模型对话对象，`network/` 保存协议对象，
 `base/` 提供生命周期、RPC、日志与热修，`helper/` 提供 Protobuf、服务池和开发渠道热修监听。
 `src/main.lua` 通过 `node.init(callback)` 定制业务 schema、服务数量、依赖顺序和初始化参数。
 `node` 在回调前启动公共服务，业务启动完成后进入就绪状态，统一处理服务登记、状态查询和进程关闭。
@@ -220,7 +223,7 @@ Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader �
 其他渠道不自动监听。首次启用监听器需重启进程。
 
 库文件转换为对应模块名，基础目录使用短模块名，服务主体使用服务名，例如
-`lualib/client/connection.lua` 对应 `client.connection`，`lualib/base/rpc.lua` 对应 `rpc`，
+`lualib/user.lua` 对应 `user`，`lualib/base/rpc.lua` 对应 `rpc`，
 `service/websocket/websocket.lua` 对应 `websocket`。主入口、公共服务入口、热修器、监听器自身、
 预加载脚本和 `luaext/` 不进入热修；这些代码以及配置、schema、新增或删除文件的变更通过重启生效。
 
@@ -237,7 +240,7 @@ Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader �
 也可以通过 `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .client_1 HOTFIX client client.connection agent.conversation llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
+dbgcmd .client_1 HOTFIX client user agent.conversation llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
 ```
 
 服务地址使用 Skynet 注册名（以 `.` 开头）或数字地址（以 `:` 开头）。手动命令只更新指定 VM，

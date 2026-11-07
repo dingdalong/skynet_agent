@@ -1,4 +1,5 @@
 local class = require("class")
+local hash = require("helper.hash")
 
 ---@class helper.ServicePool
 ---@field new fun(self: helper.ServicePool, addresses: integer[]): helper.ServicePool
@@ -17,6 +18,12 @@ end
 function Pool:next()
     self.index = self.index % #self.addresses + 1
     return self.addresses[self.index]
+end
+
+---@param key string
+---@return integer
+function Pool:select(key)
+    return self.addresses[hash.fnv1a32(key) % #self.addresses + 1]
 end
 
 return Pool

@@ -3,24 +3,25 @@
 ## 边界
 
 Web 和 Tauri 客户端通过 WebSocket 连接 Skynet。模型对话、会话历史、模型配置和 API Key
-都位于服务端；客户端持有展示状态。每个连接拥有独立的短期会话集合，断线、重启或退出后不恢复。
-当前不提供账号、跨设备同步或持久历史。
+都位于服务端，以 `user` 为所有者，服务器重启前保留。客户端输入用户名进入，同名共享数据并实时同步；
+刷新、断线和退出只改变网络连接，不删除会话或停止生成。用户名识别不提供密码认证，数据暂不落盘。
 
 ## 术语与职责
 
-| 名称 | 含义 |
-| --- | --- |
-| `client` | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
-| `connection` | 单条客户端连接及其业务上下文 |
-| `session` | 聊天会话，保存消息与对话历史 |
-| `Conversation` | 模型调用与历史管理对象，由 `agent.conversation` 导出 |
-| `user` | 预留给用户身份概念 |
-| `Agent` | 保留给智能体业务概念，实体模型后续设计 |
+| 名称           | 含义                                                   |
+| -------------- | ------------------------------------------------------ |
+| `client`       | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
+| `connection`   | 单条网络连接及用户订阅                                 |
+| `session`      | 聊天会话，保存消息与对话历史                           |
+| `Conversation` | 模型调用与历史管理对象，由 `agent.conversation` 导出   |
+| `user`         | 用户身份、会话集合和后台任务的所有者                   |
+| `Agent`        | 保留给智能体业务概念，实体模型后续设计                 |
 
 ```mermaid
 flowchart LR
-    C["⚙️ client 服务"] -->|"1:N"| N["🔌 connection"]
-    N -->|"1:N"| S["💬 session"]
+    C["client 服务"] -->|"1:N"| U["user"]
+    U -->|"1:N"| N["connection 订阅"]
+    U -->|"1:N"| S["session"]
     S -->|"1:1"| V["🧠 Conversation"]
 ```
 
@@ -36,19 +37,19 @@ WebSocket、登录和 client 服务，等待在途命令、连接读循环和后
 启动和关闭均无超时，正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
 显式强制关闭跳过清理并退出 1。进程重启由外部管理器负责。
 
-| 目录 / 服务                                      | 职责                                                       |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| `base/service.lua`                               | 命令白名单、上下文、初始化、状态、关闭、异常边界、热修注册 |
-| `service/init.lua`                               | 根据 loader 提供的服务名加载业务主体                      |
-| `main.lua`                                      | 业务 schema、服务数量、依赖顺序和初始化参数              |
-| `base/node.lua` / `main`                         | 公共初始化、服务登记、启动失败回收、状态汇总、进程关闭   |
-| `base/rpc.lua`                                   | 固定 Lua 协议、有超时与无超时调用、状态码、完整多返回值    |
-| `helper/`                                        | Protobuf 加载与接入、服务池轮询、开发渠道热修监听          |
-| `service/gateway/gateway.lua` / `gateway`        | 单例监听和新连接分发                                       |
-| `service/websocket/websocket.lua` / `websocket`  | 连接生命周期、编解码、协议守卫、写队列和消息路由           |
-| `service/logind/logind.lua` / `logind`           | 分配 client 服务、初始化连接、绑定、登录响应、失败关闭           |
-| `service/client/client.lua` / `client`             | 连接业务路由、会话和模型请求                               |
-| `client/connection.lua`、`agent/conversation.lua` | 客户端会话状态、模型对话与历史提交                         |
+| 目录 / 服务                                     | 职责                                                        |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `base/service.lua`                              | 命令白名单、上下文、初始化、状态、关闭、异常边界、热修注册  |
+| `service/init.lua`                              | 根据 loader 提供的服务名加载业务主体                        |
+| `main.lua`                                      | 业务 schema、服务数量、依赖顺序和初始化参数                 |
+| `base/node.lua` / `main`                        | 公共初始化、服务登记、启动失败回收、状态汇总、进程关闭      |
+| `base/rpc.lua`                                  | 固定 Lua 协议、有超时与无超时调用、状态码、完整多返回值     |
+| `helper/`                                       | Protobuf 加载与接入、服务池轮询与固定路由、开发渠道热修监听 |
+| `service/gateway/gateway.lua` / `gateway`       | 单例监听和新连接分发                                        |
+| `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
+| `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
+| `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
+| `user.lua`、`agent/conversation.lua`            | 用户业务状态、模型对话与历史提交                            |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
 独立脚本和 Skynet 内置服务优先于公共入口。`src/service/<name>/<name>.lua` 返回稳定类表，
@@ -114,18 +115,20 @@ sequenceDiagram
     participant L as logind
     participant A as client
     G->>W: accept(fd, address, logind)
-    C->>W: LoginReq
+    C->>W: LoginReq(username)
     W->>L: call handle_request(connection_id, ...)
-    L->>A: call open(connection_id, websocket)
-    A-->>L: 会话快照
+    L->>A: call open(connection_id, websocket, username)
+    A-->>L: 用户快照
     L->>W: call bind_client(connection_id, client_address)
     L->>W: call send_response(LoginRes)
     W-->>C: LoginRes
     L-->>W: 已处理
     C->>W: MessageSendReq
     W->>A: send handle_request(connection_id, ...)
-    A->>W: send send_response(delta / 终态)
-    W-->>C: MessageSendRes
+    A->>W: send send_response(MessageSendRes)
+    W-->>C: 任务已接受
+    A->>W: 向用户所有连接推送更新
+    W-->>C: SessionUpdatedNtf / MessageDeltaNtf
 ```
 
 WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同步等待 logind，暂停当前连接的读取；
@@ -134,7 +137,7 @@ WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同�
 
 登录严格按 `client.open → websocket.bind_client → websocket.send_response(LoginRes)` 编排。
 绑定先于成功响应，客户端收到成功响应后可以立即发送业务消息。失败时先同步写响应，再关闭连接；
-绑定前失败由 logind 清理新建客户端上下文，绑定后断线或写入失败由 WebSocket 通知 client 服务。
+绑定前失败由 logind 清理该连接订阅，绑定后断线或写入失败由 WebSocket 通知 client 服务。
 调用超时或处理结果不是 `true` 时，WebSocket 以 1011 关闭连接。
 
 每次接入生成独立 `connection_id`，服务之间用该标识操作连接，fd 只用于本地 socket。
@@ -159,14 +162,14 @@ client 服务以 WebSocket 的消息来源地址校验连接归属，通过白�
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `runtime.control_port`              | 1..65535，仅回环监听的管理端口                                              |
 | `agent_gateway.socket`              | `host`、`port`、以 `/` 开头的 `path`                                        |
-| `agent_gateway.instance`            | `client`、`logind`、`websocket` 各为 1..32                                   |
+| `agent_gateway.instance`            | `client`、`logind`、`websocket` 各为 1..32                                  |
 | `agent_gateway.login_timeout_ticks` | 正整数，未绑定连接的存活时间                                                |
 | `agent.llm`                         | `api_key`、`base_url`、`model`、正整数 `request_timeout_ticks`              |
 | `agent`                             | 非空 `system_prompt`，正整数 `max_message_length` 与 `session_title_length` |
 | `protocol.agent_gateway_schema_dir` | schema 目录                                                                 |
 
 所有 `_ticks` 时间单位为厘秒。模型请求使用从发送到流结束的总截止时间，包含停滞流；超时后关闭
-供应商连接并释放本轮占用。模型截止时间应小于客户端流式请求的等待时间。
+供应商连接并释放该会话的本轮占用。客户端发送命令只等待接受确认，任务通过推送跟踪。
 本地回环连接可使用 `ws://`，其他地址必须使用 `wss://`，由反向代理终止 TLS。
 
 `helper.protobuf.load` 只由 main 执行。消费者初始化时 `attach` 共享只读 schema，再由各自 VM 中的
@@ -182,22 +185,22 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 多字节整数使用网络字节序。类型哈希按完整 Protobuf 消息名计算 FNV-1a 32 位哈希。
 WebSocket 负责消息边界、长度和分片重组，业务层不再增加长度字段。
 
-消息 ID 从 1 严格递增，达到 `2^32 - 1` 后关闭连接；0 保留给主动消息，目前不接受。
-服务端忽略已处理 ID，普通响应复用请求 ID，流式消息一直复用原发送请求 ID。
-`ret` 是与 `common/enum/error_code.lua` 一致的 int32：1 表示成功，其余为失败。
-`ErrorInfo` 提供文字和是否可重试；错误详情与供应商堆栈只记录在服务器。
+请求消息 ID 从 1 严格递增，达到 `2^32 - 1` 后关闭连接，服务端忽略已处理 ID。
+普通响应复用请求 ID；`Ntf` 主动推送使用 ID 0，不进入请求的 pending 表。
+`ret` 与 `common/enum/error_code.lua` 一致，1 为成功。错误详情与供应商堆栈只记录在服务器。
 
-| 请求                                  | 响应成功内容                          |
-| ------------------------------------- | ------------------------------------- |
-| `LoginReq`                            | `LoginRes`：会话快照                  |
-| `SessionCreateReq`                    | `SessionCreateRes`：会话概要和历史    |
-| `SessionSelectReq(session_id)`        | `SessionSelectRes`：会话 ID 和历史    |
-| `MessageSendReq(session_id, text)`    | `MessageSendRes`：增量或完成/取消终态 |
-| `MessageCancelReq(target_message_id)` | `MessageCancelRes`：取消已确认        |
+| 请求                                              | 成功内容                           |
+| ------------------------------------------------- | ---------------------------------- |
+| `LoginReq(username)`                              | 用户身份和所有会话的完整快照       |
+| `UserSnapshotReq`                                 | 最新用户快照，用于重新建立同步基线 |
+| `SessionCreateReq`                                | 新会话完整状态                     |
+| `MessageSendReq(session_id, text, retry_run_id?)` | 接受确认和当前会话状态             |
+| `MessageCancelReq(session_id, run_id)`            | 取消已确认，任务退出后再推送终态   |
 
-`MessageSendRes` 的中间帧使用 `MESSAGE_STATUS_STREAMING`。最终只发送一个
-`MESSAGE_STATUS_COMPLETED`、`MESSAGE_STATUS_CANCELLED` 或失败响应。
-成功完成帧携带完整回答，客户端以完整回答更新最终状态。时间字段为毫秒时间戳，业务 ID 为不透明字符串。
+`SessionUpdatedNtf` 在创建、开始生成、取消请求和最终完成时携带完整会话状态；
+`MessageDeltaNtf` 携带会话、任务、消息 ID、增量和递增会话版本。
+快照包含消息状态、部分回答和活动任务。消息状态分为生成中、完成、停止和失败。
+时间为毫秒时间戳，业务 ID 为不透明字符串；`run_id` 跨连接稳定，与线路请求编号分离。
 
 只接受二进制帧和 `Req` 方向消息。文本帧以 1003 关闭，损坏数据、未知哈希、非零压缩标志或消息 ID 0
 以 1007 关闭，错误消息方向以 1008 关闭。未绑定时只接受 `LoginReq`，其他业务请求先返回登录错误，
@@ -209,24 +212,27 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 超时和连接代次，`ChatClient` 把协议转换为业务对象。store 只使用业务 API，不解析 Protobuf。
 Mock 实现二进制通道，复用相同的编解码和请求管理。
 
-`connect`、`createSession`、`selectSession` 返回普通 Promise。`sendMessage(input, onDelta)`
-返回 `{messageId, completed, cancel}`，增量通过回调交付，终态通过 Promise 交付。
-普通请求与连接有截止时间，流式请求另有总截止时间；超时、损坏响应或响应类型错配会关闭连接并
-拒绝全部等待请求。业务失败只拒绝对应请求。重连结束旧 Promise，旧 socket 与旧异步结果不能修改新状态。
-会话切换与创建通过队列串行执行，执行期间禁止发送。
+`connect(username)` 返回用户快照；`snapshot`、`createSession`、`sendMessage`、`cancelRun`
+返回普通 Promise。主动更新通过 `subscribeUpdates` 订阅，连接状态通过 `subscribeConnection` 订阅。
+超时、损坏响应或类型错配关闭连接并拒绝等待请求；业务错误只拒绝对应请求。
+旧 socket、旧登录和旧命令的迟到结果不能修改新连接状态。
 
-连接终止事件携带状态和具体错误原因。store 按会话缓存展示消息、草稿、业务错误和最近一次
-可重试失败；重试绑定原会话及原用户消息，只替换对应失败回答。会话切换仍经服务端确认，
-已访问会话复用当前连接内的展示缓存，保留失败和取消轮次的界面记录。断线保留展示供查看，
-重连开始时清空旧连接缓存。展示缓存不进入模型历史，也不持久化到本地存储。
+客户端先安装快照基线，再按会话版本合并登录期间缓冲的更新。重复和旧版本无副作用；
+增量出现缺口时拉取完整快照，期间继续缓冲。完整会话状态可以跨版本直接覆盖较旧记录。
+服务端快照复制可变消息，保证版本与内容对应。
 
-每个连接同一时刻只运行一个模型请求。点击停止后先进入 `cancelling`，取消请求用自己的 ID 得到
-`MessageCancelRes`；这只表示确认取消。模型调用退出、模型历史与会话历史回滚、占用释放后，原发送
-请求才返回取消终态。客户端收到终态后允许下一次发送，不能靠固定延迟推测清理完成。
-目标已经结束时取消幂等成功；无效目标 ID 返回参数错误。
+选中会话按用户名保存在当前页面的 sessionStorage，用户名保存在 localStorage。
+草稿只保留页面内存，各端互不干扰；会话选择不修改服务端用户数据。
+断线保留已有展示，自动重连后取回用户数据，不自动重放发送命令。存储不可用时仍可输入用户名进入。
+服务器重启后用户 ID 改变，客户端清除旧缓存并使用新快照。
 
-失败与取消的轮次不进入模型历史。断线时结束客户端等待、标记未完成回答，用户主动重连会得到新会话。
-各连接的会话、请求和取消状态互相隔离。供应商错误只向客户端返回统一、可重试的业务提示。
+每个会话最多一个生成，不同会话可以并发。生成任务由用户持有，全部连接离线后仍继续执行。
+停止按会话和任务 ID 定位，所有端看到取消中状态；确认不表示占用已释放，任务退出后再广播停止终态。
+取消已结束任务幂等成功，不存在的会话返回失败。服务关闭时取消所有任务并等待上游资源释放。
+
+展示历史保留全部轮次，只有成功完成的对话进入模型上下文。最新失败轮次允许原位重试，
+保留原用户消息和助手消息 ID，为新一轮生成分配新 run_id；后续已有新消息时旧失败轮次不能重试。
+用户数据在进程存活期间保留，暂不设置离线过期或持久化。
 
 ## 安全与验证
 

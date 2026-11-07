@@ -70,7 +70,7 @@ defineExpose({ focus })
         }}</span>
         <SkButton
           v-if="runState !== 'idle'"
-          :disabled="runState === 'cancelling'"
+          :disabled="disabled || runState === 'cancelling'"
           @click="emit('stop')"
         >
           <template #leading><Square :size="12" fill="currentColor" aria-hidden="true" /></template>

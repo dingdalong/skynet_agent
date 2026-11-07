@@ -14,6 +14,8 @@ async function sendMessage(page: Page, text: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
+  await page.getByRole('textbox', { name: '用户名', exact: true }).fill('ui-user')
+  await page.getByRole('button', { name: '进入', exact: true }).click()
   await page.evaluate(() => document.fonts.ready)
   await expect(page.getByRole('main').getByRole('heading', { name: '新的会话' })).toBeVisible()
 })
@@ -145,6 +147,7 @@ test('中屏两侧抽屉均可打开、关闭并恢复焦点', async ({ page, is
     await expect(page.getByRole('button', { name: '打开上下文' })).toBeFocused()
     return
   }
+  await expect(page.getByRole('dialog', { name: '会话上下文' })).toBeHidden()
   await expect(page.getByRole('heading', { name: '当前会话' })).toBeVisible()
   await expect(
     page.getByRole('main').getByRole('heading', { name: '新的会话', exact: true }),
@@ -312,6 +315,8 @@ test('iPadOS 桌面模式在宽视口仍使用移动抽屉布局', async ({ brow
       Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }),
     )
     await tablet.goto('/')
+    await tablet.getByRole('textbox', { name: '用户名', exact: true }).fill('tablet-user')
+    await tablet.getByRole('button', { name: '进入', exact: true }).click()
     await expect(tablet.locator('.chat-product')).toHaveAttribute('data-layout', 'mobile')
     await tablet.getByRole('button', { name: '打开会话栏' }).click()
     await expect(tablet.getByRole('dialog', { name: '会话栏' })).toBeVisible()
@@ -369,4 +374,17 @@ test('移动端可视视口随键盘收缩时输入区保持可达', async ({ pa
   await expect(page.getByRole('article', { name: '用户消息', exact: true })).toContainText(
     '键盘打开时发送',
   )
+})
+
+test('切换用户入口提供可访问的用户名表单', async ({ page }) => {
+  await page.getByRole('button', { name: '切换用户', exact: true }).click()
+  const field = page.getByRole('textbox', { name: '用户名', exact: true })
+  await field.fill('另一用户')
+  const results = await new AxeBuilder({ page }).analyze()
+  expect(
+    results.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
+  ).toEqual([])
+  await field.press('Enter')
+  await expect(page.getByRole('textbox', { name: '给 Agent 发送消息' })).toBeEnabled()
+  await expect(page.locator('.chat-product__thread-title')).toContainText('另一用户')
 })

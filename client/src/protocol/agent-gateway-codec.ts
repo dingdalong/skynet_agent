@@ -1,5 +1,5 @@
 import type { ServerMessage } from './messages'
-import { isValidMessageId, isValidWireMessageId } from './message-id'
+import { isValidWireMessageId } from './message-id'
 import { skynet } from './generated/agent_gateway.js'
 
 export const WIRE_HEADER_SIZE = 9
@@ -84,8 +84,8 @@ export function encodeMessage(
   name: string,
   payload: Record<string, unknown>,
 ): Uint8Array {
-  if (!isValidMessageId(messageId)) {
-    throw new Error('messageId 必须是 1 到 4294967295 之间的整数')
+  if (!isValidWireMessageId(messageId) || (messageId === 0) !== name.endsWith('Ntf')) {
+    throw new Error('主动推送使用 messageId 0，请求响应使用非零 messageId')
   }
   const type = resolveWireType(name)
   const args = type.encode(type.create(payload)).finish()
@@ -130,7 +130,10 @@ export function decodeMessage(frame: ArrayBuffer | ArrayBufferView): WireMessage
 
 export function decodeServerMessage(frame: ArrayBuffer | ArrayBufferView): ServerMessage {
   const message = decodeMessage(frame)
-  if (!message.name.endsWith('Res')) {
+  if (
+    !(message.name.endsWith('Res') && message.messageId > 0) &&
+    !(message.name.endsWith('Ntf') && message.messageId === 0)
+  ) {
     throw new Error(`Agent 返回了非响应消息: ${message.name}`)
   }
   return message as ServerMessage

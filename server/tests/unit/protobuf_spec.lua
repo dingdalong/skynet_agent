@@ -1,3 +1,4 @@
+local hash = require("helper.hash")
 local cjson = require("cjson")
 local error_code = require("enum.error_code")
 local lfs = require("lfs")
@@ -96,16 +97,18 @@ describe("protobuf", function()
         assert.is_true(protobuf.load(AGENT_PROTO_DIR))
         protocol:init()
 
-        assert_round_trip("skynet.agent.v1.LoginReq", {}, {})
+        assert_round_trip("skynet.agent.v1.LoginReq", { username = "alice" }, { username = "alice" })
         assert_round_trip("skynet.agent.v1.MessageSendReq", {
             session_id = "session-1",
             text = "你好",
+            retry_run_id = "",
         }, {
             session_id = "session-1",
             text = "你好",
+            retry_run_id = "",
         })
 
-        local login_hash = protocol.fnv1a32("skynet.agent.v1.LoginReq")
+        local login_hash = hash.fnv1a32("skynet.agent.v1.LoginReq")
         assert.are.equal("skynet.agent.v1.LoginReq", protocol.hash_to_name[login_hash])
         assert.are.equal(
             "skynet.agent.v1.LoginReq",
@@ -136,13 +139,14 @@ describe("protobuf", function()
         local frame = protocol:encode_msg(42, "MessageSendReq", {
             session_id = "session-1",
             text = "你好",
+            retry_run_id = "",
         })
         local compression, message_id, type_hash, offset =
             string.unpack(HEADER_FORMAT, frame)
         assert.are.equal(0, compression)
         assert.are.equal(42, message_id)
         assert.are.equal(
-            protocol.fnv1a32("skynet.agent.v1.MessageSendReq"),
+            hash.fnv1a32("skynet.agent.v1.MessageSendReq"),
             type_hash
         )
 
@@ -152,6 +156,7 @@ describe("protobuf", function()
         assert.same({
             session_id = "session-1",
             text = "你好",
+            retry_run_id = "",
         }, args)
     end)
 
@@ -164,65 +169,24 @@ describe("protobuf", function()
         local message_id, name, args = protocol:decode_msg(login_request)
         assert.are.equal(1, message_id)
         assert.are.equal("LoginReq", name)
-        assert.same({}, args)
-        assert.are.equal(
-            login_request,
-            protocol:encode_msg(1, "LoginReq", {})
-        )
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.message_send)
-        )
-        assert.are.equal(2, message_id)
-        assert.are.equal("MessageSendReq", name)
-        assert.same({
-            session_id = "session-1",
-            text = "你好",
-        }, args)
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.login_success)
-        )
-        assert.are.equal(1, message_id)
-        assert.are.equal("LoginRes", name)
-        assert.are.equal(error_code.succ, args.ret)
-        assert.are.equal("session-1", args.snapshot.active_session_id)
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.message_streaming)
-        )
-        assert.are.equal(2, message_id)
-        assert.are.equal("MessageSendRes", name)
-        assert.are.equal(error_code.succ, args.ret)
-        assert.are.equal("MESSAGE_STATUS_STREAMING", args.status)
-        assert.are.equal("你好", args.delta)
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.message_completed)
-        )
-        assert.are.equal(2, message_id)
-        assert.are.equal("MessageSendRes", name)
-        assert.are.equal(error_code.succ, args.ret)
-        assert.are.equal("MESSAGE_STATUS_COMPLETED", args.status)
-        assert.are.equal("你好", args.message.content)
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.message_cancelled)
-        )
-        assert.are.equal(2, message_id)
-        assert.are.equal("MessageSendRes", name)
-        assert.are.equal(error_code.succ, args.ret)
-        assert.are.equal("MESSAGE_STATUS_CANCELLED", args.status)
-
-        message_id, name, args = protocol:decode_msg(
-            decode_hex(vectors.frames.message_failed)
-        )
-        assert.are.equal(2, message_id)
-        assert.are.equal("MessageSendRes", name)
-        assert.are.equal(error_code.call_fail, args.ret)
-        assert.are.equal("上游失败", args.error.message)
-        assert.is_true(args.error.retryable)
-        assert.is_nil(args.error.code)
+        assert.are.equal("alice", args.username)
+        assert.are.equal(login_request, protocol:encode_msg(1, "LoginReq", { username = "alice" }))
+        local expectations = {
+            message_send = "MessageSendReq", login_success = "LoginRes", message_accepted = "MessageSendRes",
+            message_streaming = "MessageDeltaNtf", message_completed = "SessionUpdatedNtf",
+            message_cancelled = "SessionUpdatedNtf", message_failed = "SessionUpdatedNtf",
+        }
+        for key, expected in pairs(expectations) do
+            local id, decoded_name, payload = protocol:decode_msg(decode_hex(vectors.frames[key]))
+            assert.are.equal(expected, decoded_name)
+            if expected:match("Ntf$") then assert.are.equal(0, id) end
+            if key == "login_success" then assert.are.equal("user-1", payload.snapshot.user_id) end
+            if key == "message_streaming" then assert.are.equal("你好", payload.delta) end
+            if key == "message_failed" then
+                assert.are.equal("上游失败", payload.session.messages[1].error.message)
+                assert.are.equal("MESSAGE_STATUS_FAILED", payload.session.messages[1].status)
+            end
+        end
     end)
 
     it("拒绝压缩、未知哈希和过短消息", function()
@@ -234,7 +198,7 @@ describe("protobuf", function()
             HEADER_FORMAT,
             1,
             1,
-            protocol.fnv1a32("skynet.agent.v1.LoginReq")
+            hash.fnv1a32("skynet.agent.v1.LoginReq")
         ) .. args
         local ok, err = pcall(protocol.decode_msg, protocol, compressed)
         assert.is_false(ok)

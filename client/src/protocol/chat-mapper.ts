@@ -1,6 +1,6 @@
 import { skynet } from './generated/agent_gateway.js'
 import { errorCode, formatResponseError } from './error-code'
-import type { ChatMessage, ChatSessionSummary, SessionSnapshot } from '../types/chat'
+import type { ChatMessage, ChatSession, UserSnapshot, ChatUpdate } from '../types/chat'
 
 export class ResponseError extends Error {
   constructor(
@@ -45,40 +45,63 @@ function timestamp(value: unknown): number {
 }
 
 export function toChatMessage(payload: skynet.agent.v1.ChatMessage.$Properties): ChatMessage {
-  const role =
-    payload.role === skynet.agent.v1.MessageRole.MESSAGE_ROLE_USER
-      ? 'user'
-      : payload.role === skynet.agent.v1.MessageRole.MESSAGE_ROLE_ASSISTANT
-        ? 'assistant'
-        : null
-  if (!role) throw new Error('Protobuf 消息角色无效')
+  const role = payload.role === 1 ? 'user' : payload.role === 2 ? 'assistant' : null
+  const status = ({ 1: 'streaming', 2: 'complete', 3: 'cancelled', 4: 'error' } as const)[
+    payload.status as 1 | 2 | 3 | 4
+  ]
+  if (!role || !status) throw new Error('Protobuf 消息角色或状态无效')
   return {
     id: requiredString(payload.id, 'message.id'),
     role,
     content: requiredString(payload.content, 'message.content'),
     createdAt: timestamp(payload.createdAt),
-    status: 'complete',
+    status,
+    runId: payload.runId ?? '',
+    error: payload.error ? formatResponseError(payload.ret, payload.error, '生成失败') : '',
+    retryable: payload.error?.retryable === true,
   }
 }
 
-export function toSessionSummary(
-  payload: skynet.agent.v1.SessionSummary.$Properties,
-): ChatSessionSummary {
+export function toSession(payload: skynet.agent.v1.SessionState.$Properties): ChatSession {
+  const revision = Number(payload.revision)
+  if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('会话版本无效')
   return {
     id: requiredString(payload.id, 'session.id'),
     title: requiredString(payload.title, 'session.title'),
     updatedAt: timestamp(payload.updatedAt),
+    revision,
+    messages: (payload.messages ?? []).map(toChatMessage),
+    runId: payload.runId ?? '',
+    cancelling: payload.cancelling === true,
   }
 }
 
-export function toSnapshot(payload: skynet.agent.v1.SessionSnapshot.$Properties): SessionSnapshot {
-  const snapshot = {
-    sessions: (payload.sessions ?? []).map(toSessionSummary),
-    activeSessionId: requiredString(payload.activeSessionId, 'snapshot.activeSessionId'),
-    messages: (payload.messages ?? []).map(toChatMessage),
+export function toSnapshot(payload: skynet.agent.v1.UserSnapshot.$Properties): UserSnapshot {
+  const sessions = (payload.sessions ?? []).map(toSession)
+  if (!sessions.length) throw new Error('用户快照缺少会话')
+  return {
+    userId: requiredString(payload.userId, 'userId'),
+    username: requiredString(payload.username, 'username'),
+    sessions,
   }
-  if (!snapshot.sessions.some((session) => session.id === snapshot.activeSessionId)) {
-    throw new Error('Agent 登录快照的当前会话无效')
+}
+
+export function toUpdate(message: import('./messages').ServerMessage): ChatUpdate {
+  if (message.name === 'SessionUpdatedNtf' && message.payload.session) {
+    return { type: 'session', session: toSession(message.payload.session) }
   }
-  return snapshot
+  if (message.name === 'MessageDeltaNtf') {
+    const payload = message.payload
+    if (!Number.isSafeInteger(payload.revision) || Number(payload.revision) < 1)
+      throw new Error('增量版本无效')
+    return {
+      type: 'delta',
+      sessionId: requiredString(payload.sessionId, 'sessionId'),
+      runId: requiredString(payload.runId, 'runId'),
+      messageId: requiredString(payload.messageId, 'messageId'),
+      delta: requiredString(payload.delta, 'delta'),
+      revision: Number(payload.revision),
+    }
+  }
+  throw new Error('未知用户更新')
 }

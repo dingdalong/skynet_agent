@@ -18,6 +18,7 @@ export class RequestClient {
   private generation = 0
   private nextId: number | null = 1
   private pending = new Map<number, PendingRequest>()
+  private notifications = new Set<(message: ServerMessage) => void>()
   private listeners = new Set<TransportConnectionListener>()
   private rejectOpening: ((error: Error) => void) | null = null
 
@@ -90,6 +91,11 @@ export class RequestClient {
     return { messageId, completed }
   }
 
+  subscribeNotifications(listener: (message: ServerMessage) => void): () => void {
+    this.notifications.add(listener)
+    return () => this.notifications.delete(listener)
+  }
+
   subscribeConnection(listener: TransportConnectionListener): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
@@ -124,7 +130,10 @@ export class RequestClient {
     if (!this.active) return
     try {
       const message = decodeServerMessage(frame)
-      if (message.messageId === 0) throw new Error('不支持无请求的响应消息')
+      if (message.messageId === 0) {
+        for (const listener of this.notifications) listener(message)
+        return
+      }
       const request = this.pending.get(message.messageId)
       // 已完成请求和超时连接的迟到消息没有副作用。
       if (!request) return

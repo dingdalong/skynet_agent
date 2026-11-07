@@ -52,7 +52,7 @@ const connectionLabel = computed(() => {
 
     <section class="boundary-note">
       <h3>数据边界</h3>
-      <p>模型密钥不进入客户端。断线或服务重启后，MVP 会话不会恢复。</p>
+      <p>会话按用户名保留，刷新或断线后自动恢复；服务器重启会清空数据。</p>
     </section>
   </aside>
 </template>

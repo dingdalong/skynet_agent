@@ -4,6 +4,7 @@ local message_status = {
     streaming = 1,
     completed = 2,
     cancelled = 3,
+    failed = 4,
 }
 
 return message_status

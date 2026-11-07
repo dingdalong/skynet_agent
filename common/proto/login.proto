@@ -4,10 +4,20 @@ package skynet.agent.v1;
 
 import "common.proto";
 
-message LoginReq {}
+message LoginReq {
+  string username = 1;
+}
 
 message LoginRes {
   int32 ret = 2;
   ErrorInfo error = 3;
-  SessionSnapshot snapshot = 4;
+  UserSnapshot snapshot = 4;
+}
+
+message UserSnapshotReq {}
+
+message UserSnapshotRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  UserSnapshot snapshot = 4;
 }

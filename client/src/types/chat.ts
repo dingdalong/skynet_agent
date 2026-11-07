@@ -7,6 +7,9 @@ export interface ChatMessage {
   content: string
   createdAt: number
   status: MessageStatus
+  runId: string
+  error: string
+  retryable: boolean
 }
 
 export interface ChatSessionSummary {
@@ -15,47 +18,36 @@ export interface ChatSessionSummary {
   updatedAt: number
 }
 
-export interface ChatSession {
-  id: string
-  title: string
-  updatedAt: number
+export interface ChatSession extends ChatSessionSummary {
+  revision: number
   messages: ChatMessage[]
+  runId: string
+  cancelling: boolean
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
 
-export interface SessionSnapshot {
-  sessions: ChatSessionSummary[]
-  activeSessionId: string
-  messages: ChatMessage[]
+export interface UserSnapshot {
+  userId: string
+  username: string
+  sessions: ChatSession[]
 }
 
-export interface SessionSelection {
-  sessionId: string
-  messages: ChatMessage[]
-}
-
-export type ReplyResult = { status: 'complete'; message: ChatMessage } | { status: 'cancelled' }
-
-export interface StreamRequest {
-  messageId: number
-  completed: Promise<ReplyResult>
-  cancel(): Promise<void>
-}
-
-export interface FailedReply {
-  sessionId: string
-  userMessageId: string
-  assistantMessageId: string
-  text: string
-}
-
-export interface ChatSessionView {
-  messages: ChatMessage[]
+export interface ChatSessionView extends ChatSession {
   draft: string
   error: string
-  retry: FailedReply | null
 }
+
+export type ChatUpdate =
+  | { type: 'session'; session: ChatSession }
+  | {
+      type: 'delta'
+      sessionId: string
+      runId: string
+      messageId: string
+      delta: string
+      revision: number
+    }
 
 export interface TransportConnectionEvent {
   state: 'offline' | 'error'
@@ -65,13 +57,12 @@ export interface TransportConnectionEvent {
 export type TransportConnectionListener = (event: TransportConnectionEvent) => void
 
 export interface ChatTransport {
-  connect(): Promise<SessionSnapshot>
+  connect(username: string): Promise<UserSnapshot>
+  snapshot(): Promise<UserSnapshot>
   createSession(): Promise<ChatSession>
-  selectSession(sessionId: string): Promise<SessionSelection>
-  sendMessage(
-    input: { sessionId: string; text: string },
-    onDelta: (delta: string) => void,
-  ): StreamRequest
+  sendMessage(input: { sessionId: string; text: string; retryRunId?: string }): Promise<ChatSession>
+  cancelRun(sessionId: string, runId: string): Promise<void>
+  subscribeUpdates(listener: (update: ChatUpdate) => void): () => void
   subscribeConnection(listener: TransportConnectionListener): () => void
   close(): void
 }

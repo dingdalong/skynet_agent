@@ -77,7 +77,7 @@ function hashName(name) {
 }
 
 function request(socket, id, name, args, predicate = () => true) {
-  const responseName = name.replace(/Req$/, "Res");
+  const responseName = name === "MessageSendReq" ? "SessionUpdatedNtf" : name.replace(/Req$/, "Res");
   const response = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.removeEventListener("message", onMessage);
@@ -87,7 +87,7 @@ function request(socket, id, name, args, predicate = () => true) {
       const frame = new Uint8Array(event.data);
       const view = new DataView(frame.buffer);
       if (
-        view.getUint32(1) !== id ||
+        view.getUint32(1) !== (name === "MessageSendReq" ? 0 : id) ||
         view.getUint32(5) !== hashName(responseName)
       )
         return;
@@ -135,13 +135,13 @@ async function connect() {
       { once: true },
     );
   });
-  const login = await request(socket, 1, "LoginReq", {});
+  const login = await request(socket, 1, "LoginReq", { username: `hotfix-${sockets.length}` });
   assert.equal(login.ret, 1);
-  return { socket, sessionId: login.snapshot.activeSessionId };
+  return { socket, sessionId: login.snapshot.sessions[0].id };
 }
 
 function completed(value) {
-  return value.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED;
+  return !value.session.runId && value.session.messages.at(-1)?.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED;
 }
 
 function marked(source, signature, marker) {
@@ -224,7 +224,7 @@ try {
     () => serverLog.includes("监听源码"),
     "develop 节点未建立监听基线",
   );
-  // 每个 logind 持有独立的 client 轮询游标，需要两轮登录才能覆盖全部 client。
+  // 不同用户名分布到两个 client；四条连接同时覆盖两个 WebSocket 实例。
   const connections = [];
   for (let index = 0; index < 4; index++) connections.push(await connect());
   for (const { socket, sessionId } of connections) {
@@ -235,7 +235,7 @@ try {
       { sessionId, text: "[e2e:history-set]" },
       completed,
     );
-    assert.equal(response.message.content, "E2E 历史已保存");
+    assert.equal(response.session.messages.at(-1).content, "E2E 历史已保存");
   }
 
   const wsPath = "src/service/websocket/websocket.lua";
@@ -255,12 +255,12 @@ try {
   assert.deepEqual(updatedFiles(batch), [clientPath, wsPath]);
 
   for (const { socket, sessionId } of connections) {
-    const selected = await request(socket, 3, "SessionSelectReq", {
+    const selected = await request(socket, 3, "UserSnapshotReq", {
       sessionId,
     });
     assert.equal(selected.ret, 1);
-    assert.equal(selected.messages.length, 2);
-    assert.equal(selected.messages[1].content, "E2E 历史已保存");
+    assert.equal(selected.snapshot.sessions[0].messages.length, 2);
+    assert.equal(selected.snapshot.sessions[0].messages[1].content, "E2E 历史已保存");
     const response = await request(
       socket,
       4,
@@ -268,7 +268,7 @@ try {
       { sessionId, text: "[e2e:history-check]" },
       completed,
     );
-    assert.equal(response.message.content, "E2E 历史通过");
+    assert.equal(response.session.messages.at(-1).content, "E2E 历史通过");
   }
   await until(
     () =>
@@ -296,7 +296,7 @@ try {
   const failedOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 5, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 5, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }
@@ -318,7 +318,7 @@ try {
   const recoveredOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 6, "SessionSelectReq", { sessionId })).messages
+      (await request(socket, 6, "UserSnapshotReq", { sessionId })).snapshot.sessions[0].messages
         .length,
       4,
     );
@@ -358,7 +358,7 @@ try {
   const executionOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 7, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 7, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }
@@ -377,7 +377,7 @@ try {
   const executionRecoveredOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 8, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 8, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }
@@ -421,7 +421,7 @@ try {
   const incompatibleOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 9, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 9, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }
@@ -439,7 +439,7 @@ try {
   const compatibleOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 10, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 10, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }
@@ -471,7 +471,7 @@ try {
   );
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 11, "SessionSelectReq", { sessionId })).ret,
+      (await request(socket, 11, "UserSnapshotReq", { sessionId })).ret,
       1,
     );
   }

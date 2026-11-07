@@ -1,3 +1,4 @@
+local username = require("helper.username")
 local class = require("class")
 local pool = require("helper.service_pool")
 local rpc = require("rpc")
@@ -51,15 +52,21 @@ end
 ---@param id string
 ---@param message_id integer
 ---@param name string
----@param _args table
+---@param args table
 ---@return boolean
-function Login:handle_request(context, id, message_id, name, _args)
+function Login:handle_request(context, id, message_id, name, args)
     local websocket_address = context.source
     if name ~= "LoginReq" then
         return self:_fail(websocket_address, id, message_id, error_code.invalid_param, "连接尚未登录")
     end
-    local client_address = self.client_services:next()
-    local code, snapshot = rpc.call(client_address, "open", id, websocket_address)
+    local user_name = username.normalize(args.username)
+    if not user_name then
+        return self:_fail(
+            websocket_address, id, message_id, error_code.invalid_param, "用户名须为 1–32 个字符"
+        )
+    end
+    local client_address = self.client_services:select(user_name)
+    local code, snapshot = rpc.call(client_address, "open", id, websocket_address, user_name)
     if code ~= error_code.succ or type(snapshot) ~= "table" then
         rpc.send(client_address, "disconnect", id)
         return self:_fail(websocket_address, id, message_id, error_code.call_fail, "客户端上下文初始化失败")

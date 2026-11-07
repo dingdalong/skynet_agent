@@ -1,243 +1,213 @@
-import type { ChatSessionSummary } from '../types/chat'
 import type { ServerMessage } from '../protocol/messages'
 import type { BinaryChannel, BinaryFrame } from '../network/websocket-channel'
 import { decodeMessage, encodeMessage } from '../protocol/agent-gateway-codec'
-import { skynet } from '../protocol/generated/agent_gateway.js'
-import { errorCode } from '../protocol/error-code'
+import type { skynet } from '../protocol/generated/agent_gateway.js'
 
-const { MessageRole, MessageStatus } = skynet.agent.v1
-const now = () => Date.now()
+type Message = skynet.agent.v1.ChatMessage.$Properties
+interface Session {
+  id: string
+  title: string
+  updatedAt: number
+  revision: number
+  messages: Message[]
+  runId: string
+  cancelling: boolean
+}
+interface MockUser {
+  userId: string
+  username: string
+  sessions: Session[]
+  channels: Set<MockAgentChannel>
+  timers: Map<string, number>
+}
+
+// Mock 后端的寿命独立于通道；真实 reload 恢复由全链路测试验证。
+const users = new Map<string, MockUser>()
 
 export class MockAgentChannel implements BinaryChannel {
   private onMessage: ((frame: BinaryFrame) => void) | null = null
+  private user: MockUser | null = null
   private generation = 0
-  private sessions: ChatSessionSummary[] = []
-  private activeSessionId = ''
-  private messages = new Map<string, skynet.agent.v1.ChatMessage.$Properties[]>()
-  private timers = new Map<number, { timer: number; sessionId: string; userId: string }>()
 
   async open(onMessage: (frame: BinaryFrame) => void): Promise<void> {
     this.close()
     this.onMessage = onMessage
-    this.sessions = []
-    this.messages.clear()
-    this.createSessionState()
   }
 
   send(frame: Uint8Array): void {
     const request = decodeMessage(frame)
-    const args = request.payload as { sessionId: string; text: string; targetMessageId: number }
-    switch (request.name) {
-      case 'LoginReq':
-        this.emit({
-          name: 'LoginRes',
-          messageId: request.messageId,
-          payload: {
-            ret: errorCode.succ,
-            snapshot: {
-              sessions: this.sessions,
-              activeSessionId: this.activeSessionId,
-              messages: this.currentMessages(),
-            },
-          },
-        })
-        return
-      case 'SessionCreateReq':
-        this.createSession(request.messageId)
-        return
-      case 'SessionSelectReq':
-        this.selectSession(request.messageId, args.sessionId)
-        return
-      case 'MessageSendReq':
-        this.sendMessage(request.messageId, args)
-        return
-      case 'MessageCancelReq':
-        this.cancel(request.messageId, args.targetMessageId)
-        return
-      default:
-        throw new Error('Mock 不支持的请求')
+    const args = request.payload as {
+      username: string
+      sessionId: string
+      text: string
+      runId: string
+      retryRunId?: string
     }
-  }
-
-  private createSession(messageId: number): void {
-    const session = this.createSessionState()
-    this.emit({
-      name: 'SessionCreateRes',
-      messageId,
-      payload: {
-        ret: errorCode.succ,
-        session,
-        messages: [],
-      },
-    })
-    return
-  }
-
-  private selectSession(messageId: number, sessionId: string): void {
-    const session = this.sessions.find((item) => item.id === sessionId)
-    if (!session) {
+    const reply = (payload: Record<string, unknown>) =>
       this.emit({
-        name: 'SessionSelectRes',
-        messageId,
-        payload: {
-          ret: errorCode.fail,
-          sessionId,
-          error: {
-            message: '会话不存在或已经失效',
-            retryable: false,
-          },
-        },
-      })
+        name: request.name.replace(/Req$/, 'Res'),
+        messageId: request.messageId,
+        payload,
+      } as ServerMessage)
+    if (request.name === 'LoginReq') {
+      let user = users.get(args.username)
+      if (!user) {
+        user = {
+          userId: crypto.randomUUID(),
+          username: args.username,
+          sessions: [],
+          channels: new Set(),
+          timers: new Map(),
+        }
+        users.set(args.username, user)
+        this.user = user
+        this.createSession()
+      }
+      this.user = user
+      user.channels.add(this)
+      reply({ ret: 1, snapshot: this.snapshot() })
       return
     }
-
-    this.activeSessionId = sessionId
-    this.emit({
-      name: 'SessionSelectRes',
-      messageId,
-      payload: {
-        ret: errorCode.succ,
-        sessionId,
-        messages: this.currentMessages(),
-      },
-    })
-    return
-  }
-
-  private sendMessage(messageId: number, input: { sessionId: string; text: string }): void {
-    const userMessage = {
-      id: crypto.randomUUID(),
-      role: MessageRole.MESSAGE_ROLE_USER,
-      content: input.text,
-      createdAt: now(),
+    const user = this.user
+    if (!user) throw new Error('尚未绑定用户')
+    if (request.name === 'UserSnapshotReq') {
+      reply({ ret: 1, snapshot: this.snapshot() })
+      return
     }
-    const history = this.messages.get(input.sessionId) ?? []
-    this.messages.set(input.sessionId, [...history, userMessage])
-    this.updateTitle(input.sessionId, input.text)
-
-    const answer = `这是模拟的 Agent 回复，用于验证界面。你刚才说：“${input.text}”。`
+    if (request.name === 'SessionCreateReq') {
+      reply({ ret: 1, session: this.createSession() })
+      return
+    }
+    const session = user.sessions.find((item) => item.id === args.sessionId)
+    if (!session) {
+      reply({ ret: 2, error: { message: '会话不存在', retryable: false } })
+      return
+    }
+    if (request.name === 'MessageCancelReq') {
+      if (session.runId === args.runId && session.runId) {
+        window.clearInterval(user.timers.get(session.id))
+        user.timers.delete(session.id)
+        session.cancelling = true
+        this.publishSession(session)
+        const message = session.messages.at(-1)!
+        message.status = 3
+        session.runId = ''
+        session.cancelling = false
+        this.publishSession(session)
+      }
+      reply({ ret: 1 })
+      return
+    }
+    if (request.name !== 'MessageSendReq') throw new Error('Mock 不支持的请求')
+    if (session.runId) {
+      reply({ ret: 4, error: { message: '该会话仍在生成', retryable: true } })
+      return
+    }
+    session.runId = crypto.randomUUID()
+    if (!args.retryRunId)
+      session.messages.push({
+        id: crypto.randomUUID(),
+        role: 1,
+        content: args.text,
+        createdAt: Date.now(),
+        status: 2,
+      })
+    else session.messages.pop()
+    const text = String(session.messages.at(-1)?.content)
+    session.title = text.slice(0, 24)
+    const message: Message = {
+      id: crypto.randomUUID(),
+      role: 2,
+      content: '',
+      createdAt: Date.now(),
+      status: 1,
+      runId: session.runId,
+    }
+    session.messages.push(message)
+    this.publishSession(session)
+    reply({ ret: 1, session })
+    const answer = `这是模拟的 Agent 回复，用于验证界面。你刚才说：“${text}”。`
     let index = 0
     const timer = window.setInterval(() => {
-      if (!this.timers.has(messageId)) {
-        return
-      }
       if (index < answer.length) {
-        this.emit({
-          name: 'MessageSendRes',
-          messageId,
-          payload: {
-            ret: errorCode.succ,
-            status: MessageStatus.MESSAGE_STATUS_STREAMING,
-            sessionId: input.sessionId,
-            delta: answer.slice(index, index + 2),
-          },
-        })
+        const delta = answer.slice(index, index + 2)
         index += 2
-        return
+        message.content += delta
+        session.revision++
+        this.broadcast(
+          {
+            name: 'MessageDeltaNtf',
+            messageId: 0,
+            payload: {
+              sessionId: session.id,
+              runId: session.runId,
+              messageId: message.id,
+              delta,
+              revision: session.revision,
+            },
+          },
+          user,
+        )
+      } else {
+        window.clearInterval(timer)
+        user.timers.delete(session.id)
+        message.status = 2
+        session.runId = ''
+        this.publishSession(session, user)
       }
-
-      window.clearInterval(timer)
-      this.timers.delete(messageId)
-      const message = {
-        id: crypto.randomUUID(),
-        role: MessageRole.MESSAGE_ROLE_ASSISTANT,
-        content: answer,
-        createdAt: now(),
-      }
-      const current = this.messages.get(input.sessionId) ?? []
-      this.messages.set(input.sessionId, [...current, message])
-      this.emit({
-        name: 'MessageSendRes',
-        messageId,
-        payload: {
-          ret: errorCode.succ,
-          status: MessageStatus.MESSAGE_STATUS_COMPLETED,
-          sessionId: input.sessionId,
-          message,
-        },
-      })
     }, 32)
-    this.timers.set(messageId, { timer, sessionId: input.sessionId, userId: userMessage.id })
-    return
-  }
-
-  private cancel(cancelMessageId: number, targetMessageId: number): void {
-    const request = this.timers.get(targetMessageId)
-    if (request !== undefined) {
-      window.clearInterval(request.timer)
-      this.timers.delete(targetMessageId)
-      const history = this.messages.get(request.sessionId) ?? []
-      this.messages.set(
-        request.sessionId,
-        history.filter((item) => item.id !== request.userId),
-      )
-    }
-
-    this.emit({
-      name: 'MessageCancelRes',
-      messageId: cancelMessageId,
-      payload: { ret: errorCode.succ },
-    })
-    if (!request) return
-    this.emit({
-      name: 'MessageSendRes',
-      messageId: targetMessageId,
-      payload: {
-        ret: errorCode.succ,
-        status: MessageStatus.MESSAGE_STATUS_CANCELLED,
-        sessionId: request.sessionId,
-      },
-    })
-    return
+    user.timers.set(session.id, timer)
   }
 
   close(): void {
     this.generation++
+    this.user?.channels.delete(this)
+    this.user = null
     this.onMessage = null
-    for (const request of this.timers.values()) window.clearInterval(request.timer)
-    this.timers.clear()
   }
 
-  private createSessionState(): ChatSessionSummary {
-    const session = {
+  private snapshot() {
+    return {
+      userId: this.user!.userId,
+      username: this.user!.username,
+      sessions: this.user!.sessions,
+    }
+  }
+
+  private createSession(): Session {
+    const session: Session = {
       id: `mock-${crypto.randomUUID()}`,
       title: '新的会话',
-      updatedAt: now(),
+      updatedAt: Date.now(),
+      revision: 0,
+      messages: [],
+      runId: '',
+      cancelling: false,
     }
-    this.sessions = [session, ...this.sessions]
-    this.activeSessionId = session.id
-    this.messages.set(session.id, [])
+    this.user!.sessions.unshift(session)
+    this.publishSession(session)
     return session
   }
 
-  private currentMessages() {
-    return this.messages.get(this.activeSessionId) ?? []
+  private publishSession(session: Session, user = this.user) {
+    session.revision++
+    session.updatedAt = Date.now()
+    this.broadcast({ name: 'SessionUpdatedNtf', messageId: 0, payload: { session } }, user)
   }
 
-  private updateTitle(sessionId: string, text: string) {
-    this.sessions = this.sessions.map((session) =>
-      session.id === sessionId
-        ? {
-            ...session,
-            title: text.slice(0, 24) || '新的会话',
-            updatedAt: now(),
-          }
-        : session,
-    )
+  private broadcast(message: ServerMessage, user = this.user) {
+    for (const channel of user?.channels ?? []) channel.emit(message)
   }
 
   private emit(message: ServerMessage) {
     const generation = this.generation
+    const frame = encodeMessage(
+      message.messageId,
+      message.name,
+      message.payload as Record<string, unknown>,
+    )
     queueMicrotask(() => {
-      if (generation === this.generation) {
-        this.onMessage?.(
-          encodeMessage(
-            message.messageId,
-            message.name,
-            message.payload as Record<string, unknown>,
-          ),
-        )
-      }
+      if (generation === this.generation) this.onMessage?.(frame)
     })
   }
 }

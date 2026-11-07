@@ -104,11 +104,11 @@ async function connect() {
 async function startGeneration(prompt) {
   const socket = await connect();
   const login = waitFrame(socket, 1, "LoginRes");
-  send(socket, 1, "LoginReq", {});
+  send(socket, 1, "LoginReq", { username: "control-header" });
   const response = await login;
   assert.equal(response.ret, 1);
   send(socket, 2, "MessageSendReq", {
-    sessionId: response.snapshot.activeSessionId,
+    sessionId: response.snapshot.sessions[0].id,
     text: prompt,
   });
   return socket;
@@ -117,18 +117,18 @@ async function startGeneration(prompt) {
 const idle = await connect();
 const streaming = await connect();
 const login = waitFrame(streaming, 1, "LoginRes");
-send(streaming, 1, "LoginReq", {});
+send(streaming, 1, "LoginReq", { username: "control-stream" });
 const loginResponse = await login;
 assert.equal(loginResponse.ret, 1);
-const sessionId = loginResponse.snapshot.activeSessionId;
-const savedReply = waitFrame(streaming, 2, "MessageSendRes", (value) =>
-  value.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED,
+const sessionId = loginResponse.snapshot.sessions[0].id;
+const savedReply = waitFrame(streaming, 0, "SessionUpdatedNtf", (value) =>
+  !value.session.runId && value.session.messages.at(-1)?.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED,
 );
 send(streaming, 2, "MessageSendReq", {
   sessionId,
   text: "[e2e:history-set]",
 });
-assert.equal((await savedReply).message.content, "E2E 历史已保存");
+assert.equal((await savedReply).session.messages.at(-1).content, "E2E 历史已保存");
 const hotfixScript = fileURLToPath(
   new URL("../fixtures/hotfix/client_runtime.lua", import.meta.url),
 );
@@ -136,21 +136,21 @@ assert.match(
   await runConsole(`inject .main ${hotfixScript}`),
   /CLIENT_HOTFIX_OK/,
 );
-const selection = waitFrame(streaming, 3, "SessionSelectRes");
-send(streaming, 3, "SessionSelectReq", { sessionId });
+const selection = waitFrame(streaming, 3, "UserSnapshotRes");
+send(streaming, 3, "UserSnapshotReq", { sessionId });
 const selected = await selection;
 assert.equal(selected.ret, 1);
-assert.equal(selected.messages.length, 2);
-assert.equal(selected.messages[1].content, "E2E 历史已保存");
-const historyReply = waitFrame(streaming, 4, "MessageSendRes", (value) =>
-  value.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED,
+assert.equal(selected.snapshot.sessions[0].messages.length, 2);
+assert.equal(selected.snapshot.sessions[0].messages[1].content, "E2E 历史已保存");
+const historyReply = waitFrame(streaming, 0, "SessionUpdatedNtf", (value) =>
+  !value.session.runId && value.session.messages.at(-1)?.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED,
 );
 send(streaming, 4, "MessageSendReq", {
   sessionId,
   text: "[e2e:history-check]",
 });
-assert.equal((await historyReply).message.content, "E2E 历史通过");
-const delta = waitFrame(streaming, 5, "MessageSendRes", (value) =>
+assert.equal((await historyReply).session.messages.at(-1).content, "E2E 历史通过");
+const delta = waitFrame(streaming, 0, "MessageDeltaNtf", (value) =>
   Boolean(value.delta),
 );
 send(streaming, 5, "MessageSendReq", {

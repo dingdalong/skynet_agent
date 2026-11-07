@@ -31,11 +31,11 @@ describe("hotfix_watch", function()
         root = os.tmpname()
         os.remove(root)
         assert(lfs.mkdir(root))
-        for _, directory in ipairs({ "lualib", "lualib/base", "lualib/client", "lualib/helper", "lualib/luaext",
+        for _, directory in ipairs({ "lualib", "lualib/base", "lualib/helper", "lualib/luaext",
             "lualib/example", "service", "service/websocket" }) do
             assert(lfs.mkdir(root .. "/" .. directory))
         end
-        for _, path in ipairs({ "lualib/client/connection.lua", "lualib/base/rpc.lua",
+        for _, path in ipairs({ "lualib/user.lua", "lualib/base/rpc.lua",
             "service/websocket/websocket.lua",
             "main.lua", "service/init.lua", "lualib/base/hotfix.lua", "lualib/base/preload.lua",
             "lualib/luaext/table.lua", "lualib/helper/hotfix_watch.lua", "lualib/example/init.lua" }) do
@@ -112,7 +112,7 @@ describe("hotfix_watch", function()
     end)
 
     it("内容比较检测同秒同长度修改，稳定后覆盖主节点和全部就绪实例", function()
-        local path = root .. "/lualib/client/connection.lua"
+        local path = root .. "/lualib/user.lua"
         assert(lfs.touch(path, 1, 1))
         write(path, "return{ }")
         assert(lfs.touch(path, 1, 1))
@@ -124,7 +124,7 @@ describe("hotfix_watch", function()
         now = 20
         watch:poll()
         for index, address in ipairs({ 1, 11, 12 }) do
-            assert.same(table.pack(address, "debug", "HOTFIX", "client.connection"), calls[index])
+            assert.same(table.pack(address, "debug", "HOTFIX", "user"), calls[index])
         end
         assert.same({ "[hotfix_watch] reload 已更新 files=" .. path }, logs)
     end)

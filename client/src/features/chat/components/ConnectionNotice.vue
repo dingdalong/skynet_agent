@@ -25,7 +25,7 @@ const store = useChatStore()
       variant="secondary"
       size="small"
       :loading="store.connectionState === 'connecting'"
-      @click="store.connect"
+      @click="store.connect()"
     >
       重新连接
     </SkButton>

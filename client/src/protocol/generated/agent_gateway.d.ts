@@ -140,10 +140,7 @@ export namespace skynet {
                 error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
                 /** SessionCreateRes session. */
-                session?: (skynet.agent.v1.SessionSummary.$Properties|null);
-
-                /** SessionCreateRes messages. */
-                messages: skynet.agent.v1.ChatMessage.$Properties[];
+                session?: (skynet.agent.v1.SessionState.$Properties|null);
 
                 /**
                  * Creates a new SessionCreateRes instance using the specified properties.
@@ -229,10 +226,7 @@ export namespace skynet {
                     error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
                     /** SessionCreateRes session */
-                    session?: (skynet.agent.v1.SessionSummary.$Properties|null);
-
-                    /** SessionCreateRes messages */
-                    messages?: (skynet.agent.v1.ChatMessage.$Properties[]|null);
+                    session?: (skynet.agent.v1.SessionState.$Properties|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
@@ -240,244 +234,6 @@ export namespace skynet {
 
                 /** Shape of a SessionCreateRes. */
                 type $Shape = skynet.agent.v1.SessionCreateRes.$Properties;
-            }
-
-            /**
-             * Properties of a SessionSelectReq.
-             * @deprecated Use skynet.agent.v1.SessionSelectReq.$Properties instead.
-             */
-            interface ISessionSelectReq extends skynet.agent.v1.SessionSelectReq.$Properties {
-            }
-
-            /** Represents a SessionSelectReq. */
-            class SessionSelectReq {
-
-                /**
-                 * Constructs a new SessionSelectReq.
-                 * @param [properties] Properties to set
-                 */
-                constructor(properties?: skynet.agent.v1.SessionSelectReq.$Properties);
-
-                /** Unknown fields preserved while decoding when enabled */
-                $unknowns?: Uint8Array[];
-
-                /** SessionSelectReq sessionId. */
-                sessionId: string;
-
-                /**
-                 * Creates a new SessionSelectReq instance using the specified properties.
-                 * @param [properties] Properties to set
-                 * @returns SessionSelectReq instance
-                 */
-                static create(properties: skynet.agent.v1.SessionSelectReq.$Shape): skynet.agent.v1.SessionSelectReq & skynet.agent.v1.SessionSelectReq.$Shape;
-                static create(properties?: skynet.agent.v1.SessionSelectReq.$Properties): skynet.agent.v1.SessionSelectReq;
-
-                /**
-                 * Encodes the specified SessionSelectReq message. Does not implicitly {@link skynet.agent.v1.SessionSelectReq.verify|verify} messages.
-                 * @param message SessionSelectReq message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encode(message: skynet.agent.v1.SessionSelectReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Encodes the specified SessionSelectReq message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionSelectReq.verify|verify} messages.
-                 * @param message SessionSelectReq message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encodeDelimited(message: skynet.agent.v1.SessionSelectReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Decodes a SessionSelectReq message from the specified reader or buffer.
-                 * @param reader Reader or buffer to decode from
-                 * @param [length] Message length if known beforehand
-                 * @returns {skynet.agent.v1.SessionSelectReq & skynet.agent.v1.SessionSelectReq.$Shape} SessionSelectReq
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionSelectReq & skynet.agent.v1.SessionSelectReq.$Shape;
-
-                /**
-                 * Decodes a SessionSelectReq message from the specified reader or buffer, length delimited.
-                 * @param reader Reader or buffer to decode from
-                 * @returns {skynet.agent.v1.SessionSelectReq & skynet.agent.v1.SessionSelectReq.$Shape} SessionSelectReq
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionSelectReq & skynet.agent.v1.SessionSelectReq.$Shape;
-
-                /**
-                 * Verifies a SessionSelectReq message.
-                 * @param message Plain object to verify
-                 * @returns `null` if valid, otherwise the reason why it is not
-                 */
-                static verify(message: { [k: string]: any }): (string|null);
-
-                /**
-                 * Creates a SessionSelectReq message from a plain object. Also converts values to their respective internal types.
-                 * @param object Plain object
-                 * @returns SessionSelectReq
-                 */
-                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionSelectReq;
-
-                /**
-                 * Creates a plain object from a SessionSelectReq message. Also converts values to other types if specified.
-                 * @param message SessionSelectReq
-                 * @param [options] Conversion options
-                 * @returns Plain object
-                 */
-                static toObject(message: skynet.agent.v1.SessionSelectReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
-
-                /**
-                 * Converts this SessionSelectReq to JSON.
-                 * @returns JSON object
-                 */
-                toJSON(): { [k: string]: any };
-            }
-
-            namespace SessionSelectReq {
-
-                /** Properties of a SessionSelectReq. */
-                interface $Properties {
-
-                    /** SessionSelectReq sessionId */
-                    sessionId?: (string|null);
-
-                    /** Unknown fields preserved while decoding when enabled */
-                    $unknowns?: Uint8Array[];
-                }
-
-                /** Shape of a SessionSelectReq. */
-                type $Shape = skynet.agent.v1.SessionSelectReq.$Properties;
-            }
-
-            /**
-             * Properties of a SessionSelectRes.
-             * @deprecated Use skynet.agent.v1.SessionSelectRes.$Properties instead.
-             */
-            interface ISessionSelectRes extends skynet.agent.v1.SessionSelectRes.$Properties {
-            }
-
-            /** Represents a SessionSelectRes. */
-            class SessionSelectRes {
-
-                /**
-                 * Constructs a new SessionSelectRes.
-                 * @param [properties] Properties to set
-                 */
-                constructor(properties?: skynet.agent.v1.SessionSelectRes.$Properties);
-
-                /** Unknown fields preserved while decoding when enabled */
-                $unknowns?: Uint8Array[];
-
-                /** SessionSelectRes ret. */
-                ret: number;
-
-                /** SessionSelectRes error. */
-                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
-
-                /** SessionSelectRes sessionId. */
-                sessionId: string;
-
-                /** SessionSelectRes messages. */
-                messages: skynet.agent.v1.ChatMessage.$Properties[];
-
-                /**
-                 * Creates a new SessionSelectRes instance using the specified properties.
-                 * @param [properties] Properties to set
-                 * @returns SessionSelectRes instance
-                 */
-                static create(properties: skynet.agent.v1.SessionSelectRes.$Shape): skynet.agent.v1.SessionSelectRes & skynet.agent.v1.SessionSelectRes.$Shape;
-                static create(properties?: skynet.agent.v1.SessionSelectRes.$Properties): skynet.agent.v1.SessionSelectRes;
-
-                /**
-                 * Encodes the specified SessionSelectRes message. Does not implicitly {@link skynet.agent.v1.SessionSelectRes.verify|verify} messages.
-                 * @param message SessionSelectRes message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encode(message: skynet.agent.v1.SessionSelectRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Encodes the specified SessionSelectRes message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionSelectRes.verify|verify} messages.
-                 * @param message SessionSelectRes message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encodeDelimited(message: skynet.agent.v1.SessionSelectRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Decodes a SessionSelectRes message from the specified reader or buffer.
-                 * @param reader Reader or buffer to decode from
-                 * @param [length] Message length if known beforehand
-                 * @returns {skynet.agent.v1.SessionSelectRes & skynet.agent.v1.SessionSelectRes.$Shape} SessionSelectRes
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionSelectRes & skynet.agent.v1.SessionSelectRes.$Shape;
-
-                /**
-                 * Decodes a SessionSelectRes message from the specified reader or buffer, length delimited.
-                 * @param reader Reader or buffer to decode from
-                 * @returns {skynet.agent.v1.SessionSelectRes & skynet.agent.v1.SessionSelectRes.$Shape} SessionSelectRes
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionSelectRes & skynet.agent.v1.SessionSelectRes.$Shape;
-
-                /**
-                 * Verifies a SessionSelectRes message.
-                 * @param message Plain object to verify
-                 * @returns `null` if valid, otherwise the reason why it is not
-                 */
-                static verify(message: { [k: string]: any }): (string|null);
-
-                /**
-                 * Creates a SessionSelectRes message from a plain object. Also converts values to their respective internal types.
-                 * @param object Plain object
-                 * @returns SessionSelectRes
-                 */
-                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionSelectRes;
-
-                /**
-                 * Creates a plain object from a SessionSelectRes message. Also converts values to other types if specified.
-                 * @param message SessionSelectRes
-                 * @param [options] Conversion options
-                 * @returns Plain object
-                 */
-                static toObject(message: skynet.agent.v1.SessionSelectRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
-
-                /**
-                 * Converts this SessionSelectRes to JSON.
-                 * @returns JSON object
-                 */
-                toJSON(): { [k: string]: any };
-            }
-
-            namespace SessionSelectRes {
-
-                /** Properties of a SessionSelectRes. */
-                interface $Properties {
-
-                    /** SessionSelectRes ret */
-                    ret?: (number|null);
-
-                    /** SessionSelectRes error */
-                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
-
-                    /** SessionSelectRes sessionId */
-                    sessionId?: (string|null);
-
-                    /** SessionSelectRes messages */
-                    messages?: (skynet.agent.v1.ChatMessage.$Properties[]|null);
-
-                    /** Unknown fields preserved while decoding when enabled */
-                    $unknowns?: Uint8Array[];
-                }
-
-                /** Shape of a SessionSelectRes. */
-                type $Shape = skynet.agent.v1.SessionSelectRes.$Properties;
             }
 
             /**
@@ -504,6 +260,9 @@ export namespace skynet {
 
                 /** MessageSendReq text. */
                 text: string;
+
+                /** MessageSendReq retryRunId. */
+                retryRunId: string;
 
                 /**
                  * Creates a new MessageSendReq instance using the specified properties.
@@ -588,28 +347,15 @@ export namespace skynet {
                     /** MessageSendReq text */
                     text?: (string|null);
 
+                    /** MessageSendReq retryRunId */
+                    retryRunId?: (string|null);
+
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
 
                 /** Shape of a MessageSendReq. */
                 type $Shape = skynet.agent.v1.MessageSendReq.$Properties;
-            }
-
-            /** MessageStatus enum. */
-            enum MessageStatus {
-
-                /** MESSAGE_STATUS_UNSPECIFIED value */
-                MESSAGE_STATUS_UNSPECIFIED = 0,
-
-                /** MESSAGE_STATUS_STREAMING value */
-                MESSAGE_STATUS_STREAMING = 1,
-
-                /** MESSAGE_STATUS_COMPLETED value */
-                MESSAGE_STATUS_COMPLETED = 2,
-
-                /** MESSAGE_STATUS_CANCELLED value */
-                MESSAGE_STATUS_CANCELLED = 3
             }
 
             /**
@@ -637,17 +383,8 @@ export namespace skynet {
                 /** MessageSendRes error. */
                 error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
-                /** MessageSendRes sessionId. */
-                sessionId: string;
-
-                /** MessageSendRes delta. */
-                delta: string;
-
-                /** MessageSendRes message. */
-                message?: (skynet.agent.v1.ChatMessage.$Properties|null);
-
-                /** MessageSendRes status. */
-                status: skynet.agent.v1.MessageStatus;
+                /** MessageSendRes session. */
+                session?: (skynet.agent.v1.SessionState.$Properties|null);
 
                 /**
                  * Creates a new MessageSendRes instance using the specified properties.
@@ -732,17 +469,8 @@ export namespace skynet {
                     /** MessageSendRes error */
                     error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
-                    /** MessageSendRes sessionId */
-                    sessionId?: (string|null);
-
-                    /** MessageSendRes delta */
-                    delta?: (string|null);
-
-                    /** MessageSendRes message */
-                    message?: (skynet.agent.v1.ChatMessage.$Properties|null);
-
-                    /** MessageSendRes status */
-                    status?: (skynet.agent.v1.MessageStatus|null);
+                    /** MessageSendRes session */
+                    session?: (skynet.agent.v1.SessionState.$Properties|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
@@ -771,8 +499,11 @@ export namespace skynet {
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
 
-                /** MessageCancelReq targetMessageId. */
-                targetMessageId: number;
+                /** MessageCancelReq sessionId. */
+                sessionId: string;
+
+                /** MessageCancelReq runId. */
+                runId: string;
 
                 /**
                  * Creates a new MessageCancelReq instance using the specified properties.
@@ -851,8 +582,11 @@ export namespace skynet {
                 /** Properties of a MessageCancelReq. */
                 interface $Properties {
 
-                    /** MessageCancelReq targetMessageId */
-                    targetMessageId?: (number|null);
+                    /** MessageCancelReq sessionId */
+                    sessionId?: (string|null);
+
+                    /** MessageCancelReq runId */
+                    runId?: (string|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
@@ -979,6 +713,250 @@ export namespace skynet {
             }
 
             /**
+             * Properties of a SessionUpdatedNtf.
+             * @deprecated Use skynet.agent.v1.SessionUpdatedNtf.$Properties instead.
+             */
+            interface ISessionUpdatedNtf extends skynet.agent.v1.SessionUpdatedNtf.$Properties {
+            }
+
+            /** Represents a SessionUpdatedNtf. */
+            class SessionUpdatedNtf {
+
+                /**
+                 * Constructs a new SessionUpdatedNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.SessionUpdatedNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** SessionUpdatedNtf session. */
+                session?: (skynet.agent.v1.SessionState.$Properties|null);
+
+                /**
+                 * Creates a new SessionUpdatedNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns SessionUpdatedNtf instance
+                 */
+                static create(properties: skynet.agent.v1.SessionUpdatedNtf.$Shape): skynet.agent.v1.SessionUpdatedNtf & skynet.agent.v1.SessionUpdatedNtf.$Shape;
+                static create(properties?: skynet.agent.v1.SessionUpdatedNtf.$Properties): skynet.agent.v1.SessionUpdatedNtf;
+
+                /**
+                 * Encodes the specified SessionUpdatedNtf message. Does not implicitly {@link skynet.agent.v1.SessionUpdatedNtf.verify|verify} messages.
+                 * @param message SessionUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.SessionUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified SessionUpdatedNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionUpdatedNtf.verify|verify} messages.
+                 * @param message SessionUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.SessionUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a SessionUpdatedNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionUpdatedNtf & skynet.agent.v1.SessionUpdatedNtf.$Shape} SessionUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionUpdatedNtf & skynet.agent.v1.SessionUpdatedNtf.$Shape;
+
+                /**
+                 * Decodes a SessionUpdatedNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionUpdatedNtf & skynet.agent.v1.SessionUpdatedNtf.$Shape} SessionUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionUpdatedNtf & skynet.agent.v1.SessionUpdatedNtf.$Shape;
+
+                /**
+                 * Verifies a SessionUpdatedNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a SessionUpdatedNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns SessionUpdatedNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionUpdatedNtf;
+
+                /**
+                 * Creates a plain object from a SessionUpdatedNtf message. Also converts values to other types if specified.
+                 * @param message SessionUpdatedNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.SessionUpdatedNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this SessionUpdatedNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace SessionUpdatedNtf {
+
+                /** Properties of a SessionUpdatedNtf. */
+                interface $Properties {
+
+                    /** SessionUpdatedNtf session */
+                    session?: (skynet.agent.v1.SessionState.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a SessionUpdatedNtf. */
+                type $Shape = skynet.agent.v1.SessionUpdatedNtf.$Properties;
+            }
+
+            /**
+             * Properties of a MessageDeltaNtf.
+             * @deprecated Use skynet.agent.v1.MessageDeltaNtf.$Properties instead.
+             */
+            interface IMessageDeltaNtf extends skynet.agent.v1.MessageDeltaNtf.$Properties {
+            }
+
+            /** Represents a MessageDeltaNtf. */
+            class MessageDeltaNtf {
+
+                /**
+                 * Constructs a new MessageDeltaNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.MessageDeltaNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** MessageDeltaNtf sessionId. */
+                sessionId: string;
+
+                /** MessageDeltaNtf runId. */
+                runId: string;
+
+                /** MessageDeltaNtf messageId. */
+                messageId: string;
+
+                /** MessageDeltaNtf delta. */
+                delta: string;
+
+                /** MessageDeltaNtf revision. */
+                revision: number;
+
+                /**
+                 * Creates a new MessageDeltaNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns MessageDeltaNtf instance
+                 */
+                static create(properties: skynet.agent.v1.MessageDeltaNtf.$Shape): skynet.agent.v1.MessageDeltaNtf & skynet.agent.v1.MessageDeltaNtf.$Shape;
+                static create(properties?: skynet.agent.v1.MessageDeltaNtf.$Properties): skynet.agent.v1.MessageDeltaNtf;
+
+                /**
+                 * Encodes the specified MessageDeltaNtf message. Does not implicitly {@link skynet.agent.v1.MessageDeltaNtf.verify|verify} messages.
+                 * @param message MessageDeltaNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.MessageDeltaNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified MessageDeltaNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.MessageDeltaNtf.verify|verify} messages.
+                 * @param message MessageDeltaNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.MessageDeltaNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a MessageDeltaNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.MessageDeltaNtf & skynet.agent.v1.MessageDeltaNtf.$Shape} MessageDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.MessageDeltaNtf & skynet.agent.v1.MessageDeltaNtf.$Shape;
+
+                /**
+                 * Decodes a MessageDeltaNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.MessageDeltaNtf & skynet.agent.v1.MessageDeltaNtf.$Shape} MessageDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.MessageDeltaNtf & skynet.agent.v1.MessageDeltaNtf.$Shape;
+
+                /**
+                 * Verifies a MessageDeltaNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a MessageDeltaNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns MessageDeltaNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.MessageDeltaNtf;
+
+                /**
+                 * Creates a plain object from a MessageDeltaNtf message. Also converts values to other types if specified.
+                 * @param message MessageDeltaNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.MessageDeltaNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this MessageDeltaNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace MessageDeltaNtf {
+
+                /** Properties of a MessageDeltaNtf. */
+                interface $Properties {
+
+                    /** MessageDeltaNtf sessionId */
+                    sessionId?: (string|null);
+
+                    /** MessageDeltaNtf runId */
+                    runId?: (string|null);
+
+                    /** MessageDeltaNtf messageId */
+                    messageId?: (string|null);
+
+                    /** MessageDeltaNtf delta */
+                    delta?: (string|null);
+
+                    /** MessageDeltaNtf revision */
+                    revision?: (number|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a MessageDeltaNtf. */
+                type $Shape = skynet.agent.v1.MessageDeltaNtf.$Properties;
+            }
+
+            /**
              * Properties of an ErrorInfo.
              * @deprecated Use skynet.agent.v1.ErrorInfo.$Properties instead.
              */
@@ -1094,128 +1072,6 @@ export namespace skynet {
                 type $Shape = skynet.agent.v1.ErrorInfo.$Properties;
             }
 
-            /**
-             * Properties of a SessionSummary.
-             * @deprecated Use skynet.agent.v1.SessionSummary.$Properties instead.
-             */
-            interface ISessionSummary extends skynet.agent.v1.SessionSummary.$Properties {
-            }
-
-            /** Represents a SessionSummary. */
-            class SessionSummary {
-
-                /**
-                 * Constructs a new SessionSummary.
-                 * @param [properties] Properties to set
-                 */
-                constructor(properties?: skynet.agent.v1.SessionSummary.$Properties);
-
-                /** Unknown fields preserved while decoding when enabled */
-                $unknowns?: Uint8Array[];
-
-                /** SessionSummary id. */
-                id: string;
-
-                /** SessionSummary title. */
-                title: string;
-
-                /** SessionSummary updatedAt. */
-                updatedAt: number;
-
-                /**
-                 * Creates a new SessionSummary instance using the specified properties.
-                 * @param [properties] Properties to set
-                 * @returns SessionSummary instance
-                 */
-                static create(properties: skynet.agent.v1.SessionSummary.$Shape): skynet.agent.v1.SessionSummary & skynet.agent.v1.SessionSummary.$Shape;
-                static create(properties?: skynet.agent.v1.SessionSummary.$Properties): skynet.agent.v1.SessionSummary;
-
-                /**
-                 * Encodes the specified SessionSummary message. Does not implicitly {@link skynet.agent.v1.SessionSummary.verify|verify} messages.
-                 * @param message SessionSummary message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encode(message: skynet.agent.v1.SessionSummary.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Encodes the specified SessionSummary message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionSummary.verify|verify} messages.
-                 * @param message SessionSummary message or plain object to encode
-                 * @param [writer] Writer to encode to
-                 * @returns Writer
-                 */
-                static encodeDelimited(message: skynet.agent.v1.SessionSummary.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
-
-                /**
-                 * Decodes a SessionSummary message from the specified reader or buffer.
-                 * @param reader Reader or buffer to decode from
-                 * @param [length] Message length if known beforehand
-                 * @returns {skynet.agent.v1.SessionSummary & skynet.agent.v1.SessionSummary.$Shape} SessionSummary
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionSummary & skynet.agent.v1.SessionSummary.$Shape;
-
-                /**
-                 * Decodes a SessionSummary message from the specified reader or buffer, length delimited.
-                 * @param reader Reader or buffer to decode from
-                 * @returns {skynet.agent.v1.SessionSummary & skynet.agent.v1.SessionSummary.$Shape} SessionSummary
-                 * @throws {Error} If the payload is not a reader or valid buffer
-                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
-                 */
-                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionSummary & skynet.agent.v1.SessionSummary.$Shape;
-
-                /**
-                 * Verifies a SessionSummary message.
-                 * @param message Plain object to verify
-                 * @returns `null` if valid, otherwise the reason why it is not
-                 */
-                static verify(message: { [k: string]: any }): (string|null);
-
-                /**
-                 * Creates a SessionSummary message from a plain object. Also converts values to their respective internal types.
-                 * @param object Plain object
-                 * @returns SessionSummary
-                 */
-                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionSummary;
-
-                /**
-                 * Creates a plain object from a SessionSummary message. Also converts values to other types if specified.
-                 * @param message SessionSummary
-                 * @param [options] Conversion options
-                 * @returns Plain object
-                 */
-                static toObject(message: skynet.agent.v1.SessionSummary, options?: $protobuf.IConversionOptions): { [k: string]: any };
-
-                /**
-                 * Converts this SessionSummary to JSON.
-                 * @returns JSON object
-                 */
-                toJSON(): { [k: string]: any };
-            }
-
-            namespace SessionSummary {
-
-                /** Properties of a SessionSummary. */
-                interface $Properties {
-
-                    /** SessionSummary id */
-                    id?: (string|null);
-
-                    /** SessionSummary title */
-                    title?: (string|null);
-
-                    /** SessionSummary updatedAt */
-                    updatedAt?: (number|null);
-
-                    /** Unknown fields preserved while decoding when enabled */
-                    $unknowns?: Uint8Array[];
-                }
-
-                /** Shape of a SessionSummary. */
-                type $Shape = skynet.agent.v1.SessionSummary.$Properties;
-            }
-
             /** MessageRole enum. */
             enum MessageRole {
 
@@ -1227,6 +1083,25 @@ export namespace skynet {
 
                 /** MESSAGE_ROLE_ASSISTANT value */
                 MESSAGE_ROLE_ASSISTANT = 2
+            }
+
+            /** MessageStatus enum. */
+            enum MessageStatus {
+
+                /** MESSAGE_STATUS_UNSPECIFIED value */
+                MESSAGE_STATUS_UNSPECIFIED = 0,
+
+                /** MESSAGE_STATUS_STREAMING value */
+                MESSAGE_STATUS_STREAMING = 1,
+
+                /** MESSAGE_STATUS_COMPLETED value */
+                MESSAGE_STATUS_COMPLETED = 2,
+
+                /** MESSAGE_STATUS_CANCELLED value */
+                MESSAGE_STATUS_CANCELLED = 3,
+
+                /** MESSAGE_STATUS_FAILED value */
+                MESSAGE_STATUS_FAILED = 4
             }
 
             /**
@@ -1259,6 +1134,18 @@ export namespace skynet {
 
                 /** ChatMessage createdAt. */
                 createdAt: number;
+
+                /** ChatMessage status. */
+                status: skynet.agent.v1.MessageStatus;
+
+                /** ChatMessage runId. */
+                runId: string;
+
+                /** ChatMessage error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /** ChatMessage ret. */
+                ret: number;
 
                 /**
                  * Creates a new ChatMessage instance using the specified properties.
@@ -1349,6 +1236,18 @@ export namespace skynet {
                     /** ChatMessage createdAt */
                     createdAt?: (number|null);
 
+                    /** ChatMessage status */
+                    status?: (skynet.agent.v1.MessageStatus|null);
+
+                    /** ChatMessage runId */
+                    runId?: (string|null);
+
+                    /** ChatMessage error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** ChatMessage ret */
+                    ret?: (number|null);
+
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
@@ -1358,125 +1257,271 @@ export namespace skynet {
             }
 
             /**
-             * Properties of a SessionSnapshot.
-             * @deprecated Use skynet.agent.v1.SessionSnapshot.$Properties instead.
+             * Properties of a SessionState.
+             * @deprecated Use skynet.agent.v1.SessionState.$Properties instead.
              */
-            interface ISessionSnapshot extends skynet.agent.v1.SessionSnapshot.$Properties {
+            interface ISessionState extends skynet.agent.v1.SessionState.$Properties {
             }
 
-            /** Represents a SessionSnapshot. */
-            class SessionSnapshot {
+            /** Represents a SessionState. */
+            class SessionState {
 
                 /**
-                 * Constructs a new SessionSnapshot.
+                 * Constructs a new SessionState.
                  * @param [properties] Properties to set
                  */
-                constructor(properties?: skynet.agent.v1.SessionSnapshot.$Properties);
+                constructor(properties?: skynet.agent.v1.SessionState.$Properties);
 
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
 
-                /** SessionSnapshot sessions. */
-                sessions: skynet.agent.v1.SessionSummary.$Properties[];
+                /** SessionState id. */
+                id: string;
 
-                /** SessionSnapshot activeSessionId. */
-                activeSessionId: string;
+                /** SessionState title. */
+                title: string;
 
-                /** SessionSnapshot messages. */
+                /** SessionState updatedAt. */
+                updatedAt: number;
+
+                /** SessionState revision. */
+                revision: number;
+
+                /** SessionState messages. */
                 messages: skynet.agent.v1.ChatMessage.$Properties[];
 
+                /** SessionState runId. */
+                runId: string;
+
+                /** SessionState cancelling. */
+                cancelling: boolean;
+
                 /**
-                 * Creates a new SessionSnapshot instance using the specified properties.
+                 * Creates a new SessionState instance using the specified properties.
                  * @param [properties] Properties to set
-                 * @returns SessionSnapshot instance
+                 * @returns SessionState instance
                  */
-                static create(properties: skynet.agent.v1.SessionSnapshot.$Shape): skynet.agent.v1.SessionSnapshot & skynet.agent.v1.SessionSnapshot.$Shape;
-                static create(properties?: skynet.agent.v1.SessionSnapshot.$Properties): skynet.agent.v1.SessionSnapshot;
+                static create(properties: skynet.agent.v1.SessionState.$Shape): skynet.agent.v1.SessionState & skynet.agent.v1.SessionState.$Shape;
+                static create(properties?: skynet.agent.v1.SessionState.$Properties): skynet.agent.v1.SessionState;
 
                 /**
-                 * Encodes the specified SessionSnapshot message. Does not implicitly {@link skynet.agent.v1.SessionSnapshot.verify|verify} messages.
-                 * @param message SessionSnapshot message or plain object to encode
+                 * Encodes the specified SessionState message. Does not implicitly {@link skynet.agent.v1.SessionState.verify|verify} messages.
+                 * @param message SessionState message or plain object to encode
                  * @param [writer] Writer to encode to
                  * @returns Writer
                  */
-                static encode(message: skynet.agent.v1.SessionSnapshot.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+                static encode(message: skynet.agent.v1.SessionState.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
 
                 /**
-                 * Encodes the specified SessionSnapshot message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionSnapshot.verify|verify} messages.
-                 * @param message SessionSnapshot message or plain object to encode
+                 * Encodes the specified SessionState message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionState.verify|verify} messages.
+                 * @param message SessionState message or plain object to encode
                  * @param [writer] Writer to encode to
                  * @returns Writer
                  */
-                static encodeDelimited(message: skynet.agent.v1.SessionSnapshot.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+                static encodeDelimited(message: skynet.agent.v1.SessionState.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
 
                 /**
-                 * Decodes a SessionSnapshot message from the specified reader or buffer.
+                 * Decodes a SessionState message from the specified reader or buffer.
                  * @param reader Reader or buffer to decode from
                  * @param [length] Message length if known beforehand
-                 * @returns {skynet.agent.v1.SessionSnapshot & skynet.agent.v1.SessionSnapshot.$Shape} SessionSnapshot
+                 * @returns {skynet.agent.v1.SessionState & skynet.agent.v1.SessionState.$Shape} SessionState
                  * @throws {Error} If the payload is not a reader or valid buffer
                  * @throws {$protobuf.util.ProtocolError} If required fields are missing
                  */
-                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionSnapshot & skynet.agent.v1.SessionSnapshot.$Shape;
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionState & skynet.agent.v1.SessionState.$Shape;
 
                 /**
-                 * Decodes a SessionSnapshot message from the specified reader or buffer, length delimited.
+                 * Decodes a SessionState message from the specified reader or buffer, length delimited.
                  * @param reader Reader or buffer to decode from
-                 * @returns {skynet.agent.v1.SessionSnapshot & skynet.agent.v1.SessionSnapshot.$Shape} SessionSnapshot
+                 * @returns {skynet.agent.v1.SessionState & skynet.agent.v1.SessionState.$Shape} SessionState
                  * @throws {Error} If the payload is not a reader or valid buffer
                  * @throws {$protobuf.util.ProtocolError} If required fields are missing
                  */
-                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionSnapshot & skynet.agent.v1.SessionSnapshot.$Shape;
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionState & skynet.agent.v1.SessionState.$Shape;
 
                 /**
-                 * Verifies a SessionSnapshot message.
+                 * Verifies a SessionState message.
                  * @param message Plain object to verify
                  * @returns `null` if valid, otherwise the reason why it is not
                  */
                 static verify(message: { [k: string]: any }): (string|null);
 
                 /**
-                 * Creates a SessionSnapshot message from a plain object. Also converts values to their respective internal types.
+                 * Creates a SessionState message from a plain object. Also converts values to their respective internal types.
                  * @param object Plain object
-                 * @returns SessionSnapshot
+                 * @returns SessionState
                  */
-                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionSnapshot;
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionState;
 
                 /**
-                 * Creates a plain object from a SessionSnapshot message. Also converts values to other types if specified.
-                 * @param message SessionSnapshot
+                 * Creates a plain object from a SessionState message. Also converts values to other types if specified.
+                 * @param message SessionState
                  * @param [options] Conversion options
                  * @returns Plain object
                  */
-                static toObject(message: skynet.agent.v1.SessionSnapshot, options?: $protobuf.IConversionOptions): { [k: string]: any };
+                static toObject(message: skynet.agent.v1.SessionState, options?: $protobuf.IConversionOptions): { [k: string]: any };
 
                 /**
-                 * Converts this SessionSnapshot to JSON.
+                 * Converts this SessionState to JSON.
                  * @returns JSON object
                  */
                 toJSON(): { [k: string]: any };
             }
 
-            namespace SessionSnapshot {
+            namespace SessionState {
 
-                /** Properties of a SessionSnapshot. */
+                /** Properties of a SessionState. */
                 interface $Properties {
 
-                    /** SessionSnapshot sessions */
-                    sessions?: (skynet.agent.v1.SessionSummary.$Properties[]|null);
+                    /** SessionState id */
+                    id?: (string|null);
 
-                    /** SessionSnapshot activeSessionId */
-                    activeSessionId?: (string|null);
+                    /** SessionState title */
+                    title?: (string|null);
 
-                    /** SessionSnapshot messages */
+                    /** SessionState updatedAt */
+                    updatedAt?: (number|null);
+
+                    /** SessionState revision */
+                    revision?: (number|null);
+
+                    /** SessionState messages */
                     messages?: (skynet.agent.v1.ChatMessage.$Properties[]|null);
+
+                    /** SessionState runId */
+                    runId?: (string|null);
+
+                    /** SessionState cancelling */
+                    cancelling?: (boolean|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
 
-                /** Shape of a SessionSnapshot. */
-                type $Shape = skynet.agent.v1.SessionSnapshot.$Properties;
+                /** Shape of a SessionState. */
+                type $Shape = skynet.agent.v1.SessionState.$Properties;
+            }
+
+            /**
+             * Properties of a UserSnapshot.
+             * @deprecated Use skynet.agent.v1.UserSnapshot.$Properties instead.
+             */
+            interface IUserSnapshot extends skynet.agent.v1.UserSnapshot.$Properties {
+            }
+
+            /** Represents a UserSnapshot. */
+            class UserSnapshot {
+
+                /**
+                 * Constructs a new UserSnapshot.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.UserSnapshot.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** UserSnapshot userId. */
+                userId: string;
+
+                /** UserSnapshot username. */
+                username: string;
+
+                /** UserSnapshot sessions. */
+                sessions: skynet.agent.v1.SessionState.$Properties[];
+
+                /**
+                 * Creates a new UserSnapshot instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns UserSnapshot instance
+                 */
+                static create(properties: skynet.agent.v1.UserSnapshot.$Shape): skynet.agent.v1.UserSnapshot & skynet.agent.v1.UserSnapshot.$Shape;
+                static create(properties?: skynet.agent.v1.UserSnapshot.$Properties): skynet.agent.v1.UserSnapshot;
+
+                /**
+                 * Encodes the specified UserSnapshot message. Does not implicitly {@link skynet.agent.v1.UserSnapshot.verify|verify} messages.
+                 * @param message UserSnapshot message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.UserSnapshot.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified UserSnapshot message, length delimited. Does not implicitly {@link skynet.agent.v1.UserSnapshot.verify|verify} messages.
+                 * @param message UserSnapshot message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.UserSnapshot.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a UserSnapshot message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.UserSnapshot & skynet.agent.v1.UserSnapshot.$Shape} UserSnapshot
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.UserSnapshot & skynet.agent.v1.UserSnapshot.$Shape;
+
+                /**
+                 * Decodes a UserSnapshot message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.UserSnapshot & skynet.agent.v1.UserSnapshot.$Shape} UserSnapshot
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.UserSnapshot & skynet.agent.v1.UserSnapshot.$Shape;
+
+                /**
+                 * Verifies a UserSnapshot message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a UserSnapshot message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns UserSnapshot
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.UserSnapshot;
+
+                /**
+                 * Creates a plain object from a UserSnapshot message. Also converts values to other types if specified.
+                 * @param message UserSnapshot
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.UserSnapshot, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this UserSnapshot to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace UserSnapshot {
+
+                /** Properties of a UserSnapshot. */
+                interface $Properties {
+
+                    /** UserSnapshot userId */
+                    userId?: (string|null);
+
+                    /** UserSnapshot username */
+                    username?: (string|null);
+
+                    /** UserSnapshot sessions */
+                    sessions?: (skynet.agent.v1.SessionState.$Properties[]|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a UserSnapshot. */
+                type $Shape = skynet.agent.v1.UserSnapshot.$Properties;
             }
 
             /**
@@ -1497,6 +1542,9 @@ export namespace skynet {
 
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
+
+                /** LoginReq username. */
+                username: string;
 
                 /**
                  * Creates a new LoginReq instance using the specified properties.
@@ -1575,6 +1623,9 @@ export namespace skynet {
                 /** Properties of a LoginReq. */
                 interface $Properties {
 
+                    /** LoginReq username */
+                    username?: (string|null);
+
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
@@ -1609,7 +1660,7 @@ export namespace skynet {
                 error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
                 /** LoginRes snapshot. */
-                snapshot?: (skynet.agent.v1.SessionSnapshot.$Properties|null);
+                snapshot?: (skynet.agent.v1.UserSnapshot.$Properties|null);
 
                 /**
                  * Creates a new LoginRes instance using the specified properties.
@@ -1695,7 +1746,7 @@ export namespace skynet {
                     error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
 
                     /** LoginRes snapshot */
-                    snapshot?: (skynet.agent.v1.SessionSnapshot.$Properties|null);
+                    snapshot?: (skynet.agent.v1.UserSnapshot.$Properties|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
@@ -1703,6 +1754,232 @@ export namespace skynet {
 
                 /** Shape of a LoginRes. */
                 type $Shape = skynet.agent.v1.LoginRes.$Properties;
+            }
+
+            /**
+             * Properties of a UserSnapshotReq.
+             * @deprecated Use skynet.agent.v1.UserSnapshotReq.$Properties instead.
+             */
+            interface IUserSnapshotReq extends skynet.agent.v1.UserSnapshotReq.$Properties {
+            }
+
+            /** Represents a UserSnapshotReq. */
+            class UserSnapshotReq {
+
+                /**
+                 * Constructs a new UserSnapshotReq.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.UserSnapshotReq.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /**
+                 * Creates a new UserSnapshotReq instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns UserSnapshotReq instance
+                 */
+                static create(properties: skynet.agent.v1.UserSnapshotReq.$Shape): skynet.agent.v1.UserSnapshotReq & skynet.agent.v1.UserSnapshotReq.$Shape;
+                static create(properties?: skynet.agent.v1.UserSnapshotReq.$Properties): skynet.agent.v1.UserSnapshotReq;
+
+                /**
+                 * Encodes the specified UserSnapshotReq message. Does not implicitly {@link skynet.agent.v1.UserSnapshotReq.verify|verify} messages.
+                 * @param message UserSnapshotReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.UserSnapshotReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified UserSnapshotReq message, length delimited. Does not implicitly {@link skynet.agent.v1.UserSnapshotReq.verify|verify} messages.
+                 * @param message UserSnapshotReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.UserSnapshotReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a UserSnapshotReq message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.UserSnapshotReq & skynet.agent.v1.UserSnapshotReq.$Shape} UserSnapshotReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.UserSnapshotReq & skynet.agent.v1.UserSnapshotReq.$Shape;
+
+                /**
+                 * Decodes a UserSnapshotReq message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.UserSnapshotReq & skynet.agent.v1.UserSnapshotReq.$Shape} UserSnapshotReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.UserSnapshotReq & skynet.agent.v1.UserSnapshotReq.$Shape;
+
+                /**
+                 * Verifies a UserSnapshotReq message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a UserSnapshotReq message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns UserSnapshotReq
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.UserSnapshotReq;
+
+                /**
+                 * Creates a plain object from a UserSnapshotReq message. Also converts values to other types if specified.
+                 * @param message UserSnapshotReq
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.UserSnapshotReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this UserSnapshotReq to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace UserSnapshotReq {
+
+                /** Properties of a UserSnapshotReq. */
+                interface $Properties {
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a UserSnapshotReq. */
+                type $Shape = skynet.agent.v1.UserSnapshotReq.$Properties;
+            }
+
+            /**
+             * Properties of a UserSnapshotRes.
+             * @deprecated Use skynet.agent.v1.UserSnapshotRes.$Properties instead.
+             */
+            interface IUserSnapshotRes extends skynet.agent.v1.UserSnapshotRes.$Properties {
+            }
+
+            /** Represents a UserSnapshotRes. */
+            class UserSnapshotRes {
+
+                /**
+                 * Constructs a new UserSnapshotRes.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.UserSnapshotRes.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** UserSnapshotRes ret. */
+                ret: number;
+
+                /** UserSnapshotRes error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /** UserSnapshotRes snapshot. */
+                snapshot?: (skynet.agent.v1.UserSnapshot.$Properties|null);
+
+                /**
+                 * Creates a new UserSnapshotRes instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns UserSnapshotRes instance
+                 */
+                static create(properties: skynet.agent.v1.UserSnapshotRes.$Shape): skynet.agent.v1.UserSnapshotRes & skynet.agent.v1.UserSnapshotRes.$Shape;
+                static create(properties?: skynet.agent.v1.UserSnapshotRes.$Properties): skynet.agent.v1.UserSnapshotRes;
+
+                /**
+                 * Encodes the specified UserSnapshotRes message. Does not implicitly {@link skynet.agent.v1.UserSnapshotRes.verify|verify} messages.
+                 * @param message UserSnapshotRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.UserSnapshotRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified UserSnapshotRes message, length delimited. Does not implicitly {@link skynet.agent.v1.UserSnapshotRes.verify|verify} messages.
+                 * @param message UserSnapshotRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.UserSnapshotRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a UserSnapshotRes message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.UserSnapshotRes & skynet.agent.v1.UserSnapshotRes.$Shape} UserSnapshotRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.UserSnapshotRes & skynet.agent.v1.UserSnapshotRes.$Shape;
+
+                /**
+                 * Decodes a UserSnapshotRes message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.UserSnapshotRes & skynet.agent.v1.UserSnapshotRes.$Shape} UserSnapshotRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.UserSnapshotRes & skynet.agent.v1.UserSnapshotRes.$Shape;
+
+                /**
+                 * Verifies a UserSnapshotRes message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a UserSnapshotRes message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns UserSnapshotRes
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.UserSnapshotRes;
+
+                /**
+                 * Creates a plain object from a UserSnapshotRes message. Also converts values to other types if specified.
+                 * @param message UserSnapshotRes
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.UserSnapshotRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this UserSnapshotRes to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace UserSnapshotRes {
+
+                /** Properties of a UserSnapshotRes. */
+                interface $Properties {
+
+                    /** UserSnapshotRes ret */
+                    ret?: (number|null);
+
+                    /** UserSnapshotRes error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** UserSnapshotRes snapshot */
+                    snapshot?: (skynet.agent.v1.UserSnapshot.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a UserSnapshotRes. */
+                type $Shape = skynet.agent.v1.UserSnapshotRes.$Properties;
             }
         }
     }

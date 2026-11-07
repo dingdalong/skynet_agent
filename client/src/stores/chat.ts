@@ -1,39 +1,46 @@
 import { defineStore } from 'pinia'
 import { computed, markRaw, ref } from 'vue'
 import { createChatTransport } from '../services/chat-transport'
-import { ResponseError } from '../protocol/chat-mapper'
+import {
+  normalizeUsername,
+  readUsername,
+  saveUsername,
+  readSelectedSession,
+  saveSelectedSession,
+} from '../services/user-preferences'
 import type {
-  ChatMessage,
-  ChatSessionSummary,
+  ChatSession,
   ChatSessionView,
   ChatTransport,
+  ChatUpdate,
   ConnectionState,
-  FailedReply,
-  StreamRequest,
+  UserSnapshot,
 } from '../types/chat'
 
 export const useChatStore = defineStore('chat', () => {
   let transport = markRaw(createChatTransport())
   let unsubscribe: (() => void) | null = null
   let generation = 0
-  let sessionQueue = Promise.resolve(true)
-  let activeRun: {
-    request: StreamRequest | null
-    assistant: ChatMessage
-    view: ChatSessionView
-  } | null = null
-
-  const sessions = ref<ChatSessionSummary[]>([])
+  let baselineReady = false
+  let buffered: ChatUpdate[] = []
+  let syncing = false
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+  let reconnectAttempt = 0
+  const username = ref(readUsername())
+  const userId = ref('')
   const sessionViews = ref(new Map<string, ChatSessionView>())
   const activeSessionId = ref<string | null>(null)
   const connectionState = ref<ConnectionState>('idle')
   const connectionError = ref('')
-  const runState = ref<'idle' | 'running' | 'cancelling'>('idle')
   const sessionOperations = ref(0)
-  const activeSession = computed(
-    () => sessions.value.find((item) => item.id === activeSessionId.value) ?? null,
+  const pendingSends = ref(new Set<string>())
+  const sessions = computed(() =>
+    [...sessionViews.value.values()].sort(
+      (a, b) => b.updatedAt - a.updatedAt || b.id.localeCompare(a.id),
+    ),
   )
   const activeView = computed(() => sessionViews.value.get(activeSessionId.value ?? ''))
+  const activeSession = activeView
   const messages = computed(() => activeView.value?.messages ?? [])
   const draft = computed({
     get: () => activeView.value?.draft ?? '',
@@ -41,265 +48,272 @@ export const useChatStore = defineStore('chat', () => {
       if (activeView.value) activeView.value.draft = value
     },
   })
+  const runState = computed<'idle' | 'running' | 'cancelling'>(() => {
+    if (activeView.value?.cancelling) return 'cancelling'
+    return activeView.value?.runId || pendingSends.value.has(activeSessionId.value ?? '')
+      ? 'running'
+      : 'idle'
+  })
   const errorMessage = computed(() => connectionError.value || activeView.value?.error || '')
   const sessionBusy = computed(() => sessionOperations.value > 0)
   const canOperateSessions = computed(
-    () => connectionState.value === 'connected' && runState.value === 'idle' && !sessionBusy.value,
+    () => connectionState.value === 'connected' && !sessionBusy.value,
   )
-  const canSend = computed(() => canOperateSessions.value && activeView.value !== undefined)
-  const retryAvailable = computed(
-    () => connectionState.value === 'connected' && activeView.value?.retry != null,
+  const canSend = computed(
+    () => canOperateSessions.value && runState.value === 'idle' && !!activeView.value,
   )
+  const retryAvailable = computed(() => {
+    const last = messages.value.at(-1)
+    return connectionState.value === 'connected' && last?.status === 'error' && last.retryable
+  })
   const canRetry = computed(() => retryAvailable.value && canSend.value)
 
   function messageError(error: unknown): string {
     return error instanceof Error ? error.message : 'Agent 请求失败'
   }
 
-  function cacheSession(sessionId: string, history: ChatMessage[]) {
-    sessionViews.value.set(sessionId, { messages: history, draft: '', error: '', retry: null })
+  function mergeSession(session: ChatSession) {
+    const previous = sessionViews.value.get(session.id)
+    if (previous && previous.revision >= session.revision) return
+    sessionViews.value.set(session.id, {
+      ...session,
+      draft: previous?.draft ?? '',
+      error: session.messages.at(-1)?.error ?? '',
+    })
   }
 
-  function stopLocalRun() {
-    if (activeRun) activeRun.assistant.status = 'error'
-    activeRun = null
-    runState.value = 'idle'
+  function installSnapshot(snapshot: UserSnapshot) {
+    if (snapshot.username !== username.value) throw new Error('用户快照身份不匹配')
+    if (userId.value !== snapshot.userId) {
+      sessionViews.value.clear()
+      activeSessionId.value = null
+      userId.value = snapshot.userId
+    }
+    for (const session of snapshot.sessions) mergeSession(session)
+    if (!activeSessionId.value || !sessionViews.value.has(activeSessionId.value)) {
+      const selected = readSelectedSession(username.value)
+      activeSessionId.value = sessionViews.value.has(selected) ? selected : sessions.value[0]!.id
+    }
   }
 
-  function resetOperations() {
-    generation++
-    stopLocalRun()
-    sessionQueue = Promise.resolve(true)
-    sessionOperations.value = 0
+  function applyUpdate(update: ChatUpdate): boolean {
+    if (update.type === 'session') {
+      mergeSession(update.session)
+      return true
+    }
+    const view = sessionViews.value.get(update.sessionId)
+    if (view && update.revision <= view.revision) return true
+    if (!view || update.revision !== view.revision + 1) return false
+    const message = view.messages.find(
+      (item) => item.id === update.messageId && item.runId === update.runId,
+    )
+    if (!message || view.runId !== update.runId) return false
+    message.content += update.delta
+    view.revision = update.revision
+    return true
   }
 
-  function setTransport(nextTransport: ChatTransport) {
+  function drainUpdates() {
+    const pending = buffered
+    buffered = []
+    for (const update of pending) if (!applyUpdate(update)) buffered.push(update)
+  }
+
+  async function synchronize(current: number) {
+    if (syncing || connectionState.value !== 'connected') return
+    syncing = true
+    try {
+      const snapshot = await transport.snapshot()
+      if (current !== generation) return
+      installSnapshot(snapshot)
+      drainUpdates()
+      if (buffered.length) throw new Error('用户数据版本不连续，请重新连接')
+    } catch (error) {
+      if (current === generation) {
+        connectionError.value = messageError(error)
+        // 无法建立连续基线时重新绑定，避免继续展示不完整的增量。
+        void connect()
+      }
+    } finally {
+      if (current === generation) syncing = false
+    }
+  }
+
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer)
+    const delay = [1000, 2000, 5000, 10000][Math.min(reconnectAttempt++, 3)]!
+    reconnectTimer = setTimeout(() => {
+      void connect()
+    }, delay)
+  }
+
+  function releaseConnection() {
+    clearTimeout(reconnectTimer)
     unsubscribe?.()
     unsubscribe = null
-    resetOperations()
+    generation++
+    baselineReady = false
+    buffered = []
+    syncing = false
+    pendingSends.value.clear()
+    sessionOperations.value = 0
     transport.close()
-    transport = markRaw(nextTransport)
-    connectionState.value = 'idle'
-    connectionError.value = ''
-    sessions.value = []
-    sessionViews.value.clear()
-    activeSessionId.value = null
   }
 
-  async function connect() {
-    unsubscribe?.()
-    resetOperations()
+  async function connect(name = username.value) {
+    let normalized: string
+    try {
+      normalized = normalizeUsername(name)
+    } catch (error) {
+      connectionError.value = messageError(error)
+      return
+    }
+    releaseConnection()
+    if (normalized !== username.value) {
+      sessionViews.value.clear()
+      activeSessionId.value = null
+      userId.value = ''
+    }
+    username.value = normalized
     const current = generation
-    sessions.value = []
-    sessionViews.value.clear()
-    activeSessionId.value = null
     connectionState.value = 'connecting'
     connectionError.value = ''
-    unsubscribe = transport.subscribeConnection(({ state, error }) => {
-      if (current !== generation || (state === 'offline' && connectionState.value === 'connecting'))
-        return
+    const stopUpdates = transport.subscribeUpdates((update) => {
+      if (current !== generation) return
+      if (!baselineReady || syncing) buffered.push(update)
+      else if (!applyUpdate(update)) {
+        buffered.push(update)
+        void synchronize(current)
+      }
+    })
+    let connectionFailure: Error | null = null
+    const stopConnection = transport.subscribeConnection(({ state, error }) => {
+      if (current !== generation) return
+      const wasConnecting = connectionState.value === 'connecting'
+      connectionFailure = error
       connectionState.value = state
       connectionError.value = messageError(error)
-      resetOperations()
+      pendingSends.value.clear()
+      if (!wasConnecting) scheduleReconnect()
     })
+    unsubscribe = () => {
+      stopUpdates()
+      stopConnection()
+    }
     try {
-      const snapshot = await transport.connect()
+      const snapshot = await transport.connect(normalized)
       if (current !== generation) return
-      sessions.value = snapshot.sessions
-      cacheSession(snapshot.activeSessionId, snapshot.messages)
-      activeSessionId.value = snapshot.activeSessionId
+      if (connectionFailure) throw connectionFailure
+      installSnapshot(snapshot)
+      baselineReady = true
+      drainUpdates()
       connectionState.value = 'connected'
+      connectionError.value = ''
+      reconnectAttempt = 0
+      saveUsername(normalized)
+      if (buffered.length) void synchronize(current)
     } catch (error) {
       if (current !== generation) return
       connectionState.value = 'error'
       connectionError.value = messageError(error)
+      scheduleReconnect()
     }
   }
 
   function disconnect() {
-    unsubscribe?.()
-    unsubscribe = null
-    resetOperations()
-    transport.close()
+    releaseConnection()
     connectionState.value = 'offline'
   }
 
-  function queueSessionOperation(operation: () => Promise<void>): Promise<boolean> {
-    if (connectionState.value !== 'connected' || runState.value !== 'idle')
-      return Promise.resolve(false)
-    const current = generation
-    sessionOperations.value++
-    const next = sessionQueue
-      .then(async () => {
-        if (current !== generation) return false
-        try {
-          await operation()
-          return current === generation
-        } catch (error) {
-          if (current === generation && activeView.value)
-            activeView.value.error = messageError(error)
-          return false
-        }
-      })
-      .finally(() => {
-        if (current === generation) sessionOperations.value--
-      })
-    sessionQueue = next
-    return next
+  function switchUser() {
+    disconnect()
+    username.value = ''
+    userId.value = ''
+    saveUsername('')
+    sessionViews.value.clear()
+    activeSessionId.value = null
+    connectionError.value = ''
   }
 
-  function createSession(): Promise<boolean> {
-    const current = generation
-    return queueSessionOperation(async () => {
-      // 在队列执行时判断，连续点击也会复用前一次操作得到的空会话。
-      if (activeView.value?.messages.length === 0) return
-      const emptySession = sessions.value.find(
-        (session) => sessionViews.value.get(session.id)?.messages.length === 0,
-      )
-      if (emptySession) {
-        await activateSession(emptySession.id, current)
-        return
-      }
-      const session = await transport.createSession()
-      if (current !== generation) return
-      const { messages: history, ...summary } = session
-      sessions.value = [summary, ...sessions.value.filter((item) => item.id !== session.id)]
-      cacheSession(session.id, history)
-      activeSessionId.value = session.id
-    })
+  function setTransport(next: ChatTransport) {
+    switchUser()
+    transport = markRaw(next)
+    connectionState.value = 'idle'
   }
 
   function selectSession(sessionId: string): Promise<boolean> {
-    const current = generation
-    return queueSessionOperation(() => activateSession(sessionId, current))
+    if (!sessionViews.value.has(sessionId)) return Promise.resolve(false)
+    activeSessionId.value = sessionId
+    saveSelectedSession(username.value, sessionId)
+    return Promise.resolve(true)
   }
 
-  async function activateSession(sessionId: string, current: number) {
-    if (sessionId === activeSessionId.value) return
-    const session = await transport.selectSession(sessionId)
-    if (current !== generation) return
-    // 一个连接独占自己的会话，服务端确认切换后保留本地失败、取消和草稿展示。
-    if (!sessionViews.value.has(sessionId)) cacheSession(sessionId, session.messages)
-    activeSessionId.value = session.sessionId
-  }
-
-  function startMessage(text: string, retry: FailedReply | null = null): boolean {
-    const view = activeView.value
-    const sessionId = activeSessionId.value
-    if (!canSend.value || !view || !sessionId) return false
-    if (
-      retry &&
-      (retry.sessionId !== sessionId ||
-        !view.messages.some((message) => message.id === retry.userMessageId))
-    )
-      return false
-
+  async function createSession(): Promise<boolean> {
+    if (!canOperateSessions.value) return false
+    const empty = sessions.value.find((item) => item.messages.length === 0)
+    if (empty) return selectSession(empty.id)
     const current = generation
-    const previousError = view.error
-    const previousRetry = view.retry
-    const createdAt = Date.now()
-    const userMessageId = retry?.userMessageId ?? crypto.randomUUID()
-    const assistant: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
-      createdAt,
-      status: 'streaming',
-    }
-    const retryIndex = retry
-      ? view.messages.findIndex((message) => message.id === retry.assistantMessageId)
-      : -1
-    if (retry && retryIndex < 0) return false
-    const previousAssistant = retryIndex >= 0 ? view.messages[retryIndex]! : null
-    if (retryIndex >= 0) view.messages[retryIndex] = assistant
-    else {
-      view.messages.push(
-        { id: userMessageId, role: 'user', content: text, createdAt, status: 'complete' },
-        assistant,
-      )
-    }
-    const assistantIndex = retryIndex >= 0 ? retryIndex : view.messages.length - 1
-    // 必须先登记，sendMessage 可能同步触发连接终止回调。
-    const run = {
-      request: null as StreamRequest | null,
-      assistant: view.messages[assistantIndex]!,
-      view,
-    }
-    activeRun = run
-    runState.value = 'running'
-    view.error = ''
-    view.retry = null
-
-    const rollback = () => {
-      if (previousAssistant) view.messages[assistantIndex] = previousAssistant
-      else view.messages.splice(assistantIndex - 1, 2)
-      view.retry = previousRetry
-      if (!view.error) view.error = previousError
-      if (activeRun === run) {
-        activeRun = null
-        runState.value = 'idle'
-      }
-    }
-
+    sessionOperations.value++
     try {
-      const request = transport.sendMessage({ sessionId, text }, (delta) => {
-        if (current === generation && activeRun === run && run.assistant.status === 'streaming')
-          run.assistant.content += delta
-      })
-      run.request = request
-      void request.completed
-        .then((result) => {
-          if (current !== generation || activeRun !== run) return
-          if (result.status === 'complete') view.messages[assistantIndex] = result.message
-          else run.assistant.status = 'cancelled'
-          view.error = ''
-          activeRun = null
-          runState.value = 'idle'
-        })
-        .catch((error: unknown) => {
-          if (current !== generation || activeRun !== run) return
-          view.error = messageError(error)
-          if (!(error instanceof ResponseError) || error.retryable)
-            view.retry = { sessionId, userMessageId, assistantMessageId: assistant.id, text }
-          stopLocalRun()
-        })
-      if (current !== generation || activeRun !== run) {
-        rollback()
-        return false
-      }
-      if (activeSession.value?.title === '新的会话')
-        activeSession.value.title = text.length > 24 ? `${text.slice(0, 24)}…` : text
-      if (activeSession.value) activeSession.value.updatedAt = createdAt
+      const session = await transport.createSession()
+      if (current !== generation) return false
+      mergeSession(session)
+      await selectSession(session.id)
       return true
     } catch (error) {
-      rollback()
-      if (current === generation) view.error = messageError(error)
+      if (current === generation && activeView.value) activeView.value.error = messageError(error)
       return false
+    } finally {
+      if (current === generation) sessionOperations.value--
     }
+  }
+
+  function startMessage(text: string, retryRunId?: string): boolean {
+    const view = activeView.value
+    if (!canSend.value || !view) return false
+    const current = generation
+    const originalDraft = view.draft
+    pendingSends.value.add(view.id)
+    view.error = ''
+    void (async () => {
+      try {
+        const session = await transport.sendMessage({ sessionId: view.id, text, retryRunId })
+        if (current !== generation) return
+        mergeSession(session)
+        const latest = sessionViews.value.get(view.id)
+        if (!retryRunId && latest?.draft === originalDraft) latest.draft = ''
+      } catch (error) {
+        if (current === generation) {
+          const latest = sessionViews.value.get(view.id)
+          if (latest) latest.error = messageError(error)
+        }
+      } finally {
+        if (current === generation) pendingSends.value.delete(view.id)
+      }
+    })()
+    return true
   }
 
   function sendMessage(text: string): boolean {
     const trimmed = text.trim()
-    if (!trimmed || !startMessage(trimmed)) return false
-    draft.value = ''
-    return true
+    return !!trimmed && startMessage(trimmed)
   }
-
   function retryLastMessage() {
-    const retry = activeView.value?.retry
-    if (canRetry.value && retry) startMessage(retry.text, retry)
+    const last = messages.value.at(-1)
+    if (canRetry.value && last) startMessage('', last.runId)
   }
 
   async function cancelRun() {
-    const run = activeRun
-    if (!run?.request || runState.value === 'cancelling') return
-    runState.value = 'cancelling'
+    const view = activeView.value
+    if (!view?.runId || view.cancelling || connectionState.value !== 'connected') return
+    const current = generation
     try {
-      await run.request.cancel()
+      await transport.cancelRun(view.id, view.runId)
     } catch (error) {
-      if (activeRun !== run) return
-      run.view.error = messageError(error)
-      runState.value = 'running'
+      if (current === generation) {
+        const latest = sessionViews.value.get(view.id)
+        if (latest) latest.error = messageError(error)
+      }
     }
   }
 
@@ -308,6 +322,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
+    username,
+    userId,
     sessions,
     sessionViews,
     activeSessionId,
@@ -326,6 +342,7 @@ export const useChatStore = defineStore('chat', () => {
     canSend,
     connect,
     disconnect,
+    switchUser,
     createSession,
     selectSession,
     sendMessage,
