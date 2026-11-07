@@ -61,7 +61,9 @@ endif
 BUSTED_LPATH := ./?.lua;./?/init.lua;./../common/?.lua;./../common/?/init.lua;./src/lualib/?.lua;./src/lualib/?/init.lua;./src/lualib/base/?.lua;./src/service/?/?.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/lua-protobuf/?.lua;./3rd/lua-protobuf/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
 BUSTED_CPATH := ./luaclib/?.so
 
-.PHONY: help build check check-format test test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-live \
+# 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
+.NOTPARALLEL:
+.PHONY: help build check check-format test test-integration test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-live \
 	cjson protobuf lfs linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
 	clean cleanall
 
@@ -78,6 +80,7 @@ help:
 		"" \
 		"检查:" \
 		"  make test       离线 Busted 单元测试" \
+		"  make test-integration     构建并运行全部假模型与运行时集成测试" \
 		"  make test-protobuf-shared  验证 protobuf schema 跨 VM 共享" \
 		"  make test-agent-gateway    运行假模型与四服务网关聊天测试" \
 		"  make test-service-runtime  验证服务命令、RPC 超时与热修" \
@@ -219,7 +222,9 @@ test-service-control:
 	@"$(PROJECT_ROOT)/tests/integration/shutdown_runtime_smoke.sh"
 	@"$(PROJECT_ROOT)/tests/integration/run_with_fake_gateway.sh" node "$(PROJECT_ROOT)/tests/integration/service_control_probe.mjs"
 
-check: check-format test test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
+test-integration: build test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
+
+check: check-format test test-integration
 
 clean:
 	@-$(MAKE) -C "$(SKYNET_DIR)" clean

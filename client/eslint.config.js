@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/.pnpm-store/**',
       '**/storybook-static/**',
+      '**/test-artifacts/**',
       '**/src-tauri/target/**',
       'src/protocol/generated/**',
       'packages/design-system/src/styles/tokens.ts',

@@ -118,17 +118,19 @@
 - Done right：先判断配置的生命周期和作用域，再决定是否确实需要构造参数。
 - Seen: 1× (2026-11-04; task: 20261104T233107-server-config-direct.md)
 
-### L-010: 前端协议或默认连接地址变更后重新构建桌面安装包
+### L-010: 打包态验证必须使用最新桌面产物
 
 - 类型：Pitfall
 - 状态：Verified
 - 范围：Tauri, Vite, macOS App, WebSocket 协议, 默认网关地址
 - 触发：修改前端协议代码或默认网关地址后，通过已存在的 `.app`、快捷方式或安装包启动桌面客户端。
 - 根因：生产桌面 App 在 Tauri 构建时嵌入 `dist`，重新打开旧 App 不会读取最新前端源码。
-- 解法：开发态使用 `make ui-desktop`；打包态执行 `make ui-build-desktop`，并核对 `.app` 内可执行文件时间晚于当前 `dist`。
+- 解法：日常使用 `make dev` 加载最新前端源码；Rust 或构建时注入的连接地址修改后重启开发进程。
+  打包态验证执行 `make build` 或 `pnpm --dir client build:desktop`，确认实际运行的是最新产物。
 - 证据：旧 App 构建于 11:13，当前协议源码更新于 20:58；重建后的 App 构建于 23:40，用户实测连接、登录和聊天正常。
   默认端口调整后，前端 dist 包含新网关地址；重建 App 的可执行文件包含对应资源名称且构建时间晚于该资源。
-- Done right：前端协议或默认连接地址变更后，同时验证源码单测、浏览器全链路和重新打包的桌面 App。
+- Done right：按改动运行对应运行时的测试并验证 macOS App；仅在验证打包态时要求重新构建安装包，
+  不把每次共享界面修改都升级为全平台打包验收。签名后的产物检查见 L-044 与 L-046。
 - Seen: 1× (2026-11-04; task: 20261104T234320-tauri-stale-app.md; reused by: 20261105T202717-high-ports.md)
 
 ### L-011: 热更新类的构造函数不能捕获候选类表
@@ -666,3 +668,17 @@
 - Done right：分别验证构建、bundle 签名和磁盘镜像；签名前后不要求整个文件哈希相同。
 - Seen: 1× (2026-11-07; task: 20261107T150358-native-chat-core.md)
 - 备注：此处只验证本地 ad-hoc 签名，未执行 Apple 公证或对外发布。
+
+### L-047: Storybook E2E 的无障碍扫描由单一入口执行
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Storybook 10.6.5, Playwright, AxeBuilder, 组件无障碍测试
+- 触发：Playwright 在 story 渲染后主动扫描无障碍，同时 Storybook a11y 插件也自动扫描。
+- 根因：两个扫描在同一文档中重叠，Axe 拒绝并发执行并报 `Axe is already running`。
+- 解法：仅在 E2E 的 story URL globals 中设置 `a11y.manual:!true`，由测试的 AxeBuilder 统一扫描；
+  正常 Storybook 保留自动检查。
+- 证据：完整 UI 回归首次出现 1 项冲突；按 8 worker 重复全部组件用例 3 轮，45 项中复现 3 项错误；
+  修正后相同 45 项全部通过，功能及无障碍断言保留。
+- Done right：不要通过重试或捕获忽略掩盖扫描冲突，确认测试宿主与自动化工具只有一个主动扫描入口。
+- Seen: 1× (2026-11-08; task: 20261108T003041-build-check-screenshots.md)

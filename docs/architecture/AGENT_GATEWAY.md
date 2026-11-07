@@ -99,10 +99,11 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 用于无超时等待服务初始化和清理完成。RPC 不自动重试：超时表示调用方停止等待，远端仍可能完成。
 `send` 成功仅表示消息已交给 Skynet，不能当作远端执行确认。
 
-管理命令为 `make server-status`、`make server-stop` 和 `make server-force-stop`。
+服务使用 `./server/start.sh` 启动，管理命令为 `./server/control.sh status`、
+`./server/control.sh stop` 和 `./server/control.sh force-stop`；可选第二个参数指定控制台端口。
 它们通过回环地址的控制台访问 `.main`；普通关闭等待清理完成，强制关闭可在启动、运行或关服等待期间
 由脚本显式触发，重复触发保持幂等。控制响应表示命令已接收，进程退出码表示最终结果。
-`CONTROL_PORT` 可以覆盖目标端口。工作服务使用 `.client_1`、`.logind_1`、`.websocket_1` 等注册名，
+工作服务使用 `.client_1`、`.logind_1`、`.websocket_1` 等注册名，
 网关使用 `.gateway`。状态查询并行收集服务状态，失联服务显示 `unavailable`。
 
 ## 连接与内部消息
@@ -181,7 +182,7 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 ## 外部消息格式
 
 共享协议位于 `common/proto`，客户端生成代码位于 `client/src/protocol/generated`。
-修改后执行 `make proto-generate` 和 `make proto-check`。
+修改后执行 `make proto-generate` 和 `pnpm --dir client proto:check`。
 
 每帧是 `压缩标志 uint8 | 消息 ID uint32 | 类型哈希 uint32 | Protobuf args`，固定头为 9 字节，
 多字节整数使用网络字节序。类型哈希按完整 Protobuf 消息名计算 FNV-1a 32 位哈希。
@@ -250,6 +251,7 @@ Web 的会话选择按用户名保存在 sessionStorage，草稿仅保留页面�
 当前没有身份认证，非回环监听限于受控网络；对公网发布前需要认证、授权、限流和连接配额。
 Tauri 不启用 shell、文件系统或任意命令插件，WSS 证书配置由反向代理管理。
 
-`make check-all` 覆盖两端检查、真实 Skynet RPC 与热修、Protobuf 跨 VM、管理命令和假模型消息链路。
-`make e2e` 验证真实 WebSocket 浏览器聊天；`make ui-e2e` 验证 Mock 场景的桌面、WebKit 和移动界面。
+`make check` 覆盖两端格式与静态检查、Lua、TypeScript 和 Rust 单测，以及 macOS 原生聊天主链路。
+`make check-full` 在此基础上追加服务端全部专项集成、Web 真实网关全链路、Storybook 构建及
+多浏览器 UI 回归。服务端专项测试直接使用 `make -C server`，客户端专项测试使用 `pnpm --dir client`。
 假模型可稳定复现取消、供应商失败和停滞流超时，不消耗真实模型额度。

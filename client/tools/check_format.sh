@@ -53,7 +53,7 @@ while IFS= read -r file; do
 done <<EOF
 $(find "$project_root" \
 	\( -name node_modules -o -name .pnpm-store -o -name dist \
-		-o -name playwright-report -o -name test-results -o -name coverage \
+		-o -name playwright-report -o -name test-results -o -name test-artifacts -o -name coverage \
 		-o -name gen -o -name target -o -name storybook-static \) -prune -o \
 	-type f \( -name '*.sh' -o -name '*.json' -o -name '*.md' -o -name '*.config' \
 		-o -name '*.ts' -o -name '*.vue' -o -name '*.css' -o -name '*.html' \

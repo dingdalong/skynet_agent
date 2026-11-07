@@ -9,35 +9,35 @@ Windows、Linux、iOS、Android 通过相同平台适配层扩展。整个客户
 共享本地 Inter、JetBrains Mono 字体及基础组件，通过设计 Token 统一主题；宿主行为遵循平台规范，无障碍以 WCAG 2.2 AA 为底线。
 
 前端代码、依赖和产物统一位于 `client/`，Skynet 服务端及第三方子模块统一位于 `server/`。
-根目录提供以下统一命令：
+根目录只提供依赖安装、开发、构建、检查与协议生成入口：
 
 ```bash
-make ui-install
-make ui-dev
+make help
+make install
+make dev
+make build
+make check
+make check-full
 make proto-generate
-make server-build
-make server-start
-make ui-e2e
-make e2e
 ```
 
-Web 开发监听端口见 [`client/vite.config.ts`](client/vite.config.ts)，启动后终端会显示访问地址。
-后台需要先启动 Agent WebSocket 网关：
+`make build` 构建当前平台服务端和桌面 App；`make dev` 仅启动桌面客户端开发模式，
+服务端在另一个终端通过脚本单独启动：
 
 ```bash
-make server-start
+./server/start.sh
 ```
 
-macOS 客户端使用：
+Web 开发使用子项目命令，监听端口见 [`client/vite.config.ts`](client/vite.config.ts)：
 
 ```bash
-make ui-desktop
+pnpm --dir client dev
 ```
 
 设计规范位于 [`docs/design`](docs/design)，组件与视觉样例通过以下命令查看：
 
 ```bash
-make ui-storybook
+pnpm --dir client storybook
 ```
 
 客户端连接地址通过 `client/.env.local` 的 `VITE_AGENT_WS_URL` 覆盖，配置示例见
@@ -130,7 +130,7 @@ end)
 
 ```bash
 make proto-generate
-make proto-check
+pnpm --dir client proto:check
 ```
 
 ## Protobuf 编解码
@@ -182,16 +182,16 @@ RPC 不自动重试；超时只结束调用方等待，不代表远端工作已�
 模型请求本身的超时仍然生效，关服等待不另设截止时间。
 
 ```bash
-make server-status
-make server-stop
-make server-force-stop
+./server/control.sh status
+./server/control.sh stop
+./server/control.sh force-stop
 ```
 
 管理命令通过仅监听回环地址的 Skynet 控制台访问 `.main`；控制台端口由
-`runtime.control_port` 配置。命令可以用 `CONTROL_PORT=<端口>` 覆盖连接目标。
+`runtime.control_port` 配置。`control.sh` 的可选第二个参数指定目标控制台端口。
 `stop` 的控制台响应只表示命令已接收；进程退出码表示最终清理结果。
 `force-stop` 可在启动卡住、正常运行或关服等待期间由异常处理脚本显式调用，不会自动触发。
-也可直接执行 `server/control.sh force-stop <控制台端口>`。
+指定端口时使用 `./server/control.sh force-stop <控制台端口>`。
 
 服务端以服务为主体组织：`src/service/<name>/<name>.lua` 返回服务稳定类表，使用服务名作为唯一模块名。
 Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader 提供的 `SERVICE_NAME` 加载业务主体。
@@ -255,58 +255,60 @@ dbgcmd .client_1 HOTFIX client user agent.conversation llm.base openai.ltn12 ope
 构建前需安装 OpenSSL(版本3以上) 开发文件；MinGW 交叉构建还需指向 MinGW 版本的 OpenSSL。
 
 ```bash
-make server-build
-make server-start
+make -C server build
+./server/start.sh
 ```
 
 ## 测试
 
-单元测试使用 Busted，需要提前运行 `luarocks install busted`：
+日常以 macOS App 为主要体验验证平台，运行：
 
 ```bash
-make server-check
+make check
 ```
 
-`make server-check` 同时运行单元测试、Protobuf 跨 VM、服务生命周期与 RPC、管理命令、
-热修和假模型全链路测试；`make server-test` 只运行 Busted 单元测试。
+该命令依次构建服务端，执行两端格式与静态检查、Lua 和 TypeScript 单测、Rust 核心测试，
+并通过独立 macOS App 夹具验证原生主链路。夹具覆盖页面重载、草稿、请求编号、失败重试、
+取消、断线重连及切换用户。单元测试使用 Busted，需要提前运行 `luarocks install busted`。
 
-`make server-test-hotfix-watch` 在隔离源码副本中启动开发渠道，建立真实 WebSocket 连接后保存方法修改，
-验证前置编译、单次文件日志、全部实例自动更新、会话历史保留和失败批次重试。
-
-确定性网关测试会启动本地假模型和四服务网关，覆盖登录、建会话、流式聊天、上下文、取消、
-供应商失败、停滞流超时和协议错误：
+阶段收尾和发布前执行完整检查：
 
 ```bash
-make server-test-agent-gateway
+make check-full
 ```
 
-`make ui-e2e` 使用前端 Mock 二进制通道快速验证 Chromium、WebKit 和移动视口布局。`make e2e`
-使用真实 WebSocket、Skynet 网关和本地假模型，仅在 Chromium 桌面验证完整聊天链路：
+完整检查先运行日常检查，再追加服务端全部专项集成、Web 真实网关全链路、Storybook 构建和
+Chromium、WebKit、移动视口 UI 回归。固定端口测试与会生成资源的构建顺序执行。
+测试使用隔离配置和本地假模型，不调用付费模型；执行前需安装客户端依赖及 Playwright 浏览器。
+
+共享界面修改不要求每次全平台人工回归；Web 与 Rust 运行时修改时运行对应测试，平台相关改动
+及时验证受影响平台，发布前分别验收本次支持的平台。开发态 App 可用于日常验证；涉及 Rust
+或构建时注入配置的改动需重启开发进程，打包态验收必须使用最新构建产物。
+
+专项检查直接使用子项目入口：
 
 ```bash
-make ui-e2e
-make e2e
+make -C server help
+make -C server test
+make -C server test-integration
+pnpm --dir client check
+pnpm --dir client check:native
+pnpm --dir client test:native
+pnpm --dir client test:e2e:full
+pnpm --dir client test:e2e
 ```
 
-全链路测试使用 `server/etc/cfg/channel/test.lua` 与本地假模型，不调用付费模型。
-执行前需要已完成服务端构建，并已安装客户端依赖和 Playwright 浏览器。
+单独运行原生夹具或 Web 全链路前需完成服务端构建。`test-integration` 覆盖 Protobuf 跨 VM、
+服务生命周期与 RPC、管理命令、热修和假模型网关测试。其他定向命令见子项目帮助。
+
+测试截图只用于排查和人工查看，不进行像素基线对比。UI 与 Web 全链路的截图、失败证据和
+trace 分别写入 `client/test-artifacts/ui/` 和 `client/test-artifacts/web/`，整个目录忽略、不提交 Git。
+功能、布局、主题、颜色和无障碍要求继续通过断言验证。
 
 真实接口冒烟测试通过正式 WebSocket 网关调用模型，会读取 `server/.env` 并消耗少量 API 额度：
 
 ```bash
-make server-test-live
+make -C server test-live
 ```
-
-前端、设计系统和 Storybook 检查：
-
-```bash
-make ui-check
-```
-
-`make ui-check` 同时检查共享 proto 与客户端生成代码是否一致。
 
 静态诊断统一使用 VS Code 的 sumneko.lua 插件；`.luarc.json` 固定 Lua 5.5 并启用代码风格检查。
-
-原生客户端使用 `make ui-check-native` 检查 Rust 核心与共享协议，使用 `make ui-e2e-native` 在 macOS
-上运行独立 WebView 重载夹具。夹具使用本机假模型和隔离 App，不调用真实模型；覆盖页面重载、
-草稿、请求编号、失败重试、取消、断线重连及切换用户。

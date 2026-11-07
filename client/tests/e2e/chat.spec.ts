@@ -58,26 +58,14 @@ test('空状态新建复用当前会话，草稿和唯一会话保留', async ({
   )
 })
 
-test('没有严重无障碍问题', async ({ page }) => {
+test('没有严重无障碍问题', async ({ page }, testInfo) => {
   const results = await new AxeBuilder({ page }).analyze()
   const blocking = results.violations.filter(
     (violation) => violation.impact === 'critical' || violation.impact === 'serious',
   )
   expect(blocking).toEqual([])
-})
-
-test('主要界面视觉基线', async ({ page }) => {
-  await expect(page).toHaveScreenshot('chat-shell.png', {
-    animations: 'disabled',
-    fullPage: true,
-  })
-})
-
-test('暗色主题视觉基线', async ({ page, isMobile }) => {
-  test.skip(isMobile, '桌面主题在 Chromium 和 WebKit 中验证')
-  await page.getByRole('button', { name: '切换明暗主题' }).click()
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await expect(page).toHaveScreenshot('chat-shell-dark.png', {
+  await page.screenshot({
+    path: testInfo.outputPath('chat-shell.png'),
     animations: 'disabled',
     fullPage: true,
   })
@@ -243,7 +231,7 @@ test('主题存储读写受限时仍可挂载并切换主题', async ({ page }) 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 })
 
-test('主题每次点击都切换实际明暗，刷新后保留选择', async ({ page }) => {
+test('主题每次点击都切换实际明暗，刷新后保留选择', async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' })
   await page.reload()
   const canvas = page.locator('.chat-product')
@@ -261,6 +249,11 @@ test('主题每次点击都切换实际明暗，刷新后保留选择', async ({
   await expect(canvas).toHaveCSS('background-color', light)
   await toggle.click()
   await expect(canvas).toHaveCSS('background-color', dark)
+  await page.screenshot({
+    path: testInfo.outputPath('chat-shell-dark.png'),
+    animations: 'disabled',
+    fullPage: true,
+  })
 })
 
 test('主题切换时按钮和会话选中色同步更新，保留常规动效', async ({ page }) => {

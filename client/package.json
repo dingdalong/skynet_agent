@@ -24,9 +24,7 @@
     "test:e2e:full": "./tests/e2e-fullstack/run-fullstack.sh",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm proto:check && pnpm tokens:check && pnpm typecheck && pnpm build:app && pnpm test && ./tools/check_format.sh",
-    "tauri": "node scripts/run-desktop.mjs",
-    "tauri:dev": "node scripts/run-desktop.mjs dev",
-    "tauri:build": "node scripts/run-desktop.mjs build"
+    "tauri": "node scripts/run-desktop.mjs"
   },
   "dependencies": {
     "@skynet/design-system": "workspace:*",

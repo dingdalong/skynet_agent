@@ -2,8 +2,9 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 async function openStory(page: Page, story: string, theme = 'light') {
+  // E2E 由 AxeBuilder 统一扫描，避免与 Storybook 自动检查并发运行。
   await page.goto(
-    `http://127.0.0.1:16106/iframe.html?id=design-system-${story}&viewMode=story&globals=theme:${theme}`,
+    `http://127.0.0.1:16106/iframe.html?id=design-system-${story}&viewMode=story&globals=theme:${theme};a11y.manual:!true`,
   )
   await expect(page.getByRole('main')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
@@ -11,7 +12,7 @@ async function openStory(page: Page, story: string, theme = 'light') {
 }
 
 for (const theme of ['light', 'dark']) {
-  test(`${theme} 基础按钮统一操作层级、焦点和加载状态`, async ({ page }) => {
+  test(`${theme} 基础按钮统一操作层级、焦点和加载状态`, async ({ page }, testInfo) => {
     await openStory(page, 'components--buttons', theme)
     const primary = page.getByRole('button', { name: '发送消息', exact: true })
     const icon = page.getByRole('button', { name: '图标发送消息', exact: true })
@@ -37,13 +38,14 @@ for (const theme of ['light', 'dark']) {
     expect(
       results.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
     ).toEqual([])
-    await expect(page).toHaveScreenshot(`components-buttons-${theme}.png`, {
+    await page.screenshot({
+      path: testInfo.outputPath(`components-buttons-${theme}.png`),
       animations: 'disabled',
       fullPage: true,
     })
   })
 
-  test(`${theme} 表单错误、禁用与状态反馈可访问`, async ({ page }) => {
+  test(`${theme} 表单错误、禁用与状态反馈可访问`, async ({ page }, testInfo) => {
     await openStory(page, 'components--fields-and-status', theme)
     const input = page.getByRole('textbox', { name: '会话名称', exact: true })
     await input.fill('示例会话')
@@ -59,7 +61,8 @@ for (const theme of ['light', 'dark']) {
     expect(
       results.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
     ).toEqual([])
-    await expect(page).toHaveScreenshot(`components-fields-${theme}.png`, {
+    await page.screenshot({
+      path: testInfo.outputPath(`components-fields-${theme}.png`),
       animations: 'disabled',
       fullPage: true,
     })

@@ -4,6 +4,7 @@ const agentWebSocketUrl = process.env.AGENT_WS_URL ?? 'ws://127.0.0.1:18791/agen
 
 export default defineConfig({
   testDir: './tests/e2e-fullstack',
+  outputDir: './test-artifacts/web',
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
