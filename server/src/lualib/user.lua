@@ -1,4 +1,4 @@
-local Conversation = require("agent.conversation")
+local Agent = require("agent")
 local class = require("class")
 local codes = require("enum.error_code")
 local status = require("enum.message_status")
@@ -24,7 +24,7 @@ local config = require("etc.cfg").agent
 ---@field updated_at integer
 ---@field revision integer
 ---@field messages user.Message[]
----@field conversation agent.Conversation
+---@field agent agent
 ---@field request user.Request?
 
 ---@class user.Request: llm.Request
@@ -107,14 +107,14 @@ function User:SessionCreateReq()
     if type(config.llm.api_key) ~= "string" or config.llm.api_key == "" then
         return failure(codes.call_fail, "模型配置未加载", true)
     end
-    local ok, conversation = pcall(Conversation.new, Conversation, config.llm, config.system_prompt)
+    local ok, agent = pcall(Agent.new, Agent, config.llm, config.system_prompt)
     if not ok then
-        skynet.error("[user] SessionCreateReq 创建对话失败: " .. tostring(conversation))
-        return failure(codes.call_fail, "创建对话失败", true)
+        skynet.error("[user] SessionCreateReq 创建 Agent 失败: " .. tostring(agent))
+        return failure(codes.call_fail, "创建 Agent 失败", true)
     end
     local session = {
         id = make_id("session"), title = "新的会话", updated_at = now_ms(),
-        revision = 0, messages = {}, conversation = conversation,
+        revision = 0, messages = {}, agent = agent,
     }
     self.sessions[session.id] = session
     table.insert(self.session_order, 1, session.id)
@@ -192,7 +192,7 @@ end
 function User:_run_request(request, text)
     local session = self.sessions[request.session_id]
     local ok, result, err = xpcall(function()
-        return session.conversation:chat(text, function(delta) self:_on_delta(request, delta) end, request)
+        return session.agent:chat(text, function(delta) self:_on_delta(request, delta) end, request)
     end, debug.traceback)
     -- 终态先释放占用，广播后到达的新请求才能立即开始下一轮。
     session.request = nil

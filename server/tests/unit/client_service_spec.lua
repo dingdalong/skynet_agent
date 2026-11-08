@@ -7,9 +7,9 @@ describe("用户与客户端服务", function()
     before_each(function()
         tasks, events, next_id, random_id = {}, {}, 0, 0
         model = { text = "回答" }
-        local conversation = require("class")()
-        function conversation:ctor() self.messages = {} end
-        function conversation:chat(text, on_delta, request)
+        local Agent = require("class")()
+        function Agent:ctor() self.messages = {} end
+        function Agent:chat(text, on_delta, request)
             if model.yield then coroutine.yield("generating") end
             if request.cancelled then return nil, "cancelled" end
             on_delta("回")
@@ -24,7 +24,7 @@ describe("用户与客户端服务", function()
                 randomkey = function() random_id = random_id + 1; return tostring(random_id) end,
                 hexencode = function(value) return value end,
             },
-            ["agent.conversation"] = conversation,
+            agent = Agent,
             ["etc.cfg"] = { agent = { llm = { api_key = "test" }, system_prompt = "test",
                 max_message_length = 100, session_title_length = 24 } },
             skynet = { genid = function() next_id = next_id + 1; return next_id end,
@@ -138,7 +138,7 @@ describe("用户与客户端服务", function()
         local restored = service:open(nil, "b", 200, "alice")
         assert.are.equal(status.streaming, running.sessions[1].messages[2].status)
         assert.are.equal(status.completed, restored.sessions[1].messages[2].status)
-        assert.same({ "问题" }, service.users.alice.sessions[session_id].conversation.messages)
+        assert.same({ "问题" }, service.users.alice.sessions[session_id].agent.messages)
         assert.are.equal("回答", restored.sessions[1].messages[2].content)
     end)
 
@@ -180,7 +180,7 @@ describe("用户与客户端服务", function()
         assert.is_true(coroutine.resume(tasks[1]))
         assert.is_nil(user.sessions[first].request)
         assert.are.equal(status.cancelled, user.sessions[first].messages[2].status)
-        assert.same({}, user.sessions[first].conversation.messages)
+        assert.same({}, user.sessions[first].agent.messages)
         assert.is_true(coroutine.resume(tasks[2]))
         assert.are.equal(status.completed, user.sessions[second].messages[2].status)
         send(first, "三")
@@ -195,14 +195,14 @@ describe("用户与客户端服务", function()
         assert.is_true(coroutine.resume(tasks[1]))
         local failed_id, message_id = session.messages[2].run_id, session.messages[2].id
         assert.are.equal(status.failed, session.messages[2].status)
-        assert.same({}, session.conversation.messages)
+        assert.same({}, session.agent.messages)
         model.fail = false
         send(session.id, "", "a", { retry_run_id = failed_id })
         assert.are.equal(2, #session.messages)
         assert.are.equal(message_id, session.messages[2].id)
         assert.are_not.equal(failed_id, session.messages[2].run_id)
         assert.is_true(coroutine.resume(tasks[2]))
-        assert.same({ "问题" }, session.conversation.messages)
+        assert.same({ "问题" }, session.agent.messages)
         send(session.id, "", "a", { retry_run_id = failed_id })
         assert.are.equal(codes.invalid_param, events[#events].args[4].ret)
     end)

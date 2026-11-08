@@ -8,24 +8,23 @@ Web 和 Tauri 客户端通过 WebSocket 连接 Skynet。模型对话、会话历
 
 ## 术语与职责
 
-| 名称           | 含义                                                   |
-| -------------- | ------------------------------------------------------ |
-| `client`       | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
-| `connection`   | 单条网络连接及用户订阅                                 |
-| `session`      | 聊天会话，保存消息与对话历史                           |
-| `Conversation` | 模型调用与历史管理对象，由 `agent.conversation` 导出   |
-| `user`         | 用户身份、会话集合和后台任务的所有者                   |
-| `Agent`        | 保留给智能体业务概念，实体模型后续设计                 |
+| 名称         | 含义                                                   |
+| ------------ | ------------------------------------------------------ |
+| `client`     | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
+| `connection` | 单条网络连接及用户订阅                                 |
+| `session`    | 聊天会话，保存展示消息与生成任务                       |
+| `Agent`      | 模型调用与历史管理对象，由 `agent` 导出                |
+| `user`       | 用户身份、会话集合和后台任务的所有者                   |
 
 ```mermaid
 flowchart LR
     C["client 服务"] -->|"1:N"| U["user"]
     U -->|"1:N"| N["connection 订阅"]
     U -->|"1:N"| S["session"]
-    S -->|"1:1"| V["🧠 Conversation"]
+    S -->|"1:1"| A["🧠 Agent"]
 ```
 
-服务池实例数表示承载容量；连接数、用户数与智能体数分别描述。当前模型对话对象不承担独立智能体身份。
+服务池实例数表示承载容量；连接数、用户数与智能体数分别描述。每个会话持有一个 Agent。
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
 
 ## 服务生命周期
@@ -49,7 +48,7 @@ WebSocket、登录和 client 服务，等待在途命令、连接读循环和后
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `user.lua`、`agent/conversation.lua`            | 用户业务状态、模型对话与历史提交                            |
+| `user.lua`、`agent.lua`                         | 用户业务状态、模型对话与历史提交                            |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
 独立脚本和 Skynet 内置服务优先于公共入口。`src/service/<name>/<name>.lua` 返回稳定类表，

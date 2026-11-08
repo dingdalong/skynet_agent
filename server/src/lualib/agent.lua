@@ -1,21 +1,21 @@
 local class = require("class")
 local llm = require("llm.base")
 
----@class agent.Conversation
----@field new fun(self: agent.Conversation, llm_config: llm.Config, system_prompt: string): agent.Conversation
+---@class agent
+---@field new fun(self: agent, llm_config: llm.Config, system_prompt: string): agent
 ---@field llm_config llm.Config
 ---@field llm table?
 ---@field messages llm.Message[]
 
-local Conversation = class()
+local Agent = class()
 
 ---@param llm_config llm.Config
 ---@param system_prompt string
-function Conversation:ctor(llm_config, system_prompt)
-    assert(type(llm_config) == "table", "Conversation 的 LLM 配置必须是 table")
+function Agent:ctor(llm_config, system_prompt)
+    assert(type(llm_config) == "table", "Agent 的 LLM 配置必须是 table")
     assert(
         type(system_prompt) == "string" and system_prompt ~= "",
-        "Conversation 的 system_prompt 不能为空"
+        "Agent 的 system_prompt 不能为空"
     )
 
     self.llm_config = table.copy(llm_config)
@@ -25,8 +25,8 @@ function Conversation:ctor(llm_config, system_prompt)
 end
 
 ---@param llm_config llm.Config
-function Conversation:set_llm(llm_config)
-    assert(type(llm_config) == "table", "Conversation 的 LLM 配置必须是 table")
+function Agent:set_llm(llm_config)
+    assert(type(llm_config) == "table", "Agent 的 LLM 配置必须是 table")
 
     self.llm_config = table.copy(llm_config)
     -- 保留历史，下一次对话使用最新配置重新创建客户端。
@@ -38,12 +38,12 @@ end
 ---@param request llm.Request?
 ---@return string|nil
 ---@return string|nil
-function Conversation:chat(user_input, on_text_delta, request)
+function Agent:chat(user_input, on_text_delta, request)
     assert(
         type(user_input) == "string" and user_input ~= "",
-        "Conversation 的用户消息不能为空"
+        "Agent 的用户消息不能为空"
     )
-    assert(type(on_text_delta) == "function", "Conversation 的文本回调必须是函数")
+    assert(type(on_text_delta) == "function", "Agent 的文本回调必须是函数")
 
     local client = self.llm
     if not client then
@@ -92,4 +92,4 @@ function Conversation:chat(user_input, on_text_delta, request)
     return assistant_text
 end
 
-return Conversation
+return Agent

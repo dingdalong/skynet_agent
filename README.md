@@ -72,27 +72,27 @@ Skynet 进程读取，不进入客户端。
 
 ## 模型连续对话
 
-`agent.conversation` 导出 Conversation 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
+`agent` 导出 Agent 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
 构造时传入的 system prompt 会作为首条 `role=system` 消息发送，不使用 Responses API 的
 顶层 `instructions` 参数。
 
 ```lua
-local Conversation = require("agent.conversation")
+local Agent = require("agent")
 
-local conversation = Conversation:new({
+local agent = Agent:new({
     api_key = api_key,
     base_url = base_url,
     model = model,
     request_timeout_ticks = request_timeout_ticks,
 }, "你是一个简洁、可靠的中文助手。")
 
-local text, err = conversation:chat("介绍一下 Lua", function(delta)
+local text, err = agent:chat("介绍一下 Lua", function(delta)
     io.write(delta)
 end)
 ```
 
-运行时可通过 `conversation:set_llm(llm_config)` 更新配置。切换后已有历史保持不变，
-下一次 `chat` 使用新配置重新创建 LLM 客户端。同一个 Conversation 对象的 `chat` 和 `set_llm`
+运行时可通过 `agent:set_llm(llm_config)` 更新配置。切换后已有历史保持不变，
+下一次 `chat` 使用新配置重新创建 LLM 客户端。同一个 Agent 对象的 `chat` 和 `set_llm`
 需要由调用方串行执行。
 
 ## Agent WebSocket 网关
@@ -113,7 +113,7 @@ end)
 当前仅用用户名识别用户，不提供密码认证。用户名区分大小写，长度为 1–32 个 Unicode 字符。
 
 `client` 是业务承载服务；`connection` 只表示网络连接；`user` 持有会话、消息、模型上下文和任务；
-`session` 是聊天会话，`Conversation` 管理模型调用与已成功提交的历史。断线不删除数据、不取消生成，
+`session` 是聊天会话，`Agent` 管理模型调用与已成功提交的历史。断线不删除数据、不取消生成，
 服务器重启前可随时按用户名取回。数据暂不落盘，服务器重启后清空。
 
 各端独立选择会话、编辑草稿。会话与消息实时同步，同一会话串行生成，不同会话可以并发。
@@ -245,7 +245,7 @@ Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader �
 也可以通过 `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .client_1 HOTFIX client user agent.conversation llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
+dbgcmd .client_1 HOTFIX client user agent llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
 ```
 
 服务地址使用 Skynet 注册名（以 `.` 开头）或数字地址（以 `:` 开头）。手动命令只更新指定 VM，

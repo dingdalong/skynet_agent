@@ -413,6 +413,9 @@
 
 - 类型：Success
 - 状态：Verified
+- 当前约定：2026-11-08 用户确认模型调用与历史对象就是 Agent，直接由 `agent` 模块导出，
+  会话字段使用 `session.agent`。下文原先使用 Conversation、预留 Agent 名称的部分已被替代；
+  client、connection、session、user 的职责区分仍适用。
 - 范围：Skynet, client, connection, session, Conversation, Agent, 服务命名
 - 触发：Skynet 承载连接的服务与智能体业务同时使用 agent 名称，准备扩展用户或智能体实体。
 - 根因：服务池实例、连接上下文和模型对话对象共用 Agent 名称，会混淆承载容量、用户身份和智能体身份。
