@@ -60,6 +60,7 @@ server_log="$temp_dir/server.log"
 cat >"$env_file" <<EOF
 SKYNET_CFG_CHANNEL=test
 DEEPSEEK_API_KEY=e2e-test-key
+AGENT_WORKSPACE_ROOT="$temp_dir/work_dir"
 EOF
 
 SKYNET_ENV_FILE="$env_file" "$project_root/start.sh" >"$server_log" 2>&1 &

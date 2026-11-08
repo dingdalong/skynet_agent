@@ -71,7 +71,7 @@ $(find "$project_root" \
 		-o -name node_modules -o -name storybook-static -o -name dist \
 		-o -name target -o -name coverage -o -name playwright-report \
 		-o -name test-results \) -prune -o \
-	-type f \( -name '*.lua' -o -name '*.sh' -o -name '*.json' \
+	-type f \( -name '*.lua' -o -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.json' \
 		-o -name '*.md' -o -name '*.config' -o -name 'makefile' \
 		-o -name 'Makefile' -o -name '.editorconfig' -o -name '.gitignore' \
 		-o -name '.env.example' \) -print | sort)

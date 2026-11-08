@@ -11,6 +11,378 @@ export namespace skynet {
         namespace v1 {
 
             /**
+             * Properties of a SessionModelSetReq.
+             * @deprecated Use skynet.agent.v1.SessionModelSetReq.$Properties instead.
+             */
+            interface ISessionModelSetReq extends skynet.agent.v1.SessionModelSetReq.$Properties {
+            }
+
+            /** Represents a SessionModelSetReq. */
+            class SessionModelSetReq {
+
+                /**
+                 * Constructs a new SessionModelSetReq.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.SessionModelSetReq.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** SessionModelSetReq sessionId. */
+                sessionId: string;
+
+                /** SessionModelSetReq modelId. */
+                modelId: string;
+
+                /**
+                 * Creates a new SessionModelSetReq instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns SessionModelSetReq instance
+                 */
+                static create(properties: skynet.agent.v1.SessionModelSetReq.$Shape): skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape;
+                static create(properties?: skynet.agent.v1.SessionModelSetReq.$Properties): skynet.agent.v1.SessionModelSetReq;
+
+                /**
+                 * Encodes the specified SessionModelSetReq message. Does not implicitly {@link skynet.agent.v1.SessionModelSetReq.verify|verify} messages.
+                 * @param message SessionModelSetReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.SessionModelSetReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified SessionModelSetReq message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionModelSetReq.verify|verify} messages.
+                 * @param message SessionModelSetReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.SessionModelSetReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a SessionModelSetReq message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape} SessionModelSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape;
+
+                /**
+                 * Decodes a SessionModelSetReq message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape} SessionModelSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape;
+
+                /**
+                 * Verifies a SessionModelSetReq message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a SessionModelSetReq message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns SessionModelSetReq
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionModelSetReq;
+
+                /**
+                 * Creates a plain object from a SessionModelSetReq message. Also converts values to other types if specified.
+                 * @param message SessionModelSetReq
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.SessionModelSetReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this SessionModelSetReq to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace SessionModelSetReq {
+
+                /** Properties of a SessionModelSetReq. */
+                interface $Properties {
+
+                    /** SessionModelSetReq sessionId */
+                    sessionId?: (string|null);
+
+                    /** SessionModelSetReq modelId */
+                    modelId?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a SessionModelSetReq. */
+                type $Shape = skynet.agent.v1.SessionModelSetReq.$Properties;
+            }
+
+            /**
+             * Properties of a SessionModelSetRes.
+             * @deprecated Use skynet.agent.v1.SessionModelSetRes.$Properties instead.
+             */
+            interface ISessionModelSetRes extends skynet.agent.v1.SessionModelSetRes.$Properties {
+            }
+
+            /** Represents a SessionModelSetRes. */
+            class SessionModelSetRes {
+
+                /**
+                 * Constructs a new SessionModelSetRes.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.SessionModelSetRes.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** SessionModelSetRes ret. */
+                ret: number;
+
+                /** SessionModelSetRes error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /** SessionModelSetRes session. */
+                session?: (skynet.agent.v1.SessionState.$Properties|null);
+
+                /**
+                 * Creates a new SessionModelSetRes instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns SessionModelSetRes instance
+                 */
+                static create(properties: skynet.agent.v1.SessionModelSetRes.$Shape): skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape;
+                static create(properties?: skynet.agent.v1.SessionModelSetRes.$Properties): skynet.agent.v1.SessionModelSetRes;
+
+                /**
+                 * Encodes the specified SessionModelSetRes message. Does not implicitly {@link skynet.agent.v1.SessionModelSetRes.verify|verify} messages.
+                 * @param message SessionModelSetRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.SessionModelSetRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified SessionModelSetRes message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionModelSetRes.verify|verify} messages.
+                 * @param message SessionModelSetRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.SessionModelSetRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a SessionModelSetRes message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape} SessionModelSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape;
+
+                /**
+                 * Decodes a SessionModelSetRes message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape} SessionModelSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape;
+
+                /**
+                 * Verifies a SessionModelSetRes message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a SessionModelSetRes message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns SessionModelSetRes
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionModelSetRes;
+
+                /**
+                 * Creates a plain object from a SessionModelSetRes message. Also converts values to other types if specified.
+                 * @param message SessionModelSetRes
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.SessionModelSetRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this SessionModelSetRes to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace SessionModelSetRes {
+
+                /** Properties of a SessionModelSetRes. */
+                interface $Properties {
+
+                    /** SessionModelSetRes ret */
+                    ret?: (number|null);
+
+                    /** SessionModelSetRes error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** SessionModelSetRes session */
+                    session?: (skynet.agent.v1.SessionState.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a SessionModelSetRes. */
+                type $Shape = skynet.agent.v1.SessionModelSetRes.$Properties;
+            }
+
+            /**
+             * Properties of a ReasoningDeltaNtf.
+             * @deprecated Use skynet.agent.v1.ReasoningDeltaNtf.$Properties instead.
+             */
+            interface IReasoningDeltaNtf extends skynet.agent.v1.ReasoningDeltaNtf.$Properties {
+            }
+
+            /** Represents a ReasoningDeltaNtf. */
+            class ReasoningDeltaNtf {
+
+                /**
+                 * Constructs a new ReasoningDeltaNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ReasoningDeltaNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ReasoningDeltaNtf sessionId. */
+                sessionId: string;
+
+                /** ReasoningDeltaNtf messageId. */
+                messageId: string;
+
+                /** ReasoningDeltaNtf toolCallId. */
+                toolCallId: string;
+
+                /** ReasoningDeltaNtf block. */
+                block?: (skynet.agent.v1.ReasoningBlock.$Properties|null);
+
+                /** ReasoningDeltaNtf revision. */
+                revision: number;
+
+                /**
+                 * Creates a new ReasoningDeltaNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ReasoningDeltaNtf instance
+                 */
+                static create(properties: skynet.agent.v1.ReasoningDeltaNtf.$Shape): skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape;
+                static create(properties?: skynet.agent.v1.ReasoningDeltaNtf.$Properties): skynet.agent.v1.ReasoningDeltaNtf;
+
+                /**
+                 * Encodes the specified ReasoningDeltaNtf message. Does not implicitly {@link skynet.agent.v1.ReasoningDeltaNtf.verify|verify} messages.
+                 * @param message ReasoningDeltaNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ReasoningDeltaNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ReasoningDeltaNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ReasoningDeltaNtf.verify|verify} messages.
+                 * @param message ReasoningDeltaNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ReasoningDeltaNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a ReasoningDeltaNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape} ReasoningDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape;
+
+                /**
+                 * Decodes a ReasoningDeltaNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape} ReasoningDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape;
+
+                /**
+                 * Verifies a ReasoningDeltaNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a ReasoningDeltaNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ReasoningDeltaNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ReasoningDeltaNtf;
+
+                /**
+                 * Creates a plain object from a ReasoningDeltaNtf message. Also converts values to other types if specified.
+                 * @param message ReasoningDeltaNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ReasoningDeltaNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ReasoningDeltaNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ReasoningDeltaNtf {
+
+                /** Properties of a ReasoningDeltaNtf. */
+                interface $Properties {
+
+                    /** ReasoningDeltaNtf sessionId */
+                    sessionId?: (string|null);
+
+                    /** ReasoningDeltaNtf messageId */
+                    messageId?: (string|null);
+
+                    /** ReasoningDeltaNtf toolCallId */
+                    toolCallId?: (string|null);
+
+                    /** ReasoningDeltaNtf block */
+                    block?: (skynet.agent.v1.ReasoningBlock.$Properties|null);
+
+                    /** ReasoningDeltaNtf revision */
+                    revision?: (number|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a ReasoningDeltaNtf. */
+                type $Shape = skynet.agent.v1.ReasoningDeltaNtf.$Properties;
+            }
+
+            /**
              * Properties of a SessionCreateReq.
              * @deprecated Use skynet.agent.v1.SessionCreateReq.$Properties instead.
              */
@@ -957,6 +1329,134 @@ export namespace skynet {
             }
 
             /**
+             * Properties of a ToolUpdatedNtf.
+             * @deprecated Use skynet.agent.v1.ToolUpdatedNtf.$Properties instead.
+             */
+            interface IToolUpdatedNtf extends skynet.agent.v1.ToolUpdatedNtf.$Properties {
+            }
+
+            /** Represents a ToolUpdatedNtf. */
+            class ToolUpdatedNtf {
+
+                /**
+                 * Constructs a new ToolUpdatedNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ToolUpdatedNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ToolUpdatedNtf sessionId. */
+                sessionId: string;
+
+                /** ToolUpdatedNtf messageId. */
+                messageId: string;
+
+                /** ToolUpdatedNtf tool. */
+                tool?: (skynet.agent.v1.ToolCall.$Properties|null);
+
+                /** ToolUpdatedNtf revision. */
+                revision: number;
+
+                /**
+                 * Creates a new ToolUpdatedNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ToolUpdatedNtf instance
+                 */
+                static create(properties: skynet.agent.v1.ToolUpdatedNtf.$Shape): skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape;
+                static create(properties?: skynet.agent.v1.ToolUpdatedNtf.$Properties): skynet.agent.v1.ToolUpdatedNtf;
+
+                /**
+                 * Encodes the specified ToolUpdatedNtf message. Does not implicitly {@link skynet.agent.v1.ToolUpdatedNtf.verify|verify} messages.
+                 * @param message ToolUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ToolUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ToolUpdatedNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ToolUpdatedNtf.verify|verify} messages.
+                 * @param message ToolUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ToolUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a ToolUpdatedNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape} ToolUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape;
+
+                /**
+                 * Decodes a ToolUpdatedNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape} ToolUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape;
+
+                /**
+                 * Verifies a ToolUpdatedNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a ToolUpdatedNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ToolUpdatedNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ToolUpdatedNtf;
+
+                /**
+                 * Creates a plain object from a ToolUpdatedNtf message. Also converts values to other types if specified.
+                 * @param message ToolUpdatedNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ToolUpdatedNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ToolUpdatedNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ToolUpdatedNtf {
+
+                /** Properties of a ToolUpdatedNtf. */
+                interface $Properties {
+
+                    /** ToolUpdatedNtf sessionId */
+                    sessionId?: (string|null);
+
+                    /** ToolUpdatedNtf messageId */
+                    messageId?: (string|null);
+
+                    /** ToolUpdatedNtf tool */
+                    tool?: (skynet.agent.v1.ToolCall.$Properties|null);
+
+                    /** ToolUpdatedNtf revision */
+                    revision?: (number|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a ToolUpdatedNtf. */
+                type $Shape = skynet.agent.v1.ToolUpdatedNtf.$Properties;
+            }
+
+            /**
              * Properties of an ErrorInfo.
              * @deprecated Use skynet.agent.v1.ErrorInfo.$Properties instead.
              */
@@ -1147,6 +1647,12 @@ export namespace skynet {
                 /** ChatMessage ret. */
                 ret: number;
 
+                /** ChatMessage toolCalls. */
+                toolCalls: skynet.agent.v1.ToolCall.$Properties[];
+
+                /** ChatMessage reasoning. */
+                reasoning: skynet.agent.v1.ReasoningBlock.$Properties[];
+
                 /**
                  * Creates a new ChatMessage instance using the specified properties.
                  * @param [properties] Properties to set
@@ -1248,12 +1754,468 @@ export namespace skynet {
                     /** ChatMessage ret */
                     ret?: (number|null);
 
+                    /** ChatMessage toolCalls */
+                    toolCalls?: (skynet.agent.v1.ToolCall.$Properties[]|null);
+
+                    /** ChatMessage reasoning */
+                    reasoning?: (skynet.agent.v1.ReasoningBlock.$Properties[]|null);
+
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
 
                 /** Shape of a ChatMessage. */
                 type $Shape = skynet.agent.v1.ChatMessage.$Properties;
+            }
+
+            /**
+             * Properties of a ReasoningBlock.
+             * @deprecated Use skynet.agent.v1.ReasoningBlock.$Properties instead.
+             */
+            interface IReasoningBlock extends skynet.agent.v1.ReasoningBlock.$Properties {
+            }
+
+            /** Represents a ReasoningBlock. */
+            class ReasoningBlock {
+
+                /**
+                 * Constructs a new ReasoningBlock.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ReasoningBlock.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ReasoningBlock id. */
+                id: string;
+
+                /** ReasoningBlock runId. */
+                runId: string;
+
+                /** ReasoningBlock modelId. */
+                modelId: string;
+
+                /** ReasoningBlock text. */
+                text: string;
+
+                /** ReasoningBlock status. */
+                status: string;
+
+                /**
+                 * Creates a new ReasoningBlock instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ReasoningBlock instance
+                 */
+                static create(properties: skynet.agent.v1.ReasoningBlock.$Shape): skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape;
+                static create(properties?: skynet.agent.v1.ReasoningBlock.$Properties): skynet.agent.v1.ReasoningBlock;
+
+                /**
+                 * Encodes the specified ReasoningBlock message. Does not implicitly {@link skynet.agent.v1.ReasoningBlock.verify|verify} messages.
+                 * @param message ReasoningBlock message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ReasoningBlock.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ReasoningBlock message, length delimited. Does not implicitly {@link skynet.agent.v1.ReasoningBlock.verify|verify} messages.
+                 * @param message ReasoningBlock message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ReasoningBlock.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a ReasoningBlock message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape} ReasoningBlock
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape;
+
+                /**
+                 * Decodes a ReasoningBlock message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape} ReasoningBlock
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape;
+
+                /**
+                 * Verifies a ReasoningBlock message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a ReasoningBlock message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ReasoningBlock
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ReasoningBlock;
+
+                /**
+                 * Creates a plain object from a ReasoningBlock message. Also converts values to other types if specified.
+                 * @param message ReasoningBlock
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ReasoningBlock, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ReasoningBlock to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ReasoningBlock {
+
+                /** Properties of a ReasoningBlock. */
+                interface $Properties {
+
+                    /** ReasoningBlock id */
+                    id?: (string|null);
+
+                    /** ReasoningBlock runId */
+                    runId?: (string|null);
+
+                    /** ReasoningBlock modelId */
+                    modelId?: (string|null);
+
+                    /** ReasoningBlock text */
+                    text?: (string|null);
+
+                    /** ReasoningBlock status */
+                    status?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a ReasoningBlock. */
+                type $Shape = skynet.agent.v1.ReasoningBlock.$Properties;
+            }
+
+            /**
+             * Properties of a ModelOption.
+             * @deprecated Use skynet.agent.v1.ModelOption.$Properties instead.
+             */
+            interface IModelOption extends skynet.agent.v1.ModelOption.$Properties {
+            }
+
+            /** Represents a ModelOption. */
+            class ModelOption {
+
+                /**
+                 * Constructs a new ModelOption.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ModelOption.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ModelOption id. */
+                id: string;
+
+                /** ModelOption name. */
+                name: string;
+
+                /** ModelOption model. */
+                model: string;
+
+                /**
+                 * Creates a new ModelOption instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ModelOption instance
+                 */
+                static create(properties: skynet.agent.v1.ModelOption.$Shape): skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape;
+                static create(properties?: skynet.agent.v1.ModelOption.$Properties): skynet.agent.v1.ModelOption;
+
+                /**
+                 * Encodes the specified ModelOption message. Does not implicitly {@link skynet.agent.v1.ModelOption.verify|verify} messages.
+                 * @param message ModelOption message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ModelOption.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ModelOption message, length delimited. Does not implicitly {@link skynet.agent.v1.ModelOption.verify|verify} messages.
+                 * @param message ModelOption message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ModelOption.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a ModelOption message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape} ModelOption
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape;
+
+                /**
+                 * Decodes a ModelOption message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape} ModelOption
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape;
+
+                /**
+                 * Verifies a ModelOption message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a ModelOption message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ModelOption
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ModelOption;
+
+                /**
+                 * Creates a plain object from a ModelOption message. Also converts values to other types if specified.
+                 * @param message ModelOption
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ModelOption, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ModelOption to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ModelOption {
+
+                /** Properties of a ModelOption. */
+                interface $Properties {
+
+                    /** ModelOption id */
+                    id?: (string|null);
+
+                    /** ModelOption name */
+                    name?: (string|null);
+
+                    /** ModelOption model */
+                    model?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a ModelOption. */
+                type $Shape = skynet.agent.v1.ModelOption.$Properties;
+            }
+
+            /**
+             * Properties of a ToolCall.
+             * @deprecated Use skynet.agent.v1.ToolCall.$Properties instead.
+             */
+            interface IToolCall extends skynet.agent.v1.ToolCall.$Properties {
+            }
+
+            /** Represents a ToolCall. */
+            class ToolCall {
+
+                /**
+                 * Constructs a new ToolCall.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ToolCall.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ToolCall id. */
+                id: string;
+
+                /** ToolCall name. */
+                name: string;
+
+                /** ToolCall arguments. */
+                arguments: string;
+
+                /** ToolCall status. */
+                status: string;
+
+                /** ToolCall permissionReason. */
+                permissionReason: string;
+
+                /** ToolCall permissionMode. */
+                permissionMode: string;
+
+                /** ToolCall output. */
+                output: string;
+
+                /** ToolCall exitCode. */
+                exitCode?: (number|null);
+
+                /** ToolCall truncated. */
+                truncated: boolean;
+
+                /** ToolCall changedFiles. */
+                changedFiles: string[];
+
+                /** ToolCall error. */
+                error: string;
+
+                /** ToolCall processId. */
+                processId: string;
+
+                /** ToolCall runId. */
+                runId: string;
+
+                /** ToolCall workingDirectory. */
+                workingDirectory: string;
+
+                /** ToolCall reasoning. */
+                reasoning: skynet.agent.v1.ReasoningBlock.$Properties[];
+
+                /**
+                 * Creates a new ToolCall instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ToolCall instance
+                 */
+                static create(properties: skynet.agent.v1.ToolCall.$Shape): skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape;
+                static create(properties?: skynet.agent.v1.ToolCall.$Properties): skynet.agent.v1.ToolCall;
+
+                /**
+                 * Encodes the specified ToolCall message. Does not implicitly {@link skynet.agent.v1.ToolCall.verify|verify} messages.
+                 * @param message ToolCall message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ToolCall.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ToolCall message, length delimited. Does not implicitly {@link skynet.agent.v1.ToolCall.verify|verify} messages.
+                 * @param message ToolCall message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ToolCall.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a ToolCall message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape} ToolCall
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape;
+
+                /**
+                 * Decodes a ToolCall message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape} ToolCall
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape;
+
+                /**
+                 * Verifies a ToolCall message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a ToolCall message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ToolCall
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ToolCall;
+
+                /**
+                 * Creates a plain object from a ToolCall message. Also converts values to other types if specified.
+                 * @param message ToolCall
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ToolCall, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ToolCall to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ToolCall {
+
+                /** Properties of a ToolCall. */
+                interface $Properties {
+
+                    /** ToolCall id */
+                    id?: (string|null);
+
+                    /** ToolCall name */
+                    name?: (string|null);
+
+                    /** ToolCall arguments */
+                    "arguments"?: (string|null);
+
+                    /** ToolCall status */
+                    status?: (string|null);
+
+                    /** ToolCall permissionReason */
+                    permissionReason?: (string|null);
+
+                    /** ToolCall permissionMode */
+                    permissionMode?: (string|null);
+
+                    /** ToolCall output */
+                    output?: (string|null);
+
+                    /** ToolCall exitCode */
+                    exitCode?: (number|null);
+
+                    /** ToolCall truncated */
+                    truncated?: (boolean|null);
+
+                    /** ToolCall changedFiles */
+                    changedFiles?: (string[]|null);
+
+                    /** ToolCall error */
+                    error?: (string|null);
+
+                    /** ToolCall processId */
+                    processId?: (string|null);
+
+                    /** ToolCall runId */
+                    runId?: (string|null);
+
+                    /** ToolCall workingDirectory */
+                    workingDirectory?: (string|null);
+
+                    /** ToolCall reasoning */
+                    reasoning?: (skynet.agent.v1.ReasoningBlock.$Properties[]|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a ToolCall. */
+                type $Shape = skynet.agent.v1.ToolCall.$Properties;
             }
 
             /**
@@ -1295,6 +2257,12 @@ export namespace skynet {
 
                 /** SessionState cancelling. */
                 cancelling: boolean;
+
+                /** SessionState modelId. */
+                modelId: string;
+
+                /** SessionState permissionModelId. */
+                permissionModelId: string;
 
                 /**
                  * Creates a new SessionState instance using the specified properties.
@@ -1394,6 +2362,12 @@ export namespace skynet {
                     /** SessionState cancelling */
                     cancelling?: (boolean|null);
 
+                    /** SessionState modelId */
+                    modelId?: (string|null);
+
+                    /** SessionState permissionModelId */
+                    permissionModelId?: (string|null);
+
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];
                 }
@@ -1429,6 +2403,9 @@ export namespace skynet {
 
                 /** UserSnapshot sessions. */
                 sessions: skynet.agent.v1.SessionState.$Properties[];
+
+                /** UserSnapshot models. */
+                models: skynet.agent.v1.ModelOption.$Properties[];
 
                 /**
                  * Creates a new UserSnapshot instance using the specified properties.
@@ -1515,6 +2492,9 @@ export namespace skynet {
 
                     /** UserSnapshot sessions */
                     sessions?: (skynet.agent.v1.SessionState.$Properties[]|null);
+
+                    /** UserSnapshot models */
+                    models?: (skynet.agent.v1.ModelOption.$Properties[]|null);
 
                     /** Unknown fields preserved while decoding when enabled */
                     $unknowns?: Uint8Array[];

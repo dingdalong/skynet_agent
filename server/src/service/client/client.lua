@@ -14,7 +14,7 @@ local username = require("helper.username")
 ---@field new fun(self: client.Service): client.Service
 ---@field users table<string, user.User>
 ---@field connections table<string, client.ConnectionState>
----@field pending_requests table<user.Request, boolean>
+---@field pending_runs table<user.Run, boolean>
 local ClientService = class()
 
 ClientService.commands = { open = "open", handle_request = "handle_request", disconnect = "disconnect" }
@@ -23,7 +23,7 @@ ClientService.closing_commands = { disconnect = true }
 function ClientService:ctor()
     self.users = {}
     self.connections = {}
-    self.pending_requests = {}
+    self.pending_runs = {}
 end
 
 ---@param user user.User
@@ -91,18 +91,21 @@ function ClientService:disconnect(_, id)
 end
 
 function ClientService:close()
-    local succeeded, requests = true, {}
-    for request in pairs(self.pending_requests) do requests[#requests + 1] = request end
-    for _, request in ipairs(requests) do
-        if not request:cancel() then succeeded = false end
+    local succeeded, runs = true, {}
+    for run in pairs(self.pending_runs) do runs[#runs + 1] = run end
+    for _, run in ipairs(runs) do
+        if not run:cancel() then succeeded = false end
     end
     self.connections = {}
-    while next(self.pending_requests) do skynet.sleep(1) end
-    for _, request in ipairs(requests) do
-        if request.close_error then
+    while next(self.pending_runs) do skynet.sleep(1) end
+    for _, run in ipairs(runs) do
+        if run.close_error then
             succeeded = false
-            log.failure("client", "close", request.close_error)
+            log.failure("client", "close", run.close_error)
         end
+    end
+    for _, user in pairs(self.users) do
+        for _, session in pairs(user.sessions) do session.agent:close() end
     end
     return succeeded
 end

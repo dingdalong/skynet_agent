@@ -34,6 +34,36 @@ skynet.start(function()
         assert(getmetatable(third_class_object) == class_fixture)
         assert(third_class_object.created_by == "v3")
         assert(third_class_object:get_value() == "v3:third")
+
+        local Base = require("agent.llm.base")
+        local Client, Request = Base.Client, Base.Request
+        local config = { api_key = "hotfix-probe", base_url = "https://llm.example.com", model = "probe" }
+        local model = Base:new(config, "main")
+        local client = Client:new(config)
+        local request = Request:new()
+        model.client, client.current_request = client, request
+        model.sequence = 7
+        for _ = 1, 2 do
+            local previous_stream, previous_http, previous_cancel = Base.stream, Client.get_http, Request.cancel
+            reloaded, reload_error = hotfix.reload({ "agent.llm.base" })
+            assert(reloaded, reload_error)
+            assert(package.loaded["agent.llm.base"] == Base)
+            assert(Base.Client == Client and Base.Request == Request)
+            assert(getmetatable(model) == Base and getmetatable(client) == Client)
+            assert(getmetatable(request) == Request)
+            assert(model.client == client and client.current_request == request)
+            assert(model.sequence == 7 and not request.cancelled)
+            assert(Base.stream ~= previous_stream and Client.get_http ~= previous_http)
+            assert(Request.cancel ~= previous_cancel)
+            local next_model = Base:new(config, "permission")
+            assert(getmetatable(next_model) == Base and next_model.purpose == "permission")
+            assert(getmetatable(Base.Client:new(config)) == Client)
+            assert(getmetatable(Base.Request:new()) == Request)
+            assert(client.create_response == require("openai").OpenAI.__base.create_response)
+        end
+        assert(request:cancel() and request.cancelled)
+        client.current_request = nil
+        assert(type(client:get_http().request) == "function")
     end, debug.traceback)
 
     if ok then

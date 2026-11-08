@@ -2,6 +2,9 @@
 import { SkStatusBadge } from '@skynet/design-system'
 import { Bot, UserRound } from 'lucide-vue-next'
 import LoadingState from './LoadingState.vue'
+import ToolChips from './ToolChips.vue'
+import ThinkingState from './ThinkingState.vue'
+import StreamingText from './StreamingText.vue'
 import type { ChatMessage } from '../../../types/chat'
 
 defineProps<{
@@ -30,9 +33,18 @@ defineProps<{
         <SkStatusBadge v-else-if="message.status === 'cancelled'" status="warning" label="已停止" />
         <SkStatusBadge v-else-if="message.status === 'error'" status="danger" label="生成失败" />
       </header>
-      <p v-if="message.content" class="message__content">{{ message.content }}</p>
+      <ThinkingState :blocks="message.reasoning ?? []" />
+      <ToolChips :tools="message.toolCalls ?? []" />
+      <StreamingText
+        v-if="message.content && message.role === 'assistant'"
+        :text="message.content"
+        :status="message.status"
+      />
+      <p v-else-if="message.content" class="message__content">{{ message.content }}</p>
       <LoadingState
-        v-else-if="message.status === 'streaming'"
+        v-else-if="
+          message.status === 'streaming' && !message.toolCalls?.length && !message.reasoning?.length
+        "
         label="正在等待回答"
         variant="Orbit"
       />

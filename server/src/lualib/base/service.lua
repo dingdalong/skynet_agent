@@ -22,6 +22,7 @@ local Service = class()
 ---@param instance table
 function Service:ctor(instance)
     self.instance = instance
+    self.owner = nil
     self.state = "created"
     self.active_commands = 0
     self.close_started = false

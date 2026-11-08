@@ -84,6 +84,9 @@ end
 ---@param root string?
 function HotfixWatch:ctor(node, root)
     self.node = node
+    self.candidate = nil
+    self.changed_at = nil
+    self.last_error = nil
     self.root = root or "src"
     self.snapshot = {}
     self.pending = {}

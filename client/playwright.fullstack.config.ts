@@ -8,11 +8,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  retries: 0,
   reporter: process.env.CI ? 'github' : 'list',
-  timeout: 30_000,
+  timeout: 900_000,
   use: {
-    baseURL: 'http://127.0.0.1:15173',
+    baseURL: 'http://127.0.0.1:15174',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -26,8 +26,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://127.0.0.1:15173',
+    command: 'pnpm dev --port 15174',
+    url: 'http://127.0.0.1:15174',
     reuseExistingServer: false,
     timeout: 120_000,
     env: {

@@ -326,6 +326,16 @@ describe("openai.skynet_compat", function()
             luassert.is_true(fake.closed)
         end)
 
+        it("原样转发包含空数组、空对象和 null 的请求体", function()
+            local fake = FakeHttp.new({ status = 200, chunks = {} })
+            install_httpc(fake)
+            local options = request_options(ltn12.sink.table({}))
+            local body = '{ "z": [], "input": [{ "content": [], "meta": {} }], "a": null }\n'
+            options.source = ltn12.source.string(body)
+            luassert.are.equal(1, compat.request(options))
+            luassert.are.equal(body, fake.requests[1].body)
+        end)
+
         it("sink 异常时关闭响应流", function()
             local fake = FakeHttp.new({
                 chunks = { "chunk" },
@@ -423,7 +433,7 @@ end)
 
 describe("HTTP 请求主动取消", function()
     it("流读取停滞时取消并与超时并发，只释放一次", function()
-        local request = require("llm.request"):new()
+        local request = require("agent.llm.base").Request:new()
         local closes = 0
         local stream = setmetatable({
             status = 200,
@@ -449,7 +459,7 @@ describe("HTTP 请求主动取消", function()
     end)
 
     it("响应头等待期间先标记取消，流创建后立即释放", function()
-        local request = require("llm.request"):new()
+        local request = require("agent.llm.base").Request:new()
         local closes, reads = 0, 0
         local stream = setmetatable({
             status = 200,
@@ -469,7 +479,7 @@ describe("HTTP 请求主动取消", function()
     end)
 
     it("请求开始前取消不建立网络连接", function()
-        local request = require("llm.request"):new()
+        local request = require("agent.llm.base").Request:new()
         request:cancel()
         local ok, err = compat.request(request_options(ltn12.sink.table({})), request)
         luassert.is_nil(ok)

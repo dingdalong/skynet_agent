@@ -9,7 +9,7 @@ function Worker:ctor()
 end
 
 function Worker:init(params)
-    self.mode = params.mode or os.getenv("SHUTDOWN_TEST_MODE") or "normal"
+    self.mode = params.mode or require("etc.cfg.test_runtime").shutdown_mode
     self.observer = params.observer
     if not params.loginds and (self.mode == "startup_slow" or self.mode == "startup_wait") then
         io.stderr:write("SHUTDOWN_FIXTURE_INIT_WAITING\n")

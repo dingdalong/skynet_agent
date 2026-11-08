@@ -8,7 +8,15 @@ describe("用户与客户端服务", function()
         tasks, events, next_id, random_id = {}, {}, 0, 0
         model = { text = "回答" }
         local Agent = require("class")()
-        function Agent:ctor() self.messages = {} end
+        function Agent:ctor()
+            self.messages = {}
+            self.llm_config = nil
+            self.permission_config = nil
+        end
+        function Agent:set_llm(main, permission)
+            self.llm_config, self.permission_config = main, permission
+        end
+        function Agent:close() end
         function Agent:chat(text, on_delta, request)
             if model.yield then coroutine.yield("generating") end
             if request.cancelled then return nil, "cancelled" end
@@ -20,12 +28,18 @@ describe("用户与客户端服务", function()
         end
         scope = Scope.new({
             user = false, client = false,
+            ["agent.workspace"] = { create = function() return "/test" end },
             ["skynet.crypt"] = {
                 randomkey = function() random_id = random_id + 1; return tostring(random_id) end,
                 hexencode = function(value) return value end,
             },
-            agent = Agent,
+            ["agent.agent"] = Agent,
             ["etc.cfg"] = { agent = { llm = { api_key = "test" }, system_prompt = "test",
+                tools = { workspace_root = "/test" }, permission = {},
+                default_model_id = "test", models = {
+                    { id = "test", name = "测试", model = "test" },
+                    { id = "pro", name = "Pro", model = "pro" },
+                },
                 max_message_length = 100, session_title_length = 24 } },
             skynet = { genid = function() next_id = next_id + 1; return next_id end,
                 fork = function(callback) tasks[#tasks + 1] = coroutine.create(callback) end,
@@ -45,6 +59,28 @@ describe("用户与客户端服务", function()
         args.session_id, args.text = session_id, text
         service:handle_request({ source = 100 }, connection or "a", 2, "MessageSendReq", args)
     end
+
+    it("运行中按会话切换模型，权限跟随或使用配置中的固定模型", function()
+        local snapshot = service:open(nil, "a", 100, "alice")
+        local user = service.users.alice
+        local session = user.sessions[snapshot.sessions[1].id]
+        model.yield = true
+        send(session.id, "任务")
+        assert.is_true(coroutine.resume(tasks[#tasks]))
+        local run = session.run
+        local switched = user:SessionModelSetReq({ session_id = session.id, model_id = "pro" })
+        assert.are.equal(codes.succ, switched.ret)
+        assert.are.equal(run, session.run)
+        assert.are.equal("pro", session.agent.llm_config.model)
+        assert.are.equal("pro", session.agent.permission_config.model)
+        require("etc.cfg").agent.permission.model_id = "test"
+        user:SessionModelSetReq({ session_id = session.id, model_id = "pro" })
+        assert.are.equal("test", session.agent.permission_config.model)
+        local denied = user:SessionModelSetReq({ session_id = session.id, model_id = "unknown" })
+        assert.are.equal(codes.invalid_param, denied.ret)
+        assert.are.equal("pro", session.model_id)
+        assert.is_true(coroutine.resume(tasks[#tasks]))
+    end)
 
     it("按协议原名分发业务请求并关联响应", function()
         local snapshot = service:open(nil, "a", 100, "alice")
@@ -70,7 +106,7 @@ describe("用户与客户端服务", function()
         request(44, "MessageCancelReq", "MessageCancelRes", {
             session_id = created.id, run_id = sent.session.run_id,
         })
-        assert.is_true(service.users.alice.sessions[created.id].request.cancelled)
+        assert.is_true(service.users.alice.sessions[created.id].run.cancelled)
         assert.is_true(coroutine.resume(tasks[1]))
     end)
 
@@ -171,14 +207,14 @@ describe("用户与客户端服务", function()
         assert.are.equal(codes.server_busy, events[#events].args[4].ret)
         send(second, "二")
         assert.are.equal(2, #tasks)
-        local request = user.sessions[first].request
+        local request = user.sessions[first].run
         service:handle_request({ source = 200 }, "b", 4, "MessageCancelReq", {
             session_id = first, run_id = request.id,
         })
         assert.is_true(request.cancelled)
-        assert.are.equal(request, user.sessions[first].request)
+        assert.are.equal(request, user.sessions[first].run)
         assert.is_true(coroutine.resume(tasks[1]))
-        assert.is_nil(user.sessions[first].request)
+        assert.is_nil(user.sessions[first].run)
         assert.are.equal(status.cancelled, user.sessions[first].messages[2].status)
         assert.same({}, user.sessions[first].agent.messages)
         assert.is_true(coroutine.resume(tasks[2]))
@@ -220,7 +256,7 @@ describe("用户与客户端服务", function()
         send(snapshot.sessions[1].id, "问题")
         local closing = coroutine.create(function() return service:close() end)
         assert.same({ true, "sleep" }, { coroutine.resume(closing) })
-        local request = service.users.alice.sessions[snapshot.sessions[1].id].request
+        local request = service.users.alice.sessions[snapshot.sessions[1].id].run
         assert.is_true(request.cancelled)
         assert.is_true(coroutine.resume(tasks[1]))
         assert.same({ true, true }, { coroutine.resume(closing) })

@@ -63,8 +63,8 @@ DEEPSEEK_API_KEY=your-api-key
 对话消息限制和模型参数都从这里配置。超时字段以 `_ticks` 结尾，单位为厘秒。
 三类服务实例数默认取 Skynet 工作线程数，渠道配置可以分别覆盖。
 
-当前接入的是 DeepSeek；`llm.base.new` 负责构造 OpenAI 兼容客户端，
-`llm.base.stream_responses` 统一处理 Responses API 流事件。
+当前接入的是 DeepSeek；`agent.llm.base` 统一管理模型配置、OpenAI 兼容客户端与单次请求，
+通过 `Base:new(config, purpose)` 创建实例，使用 `set_config` 切换配置、`stream` 处理 Responses API 流。
 
 `server/.env` 使用 shell 兼容语法，只保存本机密钥和渠道选择，不提交真实密钥。
 Skynet 运行日志写入 `server/logs/skynet.log`，网关日志输出到 stdout 和 stderr。模型密钥只由
@@ -72,12 +72,12 @@ Skynet 进程读取，不进入客户端。
 
 ## 模型连续对话
 
-`agent` 导出 Agent 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
+`agent.agent` 导出 Agent 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
 构造时传入的 system prompt 会作为首条 `role=system` 消息发送，不使用 Responses API 的
 顶层 `instructions` 参数。
 
 ```lua
-local Agent = require("agent")
+local Agent = require("agent.agent")
 
 local agent = Agent:new({
     api_key = api_key,
@@ -91,9 +91,40 @@ local text, err = agent:chat("介绍一下 Lua", function(delta)
 end)
 ```
 
-运行时可通过 `agent:set_llm(llm_config)` 更新配置。切换后已有历史保持不变，
-下一次 `chat` 使用新配置重新创建 LLM 客户端。同一个 Agent 对象的 `chat` 和 `set_llm`
-需要由调用方串行执行。
+运行时可通过 `agent:set_llm(llm_config, permission_config)` 更新配置，已有历史继续保留。
+已发出的模型请求使用原配置，下一次模型请求按需创建新客户端；主模型与权限模型分别管理客户端。
+同一个 Agent 对象的 `chat` 需要由调用方串行执行。
+
+## 会话模型与思考
+
+`agent.models` 声明有序的候选模型清单，每项包含 `id`、`name`、`model`，可覆盖
+`agent.llm` 提供的连接默认值。`agent.default_model_id` 指定新会话的默认模型，客户端输入栏可按会话切换。
+客户端只获得公开模型信息；密钥留在服务端。权限模型默认跟随，或由 `agent.permission.model_id` 固定指定。
+
+主模型和权限模型的思考按请求分块保存，通过增量与快照同步；重试、失败和取消保留已收到的思考。
+聊天组件从 Beautiful UI Vue 托管清单复制源码，接入真实业务数据，并沿用项目主题、平台布局与无障碍规范。
+公共提示、工具定义和已有上下文保持稳定；每次模型完成记录输入与缓存命中 token，供实际验收核对。
+
+## 工具与工作目录
+
+Agent 支持 `exec_command`、`write_stdin` 和 `apply_patch`，分别用于 bash 命令、终端交互和补丁修改。
+工具在服务端执行，客户端同步展示权限判断、运行状态与结果。工作目录按用户和会话自动分配，
+根目录通过 `agent.tools.workspace_root` 或 `AGENT_WORKSPACE_ROOT` 配置；文件保留在磁盘，
+不随聊天历史清空而自动删除。
+
+macOS 使用系统 `sandbox-exec`，Linux 需要安装 `bubblewrap` 并允许创建 user/PID namespace 和挂载独立 proc。
+默认沙盒允许联网，文件写入限制在会话工作目录；缺少隔离能力时返回错误。
+`sandbox_permissions` 可取 `use_default`、`require_escalated`，沙盒外执行需要提供 `justification`。
+
+`agent.permission.rules_enabled` 控制规则拦截，`deny_patterns` 可配置 Lua pattern 禁止规则。
+规则只负责阻止，通过后仍逐次调用独立 LLM 判断；权限模型默认跟随会话模型，
+`agent.permission.model_id` 可固定为模型清单中的 ID，`timeout_ticks` 控制判断超时。判断拒绝或失败都不会执行工具，
+也不转交人工审批。规则是辅助筛查，系统沙盒负责实际约束。
+
+执行会话支持 PTY，并受 `timeout_ms`、`max_processes` 和 `max_output_bytes` 限制；工具调用次数不设上限。
+这些执行时长使用毫秒；模型与权限请求的 `_ticks` 字段使用厘秒。停止会终止当前轮涉及的命令，
+关服回收所有进程；已经发生的文件修改会保留。失败后的重试继续使用已记录的工具结果，不重放命令。
+Lua 工具与权限代码位于 `agent/`，C 扩展源码集中在 `server/src/lualib-src/`。
 
 ## Agent WebSocket 网关
 
@@ -245,7 +276,7 @@ Skynet 先查找独立脚本和内置服务，再通过公共入口按 loader �
 也可以通过 `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .client_1 HOTFIX client user agent llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
+dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base openai.ltn12 openai.url openai.sse openai.skynet_compat
 ```
 
 服务地址使用 Skynet 注册名（以 `.` 开头）或数字地址（以 `:` 开头）。手动命令只更新指定 VM，
@@ -279,7 +310,11 @@ pnpm --dir client test:native
 pnpm --dir client test:e2e:full
 ```
 
-原生夹具运行整组场景，驱动真实 Vue 页面和 Rust 核心；Web 全链路可在命令后追加
+原生夹具运行整组场景，驱动真实 Vue 页面和 Rust 核心；这两个入口都连接真实模型供应商，
+主模型和权限模型复用 `server/.env`（或 `SKYNET_ENV_FILE`）中的凭据。模型配置沿用开发渠道，
+可通过 `DEEPSEEK_BASE_URL` 和 `DEEPSEEK_MODEL` 覆盖。缺少凭据或真实调用失败时测试失败，不回退假模型。
+测试启动隔离的服务端、会话目录和本地联网夹具；脱敏结果保存在 `client/test-artifacts/real-model/`。
+Web 全链路可在命令后追加
 `--grep '<场景名称或正则表达式>'` 筛选本次场景，其他 Playwright 参数也会原样传递。
 
 完整检查使用：
@@ -288,10 +323,17 @@ pnpm --dir client test:e2e:full
 make check-full
 ```
 
-完整检查先运行基础回归，再追加服务端全部专项集成、macOS 原生夹具、Web 真实网关全链路、
+完整检查先运行基础回归，再追加服务端全部专项集成、原生/Web 假模型集成、macOS 原生真实模型验收、
+Web 真实模型全链路、
 Storybook 构建和 Chromium、WebKit、移动视口 UI 回归。原生夹具会生成前端测试资源；固定端口
 测试与会生成资源的构建顺序执行。
-测试使用隔离配置和本地假模型，不调用付费模型；执行前需安装客户端依赖及 Playwright 浏览器。
+真实端到端验收会调用供应商并产生模型用量；执行前需配置有效凭据，安装客户端依赖及 Playwright 浏览器。
+确定性的异常注入、断流、超时和失败重试保留在假模型集成测试中，不能替代真实模型验收：
+
+```bash
+pnpm --dir client test:integration:native
+pnpm --dir client test:integration:web
+```
 
 专项检查直接使用子项目入口：
 

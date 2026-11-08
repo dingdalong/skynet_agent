@@ -1,10 +1,11 @@
 import { isTauri } from '@tauri-apps/api/core'
-import type { ChatSessionView, ConnectionState } from '../types/chat'
+import type { ChatSessionView, ConnectionState, ModelOption } from '../types/chat'
 import { readUsername } from './user-preferences'
 import { createBrowserChatRuntime } from './browser-chat-runtime'
 import { createNativeChatRuntime } from './native-chat-runtime'
 
 export interface ChatRuntimeState {
+  models: ModelOption[]
   username: string
   userId: string
   sessionViews: Map<string, ChatSessionView>
@@ -23,6 +24,7 @@ export interface ChatRuntime {
   disconnect(): void
   switchUser(): void
   createSession(): Promise<boolean>
+  setModel(modelId: string): Promise<boolean>
   selectSession(sessionId: string): Promise<boolean>
   sendMessage(text: string): boolean
   retryLastMessage(): void
@@ -33,6 +35,7 @@ export interface ChatRuntime {
 
 export function initialChatState(): ChatRuntimeState {
   return {
+    models: [],
     username: readUsername(),
     userId: '',
     sessionViews: new Map(),

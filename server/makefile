@@ -63,8 +63,8 @@ BUSTED_CPATH := ./luaclib/?.so
 
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
 .NOTPARALLEL:
-.PHONY: help build check check-format test test-integration test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-live \
-	cjson protobuf lfs linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
+.PHONY: help build check check-format test test-integration test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
+	cjson protobuf lfs process linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
 	clean cleanall
 
 help:
@@ -111,7 +111,7 @@ linux macosx freebsd: check-openssl
 		TLS_MODULE=ltls \
 		TLS_INC="$(OPENSSL_INCLUDE_DIR)" \
 		TLS_LIB="$(OPENSSL_LIB_DIR)"
-	@$(MAKE) cjson protobuf lfs
+	@$(MAKE) cjson protobuf lfs process
 
 cjson:
 	@mkdir -p "$(LUACLIB_DIR)"
@@ -189,7 +189,7 @@ mingw-tls:
 		-L"$(OPENSSL_LIB_DIR)" -lssl -lcrypto \
 		-lws2_32 -lcrypt32 -static-libgcc
 
-test: cjson protobuf lfs
+test: cjson protobuf lfs process
 	@command -v "$(BUSTED)" >/dev/null 2>&1 || { \
 		printf '%s\n' "未找到 busted，请先运行 luarocks install busted" >&2; \
 		exit 1; \
@@ -222,17 +222,27 @@ test-service-control:
 	@"$(PROJECT_ROOT)/tests/integration/shutdown_runtime_smoke.sh"
 	@"$(PROJECT_ROOT)/tests/integration/run_with_fake_gateway.sh" node "$(PROJECT_ROOT)/tests/integration/service_control_probe.mjs"
 
-test-integration: build test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
+test-integration: build test-tool-process test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
 
 check: check-format test test-integration
 
 clean:
 	@-$(MAKE) -C "$(SKYNET_DIR)" clean
 	@-$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
-	@rm -f "$(LUACLIB_DIR)/cjson.so" "$(LUACLIB_DIR)/pb.so" "$(LUACLIB_DIR)/lfs.so"
+	@rm -f "$(LUACLIB_DIR)/cjson.so" "$(LUACLIB_DIR)/pb.so" "$(LUACLIB_DIR)/lfs.so" "$(LUACLIB_DIR)/agent_process.so" "$(PROJECT_ROOT)/bin/process_launcher"
 	@-rmdir "$(LUACLIB_DIR)" 2>/dev/null || true
 
 cleanall:
 	@-$(MAKE) -C "$(SKYNET_DIR)" cleanall
 	@-$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
 	@rm -rf "$(LUACLIB_DIR)"
+
+# Project-owned Lua extensions share lualib-src; no Skynet sources are modified.
+process:
+	@mkdir -p "$(LUACLIB_DIR)" "$(PROJECT_ROOT)/bin"
+	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" \
+		"$(PROJECT_ROOT)/src/lualib-src/process.c" -o "$(LUACLIB_DIR)/agent_process.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
+	@$(CC) -O2 -Wall -Wextra "$(PROJECT_ROOT)/src/lualib-src/process_launcher.c" -o "$(PROJECT_ROOT)/bin/process_launcher"
+
+test-tool-process:
+	@cd "$(PROJECT_ROOT)" && "$(SKYNET_DIR)/skynet" tests/integration/tool_process.config

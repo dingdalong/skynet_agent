@@ -25,6 +25,7 @@ Node.initializing_commands = { force_shutdown = true }
 
 function Node:ctor()
     self.services = {}
+    self.hotfix_watch = nil
     self.closing = false
     self.close_started = false
     self.close_done = false

@@ -1,6 +1,15 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
+async function settleStory(page: Page) {
+  await page.locator('#storybook-root').evaluate(async (element) => {
+    const animations = element
+      .getAnimations({ subtree: true })
+      .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().iterations))
+    await Promise.allSettled(animations.map((animation) => animation.finished))
+  })
+}
+
 async function openStory(page: Page, story: string, theme = 'light') {
   // E2E 由 AxeBuilder 统一扫描，避免与 Storybook 自动检查并发运行。
   await page.goto(
@@ -9,9 +18,55 @@ async function openStory(page: Page, story: string, theme = 'light') {
   await expect(page.getByRole('main')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+  await settleStory(page)
 }
 
 for (const theme of ['light', 'dark']) {
+  test(`${theme} 托管思考组件与模型菜单支持键盘和窄屏`, async ({ page }, testInfo) => {
+    await openStory(page, 'agent-runtime--thinking', theme)
+    const toggle = page.getByRole('button', { name: '思考过程 · 思考完成' })
+    await toggle.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByLabel('思考内容')).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await settleStory(page)
+    const thinking = await new AxeBuilder({ page }).include('#storybook-root').analyze()
+    expect(
+      thinking.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
+    ).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath(`thinking-${theme}.png`), fullPage: true })
+    await openStory(page, 'agent-runtime--models', theme)
+    await page.getByRole('button', { name: /^切换会话模型/ }).click()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('button', { name: /^切换会话模型/ })).toContainText('DeepSeek Pro')
+    await settleStory(page)
+    const models = await new AxeBuilder({ page }).include('#storybook-root').analyze()
+    expect(
+      models.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
+    ).toEqual([])
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+
+  test(`${theme} 工具卡片遵循共享视觉，支持键盘展开和窄屏`, async ({ page }, testInfo) => {
+    await openStory(page, 'tools--completed', theme)
+    const summary = page.locator('.tool-call summary')
+    await summary.focus()
+    await expect(summary).toBeFocused()
+    await expect(summary).toHaveCSS('outline-style', 'solid')
+    await page.keyboard.press('Enter')
+    await expect(page.getByLabel('工具输出')).toBeVisible()
+    const results = await new AxeBuilder({ page }).include('#storybook-root').analyze()
+    expect(
+      results.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),
+    ).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath(`tools-${theme}.png`), fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await expect(page.getByLabel('工具输出')).toBeVisible()
+  })
+
   test(`${theme} 基础按钮统一操作层级、焦点和加载状态`, async ({ page }, testInfo) => {
     await openStory(page, 'components--buttons', theme)
     const primary = page.getByRole('button', { name: '发送消息', exact: true })

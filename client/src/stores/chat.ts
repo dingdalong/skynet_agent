@@ -50,6 +50,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
+    models: computed(() => state.value.models),
     username,
     userId,
     sessionViews,
@@ -74,6 +75,7 @@ export const useChatStore = defineStore('chat', () => {
     connect: (name = username.value) => runtime.value.connect(name),
     disconnect: () => runtime.value.disconnect(),
     switchUser: () => runtime.value.switchUser(),
+    setModel: (id: string) => runtime.value.setModel(id),
     createSession: () => runtime.value.createSession(),
     selectSession: (id: string) => runtime.value.selectSession(id),
     sendMessage: (text: string) => runtime.value.sendMessage(text),

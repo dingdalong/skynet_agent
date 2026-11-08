@@ -3,8 +3,11 @@ import { reactive } from 'vue'
 import type { ChatSessionView, ChatUpdate } from '../types/chat'
 import { initialChatState, type ChatRuntime } from './chat-runtime'
 import { normalizeUsername, saveUsername } from './user-preferences'
+import { appendReasoning } from '../protocol/reasoning'
+import type { ModelOption } from '../types/chat'
 
 export interface NativeChatState {
+  models?: ModelOption[]
   username: string
   userId: string
   sessions: ChatSessionView[]
@@ -15,10 +18,12 @@ export interface NativeChatState {
   pendingSends: string[]
 }
 export type NativeChatEvent =
+  | { type: 'reasoning'; update: Extract<ChatUpdate, { type: 'reasoning' }> }
   | { type: 'state'; state: NativeChatState }
   | { type: 'delta'; update: Extract<ChatUpdate, { type: 'delta' }> }
 
 type Action =
+  | { type: 'setModel'; modelId: string }
   | { type: 'connect'; username: string }
   | { type: 'disconnect' | 'switchUser' | 'createSession' | 'dismissError' | 'retryLastMessage' }
   | { type: 'selectSession'; sessionId: string }
@@ -52,6 +57,7 @@ export function createNativeChatRuntime(): ChatRuntime {
       }
       if (pendingSelection === rest.activeSessionId) pendingSelection = null
       Object.assign(state, rest, {
+        models: next.models ?? [],
         activeSessionId: pendingSelection ?? rest.activeSessionId,
         sessionViews: new Map(sessions.map((session) => [session.id, session])),
         pendingSends: new Set(pendingSends),
@@ -65,7 +71,8 @@ export function createNativeChatRuntime(): ChatRuntime {
     const session = state.sessionViews.get(update.sessionId)
     const message = session?.messages.find((item) => item.id === update.messageId)
     if (session && message) {
-      message.content += update.delta
+      if (update.type === 'reasoning') appendReasoning(message, update.toolCallId, update.block)
+      else message.content += update.delta
       session.revision = update.revision
     }
   }
@@ -155,6 +162,9 @@ export function createNativeChatRuntime(): ChatRuntime {
       if (state.connectionState !== 'connected' || state.sessionOperations > 0) return false
       state.sessionOperations++
       return action({ type: 'createSession' })
+    },
+    async setModel(modelId) {
+      return action({ type: 'setModel', modelId })
     },
     async selectSession(sessionId) {
       if (!state.sessionViews.has(sessionId)) return false

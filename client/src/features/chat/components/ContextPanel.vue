@@ -37,6 +37,26 @@ const connectionLabel = computed(() => {
 
     <dl class="facts">
       <div>
+        <dt>会话模型</dt>
+        <dd>
+          {{
+            store.models.find((model) => model.id === store.activeSession?.modelId)?.name ??
+            '未选择'
+          }}
+        </dd>
+      </div>
+      <div>
+        <dt>权限模型</dt>
+        <dd>
+          {{
+            store.activeSession?.permissionModelId === store.activeSession?.modelId
+              ? '跟随会话模型'
+              : (store.models.find((model) => model.id === store.activeSession?.permissionModelId)
+                  ?.name ?? '未选择')
+          }}
+        </dd>
+      </div>
+      <div>
         <dt><Cloud :size="15" aria-hidden="true" />Agent</dt>
         <dd>Skynet 云端</dd>
       </div>
@@ -45,14 +65,14 @@ const connectionLabel = computed(() => {
         <dd>仅服务内存</dd>
       </div>
       <div>
-        <dt><ShieldCheck :size="15" aria-hidden="true" />本地操作</dt>
-        <dd>未启用</dd>
+        <dt><ShieldCheck :size="15" aria-hidden="true" />工具执行</dt>
+        <dd>服务器沙盒</dd>
       </div>
     </dl>
 
     <section class="boundary-note">
       <h3>数据边界</h3>
-      <p>会话按用户名保留并自动同步，断线后自动恢复；服务器重启会清空数据。</p>
+      <p>会话按用户名保留并自动同步，断线后自动恢复；服务器重启清空聊天数据，工具文件继续保留。</p>
     </section>
   </aside>
 </template>

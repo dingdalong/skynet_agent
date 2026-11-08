@@ -12,6 +12,8 @@ interface Session {
   messages: Message[]
   runId: string
   cancelling: boolean
+  modelId?: string
+  permissionModelId?: string
 }
 interface MockUser {
   userId: string
@@ -41,6 +43,7 @@ export class MockAgentChannel implements BinaryChannel {
       sessionId: string
       text: string
       runId: string
+      modelId?: string
       retryRunId?: string
     }
     const reply = (payload: Record<string, unknown>) =>
@@ -81,6 +84,13 @@ export class MockAgentChannel implements BinaryChannel {
     const session = user.sessions.find((item) => item.id === args.sessionId)
     if (!session) {
       reply({ ret: 2, error: { message: '会话不存在', retryable: false } })
+      return
+    }
+    if (request.name === 'SessionModelSetReq') {
+      session.modelId = args.modelId
+      session.permissionModelId = args.modelId
+      this.publishSession(session)
+      reply({ ret: 1, session })
       return
     }
     if (request.name === 'MessageCancelReq') {
@@ -168,6 +178,10 @@ export class MockAgentChannel implements BinaryChannel {
 
   private snapshot() {
     return {
+      models: [
+        { id: 'deepseek-flash', name: 'DeepSeek Flash', model: 'deepseek-flash' },
+        { id: 'deepseek-v4-pro', name: 'DeepSeek Pro', model: 'deepseek-v4-pro' },
+      ],
       userId: this.user!.userId,
       username: this.user!.username,
       sessions: this.user!.sessions,
@@ -183,6 +197,8 @@ export class MockAgentChannel implements BinaryChannel {
       messages: [],
       runId: '',
       cancelling: false,
+      modelId: 'deepseek-flash',
+      permissionModelId: 'deepseek-flash',
     }
     this.user!.sessions.unshift(session)
     this.publishSession(session)

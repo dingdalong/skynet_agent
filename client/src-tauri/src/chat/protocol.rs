@@ -28,9 +28,12 @@ pub enum Server {
     Snapshot(pb::UserSnapshotRes),
     Create(pb::SessionCreateRes),
     Send(pb::MessageSendRes),
+    Model(pb::SessionModelSetRes),
+    Reasoning(pb::ReasoningDeltaNtf),
     Cancel(pb::MessageCancelRes),
     Session(pb::SessionUpdatedNtf),
     Delta(pb::MessageDeltaNtf),
+    Tool(pb::ToolUpdatedNtf),
 }
 impl Server {
     pub fn name(&self) -> &'static str {
@@ -39,9 +42,12 @@ impl Server {
             Self::Snapshot(_) => "UserSnapshotRes",
             Self::Create(_) => "SessionCreateRes",
             Self::Send(_) => "MessageSendRes",
+            Self::Model(_) => "SessionModelSetRes",
+            Self::Reasoning(_) => "ReasoningDeltaNtf",
             Self::Cancel(_) => "MessageCancelRes",
             Self::Session(_) => "SessionUpdatedNtf",
             Self::Delta(_) => "MessageDeltaNtf",
+            Self::Tool(_) => "ToolUpdatedNtf",
         }
     }
 }
@@ -58,7 +64,10 @@ pub fn decode(frame: &[u8]) -> Result<(u32, Server), String> {
             if type_hash == hash(stringify!($name)) {
                 let message = pb::$name::decode(payload)
                     .map_err(|error| format!("Agent Protobuf 解码失败: {error}"))?;
-                let notification = matches!(stringify!($variant), "Session" | "Delta");
+                let notification = matches!(
+                    stringify!($variant),
+                    "Session" | "Delta" | "Tool" | "Reasoning"
+                );
                 if (id == 0) != notification {
                     return Err("Agent 消息方向或请求编号无效".into());
                 }
@@ -70,9 +79,12 @@ pub fn decode(frame: &[u8]) -> Result<(u32, Server), String> {
     message!(UserSnapshotRes, Snapshot);
     message!(SessionCreateRes, Create);
     message!(MessageSendRes, Send);
+    message!(SessionModelSetRes, Model);
+    message!(ReasoningDeltaNtf, Reasoning);
     message!(MessageCancelRes, Cancel);
     message!(SessionUpdatedNtf, Session);
     message!(MessageDeltaNtf, Delta);
+    message!(ToolUpdatedNtf, Tool);
     Err(format!("未知 Agent 响应哈希: {type_hash}"))
 }
 

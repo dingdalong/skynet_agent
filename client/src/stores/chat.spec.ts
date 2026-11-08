@@ -48,6 +48,7 @@ function fixture() {
   let update: ((value: ChatUpdate) => void) | null = null
   let connection: TransportConnectionListener | null = null
   const transport = {
+    setModel: vi.fn<ChatTransport['setModel']>(),
     connect: vi.fn<ChatTransport['connect']>().mockImplementation(async () => snapshot()),
     snapshot: vi.fn<ChatTransport['snapshot']>().mockImplementation(async () => snapshot()),
     createSession: vi.fn<ChatTransport['createSession']>().mockResolvedValue(session('s3')),
@@ -106,6 +107,47 @@ describe('用户聊天状态', () => {
     await store.connect()
     expect(store.activeSessionId).toBe('s2')
     expect(localStorage.getItem('skynet.username')).toBe('alice')
+    store.disconnect()
+  })
+
+  it('回答结束后的后台工具更新仍按消息定位，重复版本不覆盖', async () => {
+    const { store, update } = fixture()
+    await store.connect('alice')
+    await store.selectSession('s1')
+    update({ type: 'session', session: { ...session('s1', 2), messages: [assistant('complete')] } })
+    const tool = {
+      id: 't1',
+      name: 'exec_command',
+      arguments: '{}',
+      status: 'running' as const,
+      permissionReason: '允许',
+      permissionMode: 'use_default',
+      output: 'background',
+      truncated: false,
+      changedFiles: [],
+      error: '',
+      processId: 'p1',
+      runId: 'r1',
+      workingDirectory: '/work',
+    }
+    update({ type: 'tool', sessionId: 's1', messageId: 'm1', tool, revision: 3 })
+    update({
+      type: 'tool',
+      sessionId: 's1',
+      messageId: 'm1',
+      tool: { ...tool, output: 'stale' },
+      revision: 3,
+    })
+    expect(store.messages[0]?.toolCalls?.[0]?.output).toBe('background')
+    expect(store.runState).toBe('idle')
+    update({
+      type: 'tool',
+      sessionId: 's1',
+      messageId: 'm1',
+      tool: { ...tool, status: 'completed' },
+      revision: 4,
+    })
+    expect(store.messages[0]?.toolCalls?.[0]?.status).toBe('completed')
     store.disconnect()
   })
 

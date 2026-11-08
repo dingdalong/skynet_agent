@@ -19,6 +19,7 @@ type Sink = Box<dyn Fn(Event) -> bool + Send>;
 pub enum Event {
     State { state: RuntimeState },
     Delta { update: Delta },
+    Reasoning { update: ReasoningDelta },
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +31,17 @@ pub struct Delta {
     message_id: String,
     revision: u32,
     delta: String,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReasoningDelta {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    session_id: String,
+    message_id: String,
+    tool_call_id: String,
+    block: state::ReasoningBlock,
+    revision: u32,
 }
 struct Subscriber {
     id: String,
@@ -44,6 +56,10 @@ struct Pending {
 enum Purpose {
     Login,
     Snapshot,
+    Model {
+        view: String,
+        session: String,
+    },
     Create {
         view: String,
     },
@@ -61,9 +77,9 @@ impl Purpose {
     fn target(&self) -> Option<(&str, Option<&str>)> {
         match self {
             Self::Create { view } => Some((view, None)),
-            Self::Send { view, session, .. } | Self::Cancel { view, session } => {
-                Some((view, Some(session)))
-            }
+            Self::Send { view, session, .. }
+            | Self::Cancel { view, session }
+            | Self::Model { view, session } => Some((view, Some(session))),
             _ => None,
         }
     }
@@ -524,6 +540,26 @@ impl Actor {
                             Some(reply),
                         );
                     }
+                    Action::SetModel { model_id } => {
+                        let selected = self.cache.view(&label).selected.clone().unwrap_or_default();
+                        if selected.is_empty() {
+                            let _ = reply.send(Ok(false));
+                            return;
+                        }
+                        self.request(
+                            "SessionModelSetReq",
+                            &pb::SessionModelSetReq {
+                                session_id: selected.clone(),
+                                model_id,
+                            },
+                            "SessionModelSetRes",
+                            Purpose::Model {
+                                view: label,
+                                session: selected,
+                            },
+                            Some(reply),
+                        );
+                    }
                     Action::SendMessage { text } => {
                         self.send(label, text.trim().into(), false, reply)
                     }
@@ -700,6 +736,12 @@ impl Actor {
                 }
                 self.cache.merge(session);
             }
+            Server::Model(response) => {
+                protocol::check(response.ret, response.error.as_ref())?;
+                self.cache.merge(Session::try_from(
+                    response.session.ok_or("Agent 未返回会话")?,
+                )?);
+            }
             Server::Send(response) => {
                 protocol::check(response.ret, response.error.as_ref())?;
                 self.cache.merge(Session::try_from(
@@ -762,6 +804,39 @@ impl Actor {
                 }
                 Ok(applied)
             }
+            Server::Reasoning(update) => {
+                let previous = self
+                    .cache
+                    .sessions
+                    .get(&update.session_id)
+                    .map(|s| s.revision)
+                    .unwrap_or_default();
+                let applied = self.cache.reasoning(update.clone())?;
+                if applied && update.revision > previous {
+                    let event = Event::Reasoning {
+                        update: ReasoningDelta {
+                            kind: "reasoning",
+                            session_id: update.session_id.clone(),
+                            message_id: update.message_id.clone(),
+                            tool_call_id: update.tool_call_id.clone(),
+                            block: state::ReasoningBlock::try_from(
+                                update.block.clone().ok_or("缺少思考块")?,
+                            )?,
+                            revision: update.revision,
+                        },
+                    };
+                    self.subscribers
+                        .retain(|_, subscriber| (subscriber.sink)(event.clone()));
+                }
+                Ok(applied)
+            }
+            Server::Tool(tool) => {
+                let applied = self.cache.tool(tool.clone())?;
+                if applied {
+                    self.emit_state();
+                }
+                Ok(applied)
+            }
             _ => Err("未知用户更新".into()),
         }
     }
@@ -783,6 +858,50 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
 
+    #[test]
+    fn reasoning_notification_serializes_the_page_discriminant() {
+        let (mut actor, _) = actor();
+        actor
+            .cache
+            .merge(Session::try_from(response("s1", 2, true)).unwrap());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let output = events.clone();
+        actor.subscribers.insert(
+            "main".into(),
+            Subscriber {
+                id: "page".into(),
+                sink: Box::new(move |event| {
+                    output
+                        .lock()
+                        .unwrap()
+                        .push(serde_json::to_value(event).unwrap());
+                    true
+                }),
+            },
+        );
+        actor
+            .notification(Server::Reasoning(pb::ReasoningDeltaNtf {
+                session_id: "s1".into(),
+                message_id: "m1".into(),
+                tool_call_id: String::new(),
+                block: Some(pb::ReasoningBlock {
+                    id: "b1".into(),
+                    run_id: "r1".into(),
+                    model_id: "model".into(),
+                    text: "思考增量".into(),
+                    status: "streaming".into(),
+                }),
+                revision: 3,
+            }))
+            .unwrap();
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["type"], "reasoning");
+        assert_eq!(events[0]["update"]["type"], "reasoning");
+        assert_eq!(events[0]["update"]["block"]["text"], "思考增量");
+        assert_eq!(events[0]["update"]["toolCallId"], "");
+    }
+
     fn actor() -> (Actor, mpsc::UnboundedReceiver<Vec<u8>>) {
         let (tx, _) = mpsc::unbounded_channel();
         let mut actor = Actor::new("ws://127.0.0.1:18791/agent".into(), tx);
@@ -791,6 +910,7 @@ mod tests {
         actor
             .cache
             .snapshot(pb::UserSnapshot {
+                models: vec![],
                 user_id: "u1".into(),
                 username: "alice".into(),
                 sessions: vec![pb::SessionState {
@@ -916,6 +1036,7 @@ mod tests {
                 &pb::UserSnapshotRes {
                     ret: 1,
                     snapshot: Some(pb::UserSnapshot {
+                        models: vec![],
                         user_id: "u1".into(),
                         username: "alice".into(),
                         sessions: vec![response("s1", 4, true)],

@@ -127,6 +127,21 @@ describe('Rust 客户端界面适配', () => {
     })
     expect(runtime.state.sessionViews.get('s1')?.messages[0]?.content).toBe('回答')
     expect(runtime.state.sessionViews.get('s1')?.revision).toBe(2)
+    channels[0]!.onmessage({
+      type: 'reasoning',
+      update: {
+        type: 'reasoning',
+        sessionId: 's1',
+        messageId: 'm1',
+        toolCallId: '',
+        revision: 3,
+        block: { id: 'b1', runId: 'r1', modelId: 'pro', text: '思考增量', status: 'streaming' },
+      },
+    })
+    const message = runtime.state.sessionViews.get('s1')?.messages[0]
+    expect(message?.content).toBe('回答')
+    expect(message?.reasoning?.[0]?.text).toBe('思考增量')
+    expect(runtime.state.sessionViews.get('s1')?.revision).toBe(3)
     runtime.detach()
   })
   it('挂载失败显示错误，下一次可重新挂载而不会遗留连接命令', async () => {

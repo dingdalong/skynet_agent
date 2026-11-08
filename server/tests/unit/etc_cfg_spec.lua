@@ -31,7 +31,12 @@ local function common_config()
             login_timeout_ticks = 1000,
         },
         agent = {
+            default_model_id = "e2e-test-model",
+            models = { { id = "e2e-test-model", name = "测试模型", model = "e2e-test-model" } },
             system_prompt = "测试系统提示",
+            tools = { workspace_root = "./work_dir", timeout_ms = 300000, max_processes = 8,
+                max_output_bytes = 1048576, },
+            permission = { rules_enabled = true, timeout_ticks = 3000 },
             max_message_length = 20000,
             session_title_length = 24,
             llm = {
@@ -77,6 +82,17 @@ local function assert_build_error(build, mutate, expected)
 end
 
 describe("etc.cfg", function()
+    it("模型清单解析私有配置，公开快照只包含模型标识和名称", function()
+        local config = loader.build(common_config(), channel_config(), "test").agent
+        local models = require("agent.models")
+        local resolved = models.resolve(config, config.default_model_id)
+        assert.are.equal("test-api-key", resolved.api_key)
+        assert.are.equal("e2e-test-model", resolved.model)
+        assert.are.same({ { id = "e2e-test-model", name = "测试模型", model = "e2e-test-model" } },
+            models.public(config))
+        assert.has_error(function() models.resolve(config, "unknown") end)
+    end)
+
     local original_skynet
 
     before_each(function()

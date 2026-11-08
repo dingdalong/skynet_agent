@@ -13,6 +13,7 @@ local Login = class()
 Login.commands = { handle_request = "handle_request" }
 
 function Login:ctor()
+    self.client_services = nil
 end
 
 ---@param params {client_services: integer[]}

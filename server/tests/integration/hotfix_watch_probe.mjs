@@ -195,6 +195,7 @@ try {
   );
   await symlink(join(root, "3rd"), join(server, "3rd"));
   await symlink(join(root, "luaclib"), join(server, "luaclib"));
+  await symlink(join(root, "bin"), join(server, "bin"));
   await symlink(join(root, "../common"), join(temporary, "common"));
   start(
     process.execPath,

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import net from 'node:net'
-import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -11,9 +10,19 @@ import { fnv1a32 } from '../../../server/tests/integration/gateway_socket.mjs'
 
 if (process.platform !== 'darwin') throw new Error('原生重载夹具当前在 macOS 验证')
 const root = fileURLToPath(new URL('../../..', import.meta.url))
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'skynet-native-chat-'))
+const integration = process.env.CHAT_PROBE_MODE === 'integration'
+const fixture = integration ? null : JSON.parse(process.env.AGENT_REAL_FIXTURE ?? '{}')
+const artifactRoot = integration
+  ? path.join(root, 'client/test-artifacts/native-integration')
+  : fixture.evidenceDirectory
+fs.mkdirSync(artifactRoot, { recursive: true })
+const directory = fs.mkdtempSync(path.join(artifactRoot, 'native-'))
 const evidence = { connections: 0, closes: 0, requests: [] }
-const save = () => fs.writeFileSync(path.join(directory, 'evidence.json'), JSON.stringify(evidence))
+const save = () => {
+  const temporary = path.join(directory, 'evidence.tmp')
+  fs.writeFileSync(temporary, JSON.stringify(evidence))
+  fs.renameSync(temporary, path.join(directory, 'evidence.json'))
+}
 const names = new Map(
   ['LoginReq', 'UserSnapshotReq', 'MessageSendReq', 'MessageCancelReq', 'SessionCreateReq'].map(
     (name) => [fnv1a32(`skynet.agent.v1.${name}`), name],
@@ -80,6 +89,9 @@ const server = net.createServer((client) => {
 })
 let child
 let timer
+const stop = () => child?.kill('SIGTERM')
+process.once('SIGINT', stop)
+process.once('SIGTERM', stop)
 try {
   await new Promise((resolve, reject) => {
     server.once('error', reject)
@@ -116,7 +128,7 @@ try {
     }
   }, 20)
   let result
-  for (let attempt = 0; attempt < 600; attempt++) {
+  for (let attempt = 0; attempt < (integration ? 600 : 8400); attempt++) {
     const report = path.join(directory, 'result.json')
     if (fs.existsSync(report)) {
       try {
@@ -135,18 +147,20 @@ try {
     JSON.stringify(result ?? { error: '原生夹具未在时限内完成' }),
   )
   const navigations = Number(fs.readFileSync(path.join(directory, 'navigations'), 'utf8'))
-  assert.ok(navigations >= 5, `没有执行足够的实际文档重载: ${navigations}`)
-  assert.equal(evidence.connections, 3)
+  assert.ok(navigations >= (integration ? 5 : 3), `没有执行足够的实际文档重载: ${navigations}`)
+  assert.equal(evidence.connections, integration ? 3 : 1)
   assert.equal(evidence.requests.filter((request) => request.name === 'UserSnapshotReq').length, 0)
-  for (const connection of [1, 2, 3]) {
+  for (const connection of integration ? [1, 2, 3] : [1]) {
     const requests = evidence.requests.filter((request) => request.connection === connection)
     assert.equal(requests[0].name, 'LoginReq')
     assert.equal(requests[0].messageId, 1)
     assert.equal(requests.filter((request) => request.name === 'LoginReq').length, 1)
     requests.forEach((request, index) => assert.equal(request.messageId, index + 1))
   }
+  if (!integration)
+    fs.writeFileSync(path.join(artifactRoot, 'native.json'), JSON.stringify(result, null, 2) + '\n')
   console.log(
-    `Native reload probe passed: ${navigations} documents, one WS across reloads, reconnect and switch-user verified`,
+    `${integration ? 'Native integration' : 'Real-model native E2E'} passed: ${navigations} documents, one WS across reloads`,
   )
 } catch (error) {
   console.error(`原生夹具证据：${directory}`)
@@ -155,7 +169,7 @@ try {
   throw error
 } finally {
   clearInterval(timer)
-  child?.kill('SIGTERM')
+  stop()
   for (const socket of sockets) socket.destroy()
   await new Promise((resolve) => server.close(resolve))
 }

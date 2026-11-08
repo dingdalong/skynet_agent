@@ -1,6 +1,38 @@
 export type MessageRole = 'user' | 'assistant'
 export type MessageStatus = 'complete' | 'streaming' | 'cancelled' | 'error'
 
+export interface ModelOption {
+  id: string
+  name: string
+  model: string
+}
+
+export interface ReasoningBlock {
+  id: string
+  runId: string
+  modelId: string
+  text: string
+  status: 'streaming' | 'completed' | 'cancelled' | 'failed'
+}
+
+export interface ToolCall {
+  id: string
+  name: string
+  arguments: string
+  status: 'judging' | 'running' | 'denied' | 'completed' | 'failed' | 'cancelled'
+  permissionReason: string
+  permissionMode: string
+  output: string
+  exitCode?: number
+  truncated: boolean
+  changedFiles: string[]
+  error: string
+  processId: string
+  runId: string
+  workingDirectory: string
+  reasoning?: ReasoningBlock[]
+}
+
 export interface ChatMessage {
   id: string
   role: MessageRole
@@ -10,6 +42,8 @@ export interface ChatMessage {
   runId: string
   error: string
   retryable: boolean
+  toolCalls?: ToolCall[]
+  reasoning?: ReasoningBlock[]
 }
 
 export interface ChatSessionSummary {
@@ -23,6 +57,8 @@ export interface ChatSession extends ChatSessionSummary {
   messages: ChatMessage[]
   runId: string
   cancelling: boolean
+  modelId?: string
+  permissionModelId?: string
 }
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
@@ -31,6 +67,7 @@ export interface UserSnapshot {
   userId: string
   username: string
   sessions: ChatSession[]
+  models?: ModelOption[]
 }
 
 export interface ChatSessionView extends ChatSession {
@@ -39,7 +76,16 @@ export interface ChatSessionView extends ChatSession {
 }
 
 export type ChatUpdate =
+  | {
+      type: 'reasoning'
+      sessionId: string
+      messageId: string
+      toolCallId: string
+      block: ReasoningBlock
+      revision: number
+    }
   | { type: 'session'; session: ChatSession }
+  | { type: 'tool'; sessionId: string; messageId: string; tool: ToolCall; revision: number }
   | {
       type: 'delta'
       sessionId: string
@@ -60,6 +106,7 @@ export interface ChatTransport {
   connect(username: string): Promise<UserSnapshot>
   snapshot(): Promise<UserSnapshot>
   createSession(): Promise<ChatSession>
+  setModel(sessionId: string, modelId: string): Promise<ChatSession>
   sendMessage(input: { sessionId: string; text: string; retryRunId?: string }): Promise<ChatSession>
   cancelRun(sessionId: string, runId: string): Promise<void>
   subscribeUpdates(listener: (update: ChatUpdate) => void): () => void

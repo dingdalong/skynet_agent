@@ -6,8 +6,8 @@ return {
     },
     agent = {
         llm = {
-            base_url = "https://api.deepseek.com",
-            model = "deepseek-flash",
+            base_url = os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com",
+            model = os.getenv("DEEPSEEK_MODEL") or "deepseek-flash",
         },
     },
 }

@@ -2,6 +2,7 @@ local Loader = {}
 
 ---@class server.RuntimeConfig
 ---@field control_port integer
+---@field executable_search_path string
 
 ---@class server.Config
 ---@field runtime server.RuntimeConfig
@@ -25,6 +26,10 @@ local Loader = {}
 ---@field system_prompt string
 ---@field max_message_length integer
 ---@field session_title_length integer
+---@field default_model_id string
+---@field models {id: string, name: string, model: string}[]
+---@field tools agent.ToolConfig
+---@field permission agent.PermissionConfig
 ---@field llm { api_key: string?, base_url: string, model: string, request_timeout_ticks: integer }
 
 ---@param target table
@@ -111,6 +116,31 @@ local function validate(config)
     string_field(agent.system_prompt, "agent.system_prompt")
     integer_field(agent.max_message_length, "agent.max_message_length", 1)
     integer_field(agent.session_title_length, "agent.session_title_length", 1)
+    local tools = table_field(agent.tools, "agent.tools")
+    string_field(tools.workspace_root, "agent.tools.workspace_root")
+    integer_field(tools.timeout_ms, "agent.tools.timeout_ms", 1, 3600000)
+    integer_field(tools.max_processes, "agent.tools.max_processes", 1, 64)
+    integer_field(tools.max_output_bytes, "agent.tools.max_output_bytes", 4096, 4194304)
+    local permission = table_field(agent.permission, "agent.permission")
+    assert(type(permission.rules_enabled) == "boolean", "agent.permission.rules_enabled 必须是 boolean")
+    integer_field(permission.timeout_ticks, "agent.permission.timeout_ticks", 1, 12000)
+    if permission.deny_patterns then
+        table_field(permission.deny_patterns, "agent.permission.deny_patterns")
+        for _, pattern in ipairs(permission.deny_patterns) do
+            string_field(pattern, "agent.permission.deny_patterns[]")
+            assert(pcall(string.match, "", pattern), "权限规则必须是有效的 Lua pattern")
+        end
+    end
+    local ids = {}
+    for _, model in ipairs(table_field(agent.models, "agent.models")) do
+        string_field(model.id, "agent.models[].id")
+        string_field(model.name, "agent.models[].name")
+        string_field(model.model, "agent.models[].model")
+        assert(not ids[model.id], "模型 ID 重复")
+        ids[model.id] = true
+    end
+    assert(ids[agent.default_model_id], "默认模型 ID 不在清单中")
+    assert(not permission.model_id or ids[permission.model_id], "权限模型 ID 不在清单中")
     local llm = table_field(agent.llm, "agent.llm")
     if llm.api_key ~= nil then
         string_field(llm.api_key, "agent.llm.api_key")
@@ -130,6 +160,9 @@ function Loader.build(common, channel_config, channel_name)
 
     local config = table.deep_copy(common)
     merge(config, channel_config)
+    if channel_config.agent and channel_config.agent.models then
+        config.agent.models = table.deep_copy(channel_config.agent.models)
+    end
     config.channel = channel_name
     config.worker_thread = common.worker_thread
 

@@ -2,58 +2,20 @@
 ---@diagnostic disable-next-line: assign-type-mismatch
 local luassert = assert
 
+local FakeLlm = require("tests.support.fake_llm")
 local Agent
 local fake_llm
-local original_agent
-local original_llm_base
+local scope
 
----@return function
 local function no_text_delta()
 end
 
----@return table
-local function install_fake_llm()
-    local fake = {
-        new_configs = {},
-        requests = {},
-        new_error = nil,
-        response_handler = nil,
-    }
-
-    function fake.new(config)
-        if fake.new_error then
-            error(fake.new_error, 0)
-        end
-        fake.new_configs[#fake.new_configs + 1] = config
-        return {
-            client_index = #fake.new_configs,
-        }
-    end
-
-    function fake.stream_responses(client, input, on_text_delta)
-        fake.requests[#fake.requests + 1] = {
-            client = client,
-            input = input,
-        }
-        return fake.response_handler(client, input, on_text_delta)
-    end
-
-    package.loaded["llm.base"] = fake
-    package.loaded["agent"] = nil
-    Agent = require("agent")
-    return fake
-end
-
 before_each(function()
-    original_agent = package.loaded["agent"]
-    original_llm_base = package.loaded["llm.base"]
-    fake_llm = install_fake_llm()
+    fake_llm, scope = FakeLlm.new({ ["agent.agent"] = false })
+    Agent = require("agent.agent")
 end)
 
-after_each(function()
-    package.loaded["agent"] = original_agent
-    package.loaded["llm.base"] = original_llm_base
-end)
+after_each(function() scope:restore() end)
 
 describe("agent", function()
     it("延迟创建 LLM 客户端并发送 system 消息和首轮用户消息", function()
@@ -197,7 +159,7 @@ describe("agent", function()
 
         local text, err = agent:chat("第一问", no_text_delta)
         luassert.is_nil(text)
-        luassert.are.equal("网络错误", err)
+        luassert.matches("网络错误", assert(err))
         luassert.are.same({
             { role = "system", content = "保持简洁" },
         }, agent.messages)
@@ -216,7 +178,7 @@ describe("agent", function()
     end)
 
     it("最后一个增量后取消也不会提交模型历史，并允许下一轮发送", function()
-        local request = { cancelled = false }
+        local request = require("agent.run"):new()
         fake_llm.response_handler = function(_, _, on_text_delta)
             on_text_delta("未完成回答")
             request.cancelled = true

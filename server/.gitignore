@@ -5,3 +5,5 @@
 cservice/
 logs/
 luaclib/
+bin/
+work_dir/

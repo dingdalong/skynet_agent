@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Adapted from Beautiful UI Vue: /agent/components/chat-page.vue.txt.
+// Adapted from http://localhost:5173/beautiful-ui-vue/agent/components/chat-page.vue.txt.
 import { SkButton, SkEmptyState, SkIconButton } from '@skynet/design-system'
 import { ArrowDown, Menu, PanelRight, Plus, Sparkles, SunMoon, UserRound } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -235,7 +235,10 @@ onBeforeUnmount(() => {
           variant="Rounded"
           :disabled="store.connectionState !== 'connected' || store.sessionBusy"
           :can-send="store.canSend"
+          :models="store.models"
+          :model-id="store.activeSession?.modelId"
           :run-state="store.runState"
+          @model="store.setModel"
           @send="sendMessage"
           @stop="store.cancelRun"
         />

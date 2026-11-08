@@ -1,6 +1,7 @@
 import { computed, reactive, toRefs } from 'vue'
 import { initialChatState, type ChatRuntime } from './chat-runtime'
 import { createChatTransport } from './chat-transport'
+import { appendReasoning } from '../protocol/reasoning'
 import {
   normalizeUsername,
   saveUsername,
@@ -83,6 +84,7 @@ export function createBrowserChatRuntime(
       activeSessionId.value = null
       userId.value = snapshot.userId
     }
+    state.models = snapshot.models ?? []
     for (const session of snapshot.sessions) mergeSession(session)
     if (!activeSessionId.value || !sessionViews.value.has(activeSessionId.value)) {
       const selected = readSelectedSession(username.value)
@@ -98,6 +100,24 @@ export function createBrowserChatRuntime(
     const view = sessionViews.value.get(update.sessionId)
     if (view && update.revision <= view.revision) return true
     if (!view || update.revision !== view.revision + 1) return false
+    if (update.type === 'reasoning') {
+      const message = view.messages.find(
+        (item) => item.id === update.messageId && item.role === 'assistant',
+      )
+      if (!message || !appendReasoning(message, update.toolCallId, update.block)) return false
+      view.revision = update.revision
+      return true
+    }
+    if (update.type === 'tool') {
+      const message = view.messages.find((item) => item.id === update.messageId)
+      if (!message || message.role !== 'assistant') return false
+      message.toolCalls ??= []
+      const index = message.toolCalls.findIndex((tool) => tool.id === update.tool.id)
+      if (index < 0) message.toolCalls.push(update.tool)
+      else message.toolCalls[index] = update.tool
+      view.revision = update.revision
+      return true
+    }
     const message = view.messages.find(
       (item) => item.id === update.messageId && item.runId === update.runId,
     )
@@ -318,6 +338,23 @@ export function createBrowserChatRuntime(
     connect,
     disconnect,
     switchUser,
+    async setModel(modelId) {
+      const view = activeView.value
+      if (!view || connectionState.value !== 'connected') return false
+      const current = generation
+      try {
+        const session = await transport.setModel(view.id, modelId)
+        if (current !== generation) return false
+        mergeSession(session)
+        return true
+      } catch (error) {
+        if (current === generation) {
+          const latest = sessionViews.value.get(view.id)
+          if (latest) latest.error = messageError(error)
+        }
+        return false
+      }
+    },
     createSession,
     selectSession,
     sendMessage,

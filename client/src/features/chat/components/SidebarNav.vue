@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Adapted from Beautiful UI Vue: /agent/components/sidebar-nav.vue.txt.
+// Adapted from http://localhost:5173/beautiful-ui-vue/agent/components/sidebar-nav.vue.txt.
 import { SkButton } from '@skynet/design-system'
 import { MessageSquare, Plus } from 'lucide-vue-next'
 import type { ChatSessionSummary } from '../../../types/chat'

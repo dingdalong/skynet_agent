@@ -17,7 +17,7 @@ help:
 		"  make dev            启动桌面 App 开发模式（服务端单独启动）" \
 		"  make build          构建当前平台服务端和桌面 App" \
 		"  make check          基础回归：两端静态检查与单元测试" \
-		"  make check-full     完整检查：追加服务端集成、原生/Web 全链路及多浏览器 UI" \
+		"  make check-full     完整检查：集成回归、原生/Web 真实模型端到端及多浏览器 UI" \
 		"  make proto-generate 从 common/proto 生成客户端协议代码" \
 		"  make help           显示命令说明" \
 		"" \
@@ -43,6 +43,8 @@ check:
 
 check-full: check
 	@$(MAKE) -C "$(SERVER_DIR)" test-integration
+	@pnpm --dir "$(CLIENT_DIR)" test:integration:native
+	@pnpm --dir "$(CLIENT_DIR)" test:integration:web
 	@pnpm --dir "$(CLIENT_DIR)" test:native
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e:full
 	@pnpm --dir "$(CLIENT_DIR)" --filter @skynet/design-system build-storybook

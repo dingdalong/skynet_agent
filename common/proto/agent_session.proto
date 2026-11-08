@@ -4,6 +4,26 @@ package skynet.agent.v1;
 
 import "common.proto";
 
+message SessionModelSetReq {
+  string session_id = 1;
+  string model_id = 2;
+}
+
+message SessionModelSetRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  SessionState session = 4;
+}
+
+message ReasoningDeltaNtf {
+  string session_id = 1;
+  string message_id = 2;
+  string tool_call_id = 3;
+  // block.text contains only new text; terminal updates may carry an empty string.
+  ReasoningBlock block = 4;
+  uint32 revision = 5;
+}
+
 message SessionCreateReq {}
 
 message SessionCreateRes {
@@ -44,4 +64,11 @@ message MessageDeltaNtf {
   string message_id = 3;
   string delta = 4;
   uint32 revision = 5;
+}
+
+message ToolUpdatedNtf {
+  string session_id = 1;
+  string message_id = 2;
+  ToolCall tool = 3;
+  uint32 revision = 4;
 }

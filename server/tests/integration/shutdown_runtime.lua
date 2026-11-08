@@ -2,8 +2,8 @@ local skynet = require("skynet.manager")
 local rpc = require("rpc")
 local codes = require("enum.error_code")
 
-local mode = os.getenv("SHUTDOWN_TEST_MODE") or "normal"
-local port = tonumber(os.getenv("SHUTDOWN_TEST_CONTROL_PORT")) or 18002
+local mode = require("etc.cfg.test_runtime").shutdown_mode
+local port = require("etc.cfg.test_runtime").shutdown_port
 package.loaded["etc.cfg"] = {
     channel = "test",
     runtime = { control_port = port },

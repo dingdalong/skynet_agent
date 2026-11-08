@@ -8,7 +8,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:15173',
+    baseURL: 'http://127.0.0.1:15175',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -37,9 +37,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'VITE_CHAT_TRANSPORT=mock pnpm dev',
-      url: 'http://127.0.0.1:15173',
-      reuseExistingServer: !process.env.CI,
+      command: 'VITE_CHAT_TRANSPORT=mock pnpm dev --port 15175',
+      url: 'http://127.0.0.1:15175',
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {

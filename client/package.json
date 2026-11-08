@@ -21,6 +21,8 @@
     "test:e2e": "playwright test",
     "check:native": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "test:native": "./tests/native/run-native.sh",
+    "test:integration:native": "./tests/native/run-native.sh --integration",
+    "test:integration:web": "sh ./tests/integration-web/run-integration.sh",
     "test:e2e:full": "./tests/e2e-fullstack/run-fullstack.sh",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm proto:check && pnpm tokens:check && pnpm typecheck && pnpm test && ./tools/check_format.sh",

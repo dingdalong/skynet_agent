@@ -32,6 +32,40 @@ message ChatMessage {
   string run_id = 6;
   ErrorInfo error = 7;
   int32 ret = 8;
+  repeated ToolCall tool_calls = 9;
+  repeated ReasoningBlock reasoning = 10;
+}
+
+message ReasoningBlock {
+  string id = 1;
+  string run_id = 2;
+  string model_id = 3;
+  string text = 4;
+  string status = 5;
+}
+
+message ModelOption {
+  string id = 1;
+  string name = 2;
+  string model = 3;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  string arguments = 3;
+  string status = 4;
+  string permission_reason = 5;
+  string permission_mode = 6;
+  string output = 7;
+  optional int32 exit_code = 8;
+  bool truncated = 9;
+  repeated string changed_files = 10;
+  string error = 11;
+  string process_id = 12;
+  string run_id = 13;
+  string working_directory = 14;
+  repeated ReasoningBlock reasoning = 15;
 }
 
 message SessionState {
@@ -42,10 +76,13 @@ message SessionState {
   repeated ChatMessage messages = 5;
   string run_id = 6;
   bool cancelling = 7;
+  string model_id = 8;
+  string permission_model_id = 9;
 }
 
 message UserSnapshot {
   string user_id = 1;
   string username = 2;
   repeated SessionState sessions = 3;
+  repeated ModelOption models = 4;
 }

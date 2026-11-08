@@ -18,6 +18,9 @@ Gateway.commands = {}
 
 function Gateway:ctor()
     self.closing = false
+    self.listen_id = nil
+    self.websockets = nil
+    self.loginds = nil
 end
 
 ---@param params {websockets: integer[], loginds: integer[]}

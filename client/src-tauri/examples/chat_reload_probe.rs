@@ -3,7 +3,7 @@ use skynet_agent_lib::chat::{self, ChatCore, Event};
 use std::{
     fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -15,6 +15,11 @@ struct Probe {
     directory: PathBuf,
     phase: AtomicU64,
     arm: AtomicU64,
+}
+fn write_probe_file(directory: &Path, name: &str, contents: impl AsRef<[u8]>) {
+    let temporary = directory.join(format!("{name}.tmp"));
+    fs::write(&temporary, contents).unwrap();
+    fs::rename(temporary, directory.join(name)).unwrap();
 }
 #[tauri::command]
 fn probe_phase(probe: State<'_, Arc<Probe>>, phase: Option<u64>) -> u64 {
@@ -43,11 +48,11 @@ fn probe_drop(probe: State<'_, Arc<Probe>>) {
 }
 #[tauri::command]
 fn probe_report(app: tauri::AppHandle, probe: State<'_, Arc<Probe>>, report: serde_json::Value) {
-    fs::write(
-        probe.directory.join("result.json"),
+    write_probe_file(
+        &probe.directory,
+        "result.json",
         serde_json::to_vec_pretty(&report).unwrap(),
-    )
-    .unwrap();
+    );
     app.exit(if report["status"] == "passed" { 0 } else { 1 });
 }
 #[tauri::command]
@@ -98,6 +103,16 @@ fn main() {
     });
     let navigations = Arc::new(AtomicU64::new(0));
     let observed = navigations.clone();
+    let integration = std::env::var("CHAT_PROBE_MODE").as_deref() == Ok("integration");
+    let script = if integration {
+        include_str!("../../tests/native/chat-reload-probe.js").to_owned()
+    } else {
+        format!(
+            "window.__AGENT_REAL_FIXTURE={};\n{}",
+            std::env::var("AGENT_REAL_FIXTURE").expect("真实模型夹具配置缺失"),
+            include_str!("../../tests/real-model/real-model-probe.js")
+        )
+    };
     let mut context = tauri::generate_context!();
     context.config_mut().identifier = "com.skynet.agent.chatprobe".into();
     let app = skynet_agent_lib::builder()
@@ -116,7 +131,7 @@ fn main() {
         ])
         .plugin(
             tauri::plugin::Builder::<tauri::Wry>::new("reload-probe")
-                .js_init_script(include_str!("../../tests/native/chat-reload-probe.js"))
+                .js_init_script(script)
                 .on_page_load(move |_, payload| {
                     if payload.event() == tauri::webview::PageLoadEvent::Started {
                         observed.fetch_add(1, Ordering::SeqCst);
@@ -141,11 +156,11 @@ fn main() {
                     handle.get_webview_window("main").unwrap().reload().unwrap();
                 }
             }
-            fs::write(
-                directory.join("navigations"),
+            write_probe_file(
+                &directory,
+                "navigations",
                 navigations.load(Ordering::SeqCst).to_string(),
-            )
-            .unwrap();
+            );
             true
         })
         .await

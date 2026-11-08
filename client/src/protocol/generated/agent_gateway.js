@@ -3,7 +3,7 @@ import $protobuf from "protobufjs/minimal.js";
 
 // Common aliases
 const $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
-const $Object = $util.global.Object, $undefined = $util.global.undefined, $Error = $util.global.Error, $RangeError = $util.global.RangeError, $TypeError = $util.global.TypeError, $Number = $util.global.Number, $String = $util.global.String, $Boolean = $util.global.Boolean, $parseInt = $util.global.parseInt, $BigInt = $util.global.BigInt, $Array = $util.global.Array;
+const $Object = $util.global.Object, $undefined = $util.global.undefined, $Error = $util.global.Error, $RangeError = $util.global.RangeError, $TypeError = $util.global.TypeError, $String = $util.global.String, $Number = $util.global.Number, $Boolean = $util.global.Boolean, $Array = $util.global.Array, $parseInt = $util.global.parseInt, $BigInt = $util.global.BigInt;
 
 // Exported root namespace
 const $root = $protobuf.roots["default"] || ($protobuf.roots["default"] = {});
@@ -34,6 +34,998 @@ export const skynet = $root.skynet = (() => {
              * @namespace
              */
             const v1 = {};
+
+            v1.SessionModelSetReq = (function() {
+
+                /**
+                 * Properties of a SessionModelSetReq.
+                 * @typedef {Object} skynet.agent.v1.SessionModelSetReq.$Properties
+                 * @property {string|null} [sessionId] SessionModelSetReq sessionId
+                 * @property {string|null} [modelId] SessionModelSetReq modelId
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a SessionModelSetReq.
+                 * @memberof skynet.agent.v1
+                 * @interface ISessionModelSetReq
+                 * @augments skynet.agent.v1.SessionModelSetReq.$Properties
+                 * @deprecated Use skynet.agent.v1.SessionModelSetReq.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a SessionModelSetReq.
+                 * @typedef {skynet.agent.v1.SessionModelSetReq.$Properties} skynet.agent.v1.SessionModelSetReq.$Shape
+                 */
+
+                /**
+                 * Constructs a new SessionModelSetReq.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a SessionModelSetReq.
+                 * @constructor
+                 * @param {skynet.agent.v1.SessionModelSetReq.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const SessionModelSetReq = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * SessionModelSetReq sessionId.
+                 * @member {string} sessionId
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @instance
+                 */
+                SessionModelSetReq.prototype.sessionId = "";
+
+                /**
+                 * SessionModelSetReq modelId.
+                 * @member {string} modelId
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @instance
+                 */
+                SessionModelSetReq.prototype.modelId = "";
+
+                /**
+                 * Creates a new SessionModelSetReq instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetReq.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.SessionModelSetReq} SessionModelSetReq instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.SessionModelSetReq.$Shape): skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape;
+                 *   (properties?: skynet.agent.v1.SessionModelSetReq.$Properties): skynet.agent.v1.SessionModelSetReq;
+                 * }}
+                 */
+                SessionModelSetReq.create = function(properties) {
+                    return new SessionModelSetReq(properties);
+                };
+
+                /**
+                 * Encodes the specified SessionModelSetReq message. Does not implicitly {@link skynet.agent.v1.SessionModelSetReq.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetReq.$Properties} message SessionModelSetReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionModelSetReq.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId") && message.sessionId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.sessionId);
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId") && message.modelId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.modelId);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified SessionModelSetReq message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionModelSetReq.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetReq.$Properties} message SessionModelSetReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionModelSetReq.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a SessionModelSetReq message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape} SessionModelSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionModelSetReq.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.SessionModelSetReq();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.sessionId = value;
+                                else
+                                    delete message.sessionId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.modelId = value;
+                                else
+                                    delete message.modelId;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a SessionModelSetReq message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionModelSetReq & skynet.agent.v1.SessionModelSetReq.$Shape} SessionModelSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionModelSetReq.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a SessionModelSetReq message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                SessionModelSetReq.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        if (!$util.isString(message.sessionId))
+                            return "sessionId: string expected";
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        if (!$util.isString(message.modelId))
+                            return "modelId: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a SessionModelSetReq message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.SessionModelSetReq} SessionModelSetReq
+                 */
+                SessionModelSetReq.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.SessionModelSetReq)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.SessionModelSetReq: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.SessionModelSetReq();
+                    if (object.sessionId != null)
+                        if (typeof object.sessionId !== "string" || object.sessionId.length)
+                            message.sessionId = $String(object.sessionId);
+                    if (object.modelId != null)
+                        if (typeof object.modelId !== "string" || object.modelId.length)
+                            message.modelId = $String(object.modelId);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a SessionModelSetReq message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetReq} message SessionModelSetReq
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                SessionModelSetReq.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.sessionId = "";
+                        object.modelId = "";
+                    }
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        object.sessionId = message.sessionId;
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        object.modelId = message.modelId;
+                    return object;
+                };
+
+                /**
+                 * Converts this SessionModelSetReq to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.SessionModelSetReq
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                SessionModelSetReq.prototype.toJSON = function() {
+                    return SessionModelSetReq.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return SessionModelSetReq;
+            })();
+
+            v1.SessionModelSetRes = (function() {
+
+                /**
+                 * Properties of a SessionModelSetRes.
+                 * @typedef {Object} skynet.agent.v1.SessionModelSetRes.$Properties
+                 * @property {number|null} [ret] SessionModelSetRes ret
+                 * @property {skynet.agent.v1.ErrorInfo.$Properties|null} [error] SessionModelSetRes error
+                 * @property {skynet.agent.v1.SessionState.$Properties|null} [session] SessionModelSetRes session
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a SessionModelSetRes.
+                 * @memberof skynet.agent.v1
+                 * @interface ISessionModelSetRes
+                 * @augments skynet.agent.v1.SessionModelSetRes.$Properties
+                 * @deprecated Use skynet.agent.v1.SessionModelSetRes.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a SessionModelSetRes.
+                 * @typedef {skynet.agent.v1.SessionModelSetRes.$Properties} skynet.agent.v1.SessionModelSetRes.$Shape
+                 */
+
+                /**
+                 * Constructs a new SessionModelSetRes.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a SessionModelSetRes.
+                 * @constructor
+                 * @param {skynet.agent.v1.SessionModelSetRes.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const SessionModelSetRes = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * SessionModelSetRes ret.
+                 * @member {number} ret
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @instance
+                 */
+                SessionModelSetRes.prototype.ret = 0;
+
+                /**
+                 * SessionModelSetRes error.
+                 * @member {skynet.agent.v1.ErrorInfo.$Properties|null|undefined} error
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @instance
+                 */
+                SessionModelSetRes.prototype.error = null;
+
+                /**
+                 * SessionModelSetRes session.
+                 * @member {skynet.agent.v1.SessionState.$Properties|null|undefined} session
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @instance
+                 */
+                SessionModelSetRes.prototype.session = null;
+
+                /**
+                 * Creates a new SessionModelSetRes instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetRes.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.SessionModelSetRes} SessionModelSetRes instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.SessionModelSetRes.$Shape): skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape;
+                 *   (properties?: skynet.agent.v1.SessionModelSetRes.$Properties): skynet.agent.v1.SessionModelSetRes;
+                 * }}
+                 */
+                SessionModelSetRes.create = function(properties) {
+                    return new SessionModelSetRes(properties);
+                };
+
+                /**
+                 * Encodes the specified SessionModelSetRes message. Does not implicitly {@link skynet.agent.v1.SessionModelSetRes.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetRes.$Properties} message SessionModelSetRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionModelSetRes.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret") && message.ret !== 0)
+                        writer.uint32(/* id 2, wireType 0 =*/16).int32(message.ret);
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        $root.skynet.agent.v1.ErrorInfo.encode(message.error, writer.uint32(/* id 3, wireType 2 =*/26).fork(), _depth + 1).ldelim();
+                    if (message.session != null && $Object.hasOwnProperty.call(message, "session"))
+                        $root.skynet.agent.v1.SessionState.encode(message.session, writer.uint32(/* id 4, wireType 2 =*/34).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified SessionModelSetRes message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionModelSetRes.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetRes.$Properties} message SessionModelSetRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionModelSetRes.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a SessionModelSetRes message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape} SessionModelSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionModelSetRes.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.SessionModelSetRes();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 2: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.int32())
+                                    message.ret = value;
+                                else
+                                    delete message.ret;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                message.error = $root.skynet.agent.v1.ErrorInfo.decode(reader, reader.size(), $undefined, _depth + 1, message.error);
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                message.session = $root.skynet.agent.v1.SessionState.decode(reader, reader.size(), $undefined, _depth + 1, message.session);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a SessionModelSetRes message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionModelSetRes & skynet.agent.v1.SessionModelSetRes.$Shape} SessionModelSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionModelSetRes.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a SessionModelSetRes message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                SessionModelSetRes.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        if (!$util.isInteger(message.ret))
+                            return "ret: integer expected";
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error")) {
+                        let error = $root.skynet.agent.v1.ErrorInfo.verify(message.error, _depth + 1);
+                        if (error)
+                            return "error." + error;
+                    }
+                    if (message.session != null && $Object.hasOwnProperty.call(message, "session")) {
+                        let error = $root.skynet.agent.v1.SessionState.verify(message.session, _depth + 1);
+                        if (error)
+                            return "session." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a SessionModelSetRes message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.SessionModelSetRes} SessionModelSetRes
+                 */
+                SessionModelSetRes.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.SessionModelSetRes)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.SessionModelSetRes: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.SessionModelSetRes();
+                    if (object.ret != null)
+                        if ($Number(object.ret) !== 0)
+                            message.ret = object.ret | 0;
+                    if (object.error != null) {
+                        if (!$util.isObject(object.error))
+                            throw $TypeError(".skynet.agent.v1.SessionModelSetRes.error: object expected");
+                        message.error = $root.skynet.agent.v1.ErrorInfo.fromObject(object.error, _depth + 1);
+                    }
+                    if (object.session != null) {
+                        if (!$util.isObject(object.session))
+                            throw $TypeError(".skynet.agent.v1.SessionModelSetRes.session: object expected");
+                        message.session = $root.skynet.agent.v1.SessionState.fromObject(object.session, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a SessionModelSetRes message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionModelSetRes} message SessionModelSetRes
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                SessionModelSetRes.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.ret = 0;
+                        object.error = null;
+                        object.session = null;
+                    }
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        object.ret = message.ret;
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        object.error = $root.skynet.agent.v1.ErrorInfo.toObject(message.error, options, _depth + 1);
+                    if (message.session != null && $Object.hasOwnProperty.call(message, "session"))
+                        object.session = $root.skynet.agent.v1.SessionState.toObject(message.session, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this SessionModelSetRes to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.SessionModelSetRes
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                SessionModelSetRes.prototype.toJSON = function() {
+                    return SessionModelSetRes.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return SessionModelSetRes;
+            })();
+
+            v1.ReasoningDeltaNtf = (function() {
+
+                /**
+                 * Properties of a ReasoningDeltaNtf.
+                 * @typedef {Object} skynet.agent.v1.ReasoningDeltaNtf.$Properties
+                 * @property {string|null} [sessionId] ReasoningDeltaNtf sessionId
+                 * @property {string|null} [messageId] ReasoningDeltaNtf messageId
+                 * @property {string|null} [toolCallId] ReasoningDeltaNtf toolCallId
+                 * @property {skynet.agent.v1.ReasoningBlock.$Properties|null} [block] ReasoningDeltaNtf block
+                 * @property {number|null} [revision] ReasoningDeltaNtf revision
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a ReasoningDeltaNtf.
+                 * @memberof skynet.agent.v1
+                 * @interface IReasoningDeltaNtf
+                 * @augments skynet.agent.v1.ReasoningDeltaNtf.$Properties
+                 * @deprecated Use skynet.agent.v1.ReasoningDeltaNtf.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a ReasoningDeltaNtf.
+                 * @typedef {skynet.agent.v1.ReasoningDeltaNtf.$Properties} skynet.agent.v1.ReasoningDeltaNtf.$Shape
+                 */
+
+                /**
+                 * Constructs a new ReasoningDeltaNtf.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a ReasoningDeltaNtf.
+                 * @constructor
+                 * @param {skynet.agent.v1.ReasoningDeltaNtf.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ReasoningDeltaNtf = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ReasoningDeltaNtf sessionId.
+                 * @member {string} sessionId
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 */
+                ReasoningDeltaNtf.prototype.sessionId = "";
+
+                /**
+                 * ReasoningDeltaNtf messageId.
+                 * @member {string} messageId
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 */
+                ReasoningDeltaNtf.prototype.messageId = "";
+
+                /**
+                 * ReasoningDeltaNtf toolCallId.
+                 * @member {string} toolCallId
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 */
+                ReasoningDeltaNtf.prototype.toolCallId = "";
+
+                /**
+                 * ReasoningDeltaNtf block.
+                 * @member {skynet.agent.v1.ReasoningBlock.$Properties|null|undefined} block
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 */
+                ReasoningDeltaNtf.prototype.block = null;
+
+                /**
+                 * ReasoningDeltaNtf revision.
+                 * @member {number} revision
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 */
+                ReasoningDeltaNtf.prototype.revision = 0;
+
+                /**
+                 * Creates a new ReasoningDeltaNtf instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningDeltaNtf.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf} ReasoningDeltaNtf instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ReasoningDeltaNtf.$Shape): skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape;
+                 *   (properties?: skynet.agent.v1.ReasoningDeltaNtf.$Properties): skynet.agent.v1.ReasoningDeltaNtf;
+                 * }}
+                 */
+                ReasoningDeltaNtf.create = function(properties) {
+                    return new ReasoningDeltaNtf(properties);
+                };
+
+                /**
+                 * Encodes the specified ReasoningDeltaNtf message. Does not implicitly {@link skynet.agent.v1.ReasoningDeltaNtf.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningDeltaNtf.$Properties} message ReasoningDeltaNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ReasoningDeltaNtf.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId") && message.sessionId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.sessionId);
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId") && message.messageId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.messageId);
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId") && message.toolCallId !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.toolCallId);
+                    if (message.block != null && $Object.hasOwnProperty.call(message, "block"))
+                        $root.skynet.agent.v1.ReasoningBlock.encode(message.block, writer.uint32(/* id 4, wireType 2 =*/34).fork(), _depth + 1).ldelim();
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision") && message.revision !== 0)
+                        writer.uint32(/* id 5, wireType 0 =*/40).uint32(message.revision);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ReasoningDeltaNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ReasoningDeltaNtf.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningDeltaNtf.$Properties} message ReasoningDeltaNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ReasoningDeltaNtf.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a ReasoningDeltaNtf message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape} ReasoningDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ReasoningDeltaNtf.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ReasoningDeltaNtf();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.sessionId = value;
+                                else
+                                    delete message.sessionId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.messageId = value;
+                                else
+                                    delete message.messageId;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.toolCallId = value;
+                                else
+                                    delete message.toolCallId;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                message.block = $root.skynet.agent.v1.ReasoningBlock.decode(reader, reader.size(), $undefined, _depth + 1, message.block);
+                                continue;
+                            }
+                        case 5: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.uint32())
+                                    message.revision = value;
+                                else
+                                    delete message.revision;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a ReasoningDeltaNtf message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf & skynet.agent.v1.ReasoningDeltaNtf.$Shape} ReasoningDeltaNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ReasoningDeltaNtf.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a ReasoningDeltaNtf message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ReasoningDeltaNtf.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        if (!$util.isString(message.sessionId))
+                            return "sessionId: string expected";
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId"))
+                        if (!$util.isString(message.messageId))
+                            return "messageId: string expected";
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId"))
+                        if (!$util.isString(message.toolCallId))
+                            return "toolCallId: string expected";
+                    if (message.block != null && $Object.hasOwnProperty.call(message, "block")) {
+                        let error = $root.skynet.agent.v1.ReasoningBlock.verify(message.block, _depth + 1);
+                        if (error)
+                            return "block." + error;
+                    }
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision"))
+                        if (!$util.isInteger(message.revision))
+                            return "revision: integer expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a ReasoningDeltaNtf message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ReasoningDeltaNtf} ReasoningDeltaNtf
+                 */
+                ReasoningDeltaNtf.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ReasoningDeltaNtf)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ReasoningDeltaNtf: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ReasoningDeltaNtf();
+                    if (object.sessionId != null)
+                        if (typeof object.sessionId !== "string" || object.sessionId.length)
+                            message.sessionId = $String(object.sessionId);
+                    if (object.messageId != null)
+                        if (typeof object.messageId !== "string" || object.messageId.length)
+                            message.messageId = $String(object.messageId);
+                    if (object.toolCallId != null)
+                        if (typeof object.toolCallId !== "string" || object.toolCallId.length)
+                            message.toolCallId = $String(object.toolCallId);
+                    if (object.block != null) {
+                        if (!$util.isObject(object.block))
+                            throw $TypeError(".skynet.agent.v1.ReasoningDeltaNtf.block: object expected");
+                        message.block = $root.skynet.agent.v1.ReasoningBlock.fromObject(object.block, _depth + 1);
+                    }
+                    if (object.revision != null)
+                        if ($Number(object.revision) !== 0)
+                            message.revision = object.revision >>> 0;
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a ReasoningDeltaNtf message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningDeltaNtf} message ReasoningDeltaNtf
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ReasoningDeltaNtf.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.sessionId = "";
+                        object.messageId = "";
+                        object.toolCallId = "";
+                        object.block = null;
+                        object.revision = 0;
+                    }
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        object.sessionId = message.sessionId;
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId"))
+                        object.messageId = message.messageId;
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId"))
+                        object.toolCallId = message.toolCallId;
+                    if (message.block != null && $Object.hasOwnProperty.call(message, "block"))
+                        object.block = $root.skynet.agent.v1.ReasoningBlock.toObject(message.block, options, _depth + 1);
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision"))
+                        object.revision = message.revision;
+                    return object;
+                };
+
+                /**
+                 * Converts this ReasoningDeltaNtf to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ReasoningDeltaNtf
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ReasoningDeltaNtf.prototype.toJSON = function() {
+                    return ReasoningDeltaNtf.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ReasoningDeltaNtf;
+            })();
 
             v1.SessionCreateReq = (function() {
 
@@ -2442,6 +3434,356 @@ export const skynet = $root.skynet = (() => {
                 return MessageDeltaNtf;
             })();
 
+            v1.ToolUpdatedNtf = (function() {
+
+                /**
+                 * Properties of a ToolUpdatedNtf.
+                 * @typedef {Object} skynet.agent.v1.ToolUpdatedNtf.$Properties
+                 * @property {string|null} [sessionId] ToolUpdatedNtf sessionId
+                 * @property {string|null} [messageId] ToolUpdatedNtf messageId
+                 * @property {skynet.agent.v1.ToolCall.$Properties|null} [tool] ToolUpdatedNtf tool
+                 * @property {number|null} [revision] ToolUpdatedNtf revision
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a ToolUpdatedNtf.
+                 * @memberof skynet.agent.v1
+                 * @interface IToolUpdatedNtf
+                 * @augments skynet.agent.v1.ToolUpdatedNtf.$Properties
+                 * @deprecated Use skynet.agent.v1.ToolUpdatedNtf.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a ToolUpdatedNtf.
+                 * @typedef {skynet.agent.v1.ToolUpdatedNtf.$Properties} skynet.agent.v1.ToolUpdatedNtf.$Shape
+                 */
+
+                /**
+                 * Constructs a new ToolUpdatedNtf.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a ToolUpdatedNtf.
+                 * @constructor
+                 * @param {skynet.agent.v1.ToolUpdatedNtf.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ToolUpdatedNtf = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ToolUpdatedNtf sessionId.
+                 * @member {string} sessionId
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @instance
+                 */
+                ToolUpdatedNtf.prototype.sessionId = "";
+
+                /**
+                 * ToolUpdatedNtf messageId.
+                 * @member {string} messageId
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @instance
+                 */
+                ToolUpdatedNtf.prototype.messageId = "";
+
+                /**
+                 * ToolUpdatedNtf tool.
+                 * @member {skynet.agent.v1.ToolCall.$Properties|null|undefined} tool
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @instance
+                 */
+                ToolUpdatedNtf.prototype.tool = null;
+
+                /**
+                 * ToolUpdatedNtf revision.
+                 * @member {number} revision
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @instance
+                 */
+                ToolUpdatedNtf.prototype.revision = 0;
+
+                /**
+                 * Creates a new ToolUpdatedNtf instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.ToolUpdatedNtf.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf} ToolUpdatedNtf instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ToolUpdatedNtf.$Shape): skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape;
+                 *   (properties?: skynet.agent.v1.ToolUpdatedNtf.$Properties): skynet.agent.v1.ToolUpdatedNtf;
+                 * }}
+                 */
+                ToolUpdatedNtf.create = function(properties) {
+                    return new ToolUpdatedNtf(properties);
+                };
+
+                /**
+                 * Encodes the specified ToolUpdatedNtf message. Does not implicitly {@link skynet.agent.v1.ToolUpdatedNtf.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.ToolUpdatedNtf.$Properties} message ToolUpdatedNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ToolUpdatedNtf.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId") && message.sessionId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.sessionId);
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId") && message.messageId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.messageId);
+                    if (message.tool != null && $Object.hasOwnProperty.call(message, "tool"))
+                        $root.skynet.agent.v1.ToolCall.encode(message.tool, writer.uint32(/* id 3, wireType 2 =*/26).fork(), _depth + 1).ldelim();
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision") && message.revision !== 0)
+                        writer.uint32(/* id 4, wireType 0 =*/32).uint32(message.revision);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ToolUpdatedNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ToolUpdatedNtf.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.ToolUpdatedNtf.$Properties} message ToolUpdatedNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ToolUpdatedNtf.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a ToolUpdatedNtf message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape} ToolUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ToolUpdatedNtf.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ToolUpdatedNtf();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.sessionId = value;
+                                else
+                                    delete message.sessionId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.messageId = value;
+                                else
+                                    delete message.messageId;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                message.tool = $root.skynet.agent.v1.ToolCall.decode(reader, reader.size(), $undefined, _depth + 1, message.tool);
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.uint32())
+                                    message.revision = value;
+                                else
+                                    delete message.revision;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a ToolUpdatedNtf message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf & skynet.agent.v1.ToolUpdatedNtf.$Shape} ToolUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ToolUpdatedNtf.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a ToolUpdatedNtf message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ToolUpdatedNtf.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        if (!$util.isString(message.sessionId))
+                            return "sessionId: string expected";
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId"))
+                        if (!$util.isString(message.messageId))
+                            return "messageId: string expected";
+                    if (message.tool != null && $Object.hasOwnProperty.call(message, "tool")) {
+                        let error = $root.skynet.agent.v1.ToolCall.verify(message.tool, _depth + 1);
+                        if (error)
+                            return "tool." + error;
+                    }
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision"))
+                        if (!$util.isInteger(message.revision))
+                            return "revision: integer expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a ToolUpdatedNtf message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ToolUpdatedNtf} ToolUpdatedNtf
+                 */
+                ToolUpdatedNtf.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ToolUpdatedNtf)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ToolUpdatedNtf: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ToolUpdatedNtf();
+                    if (object.sessionId != null)
+                        if (typeof object.sessionId !== "string" || object.sessionId.length)
+                            message.sessionId = $String(object.sessionId);
+                    if (object.messageId != null)
+                        if (typeof object.messageId !== "string" || object.messageId.length)
+                            message.messageId = $String(object.messageId);
+                    if (object.tool != null) {
+                        if (!$util.isObject(object.tool))
+                            throw $TypeError(".skynet.agent.v1.ToolUpdatedNtf.tool: object expected");
+                        message.tool = $root.skynet.agent.v1.ToolCall.fromObject(object.tool, _depth + 1);
+                    }
+                    if (object.revision != null)
+                        if ($Number(object.revision) !== 0)
+                            message.revision = object.revision >>> 0;
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a ToolUpdatedNtf message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.ToolUpdatedNtf} message ToolUpdatedNtf
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ToolUpdatedNtf.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.sessionId = "";
+                        object.messageId = "";
+                        object.tool = null;
+                        object.revision = 0;
+                    }
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        object.sessionId = message.sessionId;
+                    if (message.messageId != null && $Object.hasOwnProperty.call(message, "messageId"))
+                        object.messageId = message.messageId;
+                    if (message.tool != null && $Object.hasOwnProperty.call(message, "tool"))
+                        object.tool = $root.skynet.agent.v1.ToolCall.toObject(message.tool, options, _depth + 1);
+                    if (message.revision != null && $Object.hasOwnProperty.call(message, "revision"))
+                        object.revision = message.revision;
+                    return object;
+                };
+
+                /**
+                 * Converts this ToolUpdatedNtf to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ToolUpdatedNtf
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ToolUpdatedNtf.prototype.toJSON = function() {
+                    return ToolUpdatedNtf.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ToolUpdatedNtf;
+            })();
+
             v1.ErrorInfo = (function() {
 
                 /**
@@ -2782,6 +4124,8 @@ export const skynet = $root.skynet = (() => {
                  * @property {string|null} [runId] ChatMessage runId
                  * @property {skynet.agent.v1.ErrorInfo.$Properties|null} [error] ChatMessage error
                  * @property {number|null} [ret] ChatMessage ret
+                 * @property {Array.<skynet.agent.v1.ToolCall.$Properties>|null} [toolCalls] ChatMessage toolCalls
+                 * @property {Array.<skynet.agent.v1.ReasoningBlock.$Properties>|null} [reasoning] ChatMessage reasoning
                  * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
                  */
 
@@ -2807,6 +4151,8 @@ export const skynet = $root.skynet = (() => {
                  * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
                  */
                 const ChatMessage = function (properties) {
+                    this.toolCalls = [];
+                    this.reasoning = [];
                     if (properties)
                         for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
                             if (properties[keys[i]] != null && keys[i] !== "__proto__")
@@ -2878,6 +4224,22 @@ export const skynet = $root.skynet = (() => {
                 ChatMessage.prototype.ret = 0;
 
                 /**
+                 * ChatMessage toolCalls.
+                 * @member {Array.<skynet.agent.v1.ToolCall.$Properties>} toolCalls
+                 * @memberof skynet.agent.v1.ChatMessage
+                 * @instance
+                 */
+                ChatMessage.prototype.toolCalls = $util.emptyArray;
+
+                /**
+                 * ChatMessage reasoning.
+                 * @member {Array.<skynet.agent.v1.ReasoningBlock.$Properties>} reasoning
+                 * @memberof skynet.agent.v1.ChatMessage
+                 * @instance
+                 */
+                ChatMessage.prototype.reasoning = $util.emptyArray;
+
+                /**
                  * Creates a new ChatMessage instance using the specified properties.
                  * @function create
                  * @memberof skynet.agent.v1.ChatMessage
@@ -2925,6 +4287,12 @@ export const skynet = $root.skynet = (() => {
                         $root.skynet.agent.v1.ErrorInfo.encode(message.error, writer.uint32(/* id 7, wireType 2 =*/58).fork(), _depth + 1).ldelim();
                     if (message.ret != null && $Object.hasOwnProperty.call(message, "ret") && message.ret !== 0)
                         writer.uint32(/* id 8, wireType 0 =*/64).int32(message.ret);
+                    if (message.toolCalls != null && message.toolCalls.length)
+                        for (let i = 0; i < message.toolCalls.length; ++i)
+                            $root.skynet.agent.v1.ToolCall.encode(message.toolCalls[i], writer.uint32(/* id 9, wireType 2 =*/74).fork(), _depth + 1).ldelim();
+                    if (message.reasoning != null && message.reasoning.length)
+                        for (let i = 0; i < message.reasoning.length; ++i)
+                            $root.skynet.agent.v1.ReasoningBlock.encode(message.reasoning[i], writer.uint32(/* id 10, wireType 2 =*/82).fork(), _depth + 1).ldelim();
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -3051,6 +4419,22 @@ export const skynet = $root.skynet = (() => {
                                     delete message.ret;
                                 continue;
                             }
+                        case 9: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.toolCalls && message.toolCalls.length))
+                                    message.toolCalls = [];
+                                message.toolCalls.push($root.skynet.agent.v1.ToolCall.decode(reader, reader.size(), $undefined, _depth + 1));
+                                continue;
+                            }
+                        case 10: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.reasoning && message.reasoning.length))
+                                    message.reasoning = [];
+                                message.reasoning.push($root.skynet.agent.v1.ReasoningBlock.decode(reader, reader.size(), $undefined, _depth + 1));
+                                continue;
+                            }
                         }
                         reader.skipType(wireType, _depth, tag);
                         if (!reader.discardUnknown) {
@@ -3125,6 +4509,24 @@ export const skynet = $root.skynet = (() => {
                     if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
                         if (!$util.isInteger(message.ret))
                             return "ret: integer expected";
+                    if (message.toolCalls != null && $Object.hasOwnProperty.call(message, "toolCalls")) {
+                        if (!$Array.isArray(message.toolCalls))
+                            return "toolCalls: array expected";
+                        for (let i = 0; i < message.toolCalls.length; ++i) {
+                            let error = $root.skynet.agent.v1.ToolCall.verify(message.toolCalls[i], _depth + 1);
+                            if (error)
+                                return "toolCalls." + error;
+                        }
+                    }
+                    if (message.reasoning != null && $Object.hasOwnProperty.call(message, "reasoning")) {
+                        if (!$Array.isArray(message.reasoning))
+                            return "reasoning: array expected";
+                        for (let i = 0; i < message.reasoning.length; ++i) {
+                            let error = $root.skynet.agent.v1.ReasoningBlock.verify(message.reasoning[i], _depth + 1);
+                            if (error)
+                                return "reasoning." + error;
+                        }
+                    }
                     return null;
                 };
 
@@ -3217,6 +4619,26 @@ export const skynet = $root.skynet = (() => {
                     if (object.ret != null)
                         if ($Number(object.ret) !== 0)
                             message.ret = object.ret | 0;
+                    if (object.toolCalls) {
+                        if (!$Array.isArray(object.toolCalls))
+                            throw $TypeError(".skynet.agent.v1.ChatMessage.toolCalls: array expected");
+                        message.toolCalls = $Array(object.toolCalls.length);
+                        for (let i = 0; i < object.toolCalls.length; ++i) {
+                            if (!$util.isObject(object.toolCalls[i]))
+                                throw $TypeError(".skynet.agent.v1.ChatMessage.toolCalls: object expected");
+                            message.toolCalls[i] = $root.skynet.agent.v1.ToolCall.fromObject(object.toolCalls[i], _depth + 1);
+                        }
+                    }
+                    if (object.reasoning) {
+                        if (!$Array.isArray(object.reasoning))
+                            throw $TypeError(".skynet.agent.v1.ChatMessage.reasoning: array expected");
+                        message.reasoning = $Array(object.reasoning.length);
+                        for (let i = 0; i < object.reasoning.length; ++i) {
+                            if (!$util.isObject(object.reasoning[i]))
+                                throw $TypeError(".skynet.agent.v1.ChatMessage.reasoning: object expected");
+                            message.reasoning[i] = $root.skynet.agent.v1.ReasoningBlock.fromObject(object.reasoning[i], _depth + 1);
+                        }
+                    }
                     return message;
                 };
 
@@ -3237,6 +4659,10 @@ export const skynet = $root.skynet = (() => {
                     if (_depth > $util.recursionLimit)
                         throw $Error("max depth exceeded");
                     let object = {};
+                    if (options.arrays || options.defaults) {
+                        object.toolCalls = [];
+                        object.reasoning = [];
+                    }
                     if (options.defaults) {
                         object.id = "";
                         object.role = options.enums === $String ? "MESSAGE_ROLE_UNSPECIFIED" : 0;
@@ -3272,6 +4698,16 @@ export const skynet = $root.skynet = (() => {
                         object.error = $root.skynet.agent.v1.ErrorInfo.toObject(message.error, options, _depth + 1);
                     if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
                         object.ret = message.ret;
+                    if (message.toolCalls && message.toolCalls.length) {
+                        object.toolCalls = $Array(message.toolCalls.length);
+                        for (let j = 0; j < message.toolCalls.length; ++j)
+                            object.toolCalls[j] = $root.skynet.agent.v1.ToolCall.toObject(message.toolCalls[j], options, _depth + 1);
+                    }
+                    if (message.reasoning && message.reasoning.length) {
+                        object.reasoning = $Array(message.reasoning.length);
+                        for (let j = 0; j < message.reasoning.length; ++j)
+                            object.reasoning[j] = $root.skynet.agent.v1.ReasoningBlock.toObject(message.reasoning[j], options, _depth + 1);
+                    }
                     return object;
                 };
 
@@ -3289,6 +4725,1411 @@ export const skynet = $root.skynet = (() => {
                 return ChatMessage;
             })();
 
+            v1.ReasoningBlock = (function() {
+
+                /**
+                 * Properties of a ReasoningBlock.
+                 * @typedef {Object} skynet.agent.v1.ReasoningBlock.$Properties
+                 * @property {string|null} [id] ReasoningBlock id
+                 * @property {string|null} [runId] ReasoningBlock runId
+                 * @property {string|null} [modelId] ReasoningBlock modelId
+                 * @property {string|null} [text] ReasoningBlock text
+                 * @property {string|null} [status] ReasoningBlock status
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a ReasoningBlock.
+                 * @memberof skynet.agent.v1
+                 * @interface IReasoningBlock
+                 * @augments skynet.agent.v1.ReasoningBlock.$Properties
+                 * @deprecated Use skynet.agent.v1.ReasoningBlock.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a ReasoningBlock.
+                 * @typedef {skynet.agent.v1.ReasoningBlock.$Properties} skynet.agent.v1.ReasoningBlock.$Shape
+                 */
+
+                /**
+                 * Constructs a new ReasoningBlock.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a ReasoningBlock.
+                 * @constructor
+                 * @param {skynet.agent.v1.ReasoningBlock.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ReasoningBlock = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ReasoningBlock id.
+                 * @member {string} id
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 */
+                ReasoningBlock.prototype.id = "";
+
+                /**
+                 * ReasoningBlock runId.
+                 * @member {string} runId
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 */
+                ReasoningBlock.prototype.runId = "";
+
+                /**
+                 * ReasoningBlock modelId.
+                 * @member {string} modelId
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 */
+                ReasoningBlock.prototype.modelId = "";
+
+                /**
+                 * ReasoningBlock text.
+                 * @member {string} text
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 */
+                ReasoningBlock.prototype.text = "";
+
+                /**
+                 * ReasoningBlock status.
+                 * @member {string} status
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 */
+                ReasoningBlock.prototype.status = "";
+
+                /**
+                 * Creates a new ReasoningBlock instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningBlock.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ReasoningBlock} ReasoningBlock instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ReasoningBlock.$Shape): skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape;
+                 *   (properties?: skynet.agent.v1.ReasoningBlock.$Properties): skynet.agent.v1.ReasoningBlock;
+                 * }}
+                 */
+                ReasoningBlock.create = function(properties) {
+                    return new ReasoningBlock(properties);
+                };
+
+                /**
+                 * Encodes the specified ReasoningBlock message. Does not implicitly {@link skynet.agent.v1.ReasoningBlock.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningBlock.$Properties} message ReasoningBlock message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ReasoningBlock.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id") && message.id !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId") && message.runId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.runId);
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId") && message.modelId !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.modelId);
+                    if (message.text != null && $Object.hasOwnProperty.call(message, "text") && message.text !== "")
+                        writer.uint32(/* id 4, wireType 2 =*/34).string(message.text);
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status") && message.status !== "")
+                        writer.uint32(/* id 5, wireType 2 =*/42).string(message.status);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ReasoningBlock message, length delimited. Does not implicitly {@link skynet.agent.v1.ReasoningBlock.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningBlock.$Properties} message ReasoningBlock message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ReasoningBlock.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a ReasoningBlock message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape} ReasoningBlock
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ReasoningBlock.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ReasoningBlock();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.id = value;
+                                else
+                                    delete message.id;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.runId = value;
+                                else
+                                    delete message.runId;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.modelId = value;
+                                else
+                                    delete message.modelId;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.text = value;
+                                else
+                                    delete message.text;
+                                continue;
+                            }
+                        case 5: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.status = value;
+                                else
+                                    delete message.status;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a ReasoningBlock message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ReasoningBlock & skynet.agent.v1.ReasoningBlock.$Shape} ReasoningBlock
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ReasoningBlock.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a ReasoningBlock message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ReasoningBlock.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        if (!$util.isString(message.id))
+                            return "id: string expected";
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        if (!$util.isString(message.runId))
+                            return "runId: string expected";
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        if (!$util.isString(message.modelId))
+                            return "modelId: string expected";
+                    if (message.text != null && $Object.hasOwnProperty.call(message, "text"))
+                        if (!$util.isString(message.text))
+                            return "text: string expected";
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status"))
+                        if (!$util.isString(message.status))
+                            return "status: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a ReasoningBlock message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ReasoningBlock} ReasoningBlock
+                 */
+                ReasoningBlock.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ReasoningBlock)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ReasoningBlock: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ReasoningBlock();
+                    if (object.id != null)
+                        if (typeof object.id !== "string" || object.id.length)
+                            message.id = $String(object.id);
+                    if (object.runId != null)
+                        if (typeof object.runId !== "string" || object.runId.length)
+                            message.runId = $String(object.runId);
+                    if (object.modelId != null)
+                        if (typeof object.modelId !== "string" || object.modelId.length)
+                            message.modelId = $String(object.modelId);
+                    if (object.text != null)
+                        if (typeof object.text !== "string" || object.text.length)
+                            message.text = $String(object.text);
+                    if (object.status != null)
+                        if (typeof object.status !== "string" || object.status.length)
+                            message.status = $String(object.status);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a ReasoningBlock message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @static
+                 * @param {skynet.agent.v1.ReasoningBlock} message ReasoningBlock
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ReasoningBlock.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.id = "";
+                        object.runId = "";
+                        object.modelId = "";
+                        object.text = "";
+                        object.status = "";
+                    }
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        object.id = message.id;
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        object.runId = message.runId;
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        object.modelId = message.modelId;
+                    if (message.text != null && $Object.hasOwnProperty.call(message, "text"))
+                        object.text = message.text;
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status"))
+                        object.status = message.status;
+                    return object;
+                };
+
+                /**
+                 * Converts this ReasoningBlock to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ReasoningBlock
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ReasoningBlock.prototype.toJSON = function() {
+                    return ReasoningBlock.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ReasoningBlock;
+            })();
+
+            v1.ModelOption = (function() {
+
+                /**
+                 * Properties of a ModelOption.
+                 * @typedef {Object} skynet.agent.v1.ModelOption.$Properties
+                 * @property {string|null} [id] ModelOption id
+                 * @property {string|null} [name] ModelOption name
+                 * @property {string|null} [model] ModelOption model
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a ModelOption.
+                 * @memberof skynet.agent.v1
+                 * @interface IModelOption
+                 * @augments skynet.agent.v1.ModelOption.$Properties
+                 * @deprecated Use skynet.agent.v1.ModelOption.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a ModelOption.
+                 * @typedef {skynet.agent.v1.ModelOption.$Properties} skynet.agent.v1.ModelOption.$Shape
+                 */
+
+                /**
+                 * Constructs a new ModelOption.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a ModelOption.
+                 * @constructor
+                 * @param {skynet.agent.v1.ModelOption.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ModelOption = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ModelOption id.
+                 * @member {string} id
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @instance
+                 */
+                ModelOption.prototype.id = "";
+
+                /**
+                 * ModelOption name.
+                 * @member {string} name
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @instance
+                 */
+                ModelOption.prototype.name = "";
+
+                /**
+                 * ModelOption model.
+                 * @member {string} model
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @instance
+                 */
+                ModelOption.prototype.model = "";
+
+                /**
+                 * Creates a new ModelOption instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {skynet.agent.v1.ModelOption.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ModelOption} ModelOption instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ModelOption.$Shape): skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape;
+                 *   (properties?: skynet.agent.v1.ModelOption.$Properties): skynet.agent.v1.ModelOption;
+                 * }}
+                 */
+                ModelOption.create = function(properties) {
+                    return new ModelOption(properties);
+                };
+
+                /**
+                 * Encodes the specified ModelOption message. Does not implicitly {@link skynet.agent.v1.ModelOption.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {skynet.agent.v1.ModelOption.$Properties} message ModelOption message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ModelOption.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id") && message.id !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name") && message.name !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.name);
+                    if (message.model != null && $Object.hasOwnProperty.call(message, "model") && message.model !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.model);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ModelOption message, length delimited. Does not implicitly {@link skynet.agent.v1.ModelOption.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {skynet.agent.v1.ModelOption.$Properties} message ModelOption message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ModelOption.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a ModelOption message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape} ModelOption
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ModelOption.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ModelOption();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.id = value;
+                                else
+                                    delete message.id;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.name = value;
+                                else
+                                    delete message.name;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.model = value;
+                                else
+                                    delete message.model;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a ModelOption message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ModelOption & skynet.agent.v1.ModelOption.$Shape} ModelOption
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ModelOption.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a ModelOption message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ModelOption.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        if (!$util.isString(message.id))
+                            return "id: string expected";
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        if (!$util.isString(message.name))
+                            return "name: string expected";
+                    if (message.model != null && $Object.hasOwnProperty.call(message, "model"))
+                        if (!$util.isString(message.model))
+                            return "model: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a ModelOption message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ModelOption} ModelOption
+                 */
+                ModelOption.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ModelOption)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ModelOption: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ModelOption();
+                    if (object.id != null)
+                        if (typeof object.id !== "string" || object.id.length)
+                            message.id = $String(object.id);
+                    if (object.name != null)
+                        if (typeof object.name !== "string" || object.name.length)
+                            message.name = $String(object.name);
+                    if (object.model != null)
+                        if (typeof object.model !== "string" || object.model.length)
+                            message.model = $String(object.model);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a ModelOption message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @static
+                 * @param {skynet.agent.v1.ModelOption} message ModelOption
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ModelOption.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.id = "";
+                        object.name = "";
+                        object.model = "";
+                    }
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        object.id = message.id;
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        object.name = message.name;
+                    if (message.model != null && $Object.hasOwnProperty.call(message, "model"))
+                        object.model = message.model;
+                    return object;
+                };
+
+                /**
+                 * Converts this ModelOption to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ModelOption
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ModelOption.prototype.toJSON = function() {
+                    return ModelOption.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ModelOption;
+            })();
+
+            v1.ToolCall = (function() {
+
+                /**
+                 * Properties of a ToolCall.
+                 * @typedef {Object} skynet.agent.v1.ToolCall.$Properties
+                 * @property {string|null} [id] ToolCall id
+                 * @property {string|null} [name] ToolCall name
+                 * @property {string|null} ["arguments"] ToolCall arguments
+                 * @property {string|null} [status] ToolCall status
+                 * @property {string|null} [permissionReason] ToolCall permissionReason
+                 * @property {string|null} [permissionMode] ToolCall permissionMode
+                 * @property {string|null} [output] ToolCall output
+                 * @property {number|null} [exitCode] ToolCall exitCode
+                 * @property {boolean|null} [truncated] ToolCall truncated
+                 * @property {Array.<string>|null} [changedFiles] ToolCall changedFiles
+                 * @property {string|null} [error] ToolCall error
+                 * @property {string|null} [processId] ToolCall processId
+                 * @property {string|null} [runId] ToolCall runId
+                 * @property {string|null} [workingDirectory] ToolCall workingDirectory
+                 * @property {Array.<skynet.agent.v1.ReasoningBlock.$Properties>|null} [reasoning] ToolCall reasoning
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a ToolCall.
+                 * @memberof skynet.agent.v1
+                 * @interface IToolCall
+                 * @augments skynet.agent.v1.ToolCall.$Properties
+                 * @deprecated Use skynet.agent.v1.ToolCall.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a ToolCall.
+                 * @typedef {skynet.agent.v1.ToolCall.$Properties} skynet.agent.v1.ToolCall.$Shape
+                 */
+
+                /**
+                 * Constructs a new ToolCall.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a ToolCall.
+                 * @constructor
+                 * @param {skynet.agent.v1.ToolCall.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ToolCall = function (properties) {
+                    this.changedFiles = [];
+                    this.reasoning = [];
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ToolCall id.
+                 * @member {string} id
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.id = "";
+
+                /**
+                 * ToolCall name.
+                 * @member {string} name
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.name = "";
+
+                /**
+                 * ToolCall arguments.
+                 * @member {string} arguments
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype["arguments"] = "";
+
+                /**
+                 * ToolCall status.
+                 * @member {string} status
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.status = "";
+
+                /**
+                 * ToolCall permissionReason.
+                 * @member {string} permissionReason
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.permissionReason = "";
+
+                /**
+                 * ToolCall permissionMode.
+                 * @member {string} permissionMode
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.permissionMode = "";
+
+                /**
+                 * ToolCall output.
+                 * @member {string} output
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.output = "";
+
+                /**
+                 * ToolCall exitCode.
+                 * @member {number|null|undefined} exitCode
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.exitCode = null;
+
+                /**
+                 * ToolCall truncated.
+                 * @member {boolean} truncated
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.truncated = false;
+
+                /**
+                 * ToolCall changedFiles.
+                 * @member {Array.<string>} changedFiles
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.changedFiles = $util.emptyArray;
+
+                /**
+                 * ToolCall error.
+                 * @member {string} error
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.error = "";
+
+                /**
+                 * ToolCall processId.
+                 * @member {string} processId
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.processId = "";
+
+                /**
+                 * ToolCall runId.
+                 * @member {string} runId
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.runId = "";
+
+                /**
+                 * ToolCall workingDirectory.
+                 * @member {string} workingDirectory
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.workingDirectory = "";
+
+                /**
+                 * ToolCall reasoning.
+                 * @member {Array.<skynet.agent.v1.ReasoningBlock.$Properties>} reasoning
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 */
+                ToolCall.prototype.reasoning = $util.emptyArray;
+
+                // OneOf field names bound to virtual getters and setters
+                let $oneOfFields;
+
+                // Virtual OneOf for proto3 optional field
+                $Object.defineProperty(ToolCall.prototype, "_exitCode", {
+                    get: $util.oneOfGetter($oneOfFields = ["exitCode"]),
+                    set: $util.oneOfSetter($oneOfFields)
+                });
+
+                /**
+                 * Creates a new ToolCall instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {skynet.agent.v1.ToolCall.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ToolCall} ToolCall instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ToolCall.$Shape): skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape;
+                 *   (properties?: skynet.agent.v1.ToolCall.$Properties): skynet.agent.v1.ToolCall;
+                 * }}
+                 */
+                ToolCall.create = function(properties) {
+                    return new ToolCall(properties);
+                };
+
+                /**
+                 * Encodes the specified ToolCall message. Does not implicitly {@link skynet.agent.v1.ToolCall.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {skynet.agent.v1.ToolCall.$Properties} message ToolCall message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ToolCall.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id") && message.id !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name") && message.name !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.name);
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments") && message["arguments"] !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message["arguments"]);
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status") && message.status !== "")
+                        writer.uint32(/* id 4, wireType 2 =*/34).string(message.status);
+                    if (message.permissionReason != null && $Object.hasOwnProperty.call(message, "permissionReason") && message.permissionReason !== "")
+                        writer.uint32(/* id 5, wireType 2 =*/42).string(message.permissionReason);
+                    if (message.permissionMode != null && $Object.hasOwnProperty.call(message, "permissionMode") && message.permissionMode !== "")
+                        writer.uint32(/* id 6, wireType 2 =*/50).string(message.permissionMode);
+                    if (message.output != null && $Object.hasOwnProperty.call(message, "output") && message.output !== "")
+                        writer.uint32(/* id 7, wireType 2 =*/58).string(message.output);
+                    if (message.exitCode != null && $Object.hasOwnProperty.call(message, "exitCode"))
+                        writer.uint32(/* id 8, wireType 0 =*/64).int32(message.exitCode);
+                    if (message.truncated != null && $Object.hasOwnProperty.call(message, "truncated") && message.truncated !== false)
+                        writer.uint32(/* id 9, wireType 0 =*/72).bool(message.truncated);
+                    if (message.changedFiles != null && message.changedFiles.length)
+                        for (let i = 0; i < message.changedFiles.length; ++i)
+                            writer.uint32(/* id 10, wireType 2 =*/82).string(message.changedFiles[i]);
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error") && message.error !== "")
+                        writer.uint32(/* id 11, wireType 2 =*/90).string(message.error);
+                    if (message.processId != null && $Object.hasOwnProperty.call(message, "processId") && message.processId !== "")
+                        writer.uint32(/* id 12, wireType 2 =*/98).string(message.processId);
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId") && message.runId !== "")
+                        writer.uint32(/* id 13, wireType 2 =*/106).string(message.runId);
+                    if (message.workingDirectory != null && $Object.hasOwnProperty.call(message, "workingDirectory") && message.workingDirectory !== "")
+                        writer.uint32(/* id 14, wireType 2 =*/114).string(message.workingDirectory);
+                    if (message.reasoning != null && message.reasoning.length)
+                        for (let i = 0; i < message.reasoning.length; ++i)
+                            $root.skynet.agent.v1.ReasoningBlock.encode(message.reasoning[i], writer.uint32(/* id 15, wireType 2 =*/122).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ToolCall message, length delimited. Does not implicitly {@link skynet.agent.v1.ToolCall.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {skynet.agent.v1.ToolCall.$Properties} message ToolCall message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ToolCall.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a ToolCall message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape} ToolCall
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ToolCall.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ToolCall();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.id = value;
+                                else
+                                    delete message.id;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.name = value;
+                                else
+                                    delete message.name;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message["arguments"] = value;
+                                else
+                                    delete message["arguments"];
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.status = value;
+                                else
+                                    delete message.status;
+                                continue;
+                            }
+                        case 5: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.permissionReason = value;
+                                else
+                                    delete message.permissionReason;
+                                continue;
+                            }
+                        case 6: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.permissionMode = value;
+                                else
+                                    delete message.permissionMode;
+                                continue;
+                            }
+                        case 7: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.output = value;
+                                else
+                                    delete message.output;
+                                continue;
+                            }
+                        case 8: {
+                                if (wireType !== 0)
+                                    break;
+                                message.exitCode = reader.int32();
+                                message._exitCode = "exitCode";
+                                continue;
+                            }
+                        case 9: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.bool())
+                                    message.truncated = value;
+                                else
+                                    delete message.truncated;
+                                continue;
+                            }
+                        case 10: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.changedFiles && message.changedFiles.length))
+                                    message.changedFiles = [];
+                                message.changedFiles.push(reader.stringVerify());
+                                continue;
+                            }
+                        case 11: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.error = value;
+                                else
+                                    delete message.error;
+                                continue;
+                            }
+                        case 12: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.processId = value;
+                                else
+                                    delete message.processId;
+                                continue;
+                            }
+                        case 13: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.runId = value;
+                                else
+                                    delete message.runId;
+                                continue;
+                            }
+                        case 14: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.workingDirectory = value;
+                                else
+                                    delete message.workingDirectory;
+                                continue;
+                            }
+                        case 15: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.reasoning && message.reasoning.length))
+                                    message.reasoning = [];
+                                message.reasoning.push($root.skynet.agent.v1.ReasoningBlock.decode(reader, reader.size(), $undefined, _depth + 1));
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a ToolCall message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ToolCall & skynet.agent.v1.ToolCall.$Shape} ToolCall
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ToolCall.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a ToolCall message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ToolCall.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    let properties = {};
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        if (!$util.isString(message.id))
+                            return "id: string expected";
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        if (!$util.isString(message.name))
+                            return "name: string expected";
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments"))
+                        if (!$util.isString(message["arguments"]))
+                            return "arguments: string expected";
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status"))
+                        if (!$util.isString(message.status))
+                            return "status: string expected";
+                    if (message.permissionReason != null && $Object.hasOwnProperty.call(message, "permissionReason"))
+                        if (!$util.isString(message.permissionReason))
+                            return "permissionReason: string expected";
+                    if (message.permissionMode != null && $Object.hasOwnProperty.call(message, "permissionMode"))
+                        if (!$util.isString(message.permissionMode))
+                            return "permissionMode: string expected";
+                    if (message.output != null && $Object.hasOwnProperty.call(message, "output"))
+                        if (!$util.isString(message.output))
+                            return "output: string expected";
+                    if (message.exitCode != null && $Object.hasOwnProperty.call(message, "exitCode")) {
+                        properties._exitCode = 1;
+                        if (!$util.isInteger(message.exitCode))
+                            return "exitCode: integer expected";
+                    }
+                    if (message.truncated != null && $Object.hasOwnProperty.call(message, "truncated"))
+                        if (typeof message.truncated !== "boolean")
+                            return "truncated: boolean expected";
+                    if (message.changedFiles != null && $Object.hasOwnProperty.call(message, "changedFiles")) {
+                        if (!$Array.isArray(message.changedFiles))
+                            return "changedFiles: array expected";
+                        for (let i = 0; i < message.changedFiles.length; ++i)
+                            if (!$util.isString(message.changedFiles[i]))
+                                return "changedFiles: string[] expected";
+                    }
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        if (!$util.isString(message.error))
+                            return "error: string expected";
+                    if (message.processId != null && $Object.hasOwnProperty.call(message, "processId"))
+                        if (!$util.isString(message.processId))
+                            return "processId: string expected";
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        if (!$util.isString(message.runId))
+                            return "runId: string expected";
+                    if (message.workingDirectory != null && $Object.hasOwnProperty.call(message, "workingDirectory"))
+                        if (!$util.isString(message.workingDirectory))
+                            return "workingDirectory: string expected";
+                    if (message.reasoning != null && $Object.hasOwnProperty.call(message, "reasoning")) {
+                        if (!$Array.isArray(message.reasoning))
+                            return "reasoning: array expected";
+                        for (let i = 0; i < message.reasoning.length; ++i) {
+                            let error = $root.skynet.agent.v1.ReasoningBlock.verify(message.reasoning[i], _depth + 1);
+                            if (error)
+                                return "reasoning." + error;
+                        }
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a ToolCall message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ToolCall} ToolCall
+                 */
+                ToolCall.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ToolCall)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ToolCall: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ToolCall();
+                    if (object.id != null)
+                        if (typeof object.id !== "string" || object.id.length)
+                            message.id = $String(object.id);
+                    if (object.name != null)
+                        if (typeof object.name !== "string" || object.name.length)
+                            message.name = $String(object.name);
+                    if (object["arguments"] != null)
+                        if (typeof object["arguments"] !== "string" || object["arguments"].length)
+                            message["arguments"] = $String(object["arguments"]);
+                    if (object.status != null)
+                        if (typeof object.status !== "string" || object.status.length)
+                            message.status = $String(object.status);
+                    if (object.permissionReason != null)
+                        if (typeof object.permissionReason !== "string" || object.permissionReason.length)
+                            message.permissionReason = $String(object.permissionReason);
+                    if (object.permissionMode != null)
+                        if (typeof object.permissionMode !== "string" || object.permissionMode.length)
+                            message.permissionMode = $String(object.permissionMode);
+                    if (object.output != null)
+                        if (typeof object.output !== "string" || object.output.length)
+                            message.output = $String(object.output);
+                    if (object.exitCode != null)
+                        message.exitCode = object.exitCode | 0;
+                    if (object.truncated != null)
+                        if (object.truncated)
+                            message.truncated = $Boolean(object.truncated);
+                    if (object.changedFiles) {
+                        if (!$Array.isArray(object.changedFiles))
+                            throw $TypeError(".skynet.agent.v1.ToolCall.changedFiles: array expected");
+                        message.changedFiles = $Array(object.changedFiles.length);
+                        for (let i = 0; i < object.changedFiles.length; ++i)
+                            message.changedFiles[i] = $String(object.changedFiles[i]);
+                    }
+                    if (object.error != null)
+                        if (typeof object.error !== "string" || object.error.length)
+                            message.error = $String(object.error);
+                    if (object.processId != null)
+                        if (typeof object.processId !== "string" || object.processId.length)
+                            message.processId = $String(object.processId);
+                    if (object.runId != null)
+                        if (typeof object.runId !== "string" || object.runId.length)
+                            message.runId = $String(object.runId);
+                    if (object.workingDirectory != null)
+                        if (typeof object.workingDirectory !== "string" || object.workingDirectory.length)
+                            message.workingDirectory = $String(object.workingDirectory);
+                    if (object.reasoning) {
+                        if (!$Array.isArray(object.reasoning))
+                            throw $TypeError(".skynet.agent.v1.ToolCall.reasoning: array expected");
+                        message.reasoning = $Array(object.reasoning.length);
+                        for (let i = 0; i < object.reasoning.length; ++i) {
+                            if (!$util.isObject(object.reasoning[i]))
+                                throw $TypeError(".skynet.agent.v1.ToolCall.reasoning: object expected");
+                            message.reasoning[i] = $root.skynet.agent.v1.ReasoningBlock.fromObject(object.reasoning[i], _depth + 1);
+                        }
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a ToolCall message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @static
+                 * @param {skynet.agent.v1.ToolCall} message ToolCall
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ToolCall.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.arrays || options.defaults) {
+                        object.changedFiles = [];
+                        object.reasoning = [];
+                    }
+                    if (options.defaults) {
+                        object.id = "";
+                        object.name = "";
+                        object["arguments"] = "";
+                        object.status = "";
+                        object.permissionReason = "";
+                        object.permissionMode = "";
+                        object.output = "";
+                        object.truncated = false;
+                        object.error = "";
+                        object.processId = "";
+                        object.runId = "";
+                        object.workingDirectory = "";
+                    }
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        object.id = message.id;
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        object.name = message.name;
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments"))
+                        object["arguments"] = message["arguments"];
+                    if (message.status != null && $Object.hasOwnProperty.call(message, "status"))
+                        object.status = message.status;
+                    if (message.permissionReason != null && $Object.hasOwnProperty.call(message, "permissionReason"))
+                        object.permissionReason = message.permissionReason;
+                    if (message.permissionMode != null && $Object.hasOwnProperty.call(message, "permissionMode"))
+                        object.permissionMode = message.permissionMode;
+                    if (message.output != null && $Object.hasOwnProperty.call(message, "output"))
+                        object.output = message.output;
+                    if (message.exitCode != null && $Object.hasOwnProperty.call(message, "exitCode"))
+                        object.exitCode = message.exitCode;
+                    if (message.truncated != null && $Object.hasOwnProperty.call(message, "truncated"))
+                        object.truncated = message.truncated;
+                    if (message.changedFiles && message.changedFiles.length) {
+                        object.changedFiles = $Array(message.changedFiles.length);
+                        for (let j = 0; j < message.changedFiles.length; ++j)
+                            object.changedFiles[j] = message.changedFiles[j];
+                    }
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        object.error = message.error;
+                    if (message.processId != null && $Object.hasOwnProperty.call(message, "processId"))
+                        object.processId = message.processId;
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        object.runId = message.runId;
+                    if (message.workingDirectory != null && $Object.hasOwnProperty.call(message, "workingDirectory"))
+                        object.workingDirectory = message.workingDirectory;
+                    if (message.reasoning && message.reasoning.length) {
+                        object.reasoning = $Array(message.reasoning.length);
+                        for (let j = 0; j < message.reasoning.length; ++j)
+                            object.reasoning[j] = $root.skynet.agent.v1.ReasoningBlock.toObject(message.reasoning[j], options, _depth + 1);
+                    }
+                    return object;
+                };
+
+                /**
+                 * Converts this ToolCall to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ToolCall
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ToolCall.prototype.toJSON = function() {
+                    return ToolCall.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ToolCall;
+            })();
+
             v1.SessionState = (function() {
 
                 /**
@@ -3301,6 +6142,8 @@ export const skynet = $root.skynet = (() => {
                  * @property {Array.<skynet.agent.v1.ChatMessage.$Properties>|null} [messages] SessionState messages
                  * @property {string|null} [runId] SessionState runId
                  * @property {boolean|null} [cancelling] SessionState cancelling
+                 * @property {string|null} [modelId] SessionState modelId
+                 * @property {string|null} [permissionModelId] SessionState permissionModelId
                  * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
                  */
 
@@ -3390,6 +6233,22 @@ export const skynet = $root.skynet = (() => {
                 SessionState.prototype.cancelling = false;
 
                 /**
+                 * SessionState modelId.
+                 * @member {string} modelId
+                 * @memberof skynet.agent.v1.SessionState
+                 * @instance
+                 */
+                SessionState.prototype.modelId = "";
+
+                /**
+                 * SessionState permissionModelId.
+                 * @member {string} permissionModelId
+                 * @memberof skynet.agent.v1.SessionState
+                 * @instance
+                 */
+                SessionState.prototype.permissionModelId = "";
+
+                /**
                  * Creates a new SessionState instance using the specified properties.
                  * @function create
                  * @memberof skynet.agent.v1.SessionState
@@ -3436,6 +6295,10 @@ export const skynet = $root.skynet = (() => {
                         writer.uint32(/* id 6, wireType 2 =*/50).string(message.runId);
                     if (message.cancelling != null && $Object.hasOwnProperty.call(message, "cancelling") && message.cancelling !== false)
                         writer.uint32(/* id 7, wireType 0 =*/56).bool(message.cancelling);
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId") && message.modelId !== "")
+                        writer.uint32(/* id 8, wireType 2 =*/66).string(message.modelId);
+                    if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId") && message.permissionModelId !== "")
+                        writer.uint32(/* id 9, wireType 2 =*/74).string(message.permissionModelId);
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -3555,6 +6418,24 @@ export const skynet = $root.skynet = (() => {
                                     delete message.cancelling;
                                 continue;
                             }
+                        case 8: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.modelId = value;
+                                else
+                                    delete message.modelId;
+                                continue;
+                            }
+                        case 9: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.permissionModelId = value;
+                                else
+                                    delete message.permissionModelId;
+                                continue;
+                            }
                         }
                         reader.skipType(wireType, _depth, tag);
                         if (!reader.discardUnknown) {
@@ -3630,6 +6511,12 @@ export const skynet = $root.skynet = (() => {
                     if (message.cancelling != null && $Object.hasOwnProperty.call(message, "cancelling"))
                         if (typeof message.cancelling !== "boolean")
                             return "cancelling: boolean expected";
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        if (!$util.isString(message.modelId))
+                            return "modelId: string expected";
+                    if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId"))
+                        if (!$util.isString(message.permissionModelId))
+                            return "permissionModelId: string expected";
                     return null;
                 };
 
@@ -3686,6 +6573,12 @@ export const skynet = $root.skynet = (() => {
                     if (object.cancelling != null)
                         if (object.cancelling)
                             message.cancelling = $Boolean(object.cancelling);
+                    if (object.modelId != null)
+                        if (typeof object.modelId !== "string" || object.modelId.length)
+                            message.modelId = $String(object.modelId);
+                    if (object.permissionModelId != null)
+                        if (typeof object.permissionModelId !== "string" || object.permissionModelId.length)
+                            message.permissionModelId = $String(object.permissionModelId);
                     return message;
                 };
 
@@ -3719,6 +6612,8 @@ export const skynet = $root.skynet = (() => {
                         object.revision = 0;
                         object.runId = "";
                         object.cancelling = false;
+                        object.modelId = "";
+                        object.permissionModelId = "";
                     }
                     if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
                         object.id = message.id;
@@ -3742,6 +6637,10 @@ export const skynet = $root.skynet = (() => {
                         object.runId = message.runId;
                     if (message.cancelling != null && $Object.hasOwnProperty.call(message, "cancelling"))
                         object.cancelling = message.cancelling;
+                    if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
+                        object.modelId = message.modelId;
+                    if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId"))
+                        object.permissionModelId = message.permissionModelId;
                     return object;
                 };
 
@@ -3767,6 +6666,7 @@ export const skynet = $root.skynet = (() => {
                  * @property {string|null} [userId] UserSnapshot userId
                  * @property {string|null} [username] UserSnapshot username
                  * @property {Array.<skynet.agent.v1.SessionState.$Properties>|null} [sessions] UserSnapshot sessions
+                 * @property {Array.<skynet.agent.v1.ModelOption.$Properties>|null} [models] UserSnapshot models
                  * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
                  */
 
@@ -3793,6 +6693,7 @@ export const skynet = $root.skynet = (() => {
                  */
                 const UserSnapshot = function (properties) {
                     this.sessions = [];
+                    this.models = [];
                     if (properties)
                         for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
                             if (properties[keys[i]] != null && keys[i] !== "__proto__")
@@ -3822,6 +6723,14 @@ export const skynet = $root.skynet = (() => {
                  * @instance
                  */
                 UserSnapshot.prototype.sessions = $util.emptyArray;
+
+                /**
+                 * UserSnapshot models.
+                 * @member {Array.<skynet.agent.v1.ModelOption.$Properties>} models
+                 * @memberof skynet.agent.v1.UserSnapshot
+                 * @instance
+                 */
+                UserSnapshot.prototype.models = $util.emptyArray;
 
                 /**
                  * Creates a new UserSnapshot instance using the specified properties.
@@ -3862,6 +6771,9 @@ export const skynet = $root.skynet = (() => {
                     if (message.sessions != null && message.sessions.length)
                         for (let i = 0; i < message.sessions.length; ++i)
                             $root.skynet.agent.v1.SessionState.encode(message.sessions[i], writer.uint32(/* id 3, wireType 2 =*/26).fork(), _depth + 1).ldelim();
+                    if (message.models != null && message.models.length)
+                        for (let i = 0; i < message.models.length; ++i)
+                            $root.skynet.agent.v1.ModelOption.encode(message.models[i], writer.uint32(/* id 4, wireType 2 =*/34).fork(), _depth + 1).ldelim();
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -3945,6 +6857,14 @@ export const skynet = $root.skynet = (() => {
                                 message.sessions.push($root.skynet.agent.v1.SessionState.decode(reader, reader.size(), $undefined, _depth + 1));
                                 continue;
                             }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.models && message.models.length))
+                                    message.models = [];
+                                message.models.push($root.skynet.agent.v1.ModelOption.decode(reader, reader.size(), $undefined, _depth + 1));
+                                continue;
+                            }
                         }
                         reader.skipType(wireType, _depth, tag);
                         if (!reader.discardUnknown) {
@@ -4008,6 +6928,15 @@ export const skynet = $root.skynet = (() => {
                                 return "sessions." + error;
                         }
                     }
+                    if (message.models != null && $Object.hasOwnProperty.call(message, "models")) {
+                        if (!$Array.isArray(message.models))
+                            return "models: array expected";
+                        for (let i = 0; i < message.models.length; ++i) {
+                            let error = $root.skynet.agent.v1.ModelOption.verify(message.models[i], _depth + 1);
+                            if (error)
+                                return "models." + error;
+                        }
+                    }
                     return null;
                 };
 
@@ -4045,6 +6974,16 @@ export const skynet = $root.skynet = (() => {
                             message.sessions[i] = $root.skynet.agent.v1.SessionState.fromObject(object.sessions[i], _depth + 1);
                         }
                     }
+                    if (object.models) {
+                        if (!$Array.isArray(object.models))
+                            throw $TypeError(".skynet.agent.v1.UserSnapshot.models: array expected");
+                        message.models = $Array(object.models.length);
+                        for (let i = 0; i < object.models.length; ++i) {
+                            if (!$util.isObject(object.models[i]))
+                                throw $TypeError(".skynet.agent.v1.UserSnapshot.models: object expected");
+                            message.models[i] = $root.skynet.agent.v1.ModelOption.fromObject(object.models[i], _depth + 1);
+                        }
+                    }
                     return message;
                 };
 
@@ -4065,8 +7004,10 @@ export const skynet = $root.skynet = (() => {
                     if (_depth > $util.recursionLimit)
                         throw $Error("max depth exceeded");
                     let object = {};
-                    if (options.arrays || options.defaults)
+                    if (options.arrays || options.defaults) {
                         object.sessions = [];
+                        object.models = [];
+                    }
                     if (options.defaults) {
                         object.userId = "";
                         object.username = "";
@@ -4079,6 +7020,11 @@ export const skynet = $root.skynet = (() => {
                         object.sessions = $Array(message.sessions.length);
                         for (let j = 0; j < message.sessions.length; ++j)
                             object.sessions[j] = $root.skynet.agent.v1.SessionState.toObject(message.sessions[j], options, _depth + 1);
+                    }
+                    if (message.models && message.models.length) {
+                        object.models = $Array(message.models.length);
+                        for (let j = 0; j < message.models.length; ++j)
+                            object.models[j] = $root.skynet.agent.v1.ModelOption.toObject(message.models[j], options, _depth + 1);
                     }
                     return object;
                 };

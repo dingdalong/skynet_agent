@@ -165,7 +165,7 @@ for (let attempt = 0; attempt < 100; attempt++) {
   if (active === 2) break;
   await delay(10);
 }
-assert.equal(active, 2, "关服前必须已有流读取和响应头等待中的真实模型请求");
+assert.equal(active, 2, "关服前必须已有流读取和响应头等待中的模型 HTTP 请求");
 const closing = [idle, streaming, headerWaiting].map(
   (socket) =>
     new Promise((resolve) => {

@@ -4,6 +4,97 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ReasoningBlock {
+    pub id: String,
+    pub run_id: String,
+    pub model_id: String,
+    pub text: String,
+    pub status: String,
+}
+impl TryFrom<pb::ReasoningBlock> for ReasoningBlock {
+    type Error = String;
+    fn try_from(value: pb::ReasoningBlock) -> Result<Self, String> {
+        if value.id.is_empty()
+            || !matches!(
+                value.status.as_str(),
+                "streaming" | "completed" | "failed" | "cancelled"
+            )
+        {
+            return Err("思考块身份或状态无效".into());
+        }
+        Ok(Self {
+            id: value.id,
+            run_id: value.run_id,
+            model_id: value.model_id,
+            text: value.text,
+            status: value.status,
+        })
+    }
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct ModelOption {
+    pub id: String,
+    pub name: String,
+    pub model: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
+    pub status: String,
+    pub permission_reason: String,
+    pub permission_mode: String,
+    pub output: String,
+    pub exit_code: Option<i32>,
+    pub truncated: bool,
+    pub changed_files: Vec<String>,
+    pub error: String,
+    pub process_id: String,
+    pub run_id: String,
+    pub working_directory: String,
+    pub reasoning: Vec<ReasoningBlock>,
+}
+impl TryFrom<pb::ToolCall> for ToolCall {
+    type Error = String;
+    fn try_from(value: pb::ToolCall) -> Result<Self, String> {
+        if value.id.is_empty()
+            || value.name.is_empty()
+            || !matches!(
+                value.status.as_str(),
+                "judging" | "running" | "denied" | "completed" | "failed" | "cancelled"
+            )
+        {
+            return Err("工具身份或状态无效".into());
+        }
+        Ok(Self {
+            id: value.id,
+            name: value.name,
+            arguments: value.arguments,
+            status: value.status,
+            permission_reason: value.permission_reason,
+            permission_mode: value.permission_mode,
+            output: value.output,
+            exit_code: value.exit_code,
+            truncated: value.truncated,
+            changed_files: value.changed_files,
+            error: value.error,
+            process_id: value.process_id,
+            run_id: value.run_id,
+            working_directory: value.working_directory,
+            reasoning: value
+                .reasoning
+                .into_iter()
+                .map(ReasoningBlock::try_from)
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
     pub role: &'static str,
@@ -13,6 +104,8 @@ pub struct ChatMessage {
     pub run_id: String,
     pub error: String,
     pub retryable: bool,
+    pub tool_calls: Vec<ToolCall>,
+    pub reasoning: Vec<ReasoningBlock>,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +117,8 @@ pub struct Session {
     pub messages: Vec<ChatMessage>,
     pub run_id: String,
     pub cancelling: bool,
+    pub model_id: String,
+    pub permission_model_id: String,
 }
 impl TryFrom<pb::SessionState> for Session {
     type Error = String;
@@ -52,6 +147,11 @@ impl TryFrom<pb::SessionState> for Session {
                 id: message.id,
                 role,
                 status,
+                reasoning: message
+                    .reasoning
+                    .into_iter()
+                    .map(ReasoningBlock::try_from)
+                    .collect::<Result<_, _>>()?,
                 content: message.content,
                 created_at: message.created_at,
                 run_id: message.run_id,
@@ -61,6 +161,11 @@ impl TryFrom<pb::SessionState> for Session {
                     String::new()
                 },
                 retryable: message.error.is_some_and(|error| error.retryable),
+                tool_calls: message
+                    .tool_calls
+                    .into_iter()
+                    .map(ToolCall::try_from)
+                    .collect::<Result<_, _>>()?,
             });
         }
         Ok(Self {
@@ -71,6 +176,8 @@ impl TryFrom<pb::SessionState> for Session {
             messages,
             run_id: value.run_id,
             cancelling: value.cancelling,
+            model_id: value.model_id,
+            permission_model_id: value.permission_model_id,
         })
     }
 }
@@ -84,6 +191,7 @@ pub struct View {
 }
 #[derive(Debug, Default)]
 pub struct Cache {
+    pub models: Vec<ModelOption>,
     pub username: String,
     pub user_id: String,
     pub sessions: BTreeMap<String, Session>,
@@ -101,6 +209,7 @@ pub struct SessionView {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeState {
+    pub models: Vec<ModelOption>,
     pub username: String,
     pub user_id: String,
     pub sessions: Vec<SessionView>,
@@ -133,6 +242,15 @@ impl Cache {
             }
             self.user_id = snapshot.user_id;
         }
+        self.models = snapshot
+            .models
+            .into_iter()
+            .map(|model| ModelOption {
+                id: model.id,
+                name: model.name,
+                model: model.model,
+            })
+            .collect();
         for session in sessions {
             self.merge(session);
         }
@@ -173,6 +291,81 @@ impl Cache {
             view.errors.insert(session.id.clone(), error.clone());
         }
         self.sessions.insert(session.id.clone(), session);
+    }
+    pub fn reasoning(&mut self, update: pb::ReasoningDeltaNtf) -> Result<bool, String> {
+        if update.revision == 0 || update.session_id.is_empty() || update.message_id.is_empty() {
+            return Err("思考通知身份或版本无效".into());
+        }
+        let block = ReasoningBlock::try_from(update.block.ok_or("思考通知缺少内容")?)?;
+        let Some(session) = self.sessions.get_mut(&update.session_id) else {
+            return Ok(false);
+        };
+        if update.revision <= session.revision {
+            return Ok(true);
+        }
+        if session.revision.checked_add(1) != Some(update.revision) {
+            return Ok(false);
+        }
+        let Some(message) = session
+            .messages
+            .iter_mut()
+            .find(|item| item.id == update.message_id && item.role == "assistant")
+        else {
+            return Ok(false);
+        };
+        let target = if update.tool_call_id.is_empty() {
+            &mut message.reasoning
+        } else {
+            let Some(tool) = message
+                .tool_calls
+                .iter_mut()
+                .find(|tool| tool.id == update.tool_call_id)
+            else {
+                return Ok(false);
+            };
+            &mut tool.reasoning
+        };
+        if let Some(previous) = target.iter_mut().find(|item| item.id == block.id) {
+            previous.text.push_str(&block.text);
+            previous.status = block.status;
+        } else {
+            target.push(block);
+        }
+        session.revision = update.revision;
+        Ok(true)
+    }
+    pub fn tool(&mut self, update: pb::ToolUpdatedNtf) -> Result<bool, String> {
+        if update.revision == 0 || update.session_id.is_empty() || update.message_id.is_empty() {
+            return Err("工具通知身份或版本无效".into());
+        }
+        let tool = ToolCall::try_from(update.tool.ok_or("工具通知缺少工具")?)?;
+        let Some(session) = self.sessions.get_mut(&update.session_id) else {
+            return Ok(false);
+        };
+        if update.revision <= session.revision {
+            return Ok(true);
+        }
+        if session.revision.checked_add(1) != Some(update.revision) {
+            return Ok(false);
+        }
+        let Some(message) = session
+            .messages
+            .iter_mut()
+            .find(|message| message.id == update.message_id && message.role == "assistant")
+        else {
+            return Ok(false);
+        };
+        if let Some(previous) = message
+            .tool_calls
+            .iter_mut()
+            .find(|previous| previous.id == tool.id)
+        {
+            *previous = tool;
+        } else {
+            message.tool_calls.push(tool);
+        }
+        session.revision = update.revision;
+        Ok(true)
     }
     pub fn delta(&mut self, delta: &pb::MessageDeltaNtf) -> Result<bool, String> {
         if delta.revision == 0
@@ -221,6 +414,7 @@ impl Cache {
     pub fn state(&self, label: &str, connection_state: &str, error: &str) -> RuntimeState {
         let view = self.views.get(label);
         RuntimeState {
+            models: self.models.clone(),
             username: self.username.clone(),
             user_id: self.user_id.clone(),
             sessions: self
@@ -264,6 +458,7 @@ pub enum Action {
     Disconnect,
     SwitchUser,
     CreateSession,
+    SetModel { model_id: String },
     SelectSession { session_id: String },
     SetDraft { session_id: String, value: String },
     SendMessage { text: String },
@@ -286,8 +481,80 @@ pub fn normalize_username(name: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reasoning_deltas_keep_blocks_across_statuses_and_reject_gaps() {
+        let mut cache = Cache {
+            username: "alice".into(),
+            ..Default::default()
+        };
+        cache.snapshot(snapshot("u1", 1)).unwrap();
+        let update = pb::ReasoningDeltaNtf {
+            session_id: "s1".into(),
+            message_id: "m1".into(),
+            tool_call_id: String::new(),
+            revision: 2,
+            block: Some(pb::ReasoningBlock {
+                id: "b1".into(),
+                run_id: "r1".into(),
+                model_id: "flash".into(),
+                text: "first".into(),
+                status: "streaming".into(),
+            }),
+        };
+        assert!(cache.reasoning(update.clone()).unwrap());
+        assert!(cache.reasoning(update.clone()).unwrap());
+        assert_eq!(cache.sessions["s1"].messages[0].reasoning[0].text, "first");
+        assert!(!cache
+            .reasoning(pb::ReasoningDeltaNtf {
+                revision: 4,
+                ..update.clone()
+            })
+            .unwrap());
+        let mut completed = update;
+        completed.revision = 3;
+        completed.block.as_mut().unwrap().text.clear();
+        completed.block.as_mut().unwrap().status = "cancelled".into();
+        assert!(cache.reasoning(completed).unwrap());
+        assert_eq!(
+            cache.sessions["s1"].messages[0].reasoning[0].status,
+            "cancelled"
+        );
+        assert_eq!(cache.sessions["s1"].messages[0].reasoning[0].text, "first");
+    }
+    #[test]
+    fn tools_update_completed_messages_and_require_continuous_versions() {
+        let mut cache = Cache {
+            username: "alice".into(),
+            ..Default::default()
+        };
+        cache.snapshot(snapshot("u1", 1)).unwrap();
+        cache.sessions.get_mut("s1").unwrap().run_id.clear();
+        let update = pb::ToolUpdatedNtf {
+            session_id: "s1".into(),
+            message_id: "m1".into(),
+            revision: 2,
+            tool: Some(pb::ToolCall {
+                id: "t1".into(),
+                name: "exec_command".into(),
+                status: "running".into(),
+                output: "background".into(),
+                ..Default::default()
+            }),
+        };
+        assert!(cache.tool(update.clone()).unwrap());
+        assert!(cache.tool(update.clone()).unwrap());
+        assert_eq!(cache.sessions["s1"].messages[0].tool_calls.len(), 1);
+        assert!(!cache
+            .tool(pb::ToolUpdatedNtf {
+                revision: 4,
+                ..update
+            })
+            .unwrap());
+        assert_eq!(cache.sessions["s1"].revision, 2);
+    }
     pub fn snapshot(id: &str, revision: u32) -> pb::UserSnapshot {
         pb::UserSnapshot {
+            models: vec![],
             user_id: id.into(),
             username: "alice".into(),
             sessions: vec![pb::SessionState {

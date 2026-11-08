@@ -373,6 +373,14 @@ test('切换用户入口提供可访问的用户名表单', async ({ page }) => 
   await page.getByRole('button', { name: '切换用户', exact: true }).click()
   const field = page.getByRole('textbox', { name: '用户名', exact: true })
   await field.fill('另一用户')
+  const enter = page.getByRole('button', { name: '进入', exact: true })
+  await expect(enter).toBeEnabled()
+  // 扫描稳定的启用状态，避免把 disabled→enabled 的颜色过渡帧当成最终配色。
+  await enter.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    )
+  })
   const results = await new AxeBuilder({ page }).analyze()
   expect(
     results.violations.filter((item) => ['critical', 'serious'].includes(item.impact ?? '')),

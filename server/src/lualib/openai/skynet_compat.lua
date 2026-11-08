@@ -26,6 +26,17 @@ function module.install(timeout_ticks)
     package.loaded["socket.url"] = url
 end
 
+---@param timeout_ticks integer?
+---@return table
+function module.new_http_client(timeout_ticks)
+    -- httpc captures its timeout through a module upvalue. A request-local module
+    -- keeps independent Agent and permission deadlines without changing Skynet.
+    local path = assert(package.searchpath("http.httpc", package.path))
+    local client = assert(loadfile(path))()
+    client.timeout = timeout_ticks or 12000
+    return client
+end
+
 ---@param source openai.ltn12.Source?
 ---@return string|nil
 ---@return string|nil
@@ -67,7 +78,7 @@ end
 ---@return integer|nil
 ---@return any
 ---@return table<string, string>|nil
-function module.request(options, request)
+function module.request(options, request, client)
     assert(type(options) == "table", "HTTP request options 必须是 table")
     assert(type(options.url) == "string" and options.url ~= "", "HTTP request URL 不能为空")
     assert(type(options.method) == "string" and options.method ~= "", "HTTP request method 不能为空")
@@ -84,7 +95,6 @@ function module.request(options, request)
     if source_error then
         return nil, "读取 HTTP 请求体失败: " .. tostring(source_error)
     end
-
     local headers = request_headers(options.headers)
     headers.Host = parsed.authority
 
@@ -93,9 +103,10 @@ function module.request(options, request)
         path = path .. "?" .. parsed.query
     end
     local target = parsed.scheme .. "://" .. parsed.authority
-    local deadline = skynet.now() + (httpc.timeout or 12000)
+    client = client or httpc
+    local deadline = skynet.now() + (client.timeout or 12000)
     local request_ok, stream = pcall(
-        httpc.request_stream,
+        client.request_stream,
         options.method,
         target,
         path,

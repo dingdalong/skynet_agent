@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Adapted from Beautiful UI Vue: /agent/components/loading-state.vue.txt.
+// Adapted from http://localhost:5173/beautiful-ui-vue/agent/components/loading-state.vue.txt.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export type LoadingVariant = 'Drive' | 'Dots' | 'Orbit'
