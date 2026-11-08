@@ -13,19 +13,21 @@ help:
 	@printf '%s\n' \
 		"Skynet Agent" \
 		"" \
-		"  make install        安装客户端依赖" \
+		"  make install        安装客户端依赖并生成 Token" \
 		"  make dev            启动桌面 App 开发模式（服务端单独启动）" \
 		"  make build          构建当前平台服务端和桌面 App" \
-		"  make check          日常检查：两端检查、单测及 macOS 原生主链路" \
-		"  make check-full     完整检查：追加服务端集成、Web 全链路和多浏览器 UI" \
+		"  make check          基础回归：两端静态检查与单元测试" \
+		"  make check-full     完整检查：追加服务端集成、原生/Web 全链路及多浏览器 UI" \
 		"  make proto-generate 从 common/proto 生成客户端协议代码" \
 		"  make help           显示命令说明" \
 		"" \
+		"任务收尾还须完成本次改动的端到端测试，详见编码与协作规范.md。" \
 		"服务管理：./server/start.sh；./server/control.sh status|stop|force-stop [端口]" \
 		"专项命令：make -C server help；pnpm --dir client run"
 
 install:
 	@pnpm --dir "$(CLIENT_DIR)" install
+	@pnpm --dir "$(CLIENT_DIR)" tokens
 
 dev:
 	@pnpm --dir "$(CLIENT_DIR)" dev:desktop
@@ -35,13 +37,13 @@ build:
 	@pnpm --dir "$(CLIENT_DIR)" build:desktop
 
 check:
-	@$(MAKE) -C "$(SERVER_DIR)" build check-format test
+	@$(MAKE) -C "$(SERVER_DIR)" check-format test
 	@pnpm --dir "$(CLIENT_DIR)" check
 	@pnpm --dir "$(CLIENT_DIR)" check:native
-	@pnpm --dir "$(CLIENT_DIR)" test:native
 
 check-full: check
 	@$(MAKE) -C "$(SERVER_DIR)" test-integration
+	@pnpm --dir "$(CLIENT_DIR)" test:native
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e:full
 	@pnpm --dir "$(CLIENT_DIR)" --filter @skynet/design-system build-storybook
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e

@@ -21,7 +21,8 @@ make check-full
 make proto-generate
 ```
 
-`make build` 构建当前平台服务端和桌面 App；`make dev` 仅启动桌面客户端开发模式，
+首次运行 `make install` 安装客户端依赖并生成开发所需的 Token。日常使用 `make dev` 启动桌面
+App，Web 可同时访问它启动的开发服务器；`make build` 构建当前平台服务端和桌面 App，供打包态验收。
 服务端在另一个终端通过脚本单独启动：
 
 ```bash
@@ -261,29 +262,36 @@ make -C server build
 
 ## 测试
 
-日常以 macOS App 为主要体验验证平台，运行：
+验收规则统一见[编码与协作规范](编码与协作规范.md#测试用例)。基础回归使用：
 
 ```bash
 make check
 ```
 
-该命令依次构建服务端，执行两端格式与静态检查、Lua 和 TypeScript 单测、Rust 核心测试，
-并通过独立 macOS App 夹具验证原生主链路。夹具覆盖页面重载、草稿、请求编号、失败重试、
-取消、断线重连及切换用户。单元测试使用 Busted，需要提前运行 `luarocks install busted`。
+该命令执行两端格式与静态检查，以及 Lua、TypeScript、Rust 单测，包含测试所需的 C 模块和
+Rust 编译。Lua 单元测试使用 Busted，需要提前运行 `luarocks install busted`。
 
-阶段收尾和发布前执行完整检查：
+每个任务还必须完成覆盖本次改动的端到端验收。客户端业务按改动选择原生夹具或 Web 真实网关链路：
+
+```bash
+make -C server build
+pnpm --dir client test:native
+pnpm --dir client test:e2e:full
+```
+
+原生夹具运行整组场景，驱动真实 Vue 页面和 Rust 核心；Web 全链路可在命令后追加
+`--grep '<场景名称或正则表达式>'` 筛选本次场景，其他 Playwright 参数也会原样传递。
+
+完整检查使用：
 
 ```bash
 make check-full
 ```
 
-完整检查先运行日常检查，再追加服务端全部专项集成、Web 真实网关全链路、Storybook 构建和
-Chromium、WebKit、移动视口 UI 回归。固定端口测试与会生成资源的构建顺序执行。
+完整检查先运行基础回归，再追加服务端全部专项集成、macOS 原生夹具、Web 真实网关全链路、
+Storybook 构建和 Chromium、WebKit、移动视口 UI 回归。原生夹具会生成前端测试资源；固定端口
+测试与会生成资源的构建顺序执行。
 测试使用隔离配置和本地假模型，不调用付费模型；执行前需安装客户端依赖及 Playwright 浏览器。
-
-共享界面修改不要求每次全平台人工回归；Web 与 Rust 运行时修改时运行对应测试，平台相关改动
-及时验证受影响平台，发布前分别验收本次支持的平台。开发态 App 可用于日常验证；涉及 Rust
-或构建时注入配置的改动需重启开发进程，打包态验收必须使用最新构建产物。
 
 专项检查直接使用子项目入口：
 
@@ -293,8 +301,6 @@ make -C server test
 make -C server test-integration
 pnpm --dir client check
 pnpm --dir client check:native
-pnpm --dir client test:native
-pnpm --dir client test:e2e:full
 pnpm --dir client test:e2e
 ```
 

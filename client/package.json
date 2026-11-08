@@ -10,7 +10,7 @@
     "proto:generate": "node scripts/generate-protocol.mjs",
     "proto:check": "node scripts/generate-protocol.mjs --check",
     "storybook": "pnpm --filter @skynet/design-system storybook",
-    "build": "pnpm tokens && pnpm --filter @skynet/design-system build && pnpm build:app",
+    "build": "pnpm --filter @skynet/design-system build && pnpm build:app",
     "build:app": "vite build",
     "build:desktop": "node scripts/run-desktop.mjs build",
     "tokens": "pnpm --filter @skynet/design-system tokens",
@@ -23,7 +23,7 @@
     "test:native": "./tests/native/run-native.sh",
     "test:e2e:full": "./tests/e2e-fullstack/run-fullstack.sh",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm proto:check && pnpm tokens:check && pnpm typecheck && pnpm build:app && pnpm test && ./tools/check_format.sh",
+    "check": "pnpm format:check && pnpm lint && pnpm proto:check && pnpm tokens:check && pnpm typecheck && pnpm test && ./tools/check_format.sh",
     "tauri": "node scripts/run-desktop.mjs"
   },
   "dependencies": {

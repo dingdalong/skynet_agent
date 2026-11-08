@@ -251,7 +251,8 @@ Web 的会话选择按用户名保存在 sessionStorage，草稿仅保留页面�
 当前没有身份认证，非回环监听限于受控网络；对公网发布前需要认证、授权、限流和连接配额。
 Tauri 不启用 shell、文件系统或任意命令插件，WSS 证书配置由反向代理管理。
 
-`make check` 覆盖两端格式与静态检查、Lua、TypeScript 和 Rust 单测，以及 macOS 原生聊天主链路。
-`make check-full` 在此基础上追加服务端全部专项集成、Web 真实网关全链路、Storybook 构建及
+`make check` 覆盖两端格式与静态检查，以及 Lua、TypeScript 和 Rust 单测。
+`make check-full` 在此基础上追加服务端全部专项集成、原生与 Web 真实网关全链路、Storybook 构建及
 多浏览器 UI 回归。服务端专项测试直接使用 `make -C server`，客户端专项测试使用 `pnpm --dir client`。
+任务端到端验收要求统一见[编码与协作规范](../../编码与协作规范.md#测试用例)。
 假模型可稳定复现取消、供应商失败和停滞流超时，不消耗真实模型额度。
