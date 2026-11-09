@@ -5,6 +5,7 @@ local log = require("log")
 local codes = require("enum.error_code")
 local skynet = require("skynet")
 local username = require("helper.username")
+local Prompts = require("agent.prompts")
 
 ---@class client.ConnectionState
 ---@field user user.User
@@ -15,6 +16,7 @@ local username = require("helper.username")
 ---@field users table<string, user.User>
 ---@field connections table<string, client.ConnectionState>
 ---@field pending_runs table<user.Run, boolean>
+---@field prompt_templates agent.PromptTemplates?
 local ClientService = class()
 
 ClientService.commands = { open = "open", handle_request = "handle_request", disconnect = "disconnect" }
@@ -24,6 +26,13 @@ function ClientService:ctor()
     self.users = {}
     self.connections = {}
     self.pending_runs = {}
+    self.prompt_templates = nil
+end
+
+function ClientService:init()
+    assert(not self.prompt_templates, "Agent 提示词模板已经加载")
+    self.prompt_templates = Prompts.load_templates()
+    log.info("client", "init", "Agent 提示词模板已加载")
 end
 
 ---@param user user.User

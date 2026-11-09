@@ -107,7 +107,7 @@ static int temporary_file(lua_State *L) {
     return 1;
 }
 
-/* Walk each parent through descriptors so a swapped symlink cannot redirect a write. */
+/* Walk each parent through descriptors so a swapped symlink cannot redirect file access. */
 static int parent_directory(const char *path, char **storage, char **name) {
     if (path[0] != '/') { errno = EINVAL; return -1; }
     *storage = strdup(path + 1);
@@ -134,6 +134,41 @@ static int parent_directory(const char *path, char **storage, char **name) {
         return -1;
     }
     return fd;
+}
+
+static int read_file(lua_State *L) {
+    const char *path = luaL_checkstring(L, 1);
+    lua_Integer limit = luaL_checkinteger(L, 2);
+    luaL_argcheck(L, limit >= 0 && (lua_Unsigned)limit < (size_t)-1, 2, "invalid read limit");
+    char *storage = NULL, *name;
+    int directory = parent_directory(path, &storage, &name);
+    if (directory < 0) return luaL_error(L, "read parent: %s", strerror(errno));
+    /* O_NONBLOCK prevents a concurrent replacement with a FIFO from blocking the service. */
+    int fd = openat(directory, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    int code = fd < 0 ? errno : 0;
+    close(directory); free(storage);
+    if (code) return luaL_error(L, "open file: %s", strerror(code));
+    struct stat metadata;
+    if (fstat(fd, &metadata) < 0) code = errno;
+    else if (!S_ISREG(metadata.st_mode)) code = EINVAL;
+    if (code) { close(fd); return luaL_error(L, "read file: %s", strerror(code)); }
+    luaL_Buffer result;
+    luaL_buffinit(L, &result);
+    size_t remaining = (size_t)limit + 1;
+    char buffer[8192];
+    while (remaining > 0) {
+        size_t requested = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+        ssize_t count = read(fd, buffer, requested);
+        if (count < 0 && errno == EINTR) continue;
+        if (count < 0) { code = errno; break; }
+        if (count == 0) break;
+        luaL_addlstring(&result, buffer, (size_t)count);
+        remaining -= (size_t)count;
+    }
+    if (close(fd) < 0 && !code) code = errno;
+    if (code) return luaL_error(L, "read file: %s", strerror(code));
+    luaL_pushresult(&result);
+    return 1;
 }
 
 static int atomic_write(lua_State *L) {
@@ -250,6 +285,7 @@ int luaopen_agent_process(lua_State *L) {
         {"fds", fds}, {"__gc", release}, {NULL, NULL}};
     luaL_setfuncs(L, methods, 0); lua_pushvalue(L, -1); lua_setfield(L, -2, "__index");
     const luaL_Reg functions[] = {{"spawn", spawn_process}, {"realpath", real_path},
-        {"temporary_file", temporary_file}, {"atomic_write", atomic_write}, {"remove_file", remove_file}, {NULL, NULL}};
+        {"temporary_file", temporary_file}, {"read_file", read_file}, {"atomic_write", atomic_write},
+        {"remove_file", remove_file}, {NULL, NULL}};
     luaL_newlib(L, functions); return 1;
 }

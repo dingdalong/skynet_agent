@@ -33,7 +33,7 @@ local function common_config()
         agent = {
             default_model_id = "e2e-test-model",
             models = { { id = "e2e-test-model", name = "测试模型", model = "e2e-test-model" } },
-            system_prompt = "测试系统提示",
+            project_instructions_max_bytes = 32768,
             tools = { workspace_root = "./work_dir", timeout_ms = 300000, max_processes = 8,
                 max_output_bytes = 1048576, },
             permission = { rules_enabled = true, timeout_ticks = 3000 },
@@ -142,6 +142,15 @@ describe("etc.cfg", function()
         assert.is_nil(config.agent.llm.api_key)
     end)
 
+    it("允许通过零字节上限关闭项目规则自动读取", function()
+        local common = common_config()
+        common.agent.project_instructions_max_bytes = 0
+
+        local config = loader.build(common, channel_config(), "test")
+
+        assert.are.equal(0, config.agent.project_instructions_max_bytes)
+    end)
+
     it("未覆盖实例数时使用 Skynet 工作线程数", function()
         local common = common_config()
         local channel = channel_config()
@@ -207,9 +216,11 @@ describe("etc.cfg", function()
     end)
 
     it("拒绝无效的 Agent 配置", function()
-        assert_build_error(loader.build, function(common)
-            common.agent.system_prompt = ""
-        end, "agent.system_prompt")
+        for _, limit in ipairs({ -1, 1.5, "32768" }) do
+            assert_build_error(loader.build, function(common)
+                common.agent.project_instructions_max_bytes = limit
+            end, "agent.project_instructions_max_bytes")
+        end
         assert_build_error(loader.build, function(common)
             common.agent.max_message_length = 0
         end, "agent.max_message_length")

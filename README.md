@@ -73,18 +73,23 @@ Skynet 进程读取，不进入客户端。
 ## 模型连续对话
 
 `agent.agent` 导出 Agent 类，保存完整对话历史，并在首次 `chat` 时根据最新配置延迟创建 LLM 客户端。
-构造时传入的 system prompt 会作为首条 `role=system` 消息发送，不使用 Responses API 的
-顶层 `instructions` 参数。
+`agent.prompts` 加载 Markdown 模板，基础行为作为首条 `role=system` 消息发送；启用工具时，
+工具、权限与会话环境使用 developer 消息。模板在服务初始化时加载一次，不使用 Responses API
+的顶层 `instructions` 参数。
 
 ```lua
 local Agent = require("agent.agent")
+local Prompts = require("agent.prompts")
+
+-- 服务初始化时加载，创建 Agent 时复用。
+local prompt_templates = Prompts.load_templates()
 
 local agent = Agent:new({
     api_key = api_key,
     base_url = base_url,
     model = model,
     request_timeout_ticks = request_timeout_ticks,
-}, "你是一个简洁、可靠的中文助手。")
+}, prompt_templates)
 
 local text, err = agent:chat("介绍一下 Lua", function(delta)
     io.write(delta)
@@ -94,6 +99,12 @@ end)
 运行时可通过 `agent:set_llm(llm_config, permission_config)` 更新配置，已有历史继续保留。
 已发出的模型请求使用原配置，下一次模型请求按需创建新客户端；主模型与权限模型分别管理客户端。
 同一个 Agent 对象的 `chat` 需要由调用方串行执行。
+
+网关会话自动加载会话根目录的 `AGENTS.override.md` 或 `AGENTS.md`，前者优先。
+`agent.project_instructions_max_bytes` 为非负整数字节上限，`0` 关闭自动加载；超限或读取错误会使任务失败。
+每次新用户任务重新检查规则，本轮调用与失败重试使用同一快照。更新和失效通知只追加到历史，
+不改写已有消息；子目录规则由 Agent 使用工具读取。项目规则不能提高工具权限。
+模板职责、指令优先级和接入方式见 [Agent 提示词](docs/architecture/PROMPTS.md)。
 
 ## 会话模型与思考
 
@@ -314,6 +325,8 @@ pnpm --dir client test:e2e:full
 主模型和权限模型复用 `server/.env`（或 `SKYNET_ENV_FILE`）中的凭据。模型配置沿用开发渠道，
 可通过 `DEEPSEEK_BASE_URL` 和 `DEEPSEEK_MODEL` 覆盖。缺少凭据或真实调用失败时测试失败，不回退假模型。
 测试启动隔离的服务端、会话目录和本地联网夹具；脱敏结果保存在 `client/test-artifacts/real-model/`。
+共享真实页面场景同时验证根项目规则的新轮次加载与更新、子目录规则读取和成果文件；
+独立权限场景验证项目规则伪造授权不能放行越权动作。
 Web 全链路可在命令后追加
 `--grep '<场景名称或正则表达式>'` 筛选本次场景，其他 Playwright 参数也会原样传递。
 

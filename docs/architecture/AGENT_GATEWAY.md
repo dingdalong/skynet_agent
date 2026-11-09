@@ -26,6 +26,8 @@ flowchart LR
 
 服务池实例数表示承载容量；连接数、用户数与智能体数分别描述。每个会话持有一个 Agent。
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
+client 服务初始化时加载共享提示词模板，创建会话时与工具、权限和工作目录配置一起交给 Agent。
+基础行为、运行时环境与项目规则分别组装，详见 [Agent 提示词](PROMPTS.md)。
 
 ## 服务生命周期
 
@@ -163,15 +165,16 @@ client 服务以 WebSocket 的消息来源地址校验连接归属，再按协�
 服务器配置由 `server/etc/cfg/common.lua` 和 `channel/<name>.lua` 合并并统一校验，渠道通过
 `SKYNET_CFG_CHANNEL` 选择。配置在启动时加载，变更后重启。
 
-| 配置                                | 可用值 / 含义                                                               |
-| ----------------------------------- | --------------------------------------------------------------------------- |
-| `runtime.control_port`              | 1..65535，仅回环监听的管理端口                                              |
-| `agent_gateway.socket`              | `host`、`port`、以 `/` 开头的 `path`                                        |
-| `agent_gateway.instance`            | `client`、`logind`、`websocket` 各为 1..32                                  |
-| `agent_gateway.login_timeout_ticks` | 正整数，未绑定连接的存活时间                                                |
-| `agent.llm`                         | `api_key`、`base_url`、`model`、正整数 `request_timeout_ticks`              |
-| `agent`                             | 非空 `system_prompt`，正整数 `max_message_length` 与 `session_title_length` |
-| `protocol.agent_gateway_schema_dir` | schema 目录                                                                 |
+| 配置                                   | 可用值 / 含义                                                  |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `runtime.control_port`                 | 1..65535，仅回环监听的管理端口                                 |
+| `agent_gateway.socket`                 | `host`、`port`、以 `/` 开头的 `path`                           |
+| `agent_gateway.instance`               | `client`、`logind`、`websocket` 各为 1..32                     |
+| `agent_gateway.login_timeout_ticks`    | 正整数，未绑定连接的存活时间                                   |
+| `agent.llm`                            | `api_key`、`base_url`、`model`、正整数 `request_timeout_ticks` |
+| `agent`                                | 正整数 `max_message_length` 与 `session_title_length`          |
+| `agent.project_instructions_max_bytes` | 非负整数，自动加载根项目规则的字节上限；`0` 关闭自动加载       |
+| `protocol.agent_gateway_schema_dir`    | schema 目录                                                    |
 
 所有 `_ticks` 时间单位为厘秒。模型请求使用从发送到流结束的总截止时间，包含停滞流；超时后关闭
 供应商连接并释放该会话的本轮占用。客户端发送命令只等待接受确认，任务通过推送跟踪。
@@ -295,6 +298,9 @@ Web 与原生核心均检查版本连续性，出现缺口获取完整快照，�
 模型原始输出用于上下文续接，工具权限思考不混入主模型工具结果。
 
 公共提示和工具定义保持稳定，会话环境位于公共前缀之后，历史与工具结果只追加。
-权限输入按固定字段顺序拼接历史文本，当前动作及原始参数置于末尾，不对历史做 JSON 排序。
+根项目规则在新用户任务开始时读取，变化时追加替换或失效通知，本轮调用与失败重试共用规则快照。
+应用、项目规则和直接用户输入的来源保存在内部历史中，发送供应商请求前去除内部来源字段。
+权限模型使用独立提示词，按固定字段顺序提供带来源的历史证据，当前动作及原始参数置于末尾；
+主模型的 system/developer 内容和项目授权声明不会作为权限模型的高级指令重放，不对历史做 JSON 排序。
 HTTP 直接转发 SDK 编码的请求体，JSON 编解码直接复用 `cjson`。
 模型用量按主模型与权限模型分别记录；命中以供应商实际返回的 cached tokens 为准。

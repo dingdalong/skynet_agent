@@ -3,15 +3,18 @@ local codes = require("enum.error_code")
 local status = require("enum.message_status")
 
 describe("用户与客户端服务", function()
-    local scope, service, tasks, events, model, next_id, random_id
+    local scope, service, tasks, events, model, next_id, random_id, templates, template_loads
     before_each(function()
         tasks, events, next_id, random_id = {}, {}, 0, 0
+        templates, template_loads = { base = "测试基础提示", permission_judge = "测试权限提示" }, 0
         model = { text = "回答" }
         local Agent = require("class")()
-        function Agent:ctor()
+        function Agent:ctor(_, prompt_templates, options)
             self.messages = {}
             self.llm_config = nil
             self.permission_config = nil
+            self.templates = prompt_templates
+            self.options = options
         end
         function Agent:set_llm(main, permission)
             self.llm_config, self.permission_config = main, permission
@@ -34,7 +37,11 @@ describe("用户与客户端服务", function()
                 hexencode = function(value) return value end,
             },
             ["agent.agent"] = Agent,
-            ["etc.cfg"] = { agent = { llm = { api_key = "test" }, system_prompt = "test",
+            ["agent.prompts"] = { load_templates = function()
+                template_loads = template_loads + 1
+                return templates
+            end },
+            ["etc.cfg"] = { agent = { llm = { api_key = "test" }, project_instructions_max_bytes = 32768,
                 tools = { workspace_root = "/test" }, permission = {},
                 default_model_id = "test", models = {
                     { id = "test", name = "测试", model = "test" },
@@ -51,6 +58,7 @@ describe("用户与客户端服务", function()
             end },
         })
         service = require("client"):new()
+        service:init()
     end)
     after_each(function() scope:restore() end)
 
@@ -59,6 +67,27 @@ describe("用户与客户端服务", function()
         args.session_id, args.text = session_id, text
         service:handle_request({ source = 100 }, connection or "a", 2, "MessageSendReq", args)
     end
+
+    it("服务初始化加载一次模板，各会话共享启动快照与项目规则上限", function()
+        service:open(nil, "a", 100, "alice")
+        local user = service.users.alice
+        user:SessionCreateReq()
+
+        assert.are.equal(1, template_loads)
+        for _, session in pairs(user.sessions) do
+            assert.are.equal(templates, session.agent.templates)
+            assert.are.equal(32768, session.agent.options.project_instructions_max_bytes)
+        end
+        assert.has_error(function() service:init() end, "Agent 提示词模板已经加载")
+    end)
+
+    it("模板读取失败使初始化失败，服务不保留半份模板", function()
+        local uninitialized = require("client"):new()
+        require("agent.prompts").load_templates = function() error("模板文件无法读取", 0) end
+
+        assert.has_error(function() uninitialized:init() end, "模板文件无法读取")
+        assert.is_nil(uninitialized.prompt_templates)
+    end)
 
     it("运行中按会话切换模型，权限跟随或使用配置中的固定模型", function()
         local snapshot = service:open(nil, "a", 100, "alice")
@@ -160,7 +189,9 @@ describe("用户与客户端服务", function()
     it("服务计数重新开始时，新用户 ID 也不能复用旧 ID", function()
         local previous = service:open(nil, "a", 100, "alice")
         next_id = 0
-        local restarted = require("client"):new():open(nil, "a", 100, "alice")
+        local restarted_service = require("client"):new()
+        restarted_service:init()
+        local restarted = restarted_service:open(nil, "a", 100, "alice")
         assert.are_not.equal(previous.user_id, restarted.user_id)
     end)
 

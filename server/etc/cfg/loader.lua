@@ -23,7 +23,7 @@ local Loader = {}
 ---@field login_timeout_ticks integer
 
 ---@class server.AgentConfig
----@field system_prompt string
+---@field project_instructions_max_bytes integer
 ---@field max_message_length integer
 ---@field session_title_length integer
 ---@field default_model_id string
@@ -113,7 +113,7 @@ local function validate(config)
     integer_field(instance.websocket, "agent_gateway.instance.websocket", 1, 32)
 
     local agent = table_field(config.agent, "agent")
-    string_field(agent.system_prompt, "agent.system_prompt")
+    integer_field(agent.project_instructions_max_bytes, "agent.project_instructions_max_bytes", 0)
     integer_field(agent.max_message_length, "agent.max_message_length", 1)
     integer_field(agent.session_title_length, "agent.session_title_length", 1)
     local tools = table_field(agent.tools, "agent.tools")

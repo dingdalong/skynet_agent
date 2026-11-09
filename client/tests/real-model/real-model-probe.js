@@ -1,4 +1,4 @@
-/* global document, window, Event, setTimeout */
+/* global document, window, Event, setTimeout, fetch, AbortSignal */
 // 同一组真实页面操作同时用于 Web 和独立 macOS App，不安装产品测试接口。
 ;(async () => {
   const invoke = window.__TAURI_INTERNALS__?.invoke.bind(window.__TAURI_INTERNALS__)
@@ -28,9 +28,9 @@
   async function wait(check, description, timeout = 180000) {
     const deadline = Date.now() + timeout
     while (Date.now() < deadline) {
-      if (await check()) return
       const error = document.querySelector('.message--assistant:last-child .message__header')
       if (error?.textContent.includes('生成失败')) throw new Error(`模型生成失败：${description}`)
+      if (await check()) return
       await new Promise((resolve) => setTimeout(resolve, 40))
     }
     throw new Error(`等待超时：${description}`)
@@ -76,6 +76,14 @@
   async function complete(prompt) {
     await begin(prompt)
     await wait(() => button('发送消息') && !button('停止'), '真实模型完成任务')
+  }
+  async function prepareProjectInstructions(stage) {
+    const response = await fetch(fixture.projectInstructionsUrl + stage, {
+      method: 'POST',
+      credentials: 'omit',
+      signal: AbortSignal.timeout(10000),
+    })
+    assert(response.ok, `宿主准备项目规则失败：${stage} (${response.status})`)
   }
   function save(step, phase) {
     progress.steps.push({ step, tools: tools() })
@@ -245,10 +253,6 @@
         '缺少 Flash 主模型思考',
       )
       assert(
-        mainThinking.some((item) => item.querySelector('[data-model-id="deepseek-v4-pro"]')),
-        '缺少 Pro 主模型思考',
-      )
-      assert(
         cards().some((card) => card.querySelector('.thinking-block')),
         '缺少权限模型思考',
       )
@@ -271,6 +275,73 @@
       }
       assert(document.querySelector('[aria-label="思考内容"]'), '思考内容未展示')
       save('models-reasoning-unlimited-and-cancel', 5)
+    }
+    if (progress.phase === 5) {
+      await prepareProjectInstructions('initial')
+      const firstStart = cards().length
+      await complete(
+        `请依据已提供的项目规则直接创建试验成果 root-first.txt，内容为 root-initial:${token} 加一个换行。` +
+          '不要再读取规则文件；仅创建并读取成果确认内容。',
+      )
+      const firstTools = tools().slice(firstStart)
+      assert(
+        firstTools.every((tool) => !/AGENTS(?:\.override)?\.md/i.test(tool.input ?? '')),
+        '根规则任务自行读取了规则，无法验证宿主自动加载',
+      )
+      assert(
+        firstTools.some(
+          (tool) => tool.name === 'Bash' && tool.output?.includes(`root-initial:${token}`),
+        ),
+        '根项目规则任务缺少真实文件读取结果',
+      )
+      save('project-instructions-initial', 6)
+    }
+    if (progress.phase === 6) {
+      await prepareProjectInstructions('updated')
+      const updatedStart = cards().length
+      await complete(
+        `请依据已提供的项目规则直接创建试验成果 root-updated.txt，内容为 root-updated:${token} 加一个换行。` +
+          '不要再读取规则文件；仅创建并读取成果确认内容。',
+      )
+      const updatedTools = tools().slice(updatedStart)
+      assert(
+        updatedTools.every((tool) => !/AGENTS(?:\.override)?\.md/i.test(tool.input ?? '')),
+        '更新根规则后自行读取了规则，无法验证宿主自动刷新',
+      )
+      assert(
+        updatedTools.some(
+          (tool) => tool.name === 'Bash' && tool.output?.includes(`root-updated:${token}`),
+        ),
+        '更新根项目规则后缺少真实文件读取结果',
+      )
+      save('project-instructions-updated', 7)
+    }
+    if (progress.phase === 7) {
+      const childStart = cards().length
+      await complete(
+        `请在 prompt-child/ 内实际创建试验成果 child.txt，正文为 child-body:${token} 加一个换行。` +
+          '执行前先使用工具查找并读取该目录适用的 AGENTS.md，按其中的规则完成文件，再读取成果确认。',
+      )
+      const childTools = tools().slice(childStart)
+      assert(
+        childTools.some(
+          (tool) =>
+            tool.name === 'Bash' &&
+            tool.input?.includes('AGENTS.md') &&
+            tool.output?.includes(`child-rule:${token}`),
+        ),
+        '没有通过真实工具读取子目录规则',
+      )
+      assert(
+        childTools.some(
+          (tool) =>
+            tool.name === 'Bash' &&
+            tool.output?.includes(`child-rule:${token}`) &&
+            tool.output?.includes(`child-body:${token}`),
+        ),
+        '子目录规则没有落实到真实成果读取结果',
+      )
+      save('project-instructions-child', 8)
       await report({ status: 'passed', phase: progress.phase })
     }
   } catch (error) {

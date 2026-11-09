@@ -1,6 +1,7 @@
 //! 独立原生重载测试夹具，不向正式 App 增加测试接口。
 use skynet_agent_lib::chat::{self, ChatCore, Event};
 use std::{
+    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -9,6 +10,7 @@ use std::{
         Arc,
     },
 };
+use tauri::utils::config::{Csp, CspDirectiveSources};
 use tauri::{Manager, State, WebviewWindow};
 
 struct Probe {
@@ -115,6 +117,27 @@ fn main() {
     };
     let mut context = tauri::generate_context!();
     context.config_mut().identifier = "com.skynet.agent.chatprobe".into();
+    if !integration {
+        let fixture: serde_json::Value = serde_json::from_str(
+            &std::env::var("AGENT_REAL_FIXTURE").expect("真实模型夹具配置缺失"),
+        )
+        .unwrap();
+        let origin = url::Url::parse(fixture["projectInstructionsUrl"].as_str().unwrap())
+            .unwrap()
+            .origin()
+            .ascii_serialization();
+        let security = &mut context.config_mut().app.security;
+        for policy in [&mut security.csp, &mut security.dev_csp] {
+            if let Some(csp) = policy.take() {
+                let mut directives: HashMap<String, CspDirectiveSources> = csp.into();
+                directives
+                    .entry("connect-src".into())
+                    .or_default()
+                    .push(&origin);
+                *policy = Some(Csp::from(directives));
+            }
+        }
+    }
     let app = skynet_agent_lib::builder()
         .manage(probe.clone())
         .invoke_handler(tauri::generate_handler![

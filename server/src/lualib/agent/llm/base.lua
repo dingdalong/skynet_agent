@@ -11,6 +11,7 @@ local log = require("log")
 ---@field name string?
 ---@field arguments string?
 ---@field output string?
+---@field source 'app'|'project'|'user'|'model'|'tool'|nil 内部宿主来源，不发送给模型供应商
 
 ---@class llm.Response
 ---@field output llm.Message[]
@@ -242,7 +243,13 @@ local function stream_responses(client, input, on_text_delta, request, options, 
     client.current_request = request
     local request_options = table.copy(options or {})
     request_options.stream = true
-    local ok, status, body = pcall(client.create_response, client, input, request_options, on_event)
+    local messages = {}
+    for index, item in ipairs(input) do
+        local message = table.copy(item)
+        message.source = nil
+        messages[index] = message
+    end
+    local ok, status, body = pcall(client.create_response, client, messages, request_options, on_event)
     client.current_request = nil
     if request.cancelled then
         return nil, "用户已取消生成"

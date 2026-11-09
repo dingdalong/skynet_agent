@@ -4,6 +4,7 @@ local luassert = assert
 
 local FakeLlm = require("tests.support.fake_llm")
 local Agent
+local templates = { base = "保持简洁", tools = "工具", permissions = "权限", permission_judge = "判断" }
 local fake_llm
 local scope
 
@@ -30,7 +31,7 @@ describe("agent", function()
             base_url = "https://api.deepseek.com",
             model = "deepseek-flash",
         }
-        local agent = Agent:new(llm_config, "保持简洁")
+        local agent = Agent:new(llm_config, templates)
 
         luassert.are.equal(Agent, getmetatable(agent))
         luassert.are.equal(0, #fake_llm.new_configs)
@@ -49,9 +50,9 @@ describe("agent", function()
             { role = "user", content = "介绍自己" },
         }, fake_llm.requests[1].input)
         luassert.are.same({
-            { role = "system", content = "保持简洁" },
-            { role = "user", content = "介绍自己" },
-            { role = "assistant", content = "你好" },
+            { role = "system", content = "保持简洁", source = "app" },
+            { role = "user", content = "介绍自己", source = "user" },
+            { role = "assistant", content = "你好", source = "model" },
         }, agent.messages)
     end)
 
@@ -63,7 +64,7 @@ describe("agent", function()
             api_key = "secret",
             base_url = "https://api.deepseek.com",
             model = "deepseek-flash",
-        }, "保持简洁")
+        }, templates)
 
         local first_text, first_error = agent:chat("第一问", no_text_delta)
         luassert.is_nil(first_error)
@@ -90,7 +91,7 @@ describe("agent", function()
             api_key = "first-secret",
             base_url = "https://first.example.com",
             model = "first-model",
-        }, "保持简洁")
+        }, templates)
         local first_text, first_error = agent:chat("第一问", no_text_delta)
         luassert.is_nil(first_error)
         luassert.are.equal("回答1", first_text)
@@ -127,13 +128,13 @@ describe("agent", function()
             api_key = "secret",
             base_url = "https://api.deepseek.com",
             model = "deepseek-flash",
-        }, "保持简洁")
+        }, templates)
 
         local text, err = agent:chat("第一问", no_text_delta)
         luassert.is_nil(text)
         luassert.matches("创建 LLM 客户端失败", assert(err))
         luassert.are.same({
-            { role = "system", content = "保持简洁" },
+            { role = "system", content = "保持简洁", source = "app" },
         }, agent.messages)
 
         fake_llm.new_error = nil
@@ -141,9 +142,9 @@ describe("agent", function()
         luassert.is_nil(err)
         luassert.are.equal("重试成功", text)
         luassert.are.same({
-            { role = "system", content = "保持简洁" },
-            { role = "user", content = "第一问" },
-            { role = "assistant", content = "重试成功" },
+            { role = "system", content = "保持简洁", source = "app" },
+            { role = "user", content = "第一问", source = "user" },
+            { role = "assistant", content = "重试成功", source = "model" },
         }, agent.messages)
     end)
 
@@ -155,13 +156,13 @@ describe("agent", function()
             api_key = "secret",
             base_url = "https://api.deepseek.com",
             model = "deepseek-flash",
-        }, "保持简洁")
+        }, templates)
 
         local text, err = agent:chat("第一问", no_text_delta)
         luassert.is_nil(text)
         luassert.matches("网络错误", assert(err))
         luassert.are.same({
-            { role = "system", content = "保持简洁" },
+            { role = "system", content = "保持简洁", source = "app" },
         }, agent.messages)
 
         fake_llm.response_handler = function()
@@ -171,9 +172,9 @@ describe("agent", function()
         luassert.is_nil(err)
         luassert.are.equal("重试成功", text)
         luassert.are.same({
-            { role = "system", content = "保持简洁" },
-            { role = "user", content = "第一问" },
-            { role = "assistant", content = "重试成功" },
+            { role = "system", content = "保持简洁", source = "app" },
+            { role = "user", content = "第一问", source = "user" },
+            { role = "assistant", content = "重试成功", source = "model" },
         }, agent.messages)
     end)
 
@@ -184,11 +185,11 @@ describe("agent", function()
             request.cancelled = true
             return "完整但已取消的回答"
         end
-        local agent = Agent:new({}, "保持简洁")
+        local agent = Agent:new({}, templates)
         local text, err = agent:chat("取消这一轮", no_text_delta, request)
         luassert.is_nil(text)
         luassert.are.equal("用户已取消生成", err)
-        luassert.are.same({ { role = "system", content = "保持简洁" } }, agent.messages)
+        luassert.are.same({ { role = "system", content = "保持简洁", source = "app" } }, agent.messages)
 
         fake_llm.response_handler = function() return "下一轮成功" end
         text, err = agent:chat("新问题", no_text_delta)
@@ -199,19 +200,19 @@ describe("agent", function()
     end)
 
     it("无效构造参数和调用参数返回明确错误", function()
-        local ok, err = pcall(Agent.new, Agent, "invalid", "保持简洁")
+        local ok, err = pcall(Agent.new, Agent, "invalid", templates)
         luassert.is_false(ok)
         luassert.matches("LLM 配置必须是 table", tostring(err))
 
         ok, err = pcall(Agent.new, Agent, {}, "")
         luassert.is_false(ok)
-        luassert.matches("system_prompt 不能为空", tostring(err))
+        luassert.matches("提示词", tostring(err))
 
         local agent = Agent:new({
             api_key = "secret",
             base_url = "https://api.deepseek.com",
             model = "deepseek-flash",
-        }, "保持简洁")
+        }, templates)
         ok, err = pcall(agent.set_llm, agent, "invalid")
         luassert.is_false(ok)
         luassert.matches("LLM 配置必须是 table", tostring(err))

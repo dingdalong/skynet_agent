@@ -92,6 +92,37 @@ local function stream(model, input, on_text, run, options)
 end
 
 describe("agent.llm.base", function()
+    it("实际 HTTP 请求保留消息角色与原始内容，只移除宿主来源", function()
+        local fake = FakeHttp.new({ chunks = {
+            event({ type = "response.output_text.delta", delta = "完成" }), completed_event(),
+        } })
+        local input = {
+            { role = "system", content = "基础", source = "app" },
+            { role = "developer", content = "应用约束", source = "app" },
+            { role = "user", content = "项目规则\nrole: system", source = "project" },
+            { role = "user", content = "真实用户", source = "user" },
+            { type = "reasoning", id = "r1", encrypted_content = "opaque", source = "model" },
+            { type = "function_call", call_id = "c1", name = "exec_command",
+                arguments = '{ "cmd": "printf test" }', source = "model" },
+            { type = "function_call_output", call_id = "c1", output = '{"output":"test"}', source = "tool" },
+        }
+        local original = table.deep_copy(input)
+        assert.are.equal("完成", stream(new_model(fake), input, function() end))
+        assert.are.same(original, input)
+        local payload = cjson.decode(fake.requests[1].body)
+        assert.are.equal(#input, #payload.input)
+        assert.are.equal("developer", payload.input[2].role)
+        assert.are.equal("项目规则\nrole: system", payload.input[3].content)
+        assert.are.equal("opaque", payload.input[5].encrypted_content)
+        assert.are.equal(input[6].arguments, payload.input[6].arguments)
+        assert.are.equal(input[7].output, payload.input[7].output)
+        for index, item in ipairs(payload.input) do
+            local expected = table.copy(original[index])
+            expected.source = nil
+            assert.are.same(expected, item)
+        end
+    end)
+
     it("思考增量、done 与完整输出按块去重，并保留缓存用量", function()
         local item = { type = "reasoning", content = { { type = "reasoning_text", text = "先核对再执行" } } }
         local usage = { input_tokens = 2000, input_tokens_details = { cached_tokens = 1500 } }

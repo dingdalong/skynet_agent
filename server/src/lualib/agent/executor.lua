@@ -46,7 +46,7 @@ function Executor:ctor(options, llm_config)
     self.root, self.config, self.permission = options.workspace, options.tools, options.permission
     self.owner, self.session_id = options.owner, options.session_id
     self.processes = Processes:new(self.root, self.config, self.owner, self.session_id)
-    self.judge = Judge:new(llm_config, self.permission)
+    self.judge = Judge:new(llm_config, self.permission, options.prompt_templates)
 end
 
 function Executor:set_llm(llm_config)

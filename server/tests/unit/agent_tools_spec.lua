@@ -86,6 +86,11 @@ describe("Agent 工作区与补丁", function()
 end)
 
 describe("Agent 权限判断", function()
+    local templates
+    before_each(function()
+        templates = require("agent.prompts").load_templates()
+    end)
+
     for _, enabled in ipairs({ true, false }) do
         it("规则通过后一律调用 LLM，rules_enabled=" .. tostring(enabled), function()
             local calls = 0
@@ -93,7 +98,8 @@ describe("Agent 权限判断", function()
             local scope = Scope.new({ ["agent.executor"] = false,
                 log = { info = function() end, failure = function() end },
                 ["agent.process"] = { new = function() return {} end },
-                ["agent.permission.llm_judge"] = { new = function()
+                ["agent.permission.llm_judge"] = { new = function(_, _, _, prompt_templates)
+                    assert.are.equal(templates, prompt_templates)
                     return { decide = function(_, action)
                         calls = calls + 1
                         assert.are.equal(arguments, action.arguments)
@@ -101,7 +107,7 @@ describe("Agent 权限判断", function()
                     end }
                 end }, skynet = {} })
             local executor = require("agent.executor"):new({ workspace = "/", tools = { timeout_ms = 300000 },
-                permission = { rules_enabled = enabled } }, {})
+                permission = { rules_enabled = enabled }, prompt_templates = templates }, {})
             local result = executor:execute({ name = "exec_command", arguments = arguments },
                 {}, { cancelled = false }, { output = "" })
             scope:restore()
@@ -119,7 +125,7 @@ describe("Agent 权限判断", function()
                 return { decide = function() error("规则阻止后不能调用模型") end }
             end }, skynet = {} })
         local executor = require("agent.executor"):new({ workspace = "/", tools = { timeout_ms = 300000 },
-            permission = { rules_enabled = true } }, {})
+            permission = { rules_enabled = true }, prompt_templates = templates }, {})
         local result = executor:execute({ name = "exec_command", arguments = '{"cmd":"reboot now"}' },
             {}, { cancelled = false }, { output = "" })
         scope:restore()
@@ -150,8 +156,9 @@ describe("Agent 权限判断", function()
             launch_argv = { "/bin/bash", "-c", 'printf "中文"\n' }, timeout = 1000,
             wait_ms = 100, max_tokens = 4000 }
         local history = {
-            { role = "system", content = "原始规则" },
-            { role = "user", content = "第一行\n引号\"和反斜线\\" },
+            { role = "system", source = "app", content = "原始规则" },
+            { role = "user", source = "project", content = "项目规则" },
+            { role = "user", source = "user", content = "第一行\n引号\"和反斜线\\" },
             { type = "reasoning", content = { { type = "reasoning_text", text = "思考正文" } },
                 summary = { { type = "summary_text", text = "思考摘要" } } },
             { role = "assistant", content = { { type = "output_text", text = "助手正文" },
@@ -160,15 +167,16 @@ describe("Agent 权限判断", function()
             { type = "function_call_output", call_id = "call-1", output = '{"output":"已执行"}' },
         }
         local original = table.deep_copy(history)
-        local judge = require("agent.permission.llm_judge"):new({ model = "main" }, { timeout_ticks = 10 })
+        local judge = require("agent.permission.llm_judge"):new({ model = "main" }, { timeout_ticks = 10 }, templates)
         local context = { user_input = "当前任务", history = history }
         assert.is_true(judge:decide(action, context, require("agent.run"):new()))
         assert.are.same(original, history)
         local history_end = assert(captured[1]:find("当前用户目标:\n", 1, true)) - 1
-        history[#history + 1] = { role = "user", content = "追加消息" }
+        history[#history + 1] = { role = "user", source = "user", content = "追加消息" }
         assert.is_true(judge:decide(action, context, require("agent.run"):new()))
         assert.are.equal(captured[1]:sub(1, history_end), captured[2]:sub(1, history_end))
-        for _, text in ipairs({ "第一行\n引号\"和反斜线\\", "思考正文", "思考摘要", "助手正文",
+        for _, text in ipairs({ "source:\napp\n", "source:\nproject\n", "source:\nuser\n", "项目规则",
+            "第一行\n引号\"和反斜线\\", "思考正文", "思考摘要", "助手正文",
             "拒绝正文", "call-1", '{"output":"已执行"}', "工作区:\n/workspace\n",
             "实际工作目录:\n/workspace/sub\n", "权限模式:\nrequire_escalated\n",
             "目标路径:\n/workspace/a\n", "目标路径:\n/workspace/b\n",
@@ -178,7 +186,7 @@ describe("Agent 权限判断", function()
         end
         assert.are.equal(arguments .. "\n", captured[2]:sub(-#arguments - 1))
         -- 同样的字段以不同顺序写入 table，提示文本保持不变。
-        history[#history] = { content = "追加消息", role = "user" }
+        history[#history] = { content = "追加消息", source = "user", role = "user" }
         assert.is_true(judge:decide(action, context, require("agent.run"):new()))
         assert.are.equal(captured[2], captured[3])
         scope:restore()
@@ -197,7 +205,8 @@ describe("Agent 权限判断", function()
                 return '{"decision":"' .. (scenario == "allow" and "allow" or "deny")
                     .. '","reason":"判断原因"}'
             end
-            local judge = require("agent.permission.llm_judge"):new({ model = "main" }, { timeout_ticks = 10 })
+            local judge = require("agent.permission.llm_judge"):new({ model = "main" },
+                { timeout_ticks = 10 }, templates)
             local allowed, reason = judge:decide({ name = "exec_command" }, { user_input = "任务" }, run)
             scope:restore()
             assert.are.equal(scenario == "allow", allowed)

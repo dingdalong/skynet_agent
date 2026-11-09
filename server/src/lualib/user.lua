@@ -118,7 +118,9 @@ function User:SessionCreateReq()
         local workspace = require("agent.workspace").create(config.tools.workspace_root, self.username, session_id)
         local main = models.resolve(config, config.default_model_id)
         local permission = models.resolve(config, config.permission.model_id or config.default_model_id)
-        return Agent:new(main, config.system_prompt, { workspace = workspace, tools = config.tools,
+        return Agent:new(main, assert(self.owner.prompt_templates, "Agent 提示词模板未加载"), {
+            workspace = workspace, tools = config.tools,
+            project_instructions_max_bytes = config.project_instructions_max_bytes,
             permission_llm = permission,
             permission = config.permission, owner = self, session_id = session_id })
     end)

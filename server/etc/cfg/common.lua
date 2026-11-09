@@ -23,8 +23,7 @@ return {
         login_timeout_ticks = 1000,
     },
     agent = {
-        system_prompt = "你是一个可靠、清晰的中文助手。"
-            .. "回答应直接、准确，并说明重要限制。",
+        project_instructions_max_bytes = 32768,
         tools = {
             workspace_root = os.getenv("AGENT_WORKSPACE_ROOT") or "./work_dir",
             timeout_ms = 300000,
