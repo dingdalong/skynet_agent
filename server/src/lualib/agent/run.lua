@@ -4,7 +4,7 @@ local class = require("class")
 ---@field cancelled boolean
 ---@field llm_request llm.Request?
 ---@field permission_request llm.Request?
----@field processes table<string, agent.Processes>
+---@field processes table<string, agent.Processes|agent.Remote>
 ---@field id string
 ---@field session_id string?
 ---@field owner agent_session.AgentSession?
@@ -12,6 +12,7 @@ local class = require("class")
 ---@field assistant agent_session.Message
 ---@field retry boolean?
 ---@field close_error string?
+---@field source_device string?
 local Run = class()
 
 function Run:ctor()
@@ -25,6 +26,7 @@ function Run:ctor()
     self.assistant = { reasoning = {}, tool_calls = {} }
     self.retry = nil
     self.owner = nil
+    self.source_device = nil
 end
 
 function Run:on_reasoning(block, delta, tool_id)

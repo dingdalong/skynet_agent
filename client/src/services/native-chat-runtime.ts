@@ -12,6 +12,8 @@ import { appendReasoning } from '../protocol/reasoning'
 import type { ModelOption } from '../types/chat'
 
 export interface NativeChatState {
+  desktops?: import('../types/chat').DesktopDevice[]
+  localDeviceId?: string
   models?: ModelOption[]
   username: string
   userId: string
@@ -30,6 +32,8 @@ export type NativeChatEvent =
   | { type: 'delta'; update: Extract<ChatUpdate, { type: 'delta' }> }
 
 type Action =
+  | { type: 'setExecution'; target: ConversationSelection; directory: string | null }
+  | { type: 'setRemote'; enabled: boolean }
   | { type: 'setModel'; modelId: string }
   | { type: 'connect'; username: string }
   | { type: 'disconnect' | 'switchUser' | 'dismissError' | 'retryLastMessage' }
@@ -221,6 +225,30 @@ export function createNativeChatRuntime(): ChatRuntime {
         if (issuedAt === stateRevision) state.selection = previous
       }
       return accepted
+    },
+    async setExecution(mode) {
+      const target = state.selection && { ...state.selection }
+      if (!target) return false
+      if (mode === 'cloud') return action({ type: 'setExecution', target, directory: null })
+      const userId = state.userId
+      const current = generation
+      try {
+        const directory = await invoke<string | null>('chat_choose_directory')
+        if (!directory) return null
+        if (
+          current !== generation ||
+          state.userId !== userId ||
+          !sameSelection(target, state.selection)
+        )
+          return false
+        return action({ type: 'setExecution', target, directory })
+      } catch (error) {
+        state.connectionError = String(error)
+        return false
+      }
+    },
+    async setRemote(enabled) {
+      return action({ type: 'setRemote', enabled })
     },
     async setModel(modelId) {
       if (state.selection?.kind === 'draft' && state.localDraft?.sending) return false

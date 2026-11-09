@@ -3,8 +3,8 @@ local REQUEST = {}
 ---@param self user.User
 ---@param args table
 ---@return table
-function REQUEST:ChatReq(args)
-    return self.chat:chat(args)
+function REQUEST:ChatReq(args, connection)
+    return self.chat:chat(args, connection)
 end
 
 ---@param self user.User

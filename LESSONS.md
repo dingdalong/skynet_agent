@@ -871,3 +871,54 @@
   修复后文件模块 8 项测试通过，client 30 项测试包含子目录不可读、无部分注册与修复后重试初始化。
 - Done right：用确定性的属性读取错误验证目录与文件两条路径，避免依赖当前运行账号能否绕过文件权限。
 - Seen: 1× (2026-11-09; task: 20261109T174020-mods-handler-discovery.md)
+
+### L-062: 手工生成的 Tauri 测试包必须包含 Resources
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Tauri、macOS、原生端到端夹具、资源目录
+- 触发：测试手工建立最小 .app，setup 新增 resource_dir 调用后，App 在加载页面前退出。
+- 根因：包里只有 Contents/MacOS，没有实际的 Contents/Resources，资源解析返回 unknown path。
+- 解法：两种原生夹具统一创建 Resources；结果等待同时检测进程提前退出并报告日志位置。
+- 证据：本地执行夹具首次启动失败，修复后 JJNTCw 真实本地/远程验收通过；9cT06b 原生真实链路通过。
+- Done right：原生初始化新增路径或资源依赖时，同时检查最小测试包结构；启动失败不等待整段业务超时。
+- Seen: 1× (2026-11-09; task: 20261109T211901-local-desktop-execution.md)
+
+### L-063: 可选 JSON 字段进入 Lua 时统一处理 null
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Rust、JSON、lua-cjson、桌面执行结果
+- 触发：Rust 返回 session_id:null，Lua 按 if result.session_id 判断是否仍有运行进程。
+- 根因：cjson.null 是 userdata，在 Lua 中为真值，不能直接用作可选字段的缺省值。
+- 解法：在 ExecutionResultReq 的 JSON 边界递归移除 null，再把结果交给 Agent 执行器。
+- 证据：desktop_execution_spec 覆盖结果来源和 session_id/error 空值；JJNTCw 真实本地/远程执行通过。
+- Done right：跨语言协议边界统一处理空值，保留 false 和 0 的原本语义，业务代码只处理一种缺省表示。
+- Seen: 1× (2026-11-09; task: 20261109T211901-local-desktop-execution.md)
+
+### L-064: 异步模式切换验收等待业务状态而非控件的即时值
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Vue、原生 E2E、会话执行目标、离线拒绝
+- 触发：脚本先设置 select.value 再触发 change，随后立即按 select.value 和 disabled 判断切换完成。
+- 根因：控件值已被脚本改写，Vue 的 busy 渲染和 IPC/服务端回传尚未完成，等待条件可能立即通过；
+  退出 App 后会话仍在旧目标。页面已有的设备状态文本也不能证明本次请求被拒绝。
+- 解法：模式切换等待由会话状态计算的执行目标标签；拒绝等待请求产生的 alert；取消检查工具终态。
+  模型因无效参数重试时，按工具集合确认实际进程停止，不假设只有一条记录。
+- 证据：AYT2ju 原生夹具报告通过但会话仍在云端，离线拒绝等待超时；修正后 XeIsPu 严格场景完整通过。
+- Done right：异步 UI 验收的终态信号由真实业务结果产生，避免脚本自己写出的值或先前状态造成误判。
+- Seen: 1× (2026-11-09; task: 20261109T211901-local-desktop-execution.md)
+
+### L-065: Make 3.81 的参数变更不能只靠配置文件时间戳失效缓存
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：macOS、GNU Make 3.81、C 构建、Cargo build.rs
+- 触发：构建后立即修改编译参数，内容比较重写配置 stamp，但部分对象没有重新编译。
+- 根因：macOS 自带 Make 3.81 的文件时间比较只有秒级精度，同一秒内更新的 stamp 可能与已有对象同龄。
+- 解法：解析期比较配置内容，变化时将配置目标标记为 PHONY，让依赖对象直接失效；未变化时保持普通文件目标。
+- 证据：make-rules-final.log 中 CFLAGS 从 -O2 改为 -O0 后重编译断言失败；修正后 make-rules-verified.log
+  的同一断言通过，参数不变时没有重编译，编译器失败也正确传递。
+- Done right：同时验证快速参数切换和无变化重建，不能只测试干净构建或延迟后的参数变更。
+- Seen: 1× (2026-11-10; task: 20261110T102843-agent-runtime-make.md)

@@ -1032,6 +1032,7 @@ export const skynet = $root.skynet = (() => {
                 /**
                  * Properties of a ChatReq.
                  * @typedef {Object} skynet.agent.v1.ChatReq.$Properties
+                 * @property {skynet.agent.v1.ExecutionTarget.$Properties|null} [executionTarget] ChatReq executionTarget
                  * @property {string|null} [sessionId] ChatReq sessionId
                  * @property {string|null} [text] ChatReq text
                  * @property {string|null} [retryRunId] ChatReq retryRunId
@@ -1066,6 +1067,14 @@ export const skynet = $root.skynet = (() => {
                             if (properties[keys[i]] != null && keys[i] !== "__proto__")
                                 this[keys[i]] = properties[keys[i]];
                 };
+
+                /**
+                 * ChatReq executionTarget.
+                 * @member {skynet.agent.v1.ExecutionTarget.$Properties|null|undefined} executionTarget
+                 * @memberof skynet.agent.v1.ChatReq
+                 * @instance
+                 */
+                ChatReq.prototype.executionTarget = null;
 
                 /**
                  * ChatReq sessionId.
@@ -1139,6 +1148,8 @@ export const skynet = $root.skynet = (() => {
                         writer.uint32(/* id 4, wireType 2 =*/34).string(message.retryRunId);
                     if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId") && message.modelId !== "")
                         writer.uint32(/* id 5, wireType 2 =*/42).string(message.modelId);
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget"))
+                        $root.skynet.agent.v1.ExecutionTarget.encode(message.executionTarget, writer.uint32(/* id 6, wireType 2 =*/50).fork(), _depth + 1).ldelim();
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -1196,6 +1207,12 @@ export const skynet = $root.skynet = (() => {
                         }
                         let wireType = tag & 7;
                         switch (tag >>>= 3) {
+                        case 6: {
+                                if (wireType !== 2)
+                                    break;
+                                message.executionTarget = $root.skynet.agent.v1.ExecutionTarget.decode(reader, reader.size(), $undefined, _depth + 1, message.executionTarget);
+                                continue;
+                            }
                         case 2: {
                                 if (wireType !== 2)
                                     break;
@@ -1280,6 +1297,11 @@ export const skynet = $root.skynet = (() => {
                         _depth = 0;
                     if (_depth > $util.recursionLimit)
                         return "max depth exceeded";
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget")) {
+                        let error = $root.skynet.agent.v1.ExecutionTarget.verify(message.executionTarget, _depth + 1);
+                        if (error)
+                            return "executionTarget." + error;
+                    }
                     if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
                         if (!$util.isString(message.sessionId))
                             return "sessionId: string expected";
@@ -1313,6 +1335,11 @@ export const skynet = $root.skynet = (() => {
                     if (_depth > $util.recursionLimit)
                         throw $Error("max depth exceeded");
                     let message = new $root.skynet.agent.v1.ChatReq();
+                    if (object.executionTarget != null) {
+                        if (!$util.isObject(object.executionTarget))
+                            throw $TypeError(".skynet.agent.v1.ChatReq.executionTarget: object expected");
+                        message.executionTarget = $root.skynet.agent.v1.ExecutionTarget.fromObject(object.executionTarget, _depth + 1);
+                    }
                     if (object.sessionId != null)
                         if (typeof object.sessionId !== "string" || object.sessionId.length)
                             message.sessionId = $String(object.sessionId);
@@ -1350,6 +1377,7 @@ export const skynet = $root.skynet = (() => {
                         object.text = "";
                         object.retryRunId = "";
                         object.modelId = "";
+                        object.executionTarget = null;
                     }
                     if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
                         object.sessionId = message.sessionId;
@@ -1359,6 +1387,8 @@ export const skynet = $root.skynet = (() => {
                         object.retryRunId = message.retryRunId;
                     if (message.modelId != null && $Object.hasOwnProperty.call(message, "modelId"))
                         object.modelId = message.modelId;
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget"))
+                        object.executionTarget = $root.skynet.agent.v1.ExecutionTarget.toObject(message.executionTarget, options, _depth + 1);
                     return object;
                 };
 
@@ -6092,6 +6122,7 @@ export const skynet = $root.skynet = (() => {
                 /**
                  * Properties of a ChatSession.
                  * @typedef {Object} skynet.agent.v1.ChatSession.$Properties
+                 * @property {skynet.agent.v1.ExecutionTarget.$Properties|null} [executionTarget] ChatSession executionTarget
                  * @property {skynet.agent.v1.SessionState.$Properties|null} [session] ChatSession session
                  * @property {string|null} [modelId] ChatSession modelId
                  * @property {string|null} [permissionModelId] ChatSession permissionModelId
@@ -6125,6 +6156,14 @@ export const skynet = $root.skynet = (() => {
                             if (properties[keys[i]] != null && keys[i] !== "__proto__")
                                 this[keys[i]] = properties[keys[i]];
                 };
+
+                /**
+                 * ChatSession executionTarget.
+                 * @member {skynet.agent.v1.ExecutionTarget.$Properties|null|undefined} executionTarget
+                 * @memberof skynet.agent.v1.ChatSession
+                 * @instance
+                 */
+                ChatSession.prototype.executionTarget = null;
 
                 /**
                  * ChatSession session.
@@ -6188,6 +6227,8 @@ export const skynet = $root.skynet = (() => {
                         writer.uint32(/* id 2, wireType 2 =*/18).string(message.modelId);
                     if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId") && message.permissionModelId !== "")
                         writer.uint32(/* id 3, wireType 2 =*/26).string(message.permissionModelId);
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget"))
+                        $root.skynet.agent.v1.ExecutionTarget.encode(message.executionTarget, writer.uint32(/* id 4, wireType 2 =*/34).fork(), _depth + 1).ldelim();
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -6245,6 +6286,12 @@ export const skynet = $root.skynet = (() => {
                         }
                         let wireType = tag & 7;
                         switch (tag >>>= 3) {
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                message.executionTarget = $root.skynet.agent.v1.ExecutionTarget.decode(reader, reader.size(), $undefined, _depth + 1, message.executionTarget);
+                                continue;
+                            }
                         case 1: {
                                 if (wireType !== 2)
                                     break;
@@ -6317,6 +6364,11 @@ export const skynet = $root.skynet = (() => {
                         _depth = 0;
                     if (_depth > $util.recursionLimit)
                         return "max depth exceeded";
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget")) {
+                        let error = $root.skynet.agent.v1.ExecutionTarget.verify(message.executionTarget, _depth + 1);
+                        if (error)
+                            return "executionTarget." + error;
+                    }
                     if (message.session != null && $Object.hasOwnProperty.call(message, "session")) {
                         let error = $root.skynet.agent.v1.SessionState.verify(message.session, _depth + 1);
                         if (error)
@@ -6349,6 +6401,11 @@ export const skynet = $root.skynet = (() => {
                     if (_depth > $util.recursionLimit)
                         throw $Error("max depth exceeded");
                     let message = new $root.skynet.agent.v1.ChatSession();
+                    if (object.executionTarget != null) {
+                        if (!$util.isObject(object.executionTarget))
+                            throw $TypeError(".skynet.agent.v1.ChatSession.executionTarget: object expected");
+                        message.executionTarget = $root.skynet.agent.v1.ExecutionTarget.fromObject(object.executionTarget, _depth + 1);
+                    }
                     if (object.session != null) {
                         if (!$util.isObject(object.session))
                             throw $TypeError(".skynet.agent.v1.ChatSession.session: object expected");
@@ -6384,6 +6441,7 @@ export const skynet = $root.skynet = (() => {
                         object.session = null;
                         object.modelId = "";
                         object.permissionModelId = "";
+                        object.executionTarget = null;
                     }
                     if (message.session != null && $Object.hasOwnProperty.call(message, "session"))
                         object.session = $root.skynet.agent.v1.SessionState.toObject(message.session, options, _depth + 1);
@@ -6391,6 +6449,8 @@ export const skynet = $root.skynet = (() => {
                         object.modelId = message.modelId;
                     if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId"))
                         object.permissionModelId = message.permissionModelId;
+                    if (message.executionTarget != null && $Object.hasOwnProperty.call(message, "executionTarget"))
+                        object.executionTarget = $root.skynet.agent.v1.ExecutionTarget.toObject(message.executionTarget, options, _depth + 1);
                     return object;
                 };
 
@@ -6413,6 +6473,7 @@ export const skynet = $root.skynet = (() => {
                 /**
                  * Properties of a UserSnapshot.
                  * @typedef {Object} skynet.agent.v1.UserSnapshot.$Properties
+                 * @property {Array.<skynet.agent.v1.DesktopDevice.$Properties>|null} [desktops] UserSnapshot desktops
                  * @property {string|null} [userId] UserSnapshot userId
                  * @property {string|null} [username] UserSnapshot username
                  * @property {Array.<skynet.agent.v1.ChatSession.$Properties>|null} [chatSessions] UserSnapshot chatSessions
@@ -6444,6 +6505,7 @@ export const skynet = $root.skynet = (() => {
                  * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
                  */
                 const UserSnapshot = function (properties) {
+                    this.desktops = [];
                     this.chatSessions = [];
                     this.models = [];
                     if (properties)
@@ -6451,6 +6513,14 @@ export const skynet = $root.skynet = (() => {
                             if (properties[keys[i]] != null && keys[i] !== "__proto__")
                                 this[keys[i]] = properties[keys[i]];
                 };
+
+                /**
+                 * UserSnapshot desktops.
+                 * @member {Array.<skynet.agent.v1.DesktopDevice.$Properties>} desktops
+                 * @memberof skynet.agent.v1.UserSnapshot
+                 * @instance
+                 */
+                UserSnapshot.prototype.desktops = $util.emptyArray;
 
                 /**
                  * UserSnapshot userId.
@@ -6546,6 +6616,9 @@ export const skynet = $root.skynet = (() => {
                         writer.uint32(/* id 5, wireType 2 =*/42).string(message.defaultModelId);
                     if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId") && message.permissionModelId !== "")
                         writer.uint32(/* id 6, wireType 2 =*/50).string(message.permissionModelId);
+                    if (message.desktops != null && message.desktops.length)
+                        for (let i = 0; i < message.desktops.length; ++i)
+                            $root.skynet.agent.v1.DesktopDevice.encode(message.desktops[i], writer.uint32(/* id 7, wireType 2 =*/58).fork(), _depth + 1).ldelim();
                     if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
                         for (let i = 0; i < message.$unknowns.length; ++i)
                             writer.raw(message.$unknowns[i]);
@@ -6603,6 +6676,14 @@ export const skynet = $root.skynet = (() => {
                         }
                         let wireType = tag & 7;
                         switch (tag >>>= 3) {
+                        case 7: {
+                                if (wireType !== 2)
+                                    break;
+                                if (!(message.desktops && message.desktops.length))
+                                    message.desktops = [];
+                                message.desktops.push($root.skynet.agent.v1.DesktopDevice.decode(reader, reader.size(), $undefined, _depth + 1));
+                                continue;
+                            }
                         case 1: {
                                 if (wireType !== 2)
                                     break;
@@ -6703,6 +6784,15 @@ export const skynet = $root.skynet = (() => {
                         _depth = 0;
                     if (_depth > $util.recursionLimit)
                         return "max depth exceeded";
+                    if (message.desktops != null && $Object.hasOwnProperty.call(message, "desktops")) {
+                        if (!$Array.isArray(message.desktops))
+                            return "desktops: array expected";
+                        for (let i = 0; i < message.desktops.length; ++i) {
+                            let error = $root.skynet.agent.v1.DesktopDevice.verify(message.desktops[i], _depth + 1);
+                            if (error)
+                                return "desktops." + error;
+                        }
+                    }
                     if (message.userId != null && $Object.hasOwnProperty.call(message, "userId"))
                         if (!$util.isString(message.userId))
                             return "userId: string expected";
@@ -6754,6 +6844,16 @@ export const skynet = $root.skynet = (() => {
                     if (_depth > $util.recursionLimit)
                         throw $Error("max depth exceeded");
                     let message = new $root.skynet.agent.v1.UserSnapshot();
+                    if (object.desktops) {
+                        if (!$Array.isArray(object.desktops))
+                            throw $TypeError(".skynet.agent.v1.UserSnapshot.desktops: array expected");
+                        message.desktops = $Array(object.desktops.length);
+                        for (let i = 0; i < object.desktops.length; ++i) {
+                            if (!$util.isObject(object.desktops[i]))
+                                throw $TypeError(".skynet.agent.v1.UserSnapshot.desktops: object expected");
+                            message.desktops[i] = $root.skynet.agent.v1.DesktopDevice.fromObject(object.desktops[i], _depth + 1);
+                        }
+                    }
                     if (object.userId != null)
                         if (typeof object.userId !== "string" || object.userId.length)
                             message.userId = $String(object.userId);
@@ -6809,6 +6909,7 @@ export const skynet = $root.skynet = (() => {
                     if (options.arrays || options.defaults) {
                         object.chatSessions = [];
                         object.models = [];
+                        object.desktops = [];
                     }
                     if (options.defaults) {
                         object.userId = "";
@@ -6834,6 +6935,11 @@ export const skynet = $root.skynet = (() => {
                         object.defaultModelId = message.defaultModelId;
                     if (message.permissionModelId != null && $Object.hasOwnProperty.call(message, "permissionModelId"))
                         object.permissionModelId = message.permissionModelId;
+                    if (message.desktops && message.desktops.length) {
+                        object.desktops = $Array(message.desktops.length);
+                        for (let j = 0; j < message.desktops.length; ++j)
+                            object.desktops[j] = $root.skynet.agent.v1.DesktopDevice.toObject(message.desktops[j], options, _depth + 1);
+                    }
                     return object;
                 };
 
@@ -6849,6 +6955,3298 @@ export const skynet = $root.skynet = (() => {
                 };
 
                 return UserSnapshot;
+            })();
+
+            v1.ExecutionTarget = (function() {
+
+                /**
+                 * Properties of an ExecutionTarget.
+                 * @typedef {Object} skynet.agent.v1.ExecutionTarget.$Properties
+                 * @property {string|null} [deviceId] ExecutionTarget deviceId
+                 * @property {string|null} [workspaceId] ExecutionTarget workspaceId
+                 * @property {string|null} [directory] ExecutionTarget directory
+                 * @property {string|null} [platform] ExecutionTarget platform
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of an ExecutionTarget.
+                 * @memberof skynet.agent.v1
+                 * @interface IExecutionTarget
+                 * @augments skynet.agent.v1.ExecutionTarget.$Properties
+                 * @deprecated Use skynet.agent.v1.ExecutionTarget.$Properties instead.
+                 */
+
+                /**
+                 * Shape of an ExecutionTarget.
+                 * @typedef {skynet.agent.v1.ExecutionTarget.$Properties} skynet.agent.v1.ExecutionTarget.$Shape
+                 */
+
+                /**
+                 * Constructs a new ExecutionTarget.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents an ExecutionTarget.
+                 * @constructor
+                 * @param {skynet.agent.v1.ExecutionTarget.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ExecutionTarget = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ExecutionTarget deviceId.
+                 * @member {string} deviceId
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @instance
+                 */
+                ExecutionTarget.prototype.deviceId = "";
+
+                /**
+                 * ExecutionTarget workspaceId.
+                 * @member {string} workspaceId
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @instance
+                 */
+                ExecutionTarget.prototype.workspaceId = "";
+
+                /**
+                 * ExecutionTarget directory.
+                 * @member {string} directory
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @instance
+                 */
+                ExecutionTarget.prototype.directory = "";
+
+                /**
+                 * ExecutionTarget platform.
+                 * @member {string} platform
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @instance
+                 */
+                ExecutionTarget.prototype.platform = "";
+
+                /**
+                 * Creates a new ExecutionTarget instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionTarget.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ExecutionTarget} ExecutionTarget instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ExecutionTarget.$Shape): skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape;
+                 *   (properties?: skynet.agent.v1.ExecutionTarget.$Properties): skynet.agent.v1.ExecutionTarget;
+                 * }}
+                 */
+                ExecutionTarget.create = function(properties) {
+                    return new ExecutionTarget(properties);
+                };
+
+                /**
+                 * Encodes the specified ExecutionTarget message. Does not implicitly {@link skynet.agent.v1.ExecutionTarget.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionTarget.$Properties} message ExecutionTarget message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionTarget.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId") && message.deviceId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.deviceId);
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId") && message.workspaceId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.workspaceId);
+                    if (message.directory != null && $Object.hasOwnProperty.call(message, "directory") && message.directory !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.directory);
+                    if (message.platform != null && $Object.hasOwnProperty.call(message, "platform") && message.platform !== "")
+                        writer.uint32(/* id 4, wireType 2 =*/34).string(message.platform);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ExecutionTarget message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionTarget.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionTarget.$Properties} message ExecutionTarget message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionTarget.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes an ExecutionTarget message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape} ExecutionTarget
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionTarget.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ExecutionTarget();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.deviceId = value;
+                                else
+                                    delete message.deviceId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.workspaceId = value;
+                                else
+                                    delete message.workspaceId;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.directory = value;
+                                else
+                                    delete message.directory;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.platform = value;
+                                else
+                                    delete message.platform;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes an ExecutionTarget message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape} ExecutionTarget
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionTarget.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies an ExecutionTarget message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ExecutionTarget.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId"))
+                        if (!$util.isString(message.deviceId))
+                            return "deviceId: string expected";
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId"))
+                        if (!$util.isString(message.workspaceId))
+                            return "workspaceId: string expected";
+                    if (message.directory != null && $Object.hasOwnProperty.call(message, "directory"))
+                        if (!$util.isString(message.directory))
+                            return "directory: string expected";
+                    if (message.platform != null && $Object.hasOwnProperty.call(message, "platform"))
+                        if (!$util.isString(message.platform))
+                            return "platform: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates an ExecutionTarget message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ExecutionTarget} ExecutionTarget
+                 */
+                ExecutionTarget.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ExecutionTarget)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ExecutionTarget: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ExecutionTarget();
+                    if (object.deviceId != null)
+                        if (typeof object.deviceId !== "string" || object.deviceId.length)
+                            message.deviceId = $String(object.deviceId);
+                    if (object.workspaceId != null)
+                        if (typeof object.workspaceId !== "string" || object.workspaceId.length)
+                            message.workspaceId = $String(object.workspaceId);
+                    if (object.directory != null)
+                        if (typeof object.directory !== "string" || object.directory.length)
+                            message.directory = $String(object.directory);
+                    if (object.platform != null)
+                        if (typeof object.platform !== "string" || object.platform.length)
+                            message.platform = $String(object.platform);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from an ExecutionTarget message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionTarget} message ExecutionTarget
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ExecutionTarget.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.deviceId = "";
+                        object.workspaceId = "";
+                        object.directory = "";
+                        object.platform = "";
+                    }
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId"))
+                        object.deviceId = message.deviceId;
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId"))
+                        object.workspaceId = message.workspaceId;
+                    if (message.directory != null && $Object.hasOwnProperty.call(message, "directory"))
+                        object.directory = message.directory;
+                    if (message.platform != null && $Object.hasOwnProperty.call(message, "platform"))
+                        object.platform = message.platform;
+                    return object;
+                };
+
+                /**
+                 * Converts this ExecutionTarget to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ExecutionTarget
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ExecutionTarget.prototype.toJSON = function() {
+                    return ExecutionTarget.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ExecutionTarget;
+            })();
+
+            v1.DesktopDevice = (function() {
+
+                /**
+                 * Properties of a DesktopDevice.
+                 * @typedef {Object} skynet.agent.v1.DesktopDevice.$Properties
+                 * @property {string|null} [id] DesktopDevice id
+                 * @property {string|null} [name] DesktopDevice name
+                 * @property {boolean|null} [online] DesktopDevice online
+                 * @property {boolean|null} [remoteEnabled] DesktopDevice remoteEnabled
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a DesktopDevice.
+                 * @memberof skynet.agent.v1
+                 * @interface IDesktopDevice
+                 * @augments skynet.agent.v1.DesktopDevice.$Properties
+                 * @deprecated Use skynet.agent.v1.DesktopDevice.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a DesktopDevice.
+                 * @typedef {skynet.agent.v1.DesktopDevice.$Properties} skynet.agent.v1.DesktopDevice.$Shape
+                 */
+
+                /**
+                 * Constructs a new DesktopDevice.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a DesktopDevice.
+                 * @constructor
+                 * @param {skynet.agent.v1.DesktopDevice.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const DesktopDevice = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * DesktopDevice id.
+                 * @member {string} id
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @instance
+                 */
+                DesktopDevice.prototype.id = "";
+
+                /**
+                 * DesktopDevice name.
+                 * @member {string} name
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @instance
+                 */
+                DesktopDevice.prototype.name = "";
+
+                /**
+                 * DesktopDevice online.
+                 * @member {boolean} online
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @instance
+                 */
+                DesktopDevice.prototype.online = false;
+
+                /**
+                 * DesktopDevice remoteEnabled.
+                 * @member {boolean} remoteEnabled
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @instance
+                 */
+                DesktopDevice.prototype.remoteEnabled = false;
+
+                /**
+                 * Creates a new DesktopDevice instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {skynet.agent.v1.DesktopDevice.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.DesktopDevice} DesktopDevice instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.DesktopDevice.$Shape): skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape;
+                 *   (properties?: skynet.agent.v1.DesktopDevice.$Properties): skynet.agent.v1.DesktopDevice;
+                 * }}
+                 */
+                DesktopDevice.create = function(properties) {
+                    return new DesktopDevice(properties);
+                };
+
+                /**
+                 * Encodes the specified DesktopDevice message. Does not implicitly {@link skynet.agent.v1.DesktopDevice.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {skynet.agent.v1.DesktopDevice.$Properties} message DesktopDevice message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopDevice.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id") && message.id !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name") && message.name !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.name);
+                    if (message.online != null && $Object.hasOwnProperty.call(message, "online") && message.online !== false)
+                        writer.uint32(/* id 3, wireType 0 =*/24).bool(message.online);
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled") && message.remoteEnabled !== false)
+                        writer.uint32(/* id 4, wireType 0 =*/32).bool(message.remoteEnabled);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified DesktopDevice message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopDevice.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {skynet.agent.v1.DesktopDevice.$Properties} message DesktopDevice message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopDevice.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a DesktopDevice message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape} DesktopDevice
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopDevice.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.DesktopDevice();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.id = value;
+                                else
+                                    delete message.id;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.name = value;
+                                else
+                                    delete message.name;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.bool())
+                                    message.online = value;
+                                else
+                                    delete message.online;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.bool())
+                                    message.remoteEnabled = value;
+                                else
+                                    delete message.remoteEnabled;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a DesktopDevice message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape} DesktopDevice
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopDevice.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a DesktopDevice message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                DesktopDevice.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        if (!$util.isString(message.id))
+                            return "id: string expected";
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        if (!$util.isString(message.name))
+                            return "name: string expected";
+                    if (message.online != null && $Object.hasOwnProperty.call(message, "online"))
+                        if (typeof message.online !== "boolean")
+                            return "online: boolean expected";
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled"))
+                        if (typeof message.remoteEnabled !== "boolean")
+                            return "remoteEnabled: boolean expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a DesktopDevice message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.DesktopDevice} DesktopDevice
+                 */
+                DesktopDevice.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.DesktopDevice)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.DesktopDevice: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.DesktopDevice();
+                    if (object.id != null)
+                        if (typeof object.id !== "string" || object.id.length)
+                            message.id = $String(object.id);
+                    if (object.name != null)
+                        if (typeof object.name !== "string" || object.name.length)
+                            message.name = $String(object.name);
+                    if (object.online != null)
+                        if (object.online)
+                            message.online = $Boolean(object.online);
+                    if (object.remoteEnabled != null)
+                        if (object.remoteEnabled)
+                            message.remoteEnabled = $Boolean(object.remoteEnabled);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a DesktopDevice message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @static
+                 * @param {skynet.agent.v1.DesktopDevice} message DesktopDevice
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                DesktopDevice.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.id = "";
+                        object.name = "";
+                        object.online = false;
+                        object.remoteEnabled = false;
+                    }
+                    if (message.id != null && $Object.hasOwnProperty.call(message, "id"))
+                        object.id = message.id;
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        object.name = message.name;
+                    if (message.online != null && $Object.hasOwnProperty.call(message, "online"))
+                        object.online = message.online;
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled"))
+                        object.remoteEnabled = message.remoteEnabled;
+                    return object;
+                };
+
+                /**
+                 * Converts this DesktopDevice to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.DesktopDevice
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                DesktopDevice.prototype.toJSON = function() {
+                    return DesktopDevice.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return DesktopDevice;
+            })();
+
+            v1.DesktopRegisterReq = (function() {
+
+                /**
+                 * Properties of a DesktopRegisterReq.
+                 * @typedef {Object} skynet.agent.v1.DesktopRegisterReq.$Properties
+                 * @property {string|null} [deviceId] DesktopRegisterReq deviceId
+                 * @property {string|null} [name] DesktopRegisterReq name
+                 * @property {boolean|null} [remoteEnabled] DesktopRegisterReq remoteEnabled
+                 * @property {string|null} [authorizationId] DesktopRegisterReq authorizationId
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a DesktopRegisterReq.
+                 * @memberof skynet.agent.v1
+                 * @interface IDesktopRegisterReq
+                 * @augments skynet.agent.v1.DesktopRegisterReq.$Properties
+                 * @deprecated Use skynet.agent.v1.DesktopRegisterReq.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a DesktopRegisterReq.
+                 * @typedef {skynet.agent.v1.DesktopRegisterReq.$Properties} skynet.agent.v1.DesktopRegisterReq.$Shape
+                 */
+
+                /**
+                 * Constructs a new DesktopRegisterReq.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a DesktopRegisterReq.
+                 * @constructor
+                 * @param {skynet.agent.v1.DesktopRegisterReq.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const DesktopRegisterReq = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * DesktopRegisterReq deviceId.
+                 * @member {string} deviceId
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @instance
+                 */
+                DesktopRegisterReq.prototype.deviceId = "";
+
+                /**
+                 * DesktopRegisterReq name.
+                 * @member {string} name
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @instance
+                 */
+                DesktopRegisterReq.prototype.name = "";
+
+                /**
+                 * DesktopRegisterReq remoteEnabled.
+                 * @member {boolean} remoteEnabled
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @instance
+                 */
+                DesktopRegisterReq.prototype.remoteEnabled = false;
+
+                /**
+                 * DesktopRegisterReq authorizationId.
+                 * @member {string} authorizationId
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @instance
+                 */
+                DesktopRegisterReq.prototype.authorizationId = "";
+
+                /**
+                 * Creates a new DesktopRegisterReq instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterReq.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.DesktopRegisterReq} DesktopRegisterReq instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.DesktopRegisterReq.$Shape): skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape;
+                 *   (properties?: skynet.agent.v1.DesktopRegisterReq.$Properties): skynet.agent.v1.DesktopRegisterReq;
+                 * }}
+                 */
+                DesktopRegisterReq.create = function(properties) {
+                    return new DesktopRegisterReq(properties);
+                };
+
+                /**
+                 * Encodes the specified DesktopRegisterReq message. Does not implicitly {@link skynet.agent.v1.DesktopRegisterReq.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterReq.$Properties} message DesktopRegisterReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopRegisterReq.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId") && message.deviceId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.deviceId);
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name") && message.name !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.name);
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled") && message.remoteEnabled !== false)
+                        writer.uint32(/* id 3, wireType 0 =*/24).bool(message.remoteEnabled);
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId") && message.authorizationId !== "")
+                        writer.uint32(/* id 4, wireType 2 =*/34).string(message.authorizationId);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified DesktopRegisterReq message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopRegisterReq.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterReq.$Properties} message DesktopRegisterReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopRegisterReq.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a DesktopRegisterReq message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape} DesktopRegisterReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopRegisterReq.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.DesktopRegisterReq();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.deviceId = value;
+                                else
+                                    delete message.deviceId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.name = value;
+                                else
+                                    delete message.name;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.bool())
+                                    message.remoteEnabled = value;
+                                else
+                                    delete message.remoteEnabled;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.authorizationId = value;
+                                else
+                                    delete message.authorizationId;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a DesktopRegisterReq message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape} DesktopRegisterReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopRegisterReq.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a DesktopRegisterReq message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                DesktopRegisterReq.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId"))
+                        if (!$util.isString(message.deviceId))
+                            return "deviceId: string expected";
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        if (!$util.isString(message.name))
+                            return "name: string expected";
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled"))
+                        if (typeof message.remoteEnabled !== "boolean")
+                            return "remoteEnabled: boolean expected";
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId"))
+                        if (!$util.isString(message.authorizationId))
+                            return "authorizationId: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates a DesktopRegisterReq message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.DesktopRegisterReq} DesktopRegisterReq
+                 */
+                DesktopRegisterReq.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.DesktopRegisterReq)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.DesktopRegisterReq: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.DesktopRegisterReq();
+                    if (object.deviceId != null)
+                        if (typeof object.deviceId !== "string" || object.deviceId.length)
+                            message.deviceId = $String(object.deviceId);
+                    if (object.name != null)
+                        if (typeof object.name !== "string" || object.name.length)
+                            message.name = $String(object.name);
+                    if (object.remoteEnabled != null)
+                        if (object.remoteEnabled)
+                            message.remoteEnabled = $Boolean(object.remoteEnabled);
+                    if (object.authorizationId != null)
+                        if (typeof object.authorizationId !== "string" || object.authorizationId.length)
+                            message.authorizationId = $String(object.authorizationId);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a DesktopRegisterReq message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterReq} message DesktopRegisterReq
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                DesktopRegisterReq.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.deviceId = "";
+                        object.name = "";
+                        object.remoteEnabled = false;
+                        object.authorizationId = "";
+                    }
+                    if (message.deviceId != null && $Object.hasOwnProperty.call(message, "deviceId"))
+                        object.deviceId = message.deviceId;
+                    if (message.name != null && $Object.hasOwnProperty.call(message, "name"))
+                        object.name = message.name;
+                    if (message.remoteEnabled != null && $Object.hasOwnProperty.call(message, "remoteEnabled"))
+                        object.remoteEnabled = message.remoteEnabled;
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId"))
+                        object.authorizationId = message.authorizationId;
+                    return object;
+                };
+
+                /**
+                 * Converts this DesktopRegisterReq to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.DesktopRegisterReq
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                DesktopRegisterReq.prototype.toJSON = function() {
+                    return DesktopRegisterReq.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return DesktopRegisterReq;
+            })();
+
+            v1.DesktopRegisterRes = (function() {
+
+                /**
+                 * Properties of a DesktopRegisterRes.
+                 * @typedef {Object} skynet.agent.v1.DesktopRegisterRes.$Properties
+                 * @property {number|null} [ret] DesktopRegisterRes ret
+                 * @property {skynet.agent.v1.ErrorInfo.$Properties|null} [error] DesktopRegisterRes error
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a DesktopRegisterRes.
+                 * @memberof skynet.agent.v1
+                 * @interface IDesktopRegisterRes
+                 * @augments skynet.agent.v1.DesktopRegisterRes.$Properties
+                 * @deprecated Use skynet.agent.v1.DesktopRegisterRes.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a DesktopRegisterRes.
+                 * @typedef {skynet.agent.v1.DesktopRegisterRes.$Properties} skynet.agent.v1.DesktopRegisterRes.$Shape
+                 */
+
+                /**
+                 * Constructs a new DesktopRegisterRes.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a DesktopRegisterRes.
+                 * @constructor
+                 * @param {skynet.agent.v1.DesktopRegisterRes.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const DesktopRegisterRes = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * DesktopRegisterRes ret.
+                 * @member {number} ret
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @instance
+                 */
+                DesktopRegisterRes.prototype.ret = 0;
+
+                /**
+                 * DesktopRegisterRes error.
+                 * @member {skynet.agent.v1.ErrorInfo.$Properties|null|undefined} error
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @instance
+                 */
+                DesktopRegisterRes.prototype.error = null;
+
+                /**
+                 * Creates a new DesktopRegisterRes instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterRes.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.DesktopRegisterRes} DesktopRegisterRes instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.DesktopRegisterRes.$Shape): skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape;
+                 *   (properties?: skynet.agent.v1.DesktopRegisterRes.$Properties): skynet.agent.v1.DesktopRegisterRes;
+                 * }}
+                 */
+                DesktopRegisterRes.create = function(properties) {
+                    return new DesktopRegisterRes(properties);
+                };
+
+                /**
+                 * Encodes the specified DesktopRegisterRes message. Does not implicitly {@link skynet.agent.v1.DesktopRegisterRes.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterRes.$Properties} message DesktopRegisterRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopRegisterRes.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret") && message.ret !== 0)
+                        writer.uint32(/* id 1, wireType 0 =*/8).int32(message.ret);
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        $root.skynet.agent.v1.ErrorInfo.encode(message.error, writer.uint32(/* id 2, wireType 2 =*/18).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified DesktopRegisterRes message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopRegisterRes.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterRes.$Properties} message DesktopRegisterRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopRegisterRes.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a DesktopRegisterRes message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape} DesktopRegisterRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopRegisterRes.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.DesktopRegisterRes();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.int32())
+                                    message.ret = value;
+                                else
+                                    delete message.ret;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                message.error = $root.skynet.agent.v1.ErrorInfo.decode(reader, reader.size(), $undefined, _depth + 1, message.error);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a DesktopRegisterRes message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape} DesktopRegisterRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopRegisterRes.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a DesktopRegisterRes message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                DesktopRegisterRes.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        if (!$util.isInteger(message.ret))
+                            return "ret: integer expected";
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error")) {
+                        let error = $root.skynet.agent.v1.ErrorInfo.verify(message.error, _depth + 1);
+                        if (error)
+                            return "error." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a DesktopRegisterRes message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.DesktopRegisterRes} DesktopRegisterRes
+                 */
+                DesktopRegisterRes.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.DesktopRegisterRes)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.DesktopRegisterRes: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.DesktopRegisterRes();
+                    if (object.ret != null)
+                        if ($Number(object.ret) !== 0)
+                            message.ret = object.ret | 0;
+                    if (object.error != null) {
+                        if (!$util.isObject(object.error))
+                            throw $TypeError(".skynet.agent.v1.DesktopRegisterRes.error: object expected");
+                        message.error = $root.skynet.agent.v1.ErrorInfo.fromObject(object.error, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a DesktopRegisterRes message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @static
+                 * @param {skynet.agent.v1.DesktopRegisterRes} message DesktopRegisterRes
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                DesktopRegisterRes.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.ret = 0;
+                        object.error = null;
+                    }
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        object.ret = message.ret;
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        object.error = $root.skynet.agent.v1.ErrorInfo.toObject(message.error, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this DesktopRegisterRes to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.DesktopRegisterRes
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                DesktopRegisterRes.prototype.toJSON = function() {
+                    return DesktopRegisterRes.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return DesktopRegisterRes;
+            })();
+
+            v1.DesktopUpdatedNtf = (function() {
+
+                /**
+                 * Properties of a DesktopUpdatedNtf.
+                 * @typedef {Object} skynet.agent.v1.DesktopUpdatedNtf.$Properties
+                 * @property {skynet.agent.v1.DesktopDevice.$Properties|null} [device] DesktopUpdatedNtf device
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a DesktopUpdatedNtf.
+                 * @memberof skynet.agent.v1
+                 * @interface IDesktopUpdatedNtf
+                 * @augments skynet.agent.v1.DesktopUpdatedNtf.$Properties
+                 * @deprecated Use skynet.agent.v1.DesktopUpdatedNtf.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a DesktopUpdatedNtf.
+                 * @typedef {skynet.agent.v1.DesktopUpdatedNtf.$Properties} skynet.agent.v1.DesktopUpdatedNtf.$Shape
+                 */
+
+                /**
+                 * Constructs a new DesktopUpdatedNtf.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a DesktopUpdatedNtf.
+                 * @constructor
+                 * @param {skynet.agent.v1.DesktopUpdatedNtf.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const DesktopUpdatedNtf = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * DesktopUpdatedNtf device.
+                 * @member {skynet.agent.v1.DesktopDevice.$Properties|null|undefined} device
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @instance
+                 */
+                DesktopUpdatedNtf.prototype.device = null;
+
+                /**
+                 * Creates a new DesktopUpdatedNtf instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.DesktopUpdatedNtf.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf} DesktopUpdatedNtf instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.DesktopUpdatedNtf.$Shape): skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape;
+                 *   (properties?: skynet.agent.v1.DesktopUpdatedNtf.$Properties): skynet.agent.v1.DesktopUpdatedNtf;
+                 * }}
+                 */
+                DesktopUpdatedNtf.create = function(properties) {
+                    return new DesktopUpdatedNtf(properties);
+                };
+
+                /**
+                 * Encodes the specified DesktopUpdatedNtf message. Does not implicitly {@link skynet.agent.v1.DesktopUpdatedNtf.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.DesktopUpdatedNtf.$Properties} message DesktopUpdatedNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopUpdatedNtf.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.device != null && $Object.hasOwnProperty.call(message, "device"))
+                        $root.skynet.agent.v1.DesktopDevice.encode(message.device, writer.uint32(/* id 1, wireType 2 =*/10).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified DesktopUpdatedNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopUpdatedNtf.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.DesktopUpdatedNtf.$Properties} message DesktopUpdatedNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                DesktopUpdatedNtf.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a DesktopUpdatedNtf message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape} DesktopUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopUpdatedNtf.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.DesktopUpdatedNtf();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                message.device = $root.skynet.agent.v1.DesktopDevice.decode(reader, reader.size(), $undefined, _depth + 1, message.device);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a DesktopUpdatedNtf message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape} DesktopUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                DesktopUpdatedNtf.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a DesktopUpdatedNtf message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                DesktopUpdatedNtf.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.device != null && $Object.hasOwnProperty.call(message, "device")) {
+                        let error = $root.skynet.agent.v1.DesktopDevice.verify(message.device, _depth + 1);
+                        if (error)
+                            return "device." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a DesktopUpdatedNtf message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf} DesktopUpdatedNtf
+                 */
+                DesktopUpdatedNtf.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.DesktopUpdatedNtf)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.DesktopUpdatedNtf: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.DesktopUpdatedNtf();
+                    if (object.device != null) {
+                        if (!$util.isObject(object.device))
+                            throw $TypeError(".skynet.agent.v1.DesktopUpdatedNtf.device: object expected");
+                        message.device = $root.skynet.agent.v1.DesktopDevice.fromObject(object.device, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a DesktopUpdatedNtf message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @static
+                 * @param {skynet.agent.v1.DesktopUpdatedNtf} message DesktopUpdatedNtf
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                DesktopUpdatedNtf.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults)
+                        object.device = null;
+                    if (message.device != null && $Object.hasOwnProperty.call(message, "device"))
+                        object.device = $root.skynet.agent.v1.DesktopDevice.toObject(message.device, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this DesktopUpdatedNtf to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.DesktopUpdatedNtf
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                DesktopUpdatedNtf.prototype.toJSON = function() {
+                    return DesktopUpdatedNtf.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return DesktopUpdatedNtf;
+            })();
+
+            v1.SessionExecutionSetReq = (function() {
+
+                /**
+                 * Properties of a SessionExecutionSetReq.
+                 * @typedef {Object} skynet.agent.v1.SessionExecutionSetReq.$Properties
+                 * @property {string|null} [sessionId] SessionExecutionSetReq sessionId
+                 * @property {skynet.agent.v1.ExecutionTarget.$Properties|null} [target] SessionExecutionSetReq target
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a SessionExecutionSetReq.
+                 * @memberof skynet.agent.v1
+                 * @interface ISessionExecutionSetReq
+                 * @augments skynet.agent.v1.SessionExecutionSetReq.$Properties
+                 * @deprecated Use skynet.agent.v1.SessionExecutionSetReq.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a SessionExecutionSetReq.
+                 * @typedef {skynet.agent.v1.SessionExecutionSetReq.$Properties} skynet.agent.v1.SessionExecutionSetReq.$Shape
+                 */
+
+                /**
+                 * Constructs a new SessionExecutionSetReq.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a SessionExecutionSetReq.
+                 * @constructor
+                 * @param {skynet.agent.v1.SessionExecutionSetReq.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const SessionExecutionSetReq = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * SessionExecutionSetReq sessionId.
+                 * @member {string} sessionId
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @instance
+                 */
+                SessionExecutionSetReq.prototype.sessionId = "";
+
+                /**
+                 * SessionExecutionSetReq target.
+                 * @member {skynet.agent.v1.ExecutionTarget.$Properties|null|undefined} target
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @instance
+                 */
+                SessionExecutionSetReq.prototype.target = null;
+
+                /**
+                 * Creates a new SessionExecutionSetReq instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetReq.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq} SessionExecutionSetReq instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.SessionExecutionSetReq.$Shape): skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape;
+                 *   (properties?: skynet.agent.v1.SessionExecutionSetReq.$Properties): skynet.agent.v1.SessionExecutionSetReq;
+                 * }}
+                 */
+                SessionExecutionSetReq.create = function(properties) {
+                    return new SessionExecutionSetReq(properties);
+                };
+
+                /**
+                 * Encodes the specified SessionExecutionSetReq message. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetReq.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetReq.$Properties} message SessionExecutionSetReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionExecutionSetReq.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId") && message.sessionId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.sessionId);
+                    if (message.target != null && $Object.hasOwnProperty.call(message, "target"))
+                        $root.skynet.agent.v1.ExecutionTarget.encode(message.target, writer.uint32(/* id 2, wireType 2 =*/18).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified SessionExecutionSetReq message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetReq.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetReq.$Properties} message SessionExecutionSetReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionExecutionSetReq.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a SessionExecutionSetReq message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape} SessionExecutionSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionExecutionSetReq.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.SessionExecutionSetReq();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.sessionId = value;
+                                else
+                                    delete message.sessionId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                message.target = $root.skynet.agent.v1.ExecutionTarget.decode(reader, reader.size(), $undefined, _depth + 1, message.target);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a SessionExecutionSetReq message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape} SessionExecutionSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionExecutionSetReq.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a SessionExecutionSetReq message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                SessionExecutionSetReq.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        if (!$util.isString(message.sessionId))
+                            return "sessionId: string expected";
+                    if (message.target != null && $Object.hasOwnProperty.call(message, "target")) {
+                        let error = $root.skynet.agent.v1.ExecutionTarget.verify(message.target, _depth + 1);
+                        if (error)
+                            return "target." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a SessionExecutionSetReq message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq} SessionExecutionSetReq
+                 */
+                SessionExecutionSetReq.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.SessionExecutionSetReq)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.SessionExecutionSetReq: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.SessionExecutionSetReq();
+                    if (object.sessionId != null)
+                        if (typeof object.sessionId !== "string" || object.sessionId.length)
+                            message.sessionId = $String(object.sessionId);
+                    if (object.target != null) {
+                        if (!$util.isObject(object.target))
+                            throw $TypeError(".skynet.agent.v1.SessionExecutionSetReq.target: object expected");
+                        message.target = $root.skynet.agent.v1.ExecutionTarget.fromObject(object.target, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a SessionExecutionSetReq message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetReq} message SessionExecutionSetReq
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                SessionExecutionSetReq.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.sessionId = "";
+                        object.target = null;
+                    }
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        object.sessionId = message.sessionId;
+                    if (message.target != null && $Object.hasOwnProperty.call(message, "target"))
+                        object.target = $root.skynet.agent.v1.ExecutionTarget.toObject(message.target, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this SessionExecutionSetReq to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.SessionExecutionSetReq
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                SessionExecutionSetReq.prototype.toJSON = function() {
+                    return SessionExecutionSetReq.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return SessionExecutionSetReq;
+            })();
+
+            v1.SessionExecutionSetRes = (function() {
+
+                /**
+                 * Properties of a SessionExecutionSetRes.
+                 * @typedef {Object} skynet.agent.v1.SessionExecutionSetRes.$Properties
+                 * @property {number|null} [ret] SessionExecutionSetRes ret
+                 * @property {skynet.agent.v1.ErrorInfo.$Properties|null} [error] SessionExecutionSetRes error
+                 * @property {skynet.agent.v1.ChatSession.$Properties|null} [chatSession] SessionExecutionSetRes chatSession
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of a SessionExecutionSetRes.
+                 * @memberof skynet.agent.v1
+                 * @interface ISessionExecutionSetRes
+                 * @augments skynet.agent.v1.SessionExecutionSetRes.$Properties
+                 * @deprecated Use skynet.agent.v1.SessionExecutionSetRes.$Properties instead.
+                 */
+
+                /**
+                 * Shape of a SessionExecutionSetRes.
+                 * @typedef {skynet.agent.v1.SessionExecutionSetRes.$Properties} skynet.agent.v1.SessionExecutionSetRes.$Shape
+                 */
+
+                /**
+                 * Constructs a new SessionExecutionSetRes.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents a SessionExecutionSetRes.
+                 * @constructor
+                 * @param {skynet.agent.v1.SessionExecutionSetRes.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const SessionExecutionSetRes = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * SessionExecutionSetRes ret.
+                 * @member {number} ret
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @instance
+                 */
+                SessionExecutionSetRes.prototype.ret = 0;
+
+                /**
+                 * SessionExecutionSetRes error.
+                 * @member {skynet.agent.v1.ErrorInfo.$Properties|null|undefined} error
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @instance
+                 */
+                SessionExecutionSetRes.prototype.error = null;
+
+                /**
+                 * SessionExecutionSetRes chatSession.
+                 * @member {skynet.agent.v1.ChatSession.$Properties|null|undefined} chatSession
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @instance
+                 */
+                SessionExecutionSetRes.prototype.chatSession = null;
+
+                /**
+                 * Creates a new SessionExecutionSetRes instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetRes.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes} SessionExecutionSetRes instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.SessionExecutionSetRes.$Shape): skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape;
+                 *   (properties?: skynet.agent.v1.SessionExecutionSetRes.$Properties): skynet.agent.v1.SessionExecutionSetRes;
+                 * }}
+                 */
+                SessionExecutionSetRes.create = function(properties) {
+                    return new SessionExecutionSetRes(properties);
+                };
+
+                /**
+                 * Encodes the specified SessionExecutionSetRes message. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetRes.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetRes.$Properties} message SessionExecutionSetRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionExecutionSetRes.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret") && message.ret !== 0)
+                        writer.uint32(/* id 1, wireType 0 =*/8).int32(message.ret);
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        $root.skynet.agent.v1.ErrorInfo.encode(message.error, writer.uint32(/* id 2, wireType 2 =*/18).fork(), _depth + 1).ldelim();
+                    if (message.chatSession != null && $Object.hasOwnProperty.call(message, "chatSession"))
+                        $root.skynet.agent.v1.ChatSession.encode(message.chatSession, writer.uint32(/* id 3, wireType 2 =*/26).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified SessionExecutionSetRes message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetRes.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetRes.$Properties} message SessionExecutionSetRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                SessionExecutionSetRes.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes a SessionExecutionSetRes message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape} SessionExecutionSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionExecutionSetRes.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.SessionExecutionSetRes();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.int32())
+                                    message.ret = value;
+                                else
+                                    delete message.ret;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                message.error = $root.skynet.agent.v1.ErrorInfo.decode(reader, reader.size(), $undefined, _depth + 1, message.error);
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                message.chatSession = $root.skynet.agent.v1.ChatSession.decode(reader, reader.size(), $undefined, _depth + 1, message.chatSession);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes a SessionExecutionSetRes message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape} SessionExecutionSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                SessionExecutionSetRes.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies a SessionExecutionSetRes message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                SessionExecutionSetRes.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        if (!$util.isInteger(message.ret))
+                            return "ret: integer expected";
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error")) {
+                        let error = $root.skynet.agent.v1.ErrorInfo.verify(message.error, _depth + 1);
+                        if (error)
+                            return "error." + error;
+                    }
+                    if (message.chatSession != null && $Object.hasOwnProperty.call(message, "chatSession")) {
+                        let error = $root.skynet.agent.v1.ChatSession.verify(message.chatSession, _depth + 1);
+                        if (error)
+                            return "chatSession." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates a SessionExecutionSetRes message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes} SessionExecutionSetRes
+                 */
+                SessionExecutionSetRes.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.SessionExecutionSetRes)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.SessionExecutionSetRes: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.SessionExecutionSetRes();
+                    if (object.ret != null)
+                        if ($Number(object.ret) !== 0)
+                            message.ret = object.ret | 0;
+                    if (object.error != null) {
+                        if (!$util.isObject(object.error))
+                            throw $TypeError(".skynet.agent.v1.SessionExecutionSetRes.error: object expected");
+                        message.error = $root.skynet.agent.v1.ErrorInfo.fromObject(object.error, _depth + 1);
+                    }
+                    if (object.chatSession != null) {
+                        if (!$util.isObject(object.chatSession))
+                            throw $TypeError(".skynet.agent.v1.SessionExecutionSetRes.chatSession: object expected");
+                        message.chatSession = $root.skynet.agent.v1.ChatSession.fromObject(object.chatSession, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from a SessionExecutionSetRes message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @static
+                 * @param {skynet.agent.v1.SessionExecutionSetRes} message SessionExecutionSetRes
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                SessionExecutionSetRes.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.ret = 0;
+                        object.error = null;
+                        object.chatSession = null;
+                    }
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        object.ret = message.ret;
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        object.error = $root.skynet.agent.v1.ErrorInfo.toObject(message.error, options, _depth + 1);
+                    if (message.chatSession != null && $Object.hasOwnProperty.call(message, "chatSession"))
+                        object.chatSession = $root.skynet.agent.v1.ChatSession.toObject(message.chatSession, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this SessionExecutionSetRes to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.SessionExecutionSetRes
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                SessionExecutionSetRes.prototype.toJSON = function() {
+                    return SessionExecutionSetRes.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return SessionExecutionSetRes;
+            })();
+
+            v1.ExecutionActionNtf = (function() {
+
+                /**
+                 * Properties of an ExecutionActionNtf.
+                 * @typedef {Object} skynet.agent.v1.ExecutionActionNtf.$Properties
+                 * @property {string|null} [requestId] ExecutionActionNtf requestId
+                 * @property {string|null} [sessionId] ExecutionActionNtf sessionId
+                 * @property {string|null} [runId] ExecutionActionNtf runId
+                 * @property {string|null} [toolCallId] ExecutionActionNtf toolCallId
+                 * @property {string|null} [operation] ExecutionActionNtf operation
+                 * @property {string|null} ["arguments"] ExecutionActionNtf arguments
+                 * @property {string|null} [workspaceId] ExecutionActionNtf workspaceId
+                 * @property {boolean|null} [remote] ExecutionActionNtf remote
+                 * @property {string|null} [authorizationId] ExecutionActionNtf authorizationId
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of an ExecutionActionNtf.
+                 * @memberof skynet.agent.v1
+                 * @interface IExecutionActionNtf
+                 * @augments skynet.agent.v1.ExecutionActionNtf.$Properties
+                 * @deprecated Use skynet.agent.v1.ExecutionActionNtf.$Properties instead.
+                 */
+
+                /**
+                 * Shape of an ExecutionActionNtf.
+                 * @typedef {skynet.agent.v1.ExecutionActionNtf.$Properties} skynet.agent.v1.ExecutionActionNtf.$Shape
+                 */
+
+                /**
+                 * Constructs a new ExecutionActionNtf.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents an ExecutionActionNtf.
+                 * @constructor
+                 * @param {skynet.agent.v1.ExecutionActionNtf.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ExecutionActionNtf = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ExecutionActionNtf requestId.
+                 * @member {string} requestId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.requestId = "";
+
+                /**
+                 * ExecutionActionNtf sessionId.
+                 * @member {string} sessionId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.sessionId = "";
+
+                /**
+                 * ExecutionActionNtf runId.
+                 * @member {string} runId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.runId = "";
+
+                /**
+                 * ExecutionActionNtf toolCallId.
+                 * @member {string} toolCallId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.toolCallId = "";
+
+                /**
+                 * ExecutionActionNtf operation.
+                 * @member {string} operation
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.operation = "";
+
+                /**
+                 * ExecutionActionNtf arguments.
+                 * @member {string} arguments
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype["arguments"] = "";
+
+                /**
+                 * ExecutionActionNtf workspaceId.
+                 * @member {string} workspaceId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.workspaceId = "";
+
+                /**
+                 * ExecutionActionNtf remote.
+                 * @member {boolean} remote
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.remote = false;
+
+                /**
+                 * ExecutionActionNtf authorizationId.
+                 * @member {string} authorizationId
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 */
+                ExecutionActionNtf.prototype.authorizationId = "";
+
+                /**
+                 * Creates a new ExecutionActionNtf instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionActionNtf.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ExecutionActionNtf} ExecutionActionNtf instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ExecutionActionNtf.$Shape): skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape;
+                 *   (properties?: skynet.agent.v1.ExecutionActionNtf.$Properties): skynet.agent.v1.ExecutionActionNtf;
+                 * }}
+                 */
+                ExecutionActionNtf.create = function(properties) {
+                    return new ExecutionActionNtf(properties);
+                };
+
+                /**
+                 * Encodes the specified ExecutionActionNtf message. Does not implicitly {@link skynet.agent.v1.ExecutionActionNtf.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionActionNtf.$Properties} message ExecutionActionNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionActionNtf.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId") && message.requestId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.requestId);
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId") && message.sessionId !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.sessionId);
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId") && message.runId !== "")
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.runId);
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId") && message.toolCallId !== "")
+                        writer.uint32(/* id 4, wireType 2 =*/34).string(message.toolCallId);
+                    if (message.operation != null && $Object.hasOwnProperty.call(message, "operation") && message.operation !== "")
+                        writer.uint32(/* id 5, wireType 2 =*/42).string(message.operation);
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments") && message["arguments"] !== "")
+                        writer.uint32(/* id 6, wireType 2 =*/50).string(message["arguments"]);
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId") && message.workspaceId !== "")
+                        writer.uint32(/* id 7, wireType 2 =*/58).string(message.workspaceId);
+                    if (message.remote != null && $Object.hasOwnProperty.call(message, "remote") && message.remote !== false)
+                        writer.uint32(/* id 8, wireType 0 =*/64).bool(message.remote);
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId") && message.authorizationId !== "")
+                        writer.uint32(/* id 9, wireType 2 =*/74).string(message.authorizationId);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ExecutionActionNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionActionNtf.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionActionNtf.$Properties} message ExecutionActionNtf message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionActionNtf.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes an ExecutionActionNtf message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape} ExecutionActionNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionActionNtf.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ExecutionActionNtf();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.requestId = value;
+                                else
+                                    delete message.requestId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.sessionId = value;
+                                else
+                                    delete message.sessionId;
+                                continue;
+                            }
+                        case 3: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.runId = value;
+                                else
+                                    delete message.runId;
+                                continue;
+                            }
+                        case 4: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.toolCallId = value;
+                                else
+                                    delete message.toolCallId;
+                                continue;
+                            }
+                        case 5: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.operation = value;
+                                else
+                                    delete message.operation;
+                                continue;
+                            }
+                        case 6: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message["arguments"] = value;
+                                else
+                                    delete message["arguments"];
+                                continue;
+                            }
+                        case 7: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.workspaceId = value;
+                                else
+                                    delete message.workspaceId;
+                                continue;
+                            }
+                        case 8: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.bool())
+                                    message.remote = value;
+                                else
+                                    delete message.remote;
+                                continue;
+                            }
+                        case 9: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.authorizationId = value;
+                                else
+                                    delete message.authorizationId;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes an ExecutionActionNtf message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape} ExecutionActionNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionActionNtf.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies an ExecutionActionNtf message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ExecutionActionNtf.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId"))
+                        if (!$util.isString(message.requestId))
+                            return "requestId: string expected";
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        if (!$util.isString(message.sessionId))
+                            return "sessionId: string expected";
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        if (!$util.isString(message.runId))
+                            return "runId: string expected";
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId"))
+                        if (!$util.isString(message.toolCallId))
+                            return "toolCallId: string expected";
+                    if (message.operation != null && $Object.hasOwnProperty.call(message, "operation"))
+                        if (!$util.isString(message.operation))
+                            return "operation: string expected";
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments"))
+                        if (!$util.isString(message["arguments"]))
+                            return "arguments: string expected";
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId"))
+                        if (!$util.isString(message.workspaceId))
+                            return "workspaceId: string expected";
+                    if (message.remote != null && $Object.hasOwnProperty.call(message, "remote"))
+                        if (typeof message.remote !== "boolean")
+                            return "remote: boolean expected";
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId"))
+                        if (!$util.isString(message.authorizationId))
+                            return "authorizationId: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates an ExecutionActionNtf message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ExecutionActionNtf} ExecutionActionNtf
+                 */
+                ExecutionActionNtf.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ExecutionActionNtf)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ExecutionActionNtf: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ExecutionActionNtf();
+                    if (object.requestId != null)
+                        if (typeof object.requestId !== "string" || object.requestId.length)
+                            message.requestId = $String(object.requestId);
+                    if (object.sessionId != null)
+                        if (typeof object.sessionId !== "string" || object.sessionId.length)
+                            message.sessionId = $String(object.sessionId);
+                    if (object.runId != null)
+                        if (typeof object.runId !== "string" || object.runId.length)
+                            message.runId = $String(object.runId);
+                    if (object.toolCallId != null)
+                        if (typeof object.toolCallId !== "string" || object.toolCallId.length)
+                            message.toolCallId = $String(object.toolCallId);
+                    if (object.operation != null)
+                        if (typeof object.operation !== "string" || object.operation.length)
+                            message.operation = $String(object.operation);
+                    if (object["arguments"] != null)
+                        if (typeof object["arguments"] !== "string" || object["arguments"].length)
+                            message["arguments"] = $String(object["arguments"]);
+                    if (object.workspaceId != null)
+                        if (typeof object.workspaceId !== "string" || object.workspaceId.length)
+                            message.workspaceId = $String(object.workspaceId);
+                    if (object.remote != null)
+                        if (object.remote)
+                            message.remote = $Boolean(object.remote);
+                    if (object.authorizationId != null)
+                        if (typeof object.authorizationId !== "string" || object.authorizationId.length)
+                            message.authorizationId = $String(object.authorizationId);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from an ExecutionActionNtf message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionActionNtf} message ExecutionActionNtf
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ExecutionActionNtf.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.requestId = "";
+                        object.sessionId = "";
+                        object.runId = "";
+                        object.toolCallId = "";
+                        object.operation = "";
+                        object["arguments"] = "";
+                        object.workspaceId = "";
+                        object.remote = false;
+                        object.authorizationId = "";
+                    }
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId"))
+                        object.requestId = message.requestId;
+                    if (message.sessionId != null && $Object.hasOwnProperty.call(message, "sessionId"))
+                        object.sessionId = message.sessionId;
+                    if (message.runId != null && $Object.hasOwnProperty.call(message, "runId"))
+                        object.runId = message.runId;
+                    if (message.toolCallId != null && $Object.hasOwnProperty.call(message, "toolCallId"))
+                        object.toolCallId = message.toolCallId;
+                    if (message.operation != null && $Object.hasOwnProperty.call(message, "operation"))
+                        object.operation = message.operation;
+                    if (message["arguments"] != null && $Object.hasOwnProperty.call(message, "arguments"))
+                        object["arguments"] = message["arguments"];
+                    if (message.workspaceId != null && $Object.hasOwnProperty.call(message, "workspaceId"))
+                        object.workspaceId = message.workspaceId;
+                    if (message.remote != null && $Object.hasOwnProperty.call(message, "remote"))
+                        object.remote = message.remote;
+                    if (message.authorizationId != null && $Object.hasOwnProperty.call(message, "authorizationId"))
+                        object.authorizationId = message.authorizationId;
+                    return object;
+                };
+
+                /**
+                 * Converts this ExecutionActionNtf to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ExecutionActionNtf
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ExecutionActionNtf.prototype.toJSON = function() {
+                    return ExecutionActionNtf.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ExecutionActionNtf;
+            })();
+
+            v1.ExecutionResultReq = (function() {
+
+                /**
+                 * Properties of an ExecutionResultReq.
+                 * @typedef {Object} skynet.agent.v1.ExecutionResultReq.$Properties
+                 * @property {string|null} [requestId] ExecutionResultReq requestId
+                 * @property {string|null} [result] ExecutionResultReq result
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of an ExecutionResultReq.
+                 * @memberof skynet.agent.v1
+                 * @interface IExecutionResultReq
+                 * @augments skynet.agent.v1.ExecutionResultReq.$Properties
+                 * @deprecated Use skynet.agent.v1.ExecutionResultReq.$Properties instead.
+                 */
+
+                /**
+                 * Shape of an ExecutionResultReq.
+                 * @typedef {skynet.agent.v1.ExecutionResultReq.$Properties} skynet.agent.v1.ExecutionResultReq.$Shape
+                 */
+
+                /**
+                 * Constructs a new ExecutionResultReq.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents an ExecutionResultReq.
+                 * @constructor
+                 * @param {skynet.agent.v1.ExecutionResultReq.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ExecutionResultReq = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ExecutionResultReq requestId.
+                 * @member {string} requestId
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @instance
+                 */
+                ExecutionResultReq.prototype.requestId = "";
+
+                /**
+                 * ExecutionResultReq result.
+                 * @member {string} result
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @instance
+                 */
+                ExecutionResultReq.prototype.result = "";
+
+                /**
+                 * Creates a new ExecutionResultReq instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultReq.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ExecutionResultReq} ExecutionResultReq instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ExecutionResultReq.$Shape): skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape;
+                 *   (properties?: skynet.agent.v1.ExecutionResultReq.$Properties): skynet.agent.v1.ExecutionResultReq;
+                 * }}
+                 */
+                ExecutionResultReq.create = function(properties) {
+                    return new ExecutionResultReq(properties);
+                };
+
+                /**
+                 * Encodes the specified ExecutionResultReq message. Does not implicitly {@link skynet.agent.v1.ExecutionResultReq.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultReq.$Properties} message ExecutionResultReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionResultReq.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId") && message.requestId !== "")
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.requestId);
+                    if (message.result != null && $Object.hasOwnProperty.call(message, "result") && message.result !== "")
+                        writer.uint32(/* id 2, wireType 2 =*/18).string(message.result);
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ExecutionResultReq message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionResultReq.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultReq.$Properties} message ExecutionResultReq message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionResultReq.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes an ExecutionResultReq message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape} ExecutionResultReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionResultReq.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ExecutionResultReq();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.requestId = value;
+                                else
+                                    delete message.requestId;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                if ((value = reader.stringVerify()).length)
+                                    message.result = value;
+                                else
+                                    delete message.result;
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes an ExecutionResultReq message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape} ExecutionResultReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionResultReq.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies an ExecutionResultReq message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ExecutionResultReq.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId"))
+                        if (!$util.isString(message.requestId))
+                            return "requestId: string expected";
+                    if (message.result != null && $Object.hasOwnProperty.call(message, "result"))
+                        if (!$util.isString(message.result))
+                            return "result: string expected";
+                    return null;
+                };
+
+                /**
+                 * Creates an ExecutionResultReq message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ExecutionResultReq} ExecutionResultReq
+                 */
+                ExecutionResultReq.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ExecutionResultReq)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ExecutionResultReq: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ExecutionResultReq();
+                    if (object.requestId != null)
+                        if (typeof object.requestId !== "string" || object.requestId.length)
+                            message.requestId = $String(object.requestId);
+                    if (object.result != null)
+                        if (typeof object.result !== "string" || object.result.length)
+                            message.result = $String(object.result);
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from an ExecutionResultReq message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultReq} message ExecutionResultReq
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ExecutionResultReq.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.requestId = "";
+                        object.result = "";
+                    }
+                    if (message.requestId != null && $Object.hasOwnProperty.call(message, "requestId"))
+                        object.requestId = message.requestId;
+                    if (message.result != null && $Object.hasOwnProperty.call(message, "result"))
+                        object.result = message.result;
+                    return object;
+                };
+
+                /**
+                 * Converts this ExecutionResultReq to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ExecutionResultReq
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ExecutionResultReq.prototype.toJSON = function() {
+                    return ExecutionResultReq.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ExecutionResultReq;
+            })();
+
+            v1.ExecutionResultRes = (function() {
+
+                /**
+                 * Properties of an ExecutionResultRes.
+                 * @typedef {Object} skynet.agent.v1.ExecutionResultRes.$Properties
+                 * @property {number|null} [ret] ExecutionResultRes ret
+                 * @property {skynet.agent.v1.ErrorInfo.$Properties|null} [error] ExecutionResultRes error
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+
+                /**
+                 * Properties of an ExecutionResultRes.
+                 * @memberof skynet.agent.v1
+                 * @interface IExecutionResultRes
+                 * @augments skynet.agent.v1.ExecutionResultRes.$Properties
+                 * @deprecated Use skynet.agent.v1.ExecutionResultRes.$Properties instead.
+                 */
+
+                /**
+                 * Shape of an ExecutionResultRes.
+                 * @typedef {skynet.agent.v1.ExecutionResultRes.$Properties} skynet.agent.v1.ExecutionResultRes.$Shape
+                 */
+
+                /**
+                 * Constructs a new ExecutionResultRes.
+                 * @memberof skynet.agent.v1
+                 * @classdesc Represents an ExecutionResultRes.
+                 * @constructor
+                 * @param {skynet.agent.v1.ExecutionResultRes.$Properties=} [properties] Properties to set
+                 * @property {Array.<Uint8Array>} [$unknowns] Unknown fields preserved while decoding when enabled
+                 */
+                const ExecutionResultRes = function (properties) {
+                    if (properties)
+                        for (let keys = $Object.keys(properties), i = 0; i < keys.length; ++i)
+                            if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                                this[keys[i]] = properties[keys[i]];
+                };
+
+                /**
+                 * ExecutionResultRes ret.
+                 * @member {number} ret
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @instance
+                 */
+                ExecutionResultRes.prototype.ret = 0;
+
+                /**
+                 * ExecutionResultRes error.
+                 * @member {skynet.agent.v1.ErrorInfo.$Properties|null|undefined} error
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @instance
+                 */
+                ExecutionResultRes.prototype.error = null;
+
+                /**
+                 * Creates a new ExecutionResultRes instance using the specified properties.
+                 * @function create
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultRes.$Properties=} [properties] Properties to set
+                 * @returns {skynet.agent.v1.ExecutionResultRes} ExecutionResultRes instance
+                 * @type {{
+                 *   (properties: skynet.agent.v1.ExecutionResultRes.$Shape): skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape;
+                 *   (properties?: skynet.agent.v1.ExecutionResultRes.$Properties): skynet.agent.v1.ExecutionResultRes;
+                 * }}
+                 */
+                ExecutionResultRes.create = function(properties) {
+                    return new ExecutionResultRes(properties);
+                };
+
+                /**
+                 * Encodes the specified ExecutionResultRes message. Does not implicitly {@link skynet.agent.v1.ExecutionResultRes.verify|verify} messages.
+                 * @function encode
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultRes.$Properties} message ExecutionResultRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionResultRes.encode = function (message, writer, _depth) {
+                    if (!writer)
+                        writer = $Writer.create();
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret") && message.ret !== 0)
+                        writer.uint32(/* id 1, wireType 0 =*/8).int32(message.ret);
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        $root.skynet.agent.v1.ErrorInfo.encode(message.error, writer.uint32(/* id 2, wireType 2 =*/18).fork(), _depth + 1).ldelim();
+                    if (message.$unknowns != null && $Object.hasOwnProperty.call(message, "$unknowns"))
+                        for (let i = 0; i < message.$unknowns.length; ++i)
+                            writer.raw(message.$unknowns[i]);
+                    return writer;
+                };
+
+                /**
+                 * Encodes the specified ExecutionResultRes message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionResultRes.verify|verify} messages.
+                 * @function encodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultRes.$Properties} message ExecutionResultRes message or plain object to encode
+                 * @param {$protobuf.Writer} [writer] Writer to encode to
+                 * @returns {$protobuf.Writer} Writer
+                 */
+                ExecutionResultRes.encodeDelimited = function(message, writer) {
+                    return this.encode(message, (writer || $Writer.create()).fork()).ldelim();
+                };
+
+                /**
+                 * Decodes an ExecutionResultRes message from the specified reader or buffer.
+                 * @function decode
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @param {number} [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape} ExecutionResultRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionResultRes.decode = function (reader, length, _end, _depth, _target) {
+                    if (!(reader instanceof $Reader))
+                        reader = $Reader.create(reader);
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $Reader.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let end, message, value;
+                    if (length === $undefined)
+                        end = reader.len;
+                    else {
+                        end = reader.pos + length;
+                        if (end > reader.len)
+                            throw $RangeError("index out of range");
+                        length = reader.len;
+                        reader.len = end;
+                    }
+                    message = _target || new $root.skynet.agent.v1.ExecutionResultRes();
+                    while (reader.pos < end) {
+                        let start = reader.pos;
+                        let tag = reader.tag();
+                        if (tag === _end) {
+                            _end = $undefined;
+                            break;
+                        }
+                        let wireType = tag & 7;
+                        switch (tag >>>= 3) {
+                        case 1: {
+                                if (wireType !== 0)
+                                    break;
+                                if (value = reader.int32())
+                                    message.ret = value;
+                                else
+                                    delete message.ret;
+                                continue;
+                            }
+                        case 2: {
+                                if (wireType !== 2)
+                                    break;
+                                message.error = $root.skynet.agent.v1.ErrorInfo.decode(reader, reader.size(), $undefined, _depth + 1, message.error);
+                                continue;
+                            }
+                        }
+                        reader.skipType(wireType, _depth, tag);
+                        if (!reader.discardUnknown) {
+                            $util.makeProp(message, "$unknowns", false);
+                            (message.$unknowns || (message.$unknowns = [])).push(reader.raw(start, reader.pos));
+                        }
+                    }
+                    if (length !== $undefined) {
+                        if (reader.pos !== end)
+                            throw $RangeError("index out of range");
+                        reader.len = length;
+                    }
+                    if (_end !== $undefined)
+                        throw $Error("missing end group");
+                    return message;
+                };
+
+                /**
+                 * Decodes an ExecutionResultRes message from the specified reader or buffer, length delimited.
+                 * @function decodeDelimited
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape} ExecutionResultRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                ExecutionResultRes.decodeDelimited = function(reader) {
+                    if (!(reader instanceof $Reader))
+                        reader = new $Reader(reader);
+                    return this.decode(reader, reader.size());
+                };
+
+                /**
+                 * Verifies an ExecutionResultRes message.
+                 * @function verify
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {Object.<string,*>} message Plain object to verify
+                 * @returns {string|null} `null` if valid, otherwise the reason why it is not
+                 */
+                ExecutionResultRes.verify = function (message, _depth) {
+                    if (typeof message !== "object" || message === null)
+                        return "object expected";
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        return "max depth exceeded";
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        if (!$util.isInteger(message.ret))
+                            return "ret: integer expected";
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error")) {
+                        let error = $root.skynet.agent.v1.ErrorInfo.verify(message.error, _depth + 1);
+                        if (error)
+                            return "error." + error;
+                    }
+                    return null;
+                };
+
+                /**
+                 * Creates an ExecutionResultRes message from a plain object. Also converts values to their respective internal types.
+                 * @function fromObject
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {Object.<string,*>} object Plain object
+                 * @returns {skynet.agent.v1.ExecutionResultRes} ExecutionResultRes
+                 */
+                ExecutionResultRes.fromObject = function (object, _depth) {
+                    if (object instanceof $root.skynet.agent.v1.ExecutionResultRes)
+                        return object;
+                    if (!$util.isObject(object))
+                        throw $TypeError(".skynet.agent.v1.ExecutionResultRes: object expected");
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let message = new $root.skynet.agent.v1.ExecutionResultRes();
+                    if (object.ret != null)
+                        if ($Number(object.ret) !== 0)
+                            message.ret = object.ret | 0;
+                    if (object.error != null) {
+                        if (!$util.isObject(object.error))
+                            throw $TypeError(".skynet.agent.v1.ExecutionResultRes.error: object expected");
+                        message.error = $root.skynet.agent.v1.ErrorInfo.fromObject(object.error, _depth + 1);
+                    }
+                    return message;
+                };
+
+                /**
+                 * Creates a plain object from an ExecutionResultRes message. Also converts values to other types if specified.
+                 * @function toObject
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @static
+                 * @param {skynet.agent.v1.ExecutionResultRes} message ExecutionResultRes
+                 * @param {$protobuf.IConversionOptions} [options] Conversion options
+                 * @returns {Object.<string,*>} Plain object
+                 */
+                ExecutionResultRes.toObject = function (message, options, _depth) {
+                    if (!options)
+                        options = {};
+                    if (_depth === $undefined)
+                        _depth = 0;
+                    if (_depth > $util.recursionLimit)
+                        throw $Error("max depth exceeded");
+                    let object = {};
+                    if (options.defaults) {
+                        object.ret = 0;
+                        object.error = null;
+                    }
+                    if (message.ret != null && $Object.hasOwnProperty.call(message, "ret"))
+                        object.ret = message.ret;
+                    if (message.error != null && $Object.hasOwnProperty.call(message, "error"))
+                        object.error = $root.skynet.agent.v1.ErrorInfo.toObject(message.error, options, _depth + 1);
+                    return object;
+                };
+
+                /**
+                 * Converts this ExecutionResultRes to JSON.
+                 * @function toJSON
+                 * @memberof skynet.agent.v1.ExecutionResultRes
+                 * @instance
+                 * @returns {Object.<string,*>} JSON object
+                 */
+                ExecutionResultRes.prototype.toJSON = function() {
+                    return ExecutionResultRes.toObject(this, $protobuf.util.toJSONOptions);
+                };
+
+                return ExecutionResultRes;
             })();
 
             v1.LoginReq = (function() {

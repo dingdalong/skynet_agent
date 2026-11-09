@@ -24,6 +24,11 @@ pub fn encode(id: u32, name: &str, payload: &impl Message) -> Vec<u8> {
 
 #[derive(Debug)]
 pub enum Server {
+    DesktopRegister(pb::DesktopRegisterRes),
+    ExecutionSet(pb::SessionExecutionSetRes),
+    ExecutionResult(pb::ExecutionResultRes),
+    Desktop(pb::DesktopUpdatedNtf),
+    ExecutionAction(pb::ExecutionActionNtf),
     Login(pb::LoginRes),
     Snapshot(pb::UserSnapshotRes),
     Chat(pb::ChatRes),
@@ -37,6 +42,11 @@ pub enum Server {
 impl Server {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::DesktopRegister(_) => "DesktopRegisterRes",
+            Self::ExecutionSet(_) => "SessionExecutionSetRes",
+            Self::ExecutionResult(_) => "ExecutionResultRes",
+            Self::Desktop(_) => "DesktopUpdatedNtf",
+            Self::ExecutionAction(_) => "ExecutionActionNtf",
             Self::Login(_) => "LoginRes",
             Self::Snapshot(_) => "UserSnapshotRes",
             Self::Chat(_) => "ChatRes",
@@ -64,7 +74,7 @@ pub fn decode(frame: &[u8]) -> Result<(u32, Server), String> {
                     .map_err(|error| format!("Agent Protobuf 解码失败: {error}"))?;
                 let notification = matches!(
                     stringify!($variant),
-                    "Session" | "Delta" | "Tool" | "Reasoning"
+                    "Session" | "Delta" | "Tool" | "Reasoning" | "Desktop" | "ExecutionAction"
                 );
                 if (id == 0) != notification {
                     return Err("Agent 消息方向或请求编号无效".into());
@@ -73,6 +83,11 @@ pub fn decode(frame: &[u8]) -> Result<(u32, Server), String> {
             }
         };
     }
+    message!(DesktopRegisterRes, DesktopRegister);
+    message!(SessionExecutionSetRes, ExecutionSet);
+    message!(ExecutionResultRes, ExecutionResult);
+    message!(DesktopUpdatedNtf, Desktop);
+    message!(ExecutionActionNtf, ExecutionAction);
     message!(LoginRes, Login);
     message!(UserSnapshotRes, Snapshot);
     message!(ChatRes, Chat);
@@ -142,7 +157,8 @@ mod tests {
                     session_id: "session-1".into(),
                     text: "你好".into(),
                     retry_run_id: String::new(),
-                    model_id: String::new()
+                    model_id: String::new(),
+                    execution_target: None,
                 }
             )),
             vectors["frames"]["chat_request"].as_str().unwrap()

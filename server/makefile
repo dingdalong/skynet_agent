@@ -64,7 +64,7 @@ BUSTED_CPATH := ./luaclib/?.so
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
 .NOTPARALLEL:
 .PHONY: help build check check-format test test-integration test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
-	cjson protobuf lfs process filesystem linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
+	cjson protobuf lfs process filesystem native test-native linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
 	clean cleanall
 
 help:
@@ -79,7 +79,8 @@ help:
 		"  make mingw      MinGW 交叉构建" \
 		"" \
 		"检查:" \
-		"  make test       离线 Busted 单元测试" \
+		"  make test       共用 C 核心与离线 Busted 单元测试" \
+		"  make native     构建共用工具核心与辅助程序" \
 		"  make test-integration     构建并运行全部假模型与运行时集成测试" \
 		"  make test-protobuf-shared  验证 protobuf schema 跨 VM 共享" \
 		"  make test-agent-gateway    运行假模型与四服务网关聊天测试" \
@@ -189,7 +190,7 @@ mingw-tls:
 		-L"$(OPENSSL_LIB_DIR)" -lssl -lcrypto \
 		-lws2_32 -lcrypt32 -static-libgcc
 
-test: cjson protobuf lfs process filesystem
+test: cjson protobuf lfs process filesystem test-native
 	@command -v "$(BUSTED)" >/dev/null 2>&1 || { \
 		printf '%s\n' "未找到 busted，请先运行 luarocks install busted" >&2; \
 		exit 1; \
@@ -238,17 +239,27 @@ cleanall:
 	@-$(MAKE) -C "$(CJSON_DIR)" clean TARGET="$(LUACLIB_DIR)/cjson.so"
 	@rm -rf "$(LUACLIB_DIR)"
 
-# Project-owned Lua extensions share lualib-src; no Skynet sources are modified.
-process:
-	@mkdir -p "$(LUACLIB_DIR)" "$(PROJECT_ROOT)/bin"
-	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" \
-		"$(PROJECT_ROOT)/src/lualib-src/process.c" -o "$(LUACLIB_DIR)/agent_process.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
-	@$(CC) -O2 -Wall -Wextra "$(PROJECT_ROOT)/src/lualib-src/process_launcher.c" -o "$(PROJECT_ROOT)/bin/process_launcher"
+# Both hosts build the same native sources in independent output directories.
+NATIVE_DIR := $(PROJECT_ROOT)/../common/native/agent_runtime
+NATIVE_BUILD := $(PROJECT_ROOT)/build/native
+.PHONY: native test-native
+native:
+	@$(MAKE) -C "$(NATIVE_DIR)" BUILD_DIR="$(NATIVE_BUILD)" CC="$(CC)" all
+	@mkdir -p "$(PROJECT_ROOT)/bin"
+	@cp "$(NATIVE_BUILD)/process_launcher" "$(NATIVE_BUILD)/agent_worker" "$(PROJECT_ROOT)/bin/"
 
-filesystem:
+test-native: native
+	@$(MAKE) -C "$(NATIVE_DIR)" BUILD_DIR="$(NATIVE_BUILD)" CC="$(CC)" test
+
+process: native
 	@mkdir -p "$(LUACLIB_DIR)"
-	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" \
-		"$(PROJECT_ROOT)/src/lualib-src/filesystem.c" -o "$(LUACLIB_DIR)/agent_filesystem.so" $(LFS_LDFLAGS)
+	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" -I"$(NATIVE_DIR)" \
+		"$(PROJECT_ROOT)/src/lualib-src/process.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_process.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
+
+filesystem: native
+	@mkdir -p "$(LUACLIB_DIR)"
+	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" -I"$(NATIVE_DIR)" \
+		"$(PROJECT_ROOT)/src/lualib-src/filesystem.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_filesystem.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
 
 test-tool-process:
 	@cd "$(PROJECT_ROOT)" && "$(SKYNET_DIR)/skynet" tests/integration/tool_process.config

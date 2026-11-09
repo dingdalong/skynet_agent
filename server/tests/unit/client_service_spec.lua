@@ -217,7 +217,7 @@ describe("用户与客户端服务", function()
         assert.are.equal(1, template_loads)
         file.list_directories = list_directories
         uninitialized:init()
-        assert.are.equal(2, #uninitialized.request_handlers)
+        assert.are.equal(3, #uninitialized.request_handlers)
         assert.are.equal(templates, uninitialized.prompt_templates)
     end)
 

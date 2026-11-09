@@ -64,6 +64,38 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Rust 客户端界面适配', () => {
+  it('选择目录绑定原会话，选择期间切换会话会放弃结果', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish(state())
+    vi.mocked(invoke).mockResolvedValueOnce('/synthetic/project')
+    expect(await runtime.setExecution!('local')).toBe(true)
+    expect(invoke).toHaveBeenLastCalledWith('chat_action', {
+      subscription: 'binding',
+      action: {
+        type: 'setExecution',
+        target: { kind: 'session', sessionId: 's1' },
+        directory: '/synthetic/project',
+      },
+    })
+    let choose!: (path: string) => void
+    vi.mocked(invoke).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          choose = resolve as typeof choose
+        }),
+    )
+    const pending = runtime.setExecution!('local')
+    publish(draftState())
+    const requests = vi.mocked(invoke).mock.calls.length
+    choose('/synthetic/other')
+    expect(await pending).toBe(false)
+    expect(invoke).toHaveBeenCalledTimes(requests)
+    vi.mocked(invoke).mockResolvedValueOnce(null)
+    expect(await runtime.setExecution!('local')).toBeNull()
+    expect(invoke).toHaveBeenLastCalledWith('chat_choose_directory')
+    runtime.detach()
+  })
   it('本地草稿使用独立target，迟到回显不覆盖输入，首发绑定后清理本地投影', async () => {
     const runtime = createNativeChatRuntime()
     await runtime.attach()

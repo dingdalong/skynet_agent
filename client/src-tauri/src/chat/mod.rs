@@ -54,6 +54,7 @@ struct Pending {
     reply: Option<Reply>,
 }
 enum Purpose {
+    Execution,
     Login,
     Snapshot,
     Model {
@@ -71,6 +72,16 @@ enum Purpose {
     },
 }
 enum Input {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    ConfigureExecution {
+        data: std::path::PathBuf,
+        resources: std::path::PathBuf,
+    },
+    ExecutionFinished {
+        generation: u64,
+        request_id: String,
+        result: String,
+    },
     Attach {
         label: String,
         hint: String,
@@ -108,6 +119,10 @@ pub struct ChatCore {
     tx: mpsc::UnboundedSender<Input>,
 }
 impl ChatCore {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn configure_execution(&self, data: std::path::PathBuf, resources: std::path::PathBuf) {
+        let _ = self.tx.send(Input::ConfigureExecution { data, resources });
+    }
     pub fn start(url: String) -> Result<Self, String> {
         connection::validate_url(&url)?;
         let (tx, rx) = mpsc::unbounded_channel();
@@ -180,7 +195,27 @@ pub async fn chat_action(
         .await
 }
 
+#[tauri::command]
+pub async fn chat_choose_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .blocking_pick_folder()
+            .map(|path| {
+                path.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|e| e.to_string())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 struct Actor {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    execution: Option<crate::execution::Engine>,
     url: String,
     tx: mpsc::UnboundedSender<Input>,
     cache: Cache,
@@ -205,6 +240,8 @@ struct Actor {
 impl Actor {
     fn new(url: String, tx: mpsc::UnboundedSender<Input>) -> Self {
         Self {
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            execution: None,
             url,
             tx,
             cache: Cache::default(),
@@ -234,6 +271,18 @@ impl Actor {
                 input = rx.recv() => {
                     let Some(input) = input else { break; };
                     match input {
+                        #[cfg(any(target_os = "macos", target_os = "linux"))]
+                        Input::ConfigureExecution { data, resources } => {
+                            match crate::execution::Engine::new(data, resources) {
+                                Ok(engine) => self.execution = Some(engine),
+                                Err(error) => { eprintln!("[execution] init failed: {error}"); self.error = error; }
+                            }
+                        },
+                        Input::ExecutionFinished { generation, request_id, result } => {
+                            if generation == self.generation && self.writer.is_some() {
+                                self.request("ExecutionResultReq", &pb::ExecutionResultReq {request_id,result}, "ExecutionResultRes", Purpose::Execution, None);
+                            }
+                        },
                         Input::Shutdown => { self.stop("客户端核心已关闭"); break; },
                         Input::Attach {label,hint,sink,reply} => {
                             self.next_subscriber += 1;
@@ -279,6 +328,10 @@ impl Actor {
         }
     }
     fn tick(&mut self, now: Instant) {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if let Some(engine) = &self.execution {
+            engine.tick();
+        }
         if self
             .opening_deadline
             .is_some_and(|deadline| deadline <= now)
@@ -302,7 +355,14 @@ impl Actor {
         let error = &self.error;
         self.subscribers.retain(|label, subscriber| {
             (subscriber.sink)(Event::State {
-                state: cache.state(label, connection_state, error),
+                state: {
+                    let mut state = cache.state(label, connection_state, error);
+                    #[cfg(any(target_os = "macos", target_os = "linux"))]
+                    if let Some(engine) = &self.execution {
+                        state.local_device_id = engine.registration().device_id;
+                    }
+                    state
+                },
             })
         });
     }
@@ -321,6 +381,10 @@ impl Actor {
             .retain(|_, subscriber| (subscriber.sink)(event.clone()));
     }
     fn stop(&mut self, error: &str) {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if let Some(engine) = &self.execution {
+            engine.disconnect();
+        }
         self.generation += 1;
         if let Some(task) = self.connection_task.take() {
             task.abort();
@@ -501,6 +565,83 @@ impl Actor {
                     return;
                 }
                 match action {
+                    Action::SetRemote { enabled } => {
+                        #[cfg(any(target_os = "macos", target_os = "linux"))]
+                        if let Some(engine) = &self.execution {
+                            if let Err(error) = engine.set_remote(enabled) {
+                                let _ = reply.send(Err(error));
+                                return;
+                            }
+                            let registration = engine.registration();
+                            self.request(
+                                "DesktopRegisterReq",
+                                &registration,
+                                "DesktopRegisterRes",
+                                Purpose::Execution,
+                                Some(reply),
+                            );
+                            return;
+                        }
+                        let _ = reply.send(Err("此设备不能承载本地执行".into()));
+                    }
+                    Action::SetExecution {
+                        target: selection,
+                        directory,
+                    } => {
+                        if self.cache.view(&label).selected.as_ref() != Some(&selection) {
+                            let _ = reply.send(Ok(false));
+                            return;
+                        }
+                        let target = if let Some(directory) = directory {
+                            #[cfg(any(target_os = "macos", target_os = "linux"))]
+                            {
+                                match self
+                                    .execution
+                                    .as_ref()
+                                    .ok_or_else(|| "桌面执行器未就绪".to_string())
+                                    .and_then(|e| e.bind(&directory))
+                                {
+                                    Ok(target) => Some(target),
+                                    Err(error) => {
+                                        let _ = reply.send(Err(error));
+                                        return;
+                                    }
+                                }
+                            }
+                            #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+                            {
+                                let _ = directory;
+                                let _ = reply.send(Err("此平台不支持本地执行".into()));
+                                return;
+                            }
+                        } else {
+                            None
+                        };
+                        let view = self.cache.view(&label);
+                        match view.selected.clone() {
+                            Some(Selection::Draft { .. }) => {
+                                if let Some(draft) =
+                                    view.local_draft.as_mut().filter(|d| !d.sending)
+                                {
+                                    draft.execution_target = target;
+                                    self.emit_state();
+                                    let _ = reply.send(Ok(true));
+                                } else {
+                                    let _ = reply.send(Ok(false));
+                                }
+                            }
+                            Some(Selection::Session { session_id }) => self.request(
+                                "SessionExecutionSetReq",
+                                &pb::SessionExecutionSetReq { session_id, target },
+                                "SessionExecutionSetRes",
+                                Purpose::Execution,
+                                Some(reply),
+                            ),
+                            None => {
+                                let _ = reply.send(Ok(false));
+                            }
+                        }
+                    }
                     Action::CreateSession { draft_id } => {
                         let valid = draft_id.as_ref().is_none_or(|id| {
                             self.cache
@@ -664,6 +805,15 @@ impl Actor {
                 )
             }
         };
+        let execution_target = if let Selection::Draft { .. } = &target {
+            self.cache
+                .views
+                .get(&label)
+                .and_then(|view| view.local_draft.as_ref())
+                .and_then(|draft| draft.execution_target.clone())
+        } else {
+            None
+        };
         self.emit_state();
         self.request(
             "ChatReq",
@@ -672,6 +822,7 @@ impl Actor {
                 text,
                 retry_run_id,
                 model_id,
+                execution_target,
             },
             "ChatRes",
             Purpose::Send {
@@ -695,6 +846,9 @@ impl Actor {
         }
         let result = self.response(message, &pending.purpose);
         if let Err(error) = &result {
+            if matches!(pending.purpose, Purpose::Execution) {
+                self.error = error.clone();
+            }
             eprintln!(
                 "[chat] response name={} message_id={id} error={error}",
                 pending.expected
@@ -755,6 +909,18 @@ impl Actor {
                 self.opening_deadline = None;
                 self.attempt = 0;
                 self.error.clear();
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                if let Some(engine) = &self.execution {
+                    engine.login(&self.cache.username);
+                    let registration = engine.registration();
+                    self.request(
+                        "DesktopRegisterReq",
+                        &registration,
+                        "DesktopRegisterRes",
+                        Purpose::Execution,
+                        None,
+                    );
+                }
                 self.drain()?;
                 if !self.buffered.is_empty() {
                     self.syncing = true;
@@ -835,12 +1001,51 @@ impl Actor {
                     }
                 }
             }
+            Server::DesktopRegister(response) => {
+                protocol::check(response.ret, response.error.as_ref())?
+            }
+            Server::ExecutionResult(response) => {
+                protocol::check(response.ret, response.error.as_ref())?
+            }
+            Server::ExecutionSet(response) => {
+                protocol::check(response.ret, response.error.as_ref())?;
+                self.cache.merge(Session::try_from(
+                    response.chat_session.ok_or("未返回会话")?,
+                )?);
+            }
             Server::Cancel(response) => protocol::check(response.ret, response.error.as_ref())?,
             _ => return Err("Agent 响应方向无效".into()),
         }
         Ok(())
     }
     fn notification(&mut self, message: Server) -> Result<(), String> {
+        if let Server::ExecutionAction(action) = &message {
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            if let Some(engine) = self.execution.clone() {
+                let token = engine.token();
+                let action = action.clone();
+                let tx = self.tx.clone();
+                let generation = self.generation;
+                tauri::async_runtime::spawn_blocking(move || {
+                    let result = engine.handle_with_token(&action, token).to_string();
+                    let _ = tx.send(Input::ExecutionFinished {
+                        generation,
+                        request_id: action.request_id,
+                        result,
+                    });
+                });
+            }
+            return Ok(());
+        }
+        if let Server::Desktop(update) = &message {
+            if let Some(device) = &update.device {
+                self.cache
+                    .desktops
+                    .insert(device.id.clone(), device.clone());
+                self.emit_state();
+            }
+            return Ok(());
+        }
         if self.connection_state != "connected" || self.syncing {
             self.buffered.push(message);
             return Ok(());
@@ -1253,6 +1458,7 @@ mod tests {
         actor
             .cache
             .snapshot(pb::UserSnapshot {
+                desktops: vec![],
                 models: vec![pb::ModelOption {
                     id: "test".into(),
                     name: "Test".into(),
@@ -1262,6 +1468,7 @@ mod tests {
                 user_id: "u1".into(),
                 username: "alice".into(),
                 chat_sessions: vec![pb::ChatSession {
+                    execution_target: None,
                     session: Some(pb::SessionState {
                         id: "s1".into(),
                         title: "会话".into(),
@@ -1281,6 +1488,7 @@ mod tests {
     }
     fn response(session: &str, revision: u32, running: bool) -> pb::ChatSession {
         pb::ChatSession {
+            execution_target: None,
             session: Some(pb::SessionState {
                 id: session.into(),
                 title: "会话".into(),
@@ -1393,6 +1601,7 @@ mod tests {
                 &pb::UserSnapshotRes {
                     ret: 1,
                     snapshot: Some(pb::UserSnapshot {
+                        desktops: vec![],
                         models: vec![pb::ModelOption {
                             id: "test".into(),
                             name: "Test".into(),

@@ -70,6 +70,15 @@ export class ChatClient implements ChatTransport {
     return toSnapshot(response.payload.snapshot)
   }
 
+  async setExecution(sessionId: string): Promise<ChatSession> {
+    this.assertReady()
+    const response = await this.requests.request('SessionExecutionSetReq', { sessionId }).completed
+    if (response.name !== 'SessionExecutionSetRes') throw new Error('执行目标响应类型无效')
+    checkResponse(response.payload)
+    if (!response.payload.chatSession) throw new Error('Agent 未返回会话')
+    return toSession(response.payload.chatSession)
+  }
+
   async setModel(sessionId: string, modelId: string): Promise<ChatSession> {
     this.assertReady()
     const response = await this.requests.request('SessionModelSetReq', { sessionId, modelId })

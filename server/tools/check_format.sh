@@ -69,7 +69,7 @@ $(find "$project_root" \
 		-o -path "$project_root/3rd" -o -path "$project_root/luaclib" \
 		-o -path "$project_root/cservice" -o -path "$project_root/logs" \
 		-o -name node_modules -o -name storybook-static -o -name dist \
-		-o -name target -o -name coverage -o -name playwright-report \
+		-o -name target -o -name build -o -name coverage -o -name playwright-report \
 		-o -name test-results \) -prune -o \
 	-type f \( -name '*.lua' -o -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.json' \
 		-o -name '*.md' -o -name '*.config' -o -name 'makefile' \

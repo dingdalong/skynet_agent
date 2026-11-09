@@ -11,6 +11,8 @@ import { createBrowserChatRuntime } from './browser-chat-runtime'
 import { createNativeChatRuntime } from './native-chat-runtime'
 
 export interface ChatRuntimeState {
+  desktops: import('../types/chat').DesktopDevice[]
+  localDeviceId: string
   models: ModelOption[]
   username: string
   userId: string
@@ -32,6 +34,8 @@ export interface ChatRuntime {
   disconnect(): void
   switchUser(): void
   createSession(): Promise<boolean>
+  setExecution?(mode: 'cloud' | 'local'): Promise<boolean | null>
+  setRemote?(enabled: boolean): Promise<boolean>
   setModel(modelId: string): Promise<boolean>
   selectSession(sessionId: string): Promise<boolean>
   sendMessage(text: string): boolean
@@ -43,6 +47,8 @@ export interface ChatRuntime {
 
 export function initialChatState(): ChatRuntimeState {
   return {
+    desktops: [],
+    localDeviceId: '',
     models: [],
     username: readUsername(),
     userId: '',

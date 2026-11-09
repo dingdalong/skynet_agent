@@ -95,6 +95,7 @@ export function createBrowserChatRuntime(
       localDraft.value = null
       userId.value = snapshot.userId
     }
+    state.desktops = snapshot.desktops ?? []
     state.models = snapshot.models ?? []
     state.defaultModelId = snapshot.defaultModelId
     state.permissionModelId = snapshot.permissionModelId
@@ -109,6 +110,10 @@ export function createBrowserChatRuntime(
   }
 
   function applyUpdate(update: ChatUpdate): boolean {
+    if (update.type === 'desktop') {
+      state.desktops = [...state.desktops.filter((d) => d.id !== update.device.id), update.device]
+      return true
+    }
     if (update.type === 'session') {
       mergeSession(update.session)
       return true
@@ -381,6 +386,21 @@ export function createBrowserChatRuntime(
     connect,
     disconnect,
     switchUser,
+    async setExecution(mode) {
+      if (mode !== 'cloud' || !transport.setExecution) return false
+      const view = activeView.value
+      if (!view) return selection.value?.kind === 'draft'
+      const current = generation
+      try {
+        const session = await transport.setExecution(view.id)
+        if (current !== generation) return false
+        mergeSession(session)
+        return true
+      } catch (error) {
+        if (current === generation) view.error = messageError(error)
+        return false
+      }
+    },
     async setModel(modelId) {
       if (selection.value?.kind === 'draft') {
         if (!localDraft.value || localDraft.value.sending || connectionState.value !== 'connected')

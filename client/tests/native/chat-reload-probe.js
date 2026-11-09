@@ -69,7 +69,9 @@
       )
       const evidence = await invoke('probe_evidence')
       assert(
-        evidence.requests.length === 1 && evidence.requests[0].name === 'LoginReq',
+        evidence.requests.length === 2 &&
+          evidence.requests[0].name === 'LoginReq' &&
+          evidence.requests[1].name === 'DesktopRegisterReq',
         '打开新会话产生服务器请求',
       )
       await reload(1)

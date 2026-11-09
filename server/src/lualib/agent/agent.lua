@@ -32,6 +32,7 @@ local project = require("agent.prompts.project")
 ---@field owner agent_session.AgentSession?
 ---@field project_instructions_max_bytes integer?
 ---@field prompt_templates agent.PromptTemplates?
+---@field execution_target table?
 
 local Agent = class()
 
@@ -50,7 +51,8 @@ function Agent:ctor(llm_config, templates, options)
     self.running = false
     self.turn = nil
     local facts = options and { workspace = options.workspace,
-        platform = require("agent.sandbox").platform(), tools = require("agent.executor"):specs(),
+        platform = options.execution_target and options.execution_target.platform
+            or require("agent.sandbox").platform(), tools = require("agent.executor"):specs(),
         permission = options.permission, tool_config = options.tools } or nil
     self.messages = prompts.initial_messages(templates, facts)
 end
@@ -76,12 +78,16 @@ function Agent:_chat(user_input, on_text_delta, run)
     )
     assert(type(on_text_delta) == "function", "Agent 的文本回调必须是函数")
 
+    if self.options and not self.executor then
+        self.executor = require("agent.executor"):new(self.options, self.permission_llm_config)
+    end
     local turn = run and run.retry and self.turn or nil
     if not turn then
         -- 新任务读取失败时也不能误复用上一次失败任务的轮次。
         self.turn = nil
-        local instructions = self.options and project.load(self.options.workspace,
-            self.options.project_instructions_max_bytes or 32768) or nil
+        local instructions = self.options and (self.options.execution_target
+            and self.executor.processes:project(run, self.options.project_instructions_max_bytes or 32768)
+            or project.load(self.options.workspace, self.options.project_instructions_max_bytes or 32768)) or nil
         turn = { messages = table.copy(self.messages), text = {}, results = {},
             user_input = user_input, project_instructions = instructions }
         local update = instructions and project.update(self.project_instructions, instructions)
@@ -89,9 +95,6 @@ function Agent:_chat(user_input, on_text_delta, run)
         turn.messages[#turn.messages + 1] = { role = "user", content = user_input, source = "user" }
     end
     self.turn = turn
-    if self.options and not self.executor then
-        self.executor = require("agent.executor"):new(self.options, self.permission_llm_config)
-    end
     while true do
         local options = self.executor and { tools = self.executor:specs(), parallel_tool_calls = false } or nil
         local ok, text, err, response = pcall(self.llm.stream, self.llm,

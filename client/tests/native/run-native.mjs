@@ -25,9 +25,16 @@ const save = () => {
   fs.renameSync(temporary, path.join(directory, 'evidence.json'))
 }
 const names = new Map(
-  ['LoginReq', 'UserSnapshotReq', 'ChatReq', 'MessageCancelReq', 'SessionModelSetReq'].map(
-    (name) => [fnv1a32(`skynet.agent.v1.${name}`), name],
-  ),
+  [
+    'LoginReq',
+    'UserSnapshotReq',
+    'ChatReq',
+    'MessageCancelReq',
+    'SessionModelSetReq',
+    'DesktopRegisterReq',
+    'SessionExecutionSetReq',
+    'ExecutionResultReq',
+  ].map((name) => [fnv1a32(`skynet.agent.v1.${name}`), name]),
 )
 const sockets = new Set()
 const server = net.createServer((client) => {
@@ -150,6 +157,7 @@ try {
   const app = path.join(directory, 'Skynet Chat Probe.app')
   const executable = path.join(app, 'Contents', 'MacOS', 'chat_reload_probe')
   fs.mkdirSync(path.dirname(executable), { recursive: true })
+  fs.mkdirSync(path.join(app, 'Contents/Resources'), { recursive: true })
   fs.copyFileSync(
     path.join(root, 'client/src-tauri/target/debug/examples/chat_reload_probe'),
     executable,
@@ -211,7 +219,7 @@ try {
   const firstChat = evidence.requests.findIndex((request) => request.name === 'ChatReq')
   assert.deepEqual(
     evidence.requests.slice(0, firstChat).map((request) => request.name),
-    ['LoginReq'],
+    ['LoginReq', 'DesktopRegisterReq'],
   )
   assert.ok(chats.length > 1, '没有验证首次创建后的继续对话')
   assert.equal(chats[0].sessionId, '', '首次发送应由服务器创建会话')

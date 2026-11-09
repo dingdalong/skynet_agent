@@ -1,4 +1,6 @@
 pub mod chat;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod execution;
 mod platform;
 use tauri::Manager;
 
@@ -8,7 +10,15 @@ pub fn builder() -> tauri::Builder<tauri::Wry> {
         chat::ChatCore::start(env!("AGENT_WS_URL").into()).expect("初始化 Rust 客户端核心失败");
     tauri::Builder::default()
         .manage(core)
+        .plugin(tauri_plugin_dialog::init())
         .setup(|_app| {
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            _app.state::<chat::ChatCore>().configure_execution(
+                _app.path()
+                    .app_data_dir()
+                    .map_err(|e| format!("读取 App 数据目录失败: {e}"))?,
+                _app.path().resource_dir()?,
+            );
             #[cfg(target_os = "macos")]
             _app.manage(platform::macos::MenuFilter::install());
             Ok(())
@@ -16,7 +26,8 @@ pub fn builder() -> tauri::Builder<tauri::Wry> {
         .invoke_handler(tauri::generate_handler![
             chat::chat_attach,
             chat::chat_detach,
-            chat::chat_action
+            chat::chat_action,
+            chat::chat_choose_directory
         ])
         .on_page_load(|webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Started {

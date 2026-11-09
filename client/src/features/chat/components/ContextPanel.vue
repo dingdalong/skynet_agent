@@ -1,10 +1,62 @@
 <script setup lang="ts">
 import { SkStatusBadge } from '@skynet/design-system'
 import { Cloud, Database, ShieldCheck } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useChatStore } from '../../../stores/chat'
 
 const store = useChatStore()
+const busy = ref(false)
+const executionError = ref('')
+const device = computed(() => store.desktops.find((d) => d.id === store.executionTarget?.deviceId))
+const localDevice = computed(() => store.desktops.find((d) => d.id === store.localDeviceId))
+const executionMode = computed(() =>
+  !store.executionTarget?.deviceId
+    ? 'cloud'
+    : store.executionTarget.deviceId === store.localDeviceId
+      ? 'local'
+      : 'remote',
+)
+const targetLabel = computed(() =>
+  executionMode.value === 'cloud'
+    ? '云端开发'
+    : executionMode.value === 'local'
+      ? '本地开发'
+      : '远程开发',
+)
+const locked = computed(
+  () =>
+    busy.value ||
+    store.connectionState !== 'connected' ||
+    store.runState !== 'idle' ||
+    store.sending,
+)
+async function changeExecution(event: Event) {
+  const select = event.target as HTMLSelectElement
+  await setExecution(select.value)
+  select.value = executionMode.value
+}
+async function setExecution(mode: string) {
+  if (mode !== 'cloud' && mode !== 'local') return
+  busy.value = true
+  executionError.value = ''
+  try {
+    if ((await store.setExecution(mode)) === false)
+      executionError.value = '执行目标未更改，请检查设备状态或停止后台进程后重试。'
+  } finally {
+    busy.value = false
+  }
+}
+async function changeRemote(event: Event) {
+  const input = event.target as HTMLInputElement
+  busy.value = true
+  executionError.value = ''
+  try {
+    if (!(await store.setRemote(input.checked))) executionError.value = '远程执行设置失败，请重试。'
+  } finally {
+    input.checked = localDevice.value?.remoteEnabled === true
+    busy.value = false
+  }
+}
 const connectionLabel = computed(() => {
   switch (store.connectionState) {
     case 'connected':
@@ -32,7 +84,57 @@ const connectionLabel = computed(() => {
         :label="connectionLabel"
       />
       <h3>{{ store.activeSession?.title || '新的会话' }}</h3>
-      <p>会话由云端 Agent 处理，客户端仅保存当前界面状态。</p>
+      <p>会话由云端 Agent 处理，工具在当前执行目标运行。</p>
+    </section>
+
+    <section class="execution-settings" aria-label="开发模式">
+      <label for="execution-mode">开发模式</label>
+      <select
+        id="execution-mode"
+        :value="executionMode"
+        :disabled="locked"
+        @change="changeExecution"
+      >
+        <option value="cloud">云端开发</option>
+        <option v-if="store.localDeviceId" value="local">本地开发 · 选择目录</option>
+        <option v-if="executionMode === 'remote'" value="remote">
+          远程开发 · {{ device?.name || '桌面设备' }}
+        </option>
+      </select>
+      <p v-if="store.executionTarget?.directory" class="execution-directory">
+        {{ store.executionTarget.directory }}
+      </p>
+      <p v-if="store.executionTarget?.deviceId" role="status">
+        {{
+          device?.online
+            ? executionMode === 'local' || device.remoteEnabled
+              ? '桌面执行器在线'
+              : '目标桌面未开启远程执行'
+            : '目标桌面离线'
+        }}
+      </p>
+      <button
+        v-if="executionMode === 'local'"
+        type="button"
+        :disabled="locked"
+        @click="setExecution('local')"
+      >
+        更换工作目录
+      </button>
+      <label v-if="store.localDeviceId" class="remote-toggle">
+        <input
+          type="checkbox"
+          :checked="localDevice?.remoteEnabled === true"
+          :disabled="busy || store.connectionState !== 'connected'"
+          @change="changeRemote"
+        />
+        允许其他设备远程执行
+      </label>
+      <p v-if="store.localDeviceId">
+        开启后，同用户名的其他设备可继续此桌面的项目会话；关闭会停止远程任务。
+      </p>
+      <p v-if="busy" role="status">正在更新执行设置…</p>
+      <p v-if="executionError" role="alert">{{ executionError }}</p>
     </section>
 
     <dl class="facts">
@@ -63,7 +165,7 @@ const connectionLabel = computed(() => {
       </div>
       <div>
         <dt><ShieldCheck :size="15" aria-hidden="true" />工具执行</dt>
-        <dd>服务器沙盒</dd>
+        <dd>{{ targetLabel }}</dd>
       </div>
     </dl>
 
@@ -154,5 +256,46 @@ const connectionLabel = computed(() => {
 
 .boundary-note h3 {
   margin-top: 0;
+}
+</style>
+
+<style scoped>
+.execution-settings {
+  display: grid;
+  gap: var(--sk-p-space-3);
+}
+.execution-settings select,
+.execution-settings button {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--sk-separator);
+  border-radius: var(--sk-c-card-radius);
+  background: var(--sk-surface-default);
+  color: var(--sk-label-primary);
+  padding: var(--sk-p-space-2);
+  font: inherit;
+}
+.execution-settings p {
+  margin: 0;
+  color: var(--sk-label-secondary);
+  font-size: var(--sk-p-size-text-sm);
+  line-height: 1.55;
+}
+.execution-directory {
+  overflow-wrap: anywhere;
+}
+.remote-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sk-p-space-2);
+  min-height: 44px;
+}
+.execution-settings :disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.execution-settings :focus-visible {
+  outline: 2px solid var(--sk-label-primary);
+  outline-offset: 2px;
 }
 </style>

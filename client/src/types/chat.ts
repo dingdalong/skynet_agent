@@ -1,3 +1,15 @@
+export interface ExecutionTarget {
+  deviceId: string
+  workspaceId: string
+  directory: string
+  platform: string
+}
+export interface DesktopDevice {
+  id: string
+  name: string
+  online: boolean
+  remoteEnabled: boolean
+}
 export type MessageRole = 'user' | 'assistant'
 export type MessageStatus = 'complete' | 'streaming' | 'cancelled' | 'error'
 
@@ -53,6 +65,7 @@ export interface ChatSessionSummary {
 }
 
 export interface ChatSession extends ChatSessionSummary {
+  executionTarget?: ExecutionTarget | null
   revision: number
   messages: ChatMessage[]
   runId: string
@@ -65,6 +78,7 @@ export type ConversationSelection =
   { kind: 'draft'; draftId: string } | { kind: 'session'; sessionId: string } | null
 
 export interface LocalDraftSession {
+  executionTarget?: ExecutionTarget | null
   id: string
   text: string
   modelId: string
@@ -75,6 +89,7 @@ export interface LocalDraftSession {
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
 
 export interface UserSnapshot {
+  desktops?: DesktopDevice[]
   userId: string
   username: string
   chatSessions: ChatSession[]
@@ -89,6 +104,7 @@ export interface ChatSessionView extends ChatSession {
 }
 
 export type ChatUpdate =
+  | { type: 'desktop'; device: DesktopDevice }
   | {
       type: 'reasoning'
       sessionId: string
@@ -118,6 +134,7 @@ export type TransportConnectionListener = (event: TransportConnectionEvent) => v
 export interface ChatTransport {
   connect(username: string): Promise<UserSnapshot>
   snapshot(): Promise<UserSnapshot>
+  setExecution?(sessionId: string): Promise<ChatSession>
   setModel(sessionId: string, modelId: string): Promise<ChatSession>
   sendMessage(input: {
     sessionId?: string

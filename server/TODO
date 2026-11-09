@@ -1,3 +1,6 @@
 按照sumneko语法格式补全代码注释
 使用os.exit还是skynet.exit?
 lfs要改成子模块的方式引用
+skill
+mcp
+上下文压缩

@@ -102,7 +102,7 @@ function ClientService:open(_, id, websocket_address, name)
         self.users[name] = user
         log.info("client", "open", "创建用户 user=%s", user.id)
     end
-    self.connections[id] = { user = user, websocket_address = websocket_address }
+    self.connections[id] = { id = id, user = user, websocket_address = websocket_address }
     return user:snapshot()
 end
 
@@ -127,7 +127,7 @@ function ClientService:handle_request(context, id, message_id, name, args)
         rpc.send(state.websocket_address, "close_connection", id, codes.websocket_policy_violation, "未知请求")
         return
     end
-    local ok, response = xpcall(function() return method(state.user, args) end, debug.traceback)
+    local ok, response = xpcall(function() return method(state.user, args, state) end, debug.traceback)
     if not ok then
         log.failure("client", "handle_request connection=" .. id, response)
         rpc.send(state.websocket_address, "close_connection", id, codes.websocket_internal_error, "请求处理失败")
@@ -139,6 +139,8 @@ end
 ---@param _ base.CommandContext?
 ---@param id string
 function ClientService:disconnect(_, id)
+    local connection = self.connections[id]
+    if connection then connection.user.execution:disconnect(connection) end
     self.connections[id] = nil
 end
 

@@ -1,6 +1,5 @@
 local filesystem = require("agent_filesystem")
 local lfs = require("lfs")
-local config = require("etc.cfg").runtime
 local Sandbox = {}
 
 function Sandbox.platform()
@@ -8,7 +7,7 @@ function Sandbox.platform()
 end
 
 function Sandbox.command(argv, workspace, dependencies)
-    return require("agent.sandbox." .. Sandbox.platform()).command(argv, workspace, dependencies or {})
+    return filesystem.sandbox(argv, workspace, dependencies or {})
 end
 
 function Sandbox.environment(workspace)
@@ -18,15 +17,6 @@ function Sandbox.environment(workspace)
         "TMPDIR=" .. workspace .. "/.agent-tmp",
         "LANG=en_US.UTF-8", "TERM=xterm-256color",
     }
-end
-
-function Sandbox.program(name)
-    local paths = config.executable_search_path
-    for directory in paths:gmatch("[^:]+") do
-        local path = filesystem.realpath(directory .. "/" .. name)
-        if path and lfs.attributes(path, "mode") == "file" then return path end
-    end
-    error("缺少执行依赖: " .. name)
 end
 
 return Sandbox

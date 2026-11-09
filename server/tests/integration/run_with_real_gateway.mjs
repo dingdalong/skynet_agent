@@ -200,6 +200,12 @@ try {
   const clientEnv = { ...env }
   delete clientEnv.DEEPSEEK_API_KEY
   await requireSuccess(start(args[0], args.slice(1), 'client', clientEnv, process.cwd()), 'client')
+  if (process.env.AGENT_REAL_SCENARIO === 'desktop-execution') {
+    const evidence = JSON.parse(fs.readFileSync(path.join(evidenceDirectory, 'desktop-execution.json'), 'utf8'))
+    assert.equal(evidence.status, 'passed')
+    assert.match(logs.get('server') ?? '', /purpose=permission.*input_tokens=/)
+    assert.match(logs.get('server') ?? '', /purpose=main.*input_tokens=/)
+  } else {
   assert.equal(fs.readFileSync(fixture.outsideFile, 'utf8'), `outside:${fixture.token}`)
   assert.equal(fs.readFileSync(fixture.credentialFile, 'utf8'), 'synthetic-credential-do-not-read')
   const directory = sessionDirectory()
@@ -344,6 +350,7 @@ try {
       2,
     ) + '\n',
   )
+  }
   succeeded = true
   console.log(`真实模型端到端验收通过，证据：${evidenceDirectory}`)
 } catch (error) {

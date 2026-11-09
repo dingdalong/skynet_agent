@@ -11,7 +11,7 @@ local log = require("log")
 ---@field name string?
 ---@field arguments string?
 ---@field output string?
----@field source 'app'|'project'|'user'|'model'|'tool'|nil 内部宿主来源，不发送给模型供应商
+---@field source 'app'|'environment'|'project'|'user'|'model'|'tool'|nil 内部宿主来源，不发送给供应商
 
 ---@class llm.Response
 ---@field output llm.Message[]

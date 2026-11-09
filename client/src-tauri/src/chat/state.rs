@@ -110,6 +110,7 @@ pub struct ChatMessage {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
+    pub execution_target: Option<pb::ExecutionTarget>,
     pub id: String,
     pub title: String,
     pub updated_at: u64,
@@ -170,6 +171,7 @@ impl TryFrom<pb::ChatSession> for Session {
             });
         }
         Ok(Self {
+            execution_target: chat.execution_target,
             id: value.id,
             title: value.title,
             updated_at: value.updated_at,
@@ -204,6 +206,7 @@ impl Selection {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalDraft {
+    pub execution_target: Option<pb::ExecutionTarget>,
     pub id: String,
     pub text: String,
     pub model_id: String,
@@ -219,6 +222,7 @@ pub struct View {
 }
 #[derive(Debug, Default)]
 pub struct Cache {
+    pub desktops: BTreeMap<String, pb::DesktopDevice>,
     pub models: Vec<ModelOption>,
     pub default_model_id: String,
     pub permission_model_id: String,
@@ -240,6 +244,8 @@ pub struct SessionView {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeState {
+    pub desktops: Vec<pb::DesktopDevice>,
+    pub local_device_id: String,
     pub models: Vec<ModelOption>,
     pub default_model_id: String,
     pub permission_model_id: String,
@@ -284,6 +290,11 @@ impl Cache {
             }
             self.user_id = snapshot.user_id;
         }
+        self.desktops = snapshot
+            .desktops
+            .into_iter()
+            .map(|d| (d.id.clone(), d))
+            .collect();
         self.default_model_id = snapshot.default_model_id;
         self.permission_model_id = snapshot.permission_model_id;
         self.models = snapshot
@@ -443,6 +454,7 @@ impl Cache {
         if view.local_draft.is_none() {
             self.next_draft_id += 1;
             view.local_draft = Some(LocalDraft {
+                execution_target: None,
                 id: format!("draft-{}", self.next_draft_id),
                 text: String::new(),
                 model_id: self.default_model_id.clone(),
@@ -518,6 +530,8 @@ impl Cache {
     pub fn state(&self, label: &str, connection_state: &str, error: &str) -> RuntimeState {
         let view = self.views.get(label);
         RuntimeState {
+            desktops: self.desktops.values().cloned().collect(),
+            local_device_id: String::new(),
             models: self.models.clone(),
             default_model_id: self.default_model_id.clone(),
             permission_model_id: self.permission_model_id.clone(),
@@ -560,14 +574,34 @@ impl Cache {
     rename_all_fields = "camelCase"
 )]
 pub enum Action {
-    Connect { username: String },
+    SetExecution {
+        target: Selection,
+        directory: Option<String>,
+    },
+    SetRemote {
+        enabled: bool,
+    },
+    Connect {
+        username: String,
+    },
     Disconnect,
     SwitchUser,
-    CreateSession { draft_id: Option<String> },
-    SetModel { model_id: String },
-    SelectSession { session_id: String },
-    SetDraft { target: Selection, value: String },
-    SendMessage { text: String },
+    CreateSession {
+        draft_id: Option<String>,
+    },
+    SetModel {
+        model_id: String,
+    },
+    SelectSession {
+        session_id: String,
+    },
+    SetDraft {
+        target: Selection,
+        value: String,
+    },
+    SendMessage {
+        text: String,
+    },
     RetryLastMessage,
     CancelRun,
     DismissError,
@@ -735,6 +769,7 @@ mod tests {
     }
     pub fn snapshot(id: &str, revision: u32) -> pb::UserSnapshot {
         pb::UserSnapshot {
+            desktops: vec![],
             models: vec![pb::ModelOption {
                 id: "test".into(),
                 name: "Test".into(),
@@ -745,6 +780,7 @@ mod tests {
             user_id: id.into(),
             username: "alice".into(),
             chat_sessions: vec![pb::ChatSession {
+                execution_target: None,
                 session: Some(pb::SessionState {
                     id: "s1".into(),
                     title: "会话".into(),

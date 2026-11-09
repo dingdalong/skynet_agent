@@ -25,6 +25,7 @@ message ReasoningDeltaNtf {
 }
 
 message ChatReq {
+  ExecutionTarget execution_target = 6;
   string session_id = 2;
   string text = 3;
   string retry_run_id = 4;

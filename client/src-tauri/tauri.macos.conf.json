@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "resources": {
+      "resources/native/": "native/"
+    }
+  }
+}

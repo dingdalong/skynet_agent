@@ -515,7 +515,7 @@ try {
   for (const [name, marker] of handlerMarkers) {
     chatHandlerSource = markedHandler(
       chatHandlerSource,
-      `function REQUEST:${name}(args)`,
+      `function REQUEST:${name}(${name === "ChatReq" ? "args, connection" : "args"})`,
       marker,
     );
   }

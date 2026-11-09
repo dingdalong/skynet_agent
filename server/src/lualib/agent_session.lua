@@ -33,6 +33,7 @@ local config = require("etc.cfg").agent
 ---@field model_id string
 ---@field run agent.Run?
 ---@field pending_runs table<agent.Run, boolean>
+---@field execution_target table?
 local AgentSession = class()
 
 local function make_id(prefix)
@@ -59,7 +60,7 @@ end
 
 ---@param owner user.Chat
 ---@param model_id string
-function AgentSession:ctor(owner, model_id)
+function AgentSession:ctor(owner, model_id, target)
     self.owner = owner
     self.id = make_id("session")
     self.title = "新的会话"
@@ -70,9 +71,12 @@ function AgentSession:ctor(owner, model_id)
     self.run = nil
     self.pending_runs = owner.pending_runs
     self.agent = nil
-    local workspace = require("agent.workspace").create(config.tools.workspace_root, owner.user.username, self.id)
+    self.execution_target = target
+    local workspace =
+        target and target.directory or require("agent.workspace").create(
+            config.tools.workspace_root, owner.user.username, self.id)
     self.agent = Agent:new(models.resolve(config, model_id), owner.prompt_templates, {
-        workspace = workspace, tools = config.tools,
+        execution_target = target, workspace = workspace, tools = config.tools,
         project_instructions_max_bytes = config.project_instructions_max_bytes,
         permission_llm = models.resolve(config, config.permission.model_id or model_id),
         permission = config.permission, owner = self, session_id = self.id,
@@ -93,6 +97,7 @@ function AgentSession:snapshot()
             messages = table.deep_copy(self.messages), run_id = self.run and self.run.id or "",
             cancelling = self.run and self.run.cancelled or false,
         },
+        execution_target = self.execution_target,
         model_id = self.model_id,
         permission_model_id = config.permission.model_id or self.model_id,
     }
@@ -126,9 +131,14 @@ end
 
 ---@param args table
 ---@return table
-function AgentSession:send_message(args)
+function AgentSession:send_message(args, connection)
     local text = args.text
     if self.run then return failure(codes.server_busy, "该会话仍在生成", true) end
+    if self.execution_target then
+        local ok, err = pcall(self.owner.user.execution.available, self.owner.user.execution,
+            self.execution_target, connection and connection.device_id)
+        if not ok then return failure(codes.fail, tostring(err), true) end
+    end
     local retry_id = args.retry_run_id or ""
     local previous = self.messages[#self.messages]
     if retry_id ~= "" then
@@ -144,6 +154,7 @@ function AgentSession:send_message(args)
     local run = Run:new()
     ---@cast run agent.Run
     run.id = make_id("run")
+    run.source_device = connection and connection.device_id or ""
     run.owner = self
     run.session_id = self.id
     run.retry = retry_id ~= ""
@@ -231,6 +242,41 @@ function AgentSession:cancel_run(args)
         run:cancel()
     end
     return { ret = codes.succ }
+end
+
+function AgentSession:stop_remote()
+    if self.run and self.run.source_device ~= self.execution_target.device_id then self.run:cancel() end
+    local executor = self.agent.executor
+    if executor and executor.remote then executor.processes:stop_remote(self.execution_target.device_id) end
+end
+
+function AgentSession:set_execution(target, connection)
+    assert(not self.run, "请先停止当前任务再切换执行目标")
+    local executor = self.agent.executor
+    if executor then
+        if executor.remote then assert(not executor.processes:has_active(), "请先停止后台进程")
+        else
+            for _, process in pairs(executor.processes.processes) do
+                assert(process.done, "请先停止后台进程")
+            end
+        end
+    end
+    target = self.owner.user.execution:validate_target(target, connection)
+    local workspace = target and target.directory or require("agent.workspace").create(
+        config.tools.workspace_root, self.owner.user.username, self.id)
+    if executor then executor:close() end
+    self.agent.executor = nil
+    self.agent.options.workspace, self.agent.options.execution_target = workspace, target
+    self.execution_target = target
+    self.agent.turn = nil
+    local previous = self.messages[#self.messages]
+    if previous and previous.error then previous.error.retryable = false end
+    self.agent.messages[#self.agent.messages + 1] = { role = "developer", source = "environment",
+        content = "执行环境已切换，后续工具仅作用于新目标；"
+            .. "此前目录文件不会自动同步。工作目录: "
+            .. workspace .. "；操作系统: " .. (target and target.platform or require("agent.sandbox").platform()) }
+    self:_publish()
+    return { ret = codes.succ, chat_session = self:snapshot() }
 end
 
 function AgentSession:close()

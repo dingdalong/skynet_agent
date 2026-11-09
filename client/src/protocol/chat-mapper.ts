@@ -115,6 +115,14 @@ export function toSession(chatSession: skynet.agent.v1.ChatSession.$Properties):
   const revision = Number(payload.revision)
   if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('会话版本无效')
   return {
+    executionTarget: chatSession.executionTarget
+      ? {
+          deviceId: chatSession.executionTarget.deviceId ?? '',
+          workspaceId: chatSession.executionTarget.workspaceId ?? '',
+          directory: chatSession.executionTarget.directory ?? '',
+          platform: chatSession.executionTarget.platform ?? '',
+        }
+      : null,
     id: requiredString(payload.id, 'session.id'),
     title: requiredString(payload.title, 'session.title'),
     updatedAt: timestamp(payload.updatedAt),
@@ -142,6 +150,12 @@ export function toSnapshot(payload: skynet.agent.v1.UserSnapshot.$Properties): U
   )
     throw new Error('用户快照模型配置无效')
   return {
+    desktops: (payload.desktops ?? []).map((d) => ({
+      id: d.id ?? '',
+      name: d.name ?? '',
+      online: d.online === true,
+      remoteEnabled: d.remoteEnabled === true,
+    })),
     models,
     userId: requiredString(payload.userId, 'userId'),
     username: requiredString(payload.username, 'username'),
@@ -152,6 +166,18 @@ export function toSnapshot(payload: skynet.agent.v1.UserSnapshot.$Properties): U
 }
 
 export function toUpdate(message: import('./messages').ServerMessage): ChatUpdate {
+  if (message.name === 'DesktopUpdatedNtf' && message.payload.device) {
+    const d = message.payload.device
+    return {
+      type: 'desktop',
+      device: {
+        id: d.id ?? '',
+        name: d.name ?? '',
+        online: d.online === true,
+        remoteEnabled: d.remoteEnabled === true,
+      },
+    }
+  }
   if (message.name === 'ReasoningDeltaNtf' && message.payload.block) {
     const payload = message.payload
     if (!Number.isSafeInteger(payload.revision) || Number(payload.revision) < 1)

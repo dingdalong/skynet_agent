@@ -44,11 +44,11 @@ end
 
 ---@param args table
 ---@return table
-function Chat:chat(args)
+function Chat:chat(args, connection)
     if args.session_id and args.session_id ~= "" then
         local session = self.sessions[args.session_id]
         if not session then return failure(codes.fail, "会话不存在或已经失效") end
-        return session:send_message(args)
+        return session:send_message(args, connection)
     end
     if args.retry_run_id and args.retry_run_id ~= "" then
         return failure(codes.invalid_param, "新会话不能重试消息")
@@ -64,14 +64,17 @@ function Chat:chat(args)
     if type(config.llm.api_key) ~= "string" or config.llm.api_key == "" then
         return failure(codes.call_fail, "模型配置未加载", true)
     end
-    local ok, session = pcall(AgentSession.new, AgentSession, self, model_id)
+    local valid, target = pcall(self.user.execution.validate_target, self.user.execution,
+        args.execution_target, connection)
+    if not valid then return failure(codes.invalid_param, tostring(target)) end
+    local ok, session = pcall(AgentSession.new, AgentSession, self, model_id, target)
     if not ok then
         log.failure("user.chat", "chat 创建 Agent 失败", session)
         return failure(codes.call_fail, "创建 Agent 失败", true)
     end
     self.sessions[session.id] = session
     table.insert(self.session_order, 1, session.id)
-    return session:send_message(args)
+    return session:send_message(args, connection)
 end
 
 ---@param args table

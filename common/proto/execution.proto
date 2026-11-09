@@ -1,0 +1,26 @@
+syntax = "proto3";
+package skynet.agent.v1;
+import "common.proto";
+message DesktopRegisterReq {
+  string device_id = 1;
+  string name = 2;
+  bool remote_enabled = 3;
+  string authorization_id = 4;
+}
+message DesktopRegisterRes { int32 ret = 1; ErrorInfo error = 2; }
+message DesktopUpdatedNtf { DesktopDevice device = 1; }
+message SessionExecutionSetReq { string session_id = 1; ExecutionTarget target = 2; }
+message SessionExecutionSetRes { int32 ret = 1; ErrorInfo error = 2; ChatSession chat_session = 3; }
+message ExecutionActionNtf {
+  string request_id = 1;
+  string session_id = 2;
+  string run_id = 3;
+  string tool_call_id = 4;
+  string operation = 5;
+  string arguments = 6;
+  string workspace_id = 7;
+  bool remote = 8;
+  string authorization_id = 9;
+}
+message ExecutionResultReq { string request_id = 1; string result = 2; }
+message ExecutionResultRes { int32 ret = 1; ErrorInfo error = 2; }

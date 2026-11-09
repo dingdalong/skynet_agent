@@ -41,13 +41,9 @@ code, text = run({ "/bin/bash", "-c", "cat ../outside" })
 assert(code ~= 0 and not text:find("outside%-ok"), "沙盒未隔离其他目录读取")
 code, text = run({ "/bin/bash", "-c", 'read -r value; printf "got:%s\n" "$value"' }, nil, true, "pty-input\n")
 assert(code == 0 and text:find("got:pty%-input"), "PTY 输入失败: " .. text)
-local request = filesystem.temporary_file(cjson.encode({ workspace = directory,
-    patch = "*** Begin Patch\n*** Add File: patched\n+patch-ok\n*** End Patch" }))
-local lua = assert(filesystem.realpath("3rd/skynet/3rd/lua/lua"))
-code, text = run({ lua, "-e", string.format('require("agent.worker").main(%q)', request) }, nil, false, nil,
-    { server .. "/src/lualib", server .. "/luaclib", lua, request },
-    { "LUA_PATH=" .. server .. "/src/lualib/?.lua;" .. server .. "/src/lualib/?/init.lua",
-        "LUA_CPATH=" .. server .. "/luaclib/?.so" })
+local request = filesystem.temporary_file("*** Begin Patch\n*** Add File: patched\n+patch-ok\n*** End Patch")
+local worker = assert(filesystem.realpath("bin/agent_worker"))
+code, text = run({ worker, "patch", directory, request }, nil, false, nil, { worker, request })
 assert(code == 0 and cjson.decode(text).ok, "沙盒补丁执行失败: " .. text)
 os.remove(request)
 local timed_run = Run:new()

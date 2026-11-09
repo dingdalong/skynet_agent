@@ -38,6 +38,14 @@ local log = require("log")
 ---@field reasoning llm.ReasoningBlock[]?
 
 ---@class agent.Executor
+---@field root string
+---@field config agent.ToolConfig
+---@field permission agent.PermissionConfig
+---@field owner agent_session.AgentSession?
+---@field session_id string
+---@field remote boolean
+---@field processes agent.Processes|agent.Remote
+---@field judge agent.PermissionJudge
 local Executor = class()
 
 ---@param options agent.Options
@@ -45,7 +53,9 @@ local Executor = class()
 function Executor:ctor(options, llm_config)
     self.root, self.config, self.permission = options.workspace, options.tools, options.permission
     self.owner, self.session_id = options.owner, options.session_id
-    self.processes = Processes:new(self.root, self.config, self.owner, self.session_id)
+    self.remote = options.execution_target ~= nil
+    self.processes = self.remote and require("agent.remote"):new(options)
+        or Processes:new(self.root, self.config, self.owner, self.session_id)
     self.judge = Judge:new(llm_config, self.permission, options.prompt_templates)
 end
 
@@ -90,6 +100,12 @@ function Executor:prepare(name, args)
         assert(type(args.justification) == "string" and args.justification:match("%S"),
             "沙盒外执行必须说明原因")
     end
+    if self.remote then
+        number(args, "max_output_tokens", 4000, 1, 16384)
+        number(args, "yield_time_ms", 10000, 1, 30000)
+        if name == "exec_command" then number(args, "timeout_ms", self.config.timeout_ms, 1, self.config.timeout_ms) end
+        return self.processes:prepare(name, args)
+    end
     local action = { name = name, args = args, workspace = self.root, mode = mode }
     action.max_tokens = number(args, "max_output_tokens", 4000, 1, 16384)
     action.wait_ms = number(args, "yield_time_ms", name == "write_stdin" and 1000 or 10000, 1, 30000)
@@ -104,31 +120,17 @@ function Executor:prepare(name, args)
         assert(#(args.chars or "") <= 65536, "终端输入过长")
         action.mode, action.cwd, action.launch_argv = process.mode, process.cwd, process.argv
     else
-        local operations = require("agent.tools.apply_patch").parse(args.patch)
-        action.paths = {}
-        for _, operation in ipairs(operations) do
-            for _, path in ipairs({ operation.path, operation.move }) do
-                local target = workspace.resolve(path, self.root)
-                assert(mode == "require_escalated" or workspace.inside(target, self.root),
-                    "补丁目标超出会话工作目录")
-                action.paths[#action.paths + 1] = target
-            end
-        end
+        action.paths = require("agent.tools.apply_patch").prepare(args.patch, self.root, mode)
     end
     return action
 end
 
 function Executor:patch(action, run, record)
-    local root = assert(filesystem.realpath("."))
-    local input = filesystem.temporary_file(cjson.encode({ patch = action.args.patch, workspace = self.root,
-        mode = action.mode }))
-    local code = string.format('require("agent.worker").main(%q)', input)
-    local argv = { assert(filesystem.realpath("3rd/skynet/3rd/lua/lua")), "-e", code }
+    local input = filesystem.temporary_file(action.args.patch)
+    local worker = assert(filesystem.realpath("bin/agent_worker"))
+    local argv = { worker, "patch", self.root, input }
     local ok, process = pcall(self.processes.start, self.processes, argv, self.root, false, action.mode,
-        self.config.timeout_ms, run, record,
-        { root .. "/src/lualib", root .. "/luaclib", argv[1], input },
-        { "LUA_PATH=" .. root .. "/src/lualib/?.lua;" .. root .. "/src/lualib/?/init.lua",
-            "LUA_CPATH=" .. root .. "/luaclib/?.so" })
+        self.config.timeout_ms, run, record, { worker, input })
     if not ok then os.remove(input); error(process, 0) end
     process.cleanup_path = input
     local result, output = nil, ""
@@ -153,6 +155,9 @@ end
 ---@return table
 function Executor:execute(call, context, run, record)
     local ok, result = xpcall(function()
+        if self.remote then
+            self.processes.current_run, self.processes.current_call_id = run, call.call_id
+        end
         local args = cjson.decode(call.arguments)
         local action = self:prepare(call.name, args)
         action.arguments = call.arguments
@@ -170,6 +175,7 @@ function Executor:execute(call, context, run, record)
             return { ok = false, error = reason }
         end
         record.permission_mode = action.mode
+        if self.remote then return self.processes:execute(call.name, args, action, run, record) end
         if call.name == "apply_patch" then return self:patch(action, run, record) end
         local process
         if call.name == "exec_command" then

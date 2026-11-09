@@ -119,9 +119,16 @@ end)
 ## 工具与工作目录
 
 Agent 支持 `exec_command`、`write_stdin` 和 `apply_patch`，分别用于 bash 命令、终端交互和补丁修改。
-工具在服务端执行，客户端同步展示权限判断、运行状态与结果。工作目录按用户和会话自动分配，
+在会话上下文中选择云端或本地开发，客户端同步展示权限判断、运行状态与结果。云端工作目录按用户和会话自动分配，
 根目录通过 `agent.tools.workspace_root` 或 `AGENT_WORKSPACE_ROOT` 配置；文件保留在磁盘，
 不随聊天历史清空而自动删除。
+
+macOS、Linux 桌面可选择本机工作目录；Agent、模型调用、权限判断和会话历史仍由服务器管理。
+桌面手动开启“允许其他设备远程执行”后，同用户名的 Web、手机和其他桌面可以继续绑定的项目会话，
+工具实际在目标桌面运行。开关和目录绑定按用户名保存在该桌面，重启后恢复；关闭远程会停止远程来源任务，
+本机任务继续。目标桌面离线时拒绝执行，不自动重放未确认的操作。
+Web、移动端和 Windows 首期只提供云端及远程继续，不在这些设备选择本地目录。
+切换执行目标需先结束任务和后台进程，历史保留，文件不会自动复制。
 
 macOS 使用系统 `sandbox-exec`，Linux 需要安装 `bubblewrap` 并允许创建 user/PID namespace 和挂载独立 proc。
 默认沙盒允许联网，文件写入限制在会话工作目录；缺少隔离能力时返回错误。
@@ -135,11 +142,10 @@ macOS 使用系统 `sandbox-exec`，Linux 需要安装 `bubblewrap` 并允许创
 执行会话支持 PTY，并受 `timeout_ms`、`max_processes` 和 `max_output_bytes` 限制；工具调用次数不设上限。
 这些执行时长使用毫秒；模型与权限请求的 `_ticks` 字段使用厘秒。停止会终止当前轮涉及的命令，
 关服回收所有进程；已经发生的文件修改会保留。失败后的重试继续使用已记录的工具结果，不重放命令。
-Lua 工具与权限代码位于 `agent/`，C 扩展源码集中在 `server/src/lualib-src/`。
-`process.c` 编译为 `agent_process`，负责进程、管道和 PTY；`filesystem.c` 编译为
-`agent_filesystem`，负责路径解析、临时文件、安全读取、原子写入和删除。
-`process_launcher.c` 独立编译为子进程启动与回收辅助程序。C 代码修改后需重新构建并重启服务，
-不通过 Lua 热修生效。
+Lua 工具与权限代码位于 `agent/`。`common/native/agent_runtime/` 提供共用 C 核心，
+包含文件访问、补丁、沙盒及进程/PTY；服务端 `lualib-src/` 是 Lua 薄绑定，桌面 Rust 通过 FFI 调用。
+构建需要 Make、C 编译器和静态库归档工具，辅助程序 `agent_worker`、`process_launcher` 随服务端或对应桌面包分发。
+C 代码修改后需重新构建并重启，不通过 Lua 热修生效。
 
 ## Agent WebSocket 网关
 
@@ -312,6 +318,7 @@ dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base openai.ltn12 open
 ## 构建与运行
 
 构建前需安装 OpenSSL(版本3以上) 开发文件；MinGW 交叉构建还需指向 MinGW 版本的 OpenSSL。
+macOS 默认使用本地 ad-hoc 签名封装 App 及资源；正式分发另需配置开发者签名与公证。
 
 ```bash
 make -C server build
@@ -335,6 +342,7 @@ Rust 编译。Lua 单元测试使用 Busted，需要提前运行 `luarocks insta
 make -C server build
 pnpm --dir client test:native
 pnpm --dir client test:e2e:full
+pnpm --dir client test:execution
 ```
 
 原生夹具运行整组场景，驱动真实 Vue 页面和 Rust 核心；这两个入口都连接真实模型供应商，
@@ -353,7 +361,7 @@ make check-full
 ```
 
 完整检查先运行基础回归，再追加服务端全部专项集成、原生/Web 假模型集成、macOS 原生真实模型验收、
-Web 真实模型全链路、
+Web 真实模型全链路、本地/远程执行真实验收、
 Storybook 构建和 Chromium、WebKit、移动视口 UI 回归。原生夹具会生成前端测试资源；固定端口
 测试与会生成资源的构建顺序执行。
 真实端到端验收会调用供应商并产生模型用量；执行前需配置有效凭据，安装客户端依赖及 Playwright 浏览器。

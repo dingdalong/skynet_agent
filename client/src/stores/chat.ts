@@ -64,6 +64,14 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
+    desktops: computed(() => state.value.desktops),
+    localDeviceId: computed(() => state.value.localDeviceId),
+    executionTarget: computed(
+      () => activeDraft.value?.executionTarget ?? activeSession.value?.executionTarget,
+    ),
+    setExecution: (mode: 'cloud' | 'local') =>
+      runtime.value.setExecution?.(mode) ?? Promise.resolve(false),
+    setRemote: (enabled: boolean) => runtime.value.setRemote?.(enabled) ?? Promise.resolve(false),
     models: computed(() => state.value.models),
     username,
     userId,

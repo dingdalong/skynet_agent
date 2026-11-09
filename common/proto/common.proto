@@ -79,12 +79,14 @@ message SessionState {
 }
 
 message ChatSession {
+  ExecutionTarget execution_target = 4;
   SessionState session = 1;
   string model_id = 2;
   string permission_model_id = 3;
 }
 
 message UserSnapshot {
+  repeated DesktopDevice desktops = 7;
   string user_id = 1;
   string username = 2;
   repeated ChatSession chat_sessions = 3;
@@ -92,4 +94,17 @@ message UserSnapshot {
   string default_model_id = 5;
   // Empty means permission requests follow each session's selected model.
   string permission_model_id = 6;
+}
+
+message ExecutionTarget {
+  string device_id = 1;
+  string workspace_id = 2;
+  string directory = 3;
+  string platform = 4;
+}
+message DesktopDevice {
+  string id = 1;
+  string name = 2;
+  bool online = 3;
+  bool remote_enabled = 4;
 }

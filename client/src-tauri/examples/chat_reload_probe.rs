@@ -24,6 +24,23 @@ fn write_probe_file(directory: &Path, name: &str, contents: impl AsRef<[u8]>) {
     fs::rename(temporary, directory.join(name)).unwrap();
 }
 #[tauri::command]
+fn chat_choose_directory(probe: State<'_, Arc<Probe>>) -> Option<String> {
+    let directory = std::env::var_os("CHAT_EXECUTION_WORKSPACE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| probe.directory.join("project"));
+    fs::create_dir_all(&directory).unwrap();
+    Some(directory.to_string_lossy().into_owned())
+}
+#[tauri::command]
+fn probe_execution_state(probe: State<'_, Arc<Probe>>) -> serde_json::Value {
+    serde_json::json!({"directory":std::env::var_os("CHAT_EXECUTION_WORKSPACE").map(PathBuf::from).unwrap_or_else(|| probe.directory.join("project")),"disable":probe.directory.join("disable").exists(),"remoteDone":probe.directory.join("remoteDone").exists()})
+}
+#[tauri::command]
+fn probe_execution_marker(probe: State<'_, Arc<Probe>>, name: String) {
+    assert!(matches!(name.as_str(), "ready" | "disabled"));
+    fs::write(probe.directory.join(name), "ready").unwrap();
+}
+#[tauri::command]
 fn probe_phase(probe: State<'_, Arc<Probe>>, phase: Option<u64>) -> u64 {
     eprintln!("[probe] phase request={phase:?}");
     if let Some(phase) = phase {
@@ -106,7 +123,14 @@ fn main() {
     let navigations = Arc::new(AtomicU64::new(0));
     let observed = navigations.clone();
     let integration = std::env::var("CHAT_PROBE_MODE").as_deref() == Ok("integration");
-    let script = if integration {
+    let execution = std::env::var("CHAT_PROBE_MODE").as_deref() == Ok("execution");
+    let script = if execution {
+        format!(
+            "window.__AGENT_REAL_FIXTURE={};\n{}",
+            std::env::var("AGENT_REAL_FIXTURE").unwrap(),
+            include_str!("../../tests/execution/native-probe.js")
+        )
+    } else if integration {
         include_str!("../../tests/native/chat-reload-probe.js").to_owned()
     } else {
         format!(
@@ -144,6 +168,9 @@ fn main() {
             chat::chat_attach,
             chat::chat_detach,
             chat::chat_action,
+            chat_choose_directory,
+            probe_execution_state,
+            probe_execution_marker,
             probe_phase,
             probe_reload,
             probe_arm,

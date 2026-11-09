@@ -401,6 +401,9 @@ export namespace skynet {
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
 
+                /** ChatReq executionTarget. */
+                executionTarget?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
+
                 /** ChatReq sessionId. */
                 sessionId: string;
 
@@ -489,6 +492,9 @@ export namespace skynet {
 
                 /** Properties of a ChatReq. */
                 interface $Properties {
+
+                    /** ChatReq executionTarget */
+                    executionTarget?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
 
                     /** ChatReq sessionId */
                     sessionId?: (string|null);
@@ -2163,6 +2169,9 @@ export namespace skynet {
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
 
+                /** ChatSession executionTarget. */
+                executionTarget?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
+
                 /** ChatSession session. */
                 session?: (skynet.agent.v1.SessionState.$Properties|null);
 
@@ -2249,6 +2258,9 @@ export namespace skynet {
                 /** Properties of a ChatSession. */
                 interface $Properties {
 
+                    /** ChatSession executionTarget */
+                    executionTarget?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
+
                     /** ChatSession session */
                     session?: (skynet.agent.v1.SessionState.$Properties|null);
 
@@ -2284,6 +2296,9 @@ export namespace skynet {
 
                 /** Unknown fields preserved while decoding when enabled */
                 $unknowns?: Uint8Array[];
+
+                /** UserSnapshot desktops. */
+                desktops: skynet.agent.v1.DesktopDevice.$Properties[];
 
                 /** UserSnapshot userId. */
                 userId: string;
@@ -2380,6 +2395,9 @@ export namespace skynet {
                 /** Properties of a UserSnapshot. */
                 interface $Properties {
 
+                    /** UserSnapshot desktops */
+                    desktops?: (skynet.agent.v1.DesktopDevice.$Properties[]|null);
+
                     /** UserSnapshot userId */
                     userId?: (string|null);
 
@@ -2404,6 +2422,1244 @@ export namespace skynet {
 
                 /** Shape of a UserSnapshot. */
                 type $Shape = skynet.agent.v1.UserSnapshot.$Properties;
+            }
+
+            /**
+             * Properties of an ExecutionTarget.
+             * @deprecated Use skynet.agent.v1.ExecutionTarget.$Properties instead.
+             */
+            interface IExecutionTarget extends skynet.agent.v1.ExecutionTarget.$Properties {
+            }
+
+            /** Represents an ExecutionTarget. */
+            class ExecutionTarget {
+
+                /**
+                 * Constructs a new ExecutionTarget.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ExecutionTarget.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ExecutionTarget deviceId. */
+                deviceId: string;
+
+                /** ExecutionTarget workspaceId. */
+                workspaceId: string;
+
+                /** ExecutionTarget directory. */
+                directory: string;
+
+                /** ExecutionTarget platform. */
+                platform: string;
+
+                /**
+                 * Creates a new ExecutionTarget instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ExecutionTarget instance
+                 */
+                static create(properties: skynet.agent.v1.ExecutionTarget.$Shape): skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape;
+                static create(properties?: skynet.agent.v1.ExecutionTarget.$Properties): skynet.agent.v1.ExecutionTarget;
+
+                /**
+                 * Encodes the specified ExecutionTarget message. Does not implicitly {@link skynet.agent.v1.ExecutionTarget.verify|verify} messages.
+                 * @param message ExecutionTarget message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ExecutionTarget.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ExecutionTarget message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionTarget.verify|verify} messages.
+                 * @param message ExecutionTarget message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ExecutionTarget.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes an ExecutionTarget message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape} ExecutionTarget
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape;
+
+                /**
+                 * Decodes an ExecutionTarget message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape} ExecutionTarget
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ExecutionTarget & skynet.agent.v1.ExecutionTarget.$Shape;
+
+                /**
+                 * Verifies an ExecutionTarget message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates an ExecutionTarget message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ExecutionTarget
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ExecutionTarget;
+
+                /**
+                 * Creates a plain object from an ExecutionTarget message. Also converts values to other types if specified.
+                 * @param message ExecutionTarget
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ExecutionTarget, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ExecutionTarget to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ExecutionTarget {
+
+                /** Properties of an ExecutionTarget. */
+                interface $Properties {
+
+                    /** ExecutionTarget deviceId */
+                    deviceId?: (string|null);
+
+                    /** ExecutionTarget workspaceId */
+                    workspaceId?: (string|null);
+
+                    /** ExecutionTarget directory */
+                    directory?: (string|null);
+
+                    /** ExecutionTarget platform */
+                    platform?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of an ExecutionTarget. */
+                type $Shape = skynet.agent.v1.ExecutionTarget.$Properties;
+            }
+
+            /**
+             * Properties of a DesktopDevice.
+             * @deprecated Use skynet.agent.v1.DesktopDevice.$Properties instead.
+             */
+            interface IDesktopDevice extends skynet.agent.v1.DesktopDevice.$Properties {
+            }
+
+            /** Represents a DesktopDevice. */
+            class DesktopDevice {
+
+                /**
+                 * Constructs a new DesktopDevice.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.DesktopDevice.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** DesktopDevice id. */
+                id: string;
+
+                /** DesktopDevice name. */
+                name: string;
+
+                /** DesktopDevice online. */
+                online: boolean;
+
+                /** DesktopDevice remoteEnabled. */
+                remoteEnabled: boolean;
+
+                /**
+                 * Creates a new DesktopDevice instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns DesktopDevice instance
+                 */
+                static create(properties: skynet.agent.v1.DesktopDevice.$Shape): skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape;
+                static create(properties?: skynet.agent.v1.DesktopDevice.$Properties): skynet.agent.v1.DesktopDevice;
+
+                /**
+                 * Encodes the specified DesktopDevice message. Does not implicitly {@link skynet.agent.v1.DesktopDevice.verify|verify} messages.
+                 * @param message DesktopDevice message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.DesktopDevice.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified DesktopDevice message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopDevice.verify|verify} messages.
+                 * @param message DesktopDevice message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.DesktopDevice.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a DesktopDevice message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape} DesktopDevice
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape;
+
+                /**
+                 * Decodes a DesktopDevice message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape} DesktopDevice
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.DesktopDevice & skynet.agent.v1.DesktopDevice.$Shape;
+
+                /**
+                 * Verifies a DesktopDevice message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a DesktopDevice message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns DesktopDevice
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.DesktopDevice;
+
+                /**
+                 * Creates a plain object from a DesktopDevice message. Also converts values to other types if specified.
+                 * @param message DesktopDevice
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.DesktopDevice, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this DesktopDevice to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace DesktopDevice {
+
+                /** Properties of a DesktopDevice. */
+                interface $Properties {
+
+                    /** DesktopDevice id */
+                    id?: (string|null);
+
+                    /** DesktopDevice name */
+                    name?: (string|null);
+
+                    /** DesktopDevice online */
+                    online?: (boolean|null);
+
+                    /** DesktopDevice remoteEnabled */
+                    remoteEnabled?: (boolean|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a DesktopDevice. */
+                type $Shape = skynet.agent.v1.DesktopDevice.$Properties;
+            }
+
+            /**
+             * Properties of a DesktopRegisterReq.
+             * @deprecated Use skynet.agent.v1.DesktopRegisterReq.$Properties instead.
+             */
+            interface IDesktopRegisterReq extends skynet.agent.v1.DesktopRegisterReq.$Properties {
+            }
+
+            /** Represents a DesktopRegisterReq. */
+            class DesktopRegisterReq {
+
+                /**
+                 * Constructs a new DesktopRegisterReq.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.DesktopRegisterReq.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** DesktopRegisterReq deviceId. */
+                deviceId: string;
+
+                /** DesktopRegisterReq name. */
+                name: string;
+
+                /** DesktopRegisterReq remoteEnabled. */
+                remoteEnabled: boolean;
+
+                /** DesktopRegisterReq authorizationId. */
+                authorizationId: string;
+
+                /**
+                 * Creates a new DesktopRegisterReq instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns DesktopRegisterReq instance
+                 */
+                static create(properties: skynet.agent.v1.DesktopRegisterReq.$Shape): skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape;
+                static create(properties?: skynet.agent.v1.DesktopRegisterReq.$Properties): skynet.agent.v1.DesktopRegisterReq;
+
+                /**
+                 * Encodes the specified DesktopRegisterReq message. Does not implicitly {@link skynet.agent.v1.DesktopRegisterReq.verify|verify} messages.
+                 * @param message DesktopRegisterReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.DesktopRegisterReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified DesktopRegisterReq message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopRegisterReq.verify|verify} messages.
+                 * @param message DesktopRegisterReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.DesktopRegisterReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a DesktopRegisterReq message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape} DesktopRegisterReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape;
+
+                /**
+                 * Decodes a DesktopRegisterReq message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape} DesktopRegisterReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.DesktopRegisterReq & skynet.agent.v1.DesktopRegisterReq.$Shape;
+
+                /**
+                 * Verifies a DesktopRegisterReq message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a DesktopRegisterReq message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns DesktopRegisterReq
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.DesktopRegisterReq;
+
+                /**
+                 * Creates a plain object from a DesktopRegisterReq message. Also converts values to other types if specified.
+                 * @param message DesktopRegisterReq
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.DesktopRegisterReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this DesktopRegisterReq to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace DesktopRegisterReq {
+
+                /** Properties of a DesktopRegisterReq. */
+                interface $Properties {
+
+                    /** DesktopRegisterReq deviceId */
+                    deviceId?: (string|null);
+
+                    /** DesktopRegisterReq name */
+                    name?: (string|null);
+
+                    /** DesktopRegisterReq remoteEnabled */
+                    remoteEnabled?: (boolean|null);
+
+                    /** DesktopRegisterReq authorizationId */
+                    authorizationId?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a DesktopRegisterReq. */
+                type $Shape = skynet.agent.v1.DesktopRegisterReq.$Properties;
+            }
+
+            /**
+             * Properties of a DesktopRegisterRes.
+             * @deprecated Use skynet.agent.v1.DesktopRegisterRes.$Properties instead.
+             */
+            interface IDesktopRegisterRes extends skynet.agent.v1.DesktopRegisterRes.$Properties {
+            }
+
+            /** Represents a DesktopRegisterRes. */
+            class DesktopRegisterRes {
+
+                /**
+                 * Constructs a new DesktopRegisterRes.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.DesktopRegisterRes.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** DesktopRegisterRes ret. */
+                ret: number;
+
+                /** DesktopRegisterRes error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /**
+                 * Creates a new DesktopRegisterRes instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns DesktopRegisterRes instance
+                 */
+                static create(properties: skynet.agent.v1.DesktopRegisterRes.$Shape): skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape;
+                static create(properties?: skynet.agent.v1.DesktopRegisterRes.$Properties): skynet.agent.v1.DesktopRegisterRes;
+
+                /**
+                 * Encodes the specified DesktopRegisterRes message. Does not implicitly {@link skynet.agent.v1.DesktopRegisterRes.verify|verify} messages.
+                 * @param message DesktopRegisterRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.DesktopRegisterRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified DesktopRegisterRes message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopRegisterRes.verify|verify} messages.
+                 * @param message DesktopRegisterRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.DesktopRegisterRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a DesktopRegisterRes message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape} DesktopRegisterRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape;
+
+                /**
+                 * Decodes a DesktopRegisterRes message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape} DesktopRegisterRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.DesktopRegisterRes & skynet.agent.v1.DesktopRegisterRes.$Shape;
+
+                /**
+                 * Verifies a DesktopRegisterRes message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a DesktopRegisterRes message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns DesktopRegisterRes
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.DesktopRegisterRes;
+
+                /**
+                 * Creates a plain object from a DesktopRegisterRes message. Also converts values to other types if specified.
+                 * @param message DesktopRegisterRes
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.DesktopRegisterRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this DesktopRegisterRes to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace DesktopRegisterRes {
+
+                /** Properties of a DesktopRegisterRes. */
+                interface $Properties {
+
+                    /** DesktopRegisterRes ret */
+                    ret?: (number|null);
+
+                    /** DesktopRegisterRes error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a DesktopRegisterRes. */
+                type $Shape = skynet.agent.v1.DesktopRegisterRes.$Properties;
+            }
+
+            /**
+             * Properties of a DesktopUpdatedNtf.
+             * @deprecated Use skynet.agent.v1.DesktopUpdatedNtf.$Properties instead.
+             */
+            interface IDesktopUpdatedNtf extends skynet.agent.v1.DesktopUpdatedNtf.$Properties {
+            }
+
+            /** Represents a DesktopUpdatedNtf. */
+            class DesktopUpdatedNtf {
+
+                /**
+                 * Constructs a new DesktopUpdatedNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.DesktopUpdatedNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** DesktopUpdatedNtf device. */
+                device?: (skynet.agent.v1.DesktopDevice.$Properties|null);
+
+                /**
+                 * Creates a new DesktopUpdatedNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns DesktopUpdatedNtf instance
+                 */
+                static create(properties: skynet.agent.v1.DesktopUpdatedNtf.$Shape): skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape;
+                static create(properties?: skynet.agent.v1.DesktopUpdatedNtf.$Properties): skynet.agent.v1.DesktopUpdatedNtf;
+
+                /**
+                 * Encodes the specified DesktopUpdatedNtf message. Does not implicitly {@link skynet.agent.v1.DesktopUpdatedNtf.verify|verify} messages.
+                 * @param message DesktopUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.DesktopUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified DesktopUpdatedNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.DesktopUpdatedNtf.verify|verify} messages.
+                 * @param message DesktopUpdatedNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.DesktopUpdatedNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a DesktopUpdatedNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape} DesktopUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape;
+
+                /**
+                 * Decodes a DesktopUpdatedNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape} DesktopUpdatedNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.DesktopUpdatedNtf & skynet.agent.v1.DesktopUpdatedNtf.$Shape;
+
+                /**
+                 * Verifies a DesktopUpdatedNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a DesktopUpdatedNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns DesktopUpdatedNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.DesktopUpdatedNtf;
+
+                /**
+                 * Creates a plain object from a DesktopUpdatedNtf message. Also converts values to other types if specified.
+                 * @param message DesktopUpdatedNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.DesktopUpdatedNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this DesktopUpdatedNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace DesktopUpdatedNtf {
+
+                /** Properties of a DesktopUpdatedNtf. */
+                interface $Properties {
+
+                    /** DesktopUpdatedNtf device */
+                    device?: (skynet.agent.v1.DesktopDevice.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a DesktopUpdatedNtf. */
+                type $Shape = skynet.agent.v1.DesktopUpdatedNtf.$Properties;
+            }
+
+            /**
+             * Properties of a SessionExecutionSetReq.
+             * @deprecated Use skynet.agent.v1.SessionExecutionSetReq.$Properties instead.
+             */
+            interface ISessionExecutionSetReq extends skynet.agent.v1.SessionExecutionSetReq.$Properties {
+            }
+
+            /** Represents a SessionExecutionSetReq. */
+            class SessionExecutionSetReq {
+
+                /**
+                 * Constructs a new SessionExecutionSetReq.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.SessionExecutionSetReq.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** SessionExecutionSetReq sessionId. */
+                sessionId: string;
+
+                /** SessionExecutionSetReq target. */
+                target?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
+
+                /**
+                 * Creates a new SessionExecutionSetReq instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns SessionExecutionSetReq instance
+                 */
+                static create(properties: skynet.agent.v1.SessionExecutionSetReq.$Shape): skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape;
+                static create(properties?: skynet.agent.v1.SessionExecutionSetReq.$Properties): skynet.agent.v1.SessionExecutionSetReq;
+
+                /**
+                 * Encodes the specified SessionExecutionSetReq message. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetReq.verify|verify} messages.
+                 * @param message SessionExecutionSetReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.SessionExecutionSetReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified SessionExecutionSetReq message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetReq.verify|verify} messages.
+                 * @param message SessionExecutionSetReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.SessionExecutionSetReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a SessionExecutionSetReq message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape} SessionExecutionSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape;
+
+                /**
+                 * Decodes a SessionExecutionSetReq message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape} SessionExecutionSetReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionExecutionSetReq & skynet.agent.v1.SessionExecutionSetReq.$Shape;
+
+                /**
+                 * Verifies a SessionExecutionSetReq message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a SessionExecutionSetReq message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns SessionExecutionSetReq
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionExecutionSetReq;
+
+                /**
+                 * Creates a plain object from a SessionExecutionSetReq message. Also converts values to other types if specified.
+                 * @param message SessionExecutionSetReq
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.SessionExecutionSetReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this SessionExecutionSetReq to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace SessionExecutionSetReq {
+
+                /** Properties of a SessionExecutionSetReq. */
+                interface $Properties {
+
+                    /** SessionExecutionSetReq sessionId */
+                    sessionId?: (string|null);
+
+                    /** SessionExecutionSetReq target */
+                    target?: (skynet.agent.v1.ExecutionTarget.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a SessionExecutionSetReq. */
+                type $Shape = skynet.agent.v1.SessionExecutionSetReq.$Properties;
+            }
+
+            /**
+             * Properties of a SessionExecutionSetRes.
+             * @deprecated Use skynet.agent.v1.SessionExecutionSetRes.$Properties instead.
+             */
+            interface ISessionExecutionSetRes extends skynet.agent.v1.SessionExecutionSetRes.$Properties {
+            }
+
+            /** Represents a SessionExecutionSetRes. */
+            class SessionExecutionSetRes {
+
+                /**
+                 * Constructs a new SessionExecutionSetRes.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.SessionExecutionSetRes.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** SessionExecutionSetRes ret. */
+                ret: number;
+
+                /** SessionExecutionSetRes error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /** SessionExecutionSetRes chatSession. */
+                chatSession?: (skynet.agent.v1.ChatSession.$Properties|null);
+
+                /**
+                 * Creates a new SessionExecutionSetRes instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns SessionExecutionSetRes instance
+                 */
+                static create(properties: skynet.agent.v1.SessionExecutionSetRes.$Shape): skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape;
+                static create(properties?: skynet.agent.v1.SessionExecutionSetRes.$Properties): skynet.agent.v1.SessionExecutionSetRes;
+
+                /**
+                 * Encodes the specified SessionExecutionSetRes message. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetRes.verify|verify} messages.
+                 * @param message SessionExecutionSetRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.SessionExecutionSetRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified SessionExecutionSetRes message, length delimited. Does not implicitly {@link skynet.agent.v1.SessionExecutionSetRes.verify|verify} messages.
+                 * @param message SessionExecutionSetRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.SessionExecutionSetRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes a SessionExecutionSetRes message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape} SessionExecutionSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape;
+
+                /**
+                 * Decodes a SessionExecutionSetRes message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape} SessionExecutionSetRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.SessionExecutionSetRes & skynet.agent.v1.SessionExecutionSetRes.$Shape;
+
+                /**
+                 * Verifies a SessionExecutionSetRes message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates a SessionExecutionSetRes message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns SessionExecutionSetRes
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.SessionExecutionSetRes;
+
+                /**
+                 * Creates a plain object from a SessionExecutionSetRes message. Also converts values to other types if specified.
+                 * @param message SessionExecutionSetRes
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.SessionExecutionSetRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this SessionExecutionSetRes to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace SessionExecutionSetRes {
+
+                /** Properties of a SessionExecutionSetRes. */
+                interface $Properties {
+
+                    /** SessionExecutionSetRes ret */
+                    ret?: (number|null);
+
+                    /** SessionExecutionSetRes error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** SessionExecutionSetRes chatSession */
+                    chatSession?: (skynet.agent.v1.ChatSession.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of a SessionExecutionSetRes. */
+                type $Shape = skynet.agent.v1.SessionExecutionSetRes.$Properties;
+            }
+
+            /**
+             * Properties of an ExecutionActionNtf.
+             * @deprecated Use skynet.agent.v1.ExecutionActionNtf.$Properties instead.
+             */
+            interface IExecutionActionNtf extends skynet.agent.v1.ExecutionActionNtf.$Properties {
+            }
+
+            /** Represents an ExecutionActionNtf. */
+            class ExecutionActionNtf {
+
+                /**
+                 * Constructs a new ExecutionActionNtf.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ExecutionActionNtf.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ExecutionActionNtf requestId. */
+                requestId: string;
+
+                /** ExecutionActionNtf sessionId. */
+                sessionId: string;
+
+                /** ExecutionActionNtf runId. */
+                runId: string;
+
+                /** ExecutionActionNtf toolCallId. */
+                toolCallId: string;
+
+                /** ExecutionActionNtf operation. */
+                operation: string;
+
+                /** ExecutionActionNtf arguments. */
+                arguments: string;
+
+                /** ExecutionActionNtf workspaceId. */
+                workspaceId: string;
+
+                /** ExecutionActionNtf remote. */
+                remote: boolean;
+
+                /** ExecutionActionNtf authorizationId. */
+                authorizationId: string;
+
+                /**
+                 * Creates a new ExecutionActionNtf instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ExecutionActionNtf instance
+                 */
+                static create(properties: skynet.agent.v1.ExecutionActionNtf.$Shape): skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape;
+                static create(properties?: skynet.agent.v1.ExecutionActionNtf.$Properties): skynet.agent.v1.ExecutionActionNtf;
+
+                /**
+                 * Encodes the specified ExecutionActionNtf message. Does not implicitly {@link skynet.agent.v1.ExecutionActionNtf.verify|verify} messages.
+                 * @param message ExecutionActionNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ExecutionActionNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ExecutionActionNtf message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionActionNtf.verify|verify} messages.
+                 * @param message ExecutionActionNtf message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ExecutionActionNtf.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes an ExecutionActionNtf message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape} ExecutionActionNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape;
+
+                /**
+                 * Decodes an ExecutionActionNtf message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape} ExecutionActionNtf
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ExecutionActionNtf & skynet.agent.v1.ExecutionActionNtf.$Shape;
+
+                /**
+                 * Verifies an ExecutionActionNtf message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates an ExecutionActionNtf message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ExecutionActionNtf
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ExecutionActionNtf;
+
+                /**
+                 * Creates a plain object from an ExecutionActionNtf message. Also converts values to other types if specified.
+                 * @param message ExecutionActionNtf
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ExecutionActionNtf, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ExecutionActionNtf to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ExecutionActionNtf {
+
+                /** Properties of an ExecutionActionNtf. */
+                interface $Properties {
+
+                    /** ExecutionActionNtf requestId */
+                    requestId?: (string|null);
+
+                    /** ExecutionActionNtf sessionId */
+                    sessionId?: (string|null);
+
+                    /** ExecutionActionNtf runId */
+                    runId?: (string|null);
+
+                    /** ExecutionActionNtf toolCallId */
+                    toolCallId?: (string|null);
+
+                    /** ExecutionActionNtf operation */
+                    operation?: (string|null);
+
+                    /** ExecutionActionNtf arguments */
+                    "arguments"?: (string|null);
+
+                    /** ExecutionActionNtf workspaceId */
+                    workspaceId?: (string|null);
+
+                    /** ExecutionActionNtf remote */
+                    remote?: (boolean|null);
+
+                    /** ExecutionActionNtf authorizationId */
+                    authorizationId?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of an ExecutionActionNtf. */
+                type $Shape = skynet.agent.v1.ExecutionActionNtf.$Properties;
+            }
+
+            /**
+             * Properties of an ExecutionResultReq.
+             * @deprecated Use skynet.agent.v1.ExecutionResultReq.$Properties instead.
+             */
+            interface IExecutionResultReq extends skynet.agent.v1.ExecutionResultReq.$Properties {
+            }
+
+            /** Represents an ExecutionResultReq. */
+            class ExecutionResultReq {
+
+                /**
+                 * Constructs a new ExecutionResultReq.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ExecutionResultReq.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ExecutionResultReq requestId. */
+                requestId: string;
+
+                /** ExecutionResultReq result. */
+                result: string;
+
+                /**
+                 * Creates a new ExecutionResultReq instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ExecutionResultReq instance
+                 */
+                static create(properties: skynet.agent.v1.ExecutionResultReq.$Shape): skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape;
+                static create(properties?: skynet.agent.v1.ExecutionResultReq.$Properties): skynet.agent.v1.ExecutionResultReq;
+
+                /**
+                 * Encodes the specified ExecutionResultReq message. Does not implicitly {@link skynet.agent.v1.ExecutionResultReq.verify|verify} messages.
+                 * @param message ExecutionResultReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ExecutionResultReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ExecutionResultReq message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionResultReq.verify|verify} messages.
+                 * @param message ExecutionResultReq message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ExecutionResultReq.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes an ExecutionResultReq message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape} ExecutionResultReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape;
+
+                /**
+                 * Decodes an ExecutionResultReq message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape} ExecutionResultReq
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ExecutionResultReq & skynet.agent.v1.ExecutionResultReq.$Shape;
+
+                /**
+                 * Verifies an ExecutionResultReq message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates an ExecutionResultReq message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ExecutionResultReq
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ExecutionResultReq;
+
+                /**
+                 * Creates a plain object from an ExecutionResultReq message. Also converts values to other types if specified.
+                 * @param message ExecutionResultReq
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ExecutionResultReq, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ExecutionResultReq to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ExecutionResultReq {
+
+                /** Properties of an ExecutionResultReq. */
+                interface $Properties {
+
+                    /** ExecutionResultReq requestId */
+                    requestId?: (string|null);
+
+                    /** ExecutionResultReq result */
+                    result?: (string|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of an ExecutionResultReq. */
+                type $Shape = skynet.agent.v1.ExecutionResultReq.$Properties;
+            }
+
+            /**
+             * Properties of an ExecutionResultRes.
+             * @deprecated Use skynet.agent.v1.ExecutionResultRes.$Properties instead.
+             */
+            interface IExecutionResultRes extends skynet.agent.v1.ExecutionResultRes.$Properties {
+            }
+
+            /** Represents an ExecutionResultRes. */
+            class ExecutionResultRes {
+
+                /**
+                 * Constructs a new ExecutionResultRes.
+                 * @param [properties] Properties to set
+                 */
+                constructor(properties?: skynet.agent.v1.ExecutionResultRes.$Properties);
+
+                /** Unknown fields preserved while decoding when enabled */
+                $unknowns?: Uint8Array[];
+
+                /** ExecutionResultRes ret. */
+                ret: number;
+
+                /** ExecutionResultRes error. */
+                error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                /**
+                 * Creates a new ExecutionResultRes instance using the specified properties.
+                 * @param [properties] Properties to set
+                 * @returns ExecutionResultRes instance
+                 */
+                static create(properties: skynet.agent.v1.ExecutionResultRes.$Shape): skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape;
+                static create(properties?: skynet.agent.v1.ExecutionResultRes.$Properties): skynet.agent.v1.ExecutionResultRes;
+
+                /**
+                 * Encodes the specified ExecutionResultRes message. Does not implicitly {@link skynet.agent.v1.ExecutionResultRes.verify|verify} messages.
+                 * @param message ExecutionResultRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encode(message: skynet.agent.v1.ExecutionResultRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Encodes the specified ExecutionResultRes message, length delimited. Does not implicitly {@link skynet.agent.v1.ExecutionResultRes.verify|verify} messages.
+                 * @param message ExecutionResultRes message or plain object to encode
+                 * @param [writer] Writer to encode to
+                 * @returns Writer
+                 */
+                static encodeDelimited(message: skynet.agent.v1.ExecutionResultRes.$Properties, writer?: $protobuf.Writer): $protobuf.Writer;
+
+                /**
+                 * Decodes an ExecutionResultRes message from the specified reader or buffer.
+                 * @param reader Reader or buffer to decode from
+                 * @param [length] Message length if known beforehand
+                 * @returns {skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape} ExecutionResultRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape;
+
+                /**
+                 * Decodes an ExecutionResultRes message from the specified reader or buffer, length delimited.
+                 * @param reader Reader or buffer to decode from
+                 * @returns {skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape} ExecutionResultRes
+                 * @throws {Error} If the payload is not a reader or valid buffer
+                 * @throws {$protobuf.util.ProtocolError} If required fields are missing
+                 */
+                static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): skynet.agent.v1.ExecutionResultRes & skynet.agent.v1.ExecutionResultRes.$Shape;
+
+                /**
+                 * Verifies an ExecutionResultRes message.
+                 * @param message Plain object to verify
+                 * @returns `null` if valid, otherwise the reason why it is not
+                 */
+                static verify(message: { [k: string]: any }): (string|null);
+
+                /**
+                 * Creates an ExecutionResultRes message from a plain object. Also converts values to their respective internal types.
+                 * @param object Plain object
+                 * @returns ExecutionResultRes
+                 */
+                static fromObject(object: { [k: string]: any }): skynet.agent.v1.ExecutionResultRes;
+
+                /**
+                 * Creates a plain object from an ExecutionResultRes message. Also converts values to other types if specified.
+                 * @param message ExecutionResultRes
+                 * @param [options] Conversion options
+                 * @returns Plain object
+                 */
+                static toObject(message: skynet.agent.v1.ExecutionResultRes, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+                /**
+                 * Converts this ExecutionResultRes to JSON.
+                 * @returns JSON object
+                 */
+                toJSON(): { [k: string]: any };
+            }
+
+            namespace ExecutionResultRes {
+
+                /** Properties of an ExecutionResultRes. */
+                interface $Properties {
+
+                    /** ExecutionResultRes ret */
+                    ret?: (number|null);
+
+                    /** ExecutionResultRes error */
+                    error?: (skynet.agent.v1.ErrorInfo.$Properties|null);
+
+                    /** Unknown fields preserved while decoding when enabled */
+                    $unknowns?: Uint8Array[];
+                }
+
+                /** Shape of an ExecutionResultRes. */
+                type $Shape = skynet.agent.v1.ExecutionResultRes.$Properties;
             }
 
             /**

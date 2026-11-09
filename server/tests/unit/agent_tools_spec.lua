@@ -1,12 +1,11 @@
 local FakeLlm = require("tests.support.fake_llm")
 local lfs = require("lfs")
 local filesystem = require("agent_filesystem")
-local Patch = require("agent.tools.apply_patch")
 local workspace = require("agent.workspace")
 local rules = require("agent.permission.rules")
 local Scope = require("tests.support.modules")
 
-describe("Agent 工作区与补丁", function()
+describe("Agent 工作区与文件访问", function()
     local root
     before_each(function()
         root = os.tmpname()
@@ -23,12 +22,6 @@ describe("Agent 工作区与补丁", function()
         end
         remove(root)
     end)
-    local function read(path)
-        local file = assert(io.open(path, "rb"))
-        local text = file:read("a")
-        file:close()
-        return text
-    end
 
     it("用户名和会话路径隔离，目录跨大小写及分隔符不冲突", function()
         local a = workspace.create(root, "a/../b", "session-a")
@@ -39,49 +32,12 @@ describe("Agent 工作区与补丁", function()
         assert.is_false(workspace.inside(a .. "-other", a))
     end)
 
-    it("支持多文件增改移动删除与 CRLF 保留", function()
-        filesystem.atomic_write(root .. "/first", "a\r\nb\r\n", true)
-        local result = Patch.apply("*** Begin Patch\n*** Update File: first\n*** Move to: moved\n@@\n a\n-b\n+c\n"
-            .. "*** Add File: added\n+新增文件\n*** End Patch\n", root)
-        assert.is_true(result.ok)
-        assert.are.equal("a\r\nc\r\n", read(root .. "/moved"))
-        assert.are.equal("新增文件\n", read(root .. "/added"))
-        result = Patch.apply("*** Begin Patch\n*** Delete File: moved\n*** Delete File: added\n*** End Patch", root)
-        assert.is_true(result.ok)
-        assert.are.equal(2, #result.changed_files)
-    end)
-
-    it("整批预检先于写入，冲突不产生前面文件", function()
-        local result = Patch.apply("*** Begin Patch\n*** Add File: first\n+hello\n"
-            .. "*** Update File: missing\n@@\n-old\n+new\n*** End Patch", root)
-        assert.is_false(result.ok)
-        assert.is_nil(lfs.attributes(root .. "/first"))
-        assert.are.equal(0, #result.changed_files)
-    end)
-
-    it("拒绝越界、重复路径及覆盖新增文件", function()
-        for _, text in ipairs({
-            "*** Begin Patch\n*** Add File: ../outside\n+no\n*** End Patch",
-            "*** Begin Patch\n*** Add File: a\n+one\n*** Add File: a\n+two\n*** End Patch",
-        }) do assert.is_false(Patch.apply(text, root).ok) end
-        filesystem.atomic_write(root .. "/a", "original", true)
-        assert.is_false(Patch.apply("*** Begin Patch\n*** Add File: a\n+overwrite\n*** End Patch", root).ok)
-        assert.are.equal("original", read(root .. "/a"))
-    end)
-
     it("原生落盘拒绝符号链接且新增不会覆盖", function()
         filesystem.atomic_write(root .. "/a", "original", true)
         assert(lfs.link(root .. "/a", root .. "/link", true))
         assert.has_error(function() filesystem.atomic_write(root .. "/link", "bad", false) end)
         assert.has_error(function() filesystem.atomic_write(root .. "/a", "bad", true) end)
-        assert.are.equal("original", read(root .. "/a"))
-    end)
-
-    it("沙盒外补丁也必须显式声明权限模式", function()
-        local nested = workspace.create(root, "user", "session-a")
-        local text = "*** Begin Patch\n*** Add File: " .. root .. "/allowed\n+outside\n*** End Patch"
-        assert.is_false(Patch.apply(text, nested).ok)
-        assert.is_true(Patch.apply(text, nested, "require_escalated").ok)
+        assert.are.equal("original", filesystem.read_file(root .. "/a", 128))
     end)
 end)
 

@@ -47,6 +47,7 @@ check-full: check
 	@pnpm --dir "$(CLIENT_DIR)" test:integration:web
 	@pnpm --dir "$(CLIENT_DIR)" test:native
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e:full
+	@pnpm --dir "$(CLIENT_DIR)" test:execution
 	@pnpm --dir "$(CLIENT_DIR)" --filter @skynet/design-system build-storybook
 	@pnpm --dir "$(CLIENT_DIR)" test:e2e
 

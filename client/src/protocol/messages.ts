@@ -1,6 +1,7 @@
 import type { skynet } from './generated/agent_gateway.js'
 
 export interface RequestPayloads {
+  SessionExecutionSetReq: skynet.agent.v1.SessionExecutionSetReq.$Properties
   SessionModelSetReq: skynet.agent.v1.SessionModelSetReq.$Properties
   LoginReq: skynet.agent.v1.LoginReq.$Properties
   UserSnapshotReq: skynet.agent.v1.UserSnapshotReq.$Properties
@@ -9,6 +10,8 @@ export interface RequestPayloads {
 }
 
 export interface ServerMessagePayloads {
+  SessionExecutionSetRes: skynet.agent.v1.SessionExecutionSetRes.$Properties
+  DesktopUpdatedNtf: skynet.agent.v1.DesktopUpdatedNtf.$Properties
   SessionModelSetRes: skynet.agent.v1.SessionModelSetRes.$Properties
   ReasoningDeltaNtf: skynet.agent.v1.ReasoningDeltaNtf.$Properties
   LoginRes: skynet.agent.v1.LoginRes.$Properties
