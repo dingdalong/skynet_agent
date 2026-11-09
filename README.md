@@ -136,6 +136,10 @@ macOS 使用系统 `sandbox-exec`，Linux 需要安装 `bubblewrap` 并允许创
 这些执行时长使用毫秒；模型与权限请求的 `_ticks` 字段使用厘秒。停止会终止当前轮涉及的命令，
 关服回收所有进程；已经发生的文件修改会保留。失败后的重试继续使用已记录的工具结果，不重放命令。
 Lua 工具与权限代码位于 `agent/`，C 扩展源码集中在 `server/src/lualib-src/`。
+`process.c` 编译为 `agent_process`，负责进程、管道和 PTY；`filesystem.c` 编译为
+`agent_filesystem`，负责路径解析、临时文件、安全读取、原子写入和删除。
+`process_launcher.c` 独立编译为子进程启动与回收辅助程序。C 代码修改后需重新构建并重启服务，
+不通过 Lua 热修生效。
 
 ## Agent WebSocket 网关
 

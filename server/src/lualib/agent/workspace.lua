@@ -1,5 +1,5 @@
 local lfs = require("lfs")
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local Workspace = {}
 
 function Workspace.inside(path, root)
@@ -8,13 +8,13 @@ end
 
 function Workspace.resolve(path, base)
     assert(type(path) == "string" and not path:find("%z"), "路径无效")
-    if path:sub(1, 1) ~= "/" then path = (base or assert(native.realpath("."))) .. "/" .. path end
+    if path:sub(1, 1) ~= "/" then path = (base or assert(filesystem.realpath("."))) .. "/" .. path end
     local parts = {}
     for part in path:gmatch("[^/]+") do
         if part == ".." then table.remove(parts) elseif part ~= "." then parts[#parts + 1] = part end
     end
     path = "/" .. table.concat(parts, "/")
-    local resolved = native.realpath(path)
+    local resolved = filesystem.realpath(path)
     if resolved then return resolved end
     local parent, name = path:match("^(.*)/([^/]+)$")
     assert(parent and parent ~= path, "无法解析路径")

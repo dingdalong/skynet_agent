@@ -1,4 +1,4 @@
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local lfs = require("lfs")
 local config = require("etc.cfg").runtime
 local Sandbox = {}
@@ -23,7 +23,7 @@ end
 function Sandbox.program(name)
     local paths = config.executable_search_path
     for directory in paths:gmatch("[^:]+") do
-        local path = native.realpath(directory .. "/" .. name)
+        local path = filesystem.realpath(directory .. "/" .. name)
         if path and lfs.attributes(path, "mode") == "file" then return path end
     end
     error("缺少执行依赖: " .. name)

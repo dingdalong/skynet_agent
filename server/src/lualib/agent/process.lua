@@ -1,5 +1,6 @@
 local class = require("class")
 local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local skynet = require("skynet")
 local socket = require("skynet.socket")
 local sandbox = require("agent.sandbox")
@@ -11,7 +12,7 @@ local Processes = class()
 function Processes:ctor(root, config, owner, session_id)
     self.root, self.config, self.owner, self.session_id = root, config, owner, session_id
     self.processes, self.sequence, self.closed = {}, 0, false
-    self.launcher = assert(native.realpath("bin/process_launcher"))
+    self.launcher = assert(filesystem.realpath("bin/process_launcher"))
     log.info("agent.process", "init", "session=%s sandbox=%s max_processes=%d timeout_ms=%d",
         session_id, sandbox.platform(), config.max_processes, config.timeout_ms)
 end

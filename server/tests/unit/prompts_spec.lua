@@ -1,7 +1,7 @@
 local Prompts = require("agent.prompts")
 local Project = require("agent.prompts.project")
 local workspace = require("agent.workspace")
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local lfs = require("lfs")
 local Scope = require("tests.support.modules")
 
@@ -17,10 +17,10 @@ end
 
 ---@param overrides table
 ---@param callback fun(project: table)
-local function with_native(overrides, callback)
-    local replacement = table.copy(native)
+local function with_filesystem(overrides, callback)
+    local replacement = table.copy(filesystem)
     for key, value in pairs(overrides) do replacement[key] = value end
-    local scope = Scope.new({ agent_process = replacement, ["agent.prompts.project"] = false })
+    local scope = Scope.new({ agent_filesystem = replacement, ["agent.prompts.project"] = false })
     local ok, failure = pcall(function() callback(require("agent.prompts.project")) end)
     scope:restore()
     assert(ok, failure)
@@ -114,7 +114,7 @@ describe("Agent 根目录项目规则", function()
         root = os.tmpname()
         assert(os.remove(root))
         workspace.mkdir(root)
-        root = assert(native.realpath(root))
+        root = assert(filesystem.realpath(root))
     end)
     after_each(function()
         local function remove(path)
@@ -131,7 +131,7 @@ describe("Agent 根目录项目规则", function()
     end)
 
     local function write(name, text)
-        native.atomic_write(root .. "/" .. name, text, false)
+        filesystem.atomic_write(root .. "/" .. name, text, false)
     end
 
     it("不存在规则正常返回，不读取祖先及子目录规则", function()
@@ -197,7 +197,7 @@ describe("Agent 根目录项目规则", function()
 
     it("原生读取失败时报告所选规则路径，不生成不完整快照", function()
         write("AGENTS.md", "普通规则")
-        with_native({ read_file = function() error("read failure", 0) end }, function(project)
+        with_filesystem({ read_file = function() error("read failure", 0) end }, function(project)
             local ok, failure = pcall(project.load, root, 32768)
             assert.is_false(ok)
             assert.is_not_nil(failure:find(root .. "/AGENTS.md", 1, true))
@@ -208,7 +208,7 @@ describe("Agent 根目录项目规则", function()
     it("原生读取使用解析后的路径与字节上限", function()
         write("AGENTS.md", "普通规则")
         local requested, target
-        with_native({ read_file = function(path, limit)
+        with_filesystem({ read_file = function(path, limit)
             target, requested = path, limit
             return "文本"
         end }, function(project) assert.are.equal("文本", project.load(root, 6).text) end)
@@ -222,8 +222,8 @@ describe("Agent 根目录项目规则", function()
         write("rules.md", "越界规则")
         write("nested/AGENTS.md", "原始规则")
         local target = nested .. "/AGENTS.md"
-        with_native({ realpath = function(path)
-            local resolved, failure = native.realpath(path)
+        with_filesystem({ realpath = function(path)
+            local resolved, failure = filesystem.realpath(path)
             if path == target then
                 assert(os.remove(target))
                 assert(lfs.link(root .. "/rules.md", target, true))
@@ -241,20 +241,20 @@ describe("Agent 根目录项目规则", function()
         workspace.mkdir(root .. "/outside")
         write("nested/AGENTS.md", "原始规则")
         write("outside/AGENTS.md", "越界规则")
-        local target = assert(native.realpath(root .. "/nested/AGENTS.md"))
+        local target = assert(filesystem.realpath(root .. "/nested/AGENTS.md"))
         assert(os.rename(root .. "/nested", root .. "/moved"))
         assert(lfs.link(root .. "/outside", root .. "/nested", true))
-        assert.has_error(function() native.read_file(target, 32768) end)
+        assert.has_error(function() filesystem.read_file(target, 32768) end)
     end)
 
     it("原生读取最多返回上限加一个字节，普通文件内容保持原样", function()
         write("AGENTS.md", "中文规则\r\n")
-        assert.are.equal("中文", native.read_file(root .. "/AGENTS.md", 5))
-        assert.are.equal("中文规则\r\n", native.read_file(root .. "/AGENTS.md", 32768))
+        assert.are.equal("中文", filesystem.read_file(root .. "/AGENTS.md", 5))
+        assert.are.equal("中文规则\r\n", filesystem.read_file(root .. "/AGENTS.md", 32768))
     end)
 
     it("关闭自动加载时不探测文件，参数无效时明确失败", function()
-        with_native({ realpath = function() error("关闭时不能解析", 0) end,
+        with_filesystem({ realpath = function() error("关闭时不能解析", 0) end,
             read_file = function() error("关闭时不能读取", 0) end },
             function(project) assert.are.same({ workspace = root }, project.load(root, 0)) end)
         for _, limit in ipairs({ -1, 0.5, "1" }) do

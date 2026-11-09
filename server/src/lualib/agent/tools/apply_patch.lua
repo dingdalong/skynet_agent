@@ -1,6 +1,6 @@
 local lfs = require("lfs")
 local workspace = require("agent.workspace")
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local Patch = {}
 
 Patch.spec = { type = "function", name = "apply_patch", description =
@@ -165,12 +165,13 @@ function Patch.apply(text, root, mode)
         local operations = Patch.prepare(text, root, mode)
         for _, operation in ipairs(operations) do
             local path = operation.destination or operation.target
-            if operation.action == "Delete" then native.remove_file(path) else
+            if operation.action == "Delete" then filesystem.remove_file(path) else
                 workspace.mkdir(assert(path:match("^(.*)/[^/]+$")))
-                native.atomic_write(path, operation.content, operation.action == "Add" or operation.destination ~= nil)
+                filesystem.atomic_write(path, operation.content,
+                    operation.action == "Add" or operation.destination ~= nil)
                 changed[#changed + 1] = path
                 if operation.destination then
-                    native.remove_file(operation.target)
+                    filesystem.remove_file(operation.target)
                     changed[#changed + 1] = operation.target
                 end
             end

@@ -1,7 +1,7 @@
 local class = require("class")
 local cjson = require("cjson")
 local lfs = require("lfs")
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local workspace = require("agent.workspace")
 local Processes = require("agent.process")
 local Judge = require("agent.permission.llm_judge")
@@ -119,11 +119,11 @@ function Executor:prepare(name, args)
 end
 
 function Executor:patch(action, run, record)
-    local root = assert(native.realpath("."))
-    local input = native.temporary_file(cjson.encode({ patch = action.args.patch, workspace = self.root,
+    local root = assert(filesystem.realpath("."))
+    local input = filesystem.temporary_file(cjson.encode({ patch = action.args.patch, workspace = self.root,
         mode = action.mode }))
     local code = string.format('require("agent.worker").main(%q)', input)
-    local argv = { assert(native.realpath("3rd/skynet/3rd/lua/lua")), "-e", code }
+    local argv = { assert(filesystem.realpath("3rd/skynet/3rd/lua/lua")), "-e", code }
     local ok, process = pcall(self.processes.start, self.processes, argv, self.root, false, action.mode,
         self.config.timeout_ms, run, record,
         { root .. "/src/lualib", root .. "/luaclib", argv[1], input },

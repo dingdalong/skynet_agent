@@ -273,8 +273,11 @@ Tauri 不启用 shell、文件系统或任意命令插件，WSS 证书配置由�
 
 `exec_command` 启动 bash，`write_stdin` 继续访问所属会话的执行进程，`apply_patch` 处理文本补丁。
 补丁模块由 `agent.worker` 在受控的 Lua 子进程加载；工作输入放在私有临时文件，执行完成后回收。
-C 系统调用封装集中在 `lualib-src/`，以进程和文件描述符连接现有 Skynet 调度，不阻塞服务线程等待命令。
-启动辅助程序监督进程组，控制连接断开时终止子进程；执行器负责等待退出并回收描述符。
+C 系统调用封装集中在 `lualib-src/`。`process.c` 编译为 `agent_process`，负责进程、管道和 PTY，
+通过文件描述符接入 Skynet 调度，不阻塞服务线程等待命令。`filesystem.c` 编译为 `agent_filesystem`，
+负责路径解析、临时文件、安全读取、原子写入和删除。
+`process_launcher.c` 独立编译为启动辅助程序，负责子进程启动与回收、监督进程组，控制连接断开时终止子进程；
+执行器负责等待退出并回收描述符。C 代码修改后需重新构建并重启服务，不通过 Lua 热修生效。
 
 macOS 使用 Seatbelt，Linux 使用 bubblewrap，默认只写本会话目录且允许联网。
 沙盒外执行必须明确指定权限并经过判断，运行账号权限不变；隔离能力不可用时不自动降级。

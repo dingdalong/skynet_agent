@@ -1,4 +1,4 @@
-local native = require("agent_process")
+local filesystem = require("agent_filesystem")
 local sandbox = require("agent.sandbox")
 local workspace = require("agent.workspace")
 local cjson = require("cjson")
@@ -9,11 +9,11 @@ local Run = require("agent.run")
 
 skynet.start(function()
 local ok, failure = xpcall(function()
-local root = native.temporary_file("")
+local root = filesystem.temporary_file("")
 os.remove(root)
 workspace.mkdir(root)
 local directory = workspace.create(root, "probe", "session-probe")
-local server = assert(native.realpath("."))
+local server = assert(filesystem.realpath("."))
 
 local processes = Processes:new(directory, { max_processes = 8, timeout_ms = 300000,
     max_output_bytes = 1048576 }, nil, "probe")
@@ -41,9 +41,9 @@ code, text = run({ "/bin/bash", "-c", "cat ../outside" })
 assert(code ~= 0 and not text:find("outside%-ok"), "沙盒未隔离其他目录读取")
 code, text = run({ "/bin/bash", "-c", 'read -r value; printf "got:%s\n" "$value"' }, nil, true, "pty-input\n")
 assert(code == 0 and text:find("got:pty%-input"), "PTY 输入失败: " .. text)
-local request = native.temporary_file(cjson.encode({ workspace = directory,
+local request = filesystem.temporary_file(cjson.encode({ workspace = directory,
     patch = "*** Begin Patch\n*** Add File: patched\n+patch-ok\n*** End Patch" }))
-local lua = assert(native.realpath("3rd/skynet/3rd/lua/lua"))
+local lua = assert(filesystem.realpath("3rd/skynet/3rd/lua/lua"))
 code, text = run({ lua, "-e", string.format('require("agent.worker").main(%q)', request) }, nil, false, nil,
     { server .. "/src/lualib", server .. "/luaclib", lua, request },
     { "LUA_PATH=" .. server .. "/src/lualib/?.lua;" .. server .. "/src/lualib/?/init.lua",
