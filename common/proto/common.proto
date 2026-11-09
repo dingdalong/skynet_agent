@@ -76,13 +76,20 @@ message SessionState {
   repeated ChatMessage messages = 5;
   string run_id = 6;
   bool cancelling = 7;
-  string model_id = 8;
-  string permission_model_id = 9;
+}
+
+message ChatSession {
+  SessionState session = 1;
+  string model_id = 2;
+  string permission_model_id = 3;
 }
 
 message UserSnapshot {
   string user_id = 1;
   string username = 2;
-  repeated SessionState sessions = 3;
+  repeated ChatSession chat_sessions = 3;
   repeated ModelOption models = 4;
+  string default_model_id = 5;
+  // Empty means permission requests follow each session's selected model.
+  string permission_model_id = 6;
 }

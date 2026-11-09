@@ -26,8 +26,7 @@ pub fn encode(id: u32, name: &str, payload: &impl Message) -> Vec<u8> {
 pub enum Server {
     Login(pb::LoginRes),
     Snapshot(pb::UserSnapshotRes),
-    Create(pb::SessionCreateRes),
-    Send(pb::MessageSendRes),
+    Chat(pb::ChatRes),
     Model(pb::SessionModelSetRes),
     Reasoning(pb::ReasoningDeltaNtf),
     Cancel(pb::MessageCancelRes),
@@ -40,8 +39,7 @@ impl Server {
         match self {
             Self::Login(_) => "LoginRes",
             Self::Snapshot(_) => "UserSnapshotRes",
-            Self::Create(_) => "SessionCreateRes",
-            Self::Send(_) => "MessageSendRes",
+            Self::Chat(_) => "ChatRes",
             Self::Model(_) => "SessionModelSetRes",
             Self::Reasoning(_) => "ReasoningDeltaNtf",
             Self::Cancel(_) => "MessageCancelRes",
@@ -77,8 +75,7 @@ pub fn decode(frame: &[u8]) -> Result<(u32, Server), String> {
     }
     message!(LoginRes, Login);
     message!(UserSnapshotRes, Snapshot);
-    message!(SessionCreateRes, Create);
-    message!(MessageSendRes, Send);
+    message!(ChatRes, Chat);
     message!(SessionModelSetRes, Model);
     message!(ReasoningDeltaNtf, Reasoning);
     message!(MessageCancelRes, Cancel);
@@ -140,17 +137,37 @@ mod tests {
         assert_eq!(
             hex(&encode(
                 2,
-                "MessageSendReq",
-                &pb::MessageSendReq {
+                "ChatReq",
+                &pb::ChatReq {
                     session_id: "session-1".into(),
                     text: "你好".into(),
-                    retry_run_id: String::new()
+                    retry_run_id: String::new(),
+                    model_id: String::new()
                 }
             )),
-            vectors["frames"]["message_send"].as_str().unwrap()
+            vectors["frames"]["chat_request"].as_str().unwrap()
+        );
+        assert_eq!(
+            hash("ChatReq"),
+            vectors["hashes"]["chat_req"].as_u64().unwrap() as u32
+        );
+        assert_eq!(
+            hex(&encode(
+                3,
+                "ChatReq",
+                &pb::ChatReq {
+                    text: "你好".into(),
+                    model_id: "model-1".into(),
+                    ..Default::default()
+                }
+            )),
+            vectors["frames"]["chat_first_request"].as_str().unwrap()
         );
         for (name, value) in vectors["frames"].as_object().unwrap() {
-            if matches!(name.as_str(), "login_request" | "message_send") {
+            if matches!(
+                name.as_str(),
+                "login_request" | "chat_request" | "chat_first_request"
+            ) {
                 continue;
             }
             decode(&unhex(value.as_str().unwrap())).unwrap();

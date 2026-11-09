@@ -109,7 +109,9 @@ export function toChatMessage(payload: skynet.agent.v1.ChatMessage.$Properties):
   }
 }
 
-export function toSession(payload: skynet.agent.v1.SessionState.$Properties): ChatSession {
+export function toSession(chatSession: skynet.agent.v1.ChatSession.$Properties): ChatSession {
+  const payload = chatSession.session
+  if (!payload) throw new Error('聊天会话缺少 Agent 会话')
   const revision = Number(payload.revision)
   if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('会话版本无效')
   return {
@@ -120,23 +122,32 @@ export function toSession(payload: skynet.agent.v1.SessionState.$Properties): Ch
     messages: (payload.messages ?? []).map(toChatMessage),
     runId: payload.runId ?? '',
     cancelling: payload.cancelling === true,
-    modelId: payload.modelId ?? '',
-    permissionModelId: payload.permissionModelId ?? '',
+    modelId: chatSession.modelId ?? '',
+    permissionModelId: chatSession.permissionModelId ?? '',
   }
 }
 
 export function toSnapshot(payload: skynet.agent.v1.UserSnapshot.$Properties): UserSnapshot {
-  const sessions = (payload.sessions ?? []).map(toSession)
-  if (!sessions.length) throw new Error('用户快照缺少会话')
+  const chatSessions = (payload.chatSessions ?? []).map(toSession)
+  const models = (payload.models ?? []).map((item) => ({
+    id: requiredString(item.id, 'model.id'),
+    name: requiredString(item.name, 'model.name'),
+    model: requiredString(item.model, 'model.model'),
+  }))
+  const defaultModelId = payload.defaultModelId ?? ''
+  const permissionModelId = payload.permissionModelId ?? ''
+  if (
+    !models.some((model) => model.id === defaultModelId) ||
+    (permissionModelId && !models.some((model) => model.id === permissionModelId))
+  )
+    throw new Error('用户快照模型配置无效')
   return {
-    models: (payload.models ?? []).map((item) => ({
-      id: requiredString(item.id, 'model.id'),
-      name: requiredString(item.name, 'model.name'),
-      model: requiredString(item.model, 'model.model'),
-    })),
+    models,
     userId: requiredString(payload.userId, 'userId'),
     username: requiredString(payload.username, 'username'),
-    sessions,
+    chatSessions,
+    defaultModelId,
+    permissionModelId,
   }
 }
 
@@ -166,8 +177,8 @@ export function toUpdate(message: import('./messages').ServerMessage): ChatUpdat
       revision: Number(payload.revision),
     }
   }
-  if (message.name === 'SessionUpdatedNtf' && message.payload.session) {
-    return { type: 'session', session: toSession(message.payload.session) }
+  if (message.name === 'SessionUpdatedNtf' && message.payload.chatSession) {
+    return { type: 'session', session: toSession(message.payload.chatSession) }
   }
   if (message.name === 'MessageDeltaNtf') {
     const payload = message.payload

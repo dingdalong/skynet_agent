@@ -253,7 +253,7 @@ try {
       path.join(evidenceDirectory, 'snapshot.json'),
       redact(JSON.stringify(verified.snapshot, null, 2)) + '\n',
     )
-    const messages = verified.snapshot.sessions.flatMap((session) => session.messages)
+    const messages = verified.snapshot.chatSessions.flatMap(({ session }) => session.messages)
     assert.ok(
       messages.every((message) => message.status !== 4),
       '真实模型出现了生成错误',
@@ -295,7 +295,7 @@ try {
       '缺少权限模型实际思考',
     )
     assert.equal(
-      verified.snapshot.sessions.find((session) => session.id === path.basename(directory))
+      verified.snapshot.chatSessions.find(({ session }) => session.id === path.basename(directory))
         ?.modelId,
       'deepseek-flash',
     )

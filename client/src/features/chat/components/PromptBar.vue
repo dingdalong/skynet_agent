@@ -12,6 +12,7 @@ const props = withDefaults(
     multiline?: boolean
     disabled?: boolean
     canSend: boolean
+    sending?: boolean
     runState: 'idle' | 'running' | 'cancelling'
     models?: ModelOption[]
     modelId?: string
@@ -21,6 +22,7 @@ const props = withDefaults(
     compact: false,
     multiline: false,
     disabled: false,
+    sending: false,
     models: () => [],
     modelId: '',
   },
@@ -43,7 +45,13 @@ async function focus() {
   textarea.value?.focus()
 }
 function send() {
-  if (!props.disabled && props.canSend && draft.value.trim() && props.runState === 'idle')
+  if (
+    !props.disabled &&
+    !props.sending &&
+    props.canSend &&
+    draft.value.trim() &&
+    props.runState === 'idle'
+  )
     emit('send', draft.value)
 }
 function onKeydown(event: KeyboardEvent) {
@@ -85,6 +93,12 @@ function outside(event: PointerEvent) {
 onMounted(() => document.addEventListener('pointerdown', outside))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
 watch(draft, resizeTextarea, { flush: 'post', immediate: true })
+watch(
+  () => props.disabled || props.sending,
+  (busy) => {
+    if (busy) modelOpen.value = false
+  },
+)
 defineExpose({ focus })
 </script>
 <template>
@@ -125,7 +139,11 @@ defineExpose({ focus })
             v-model="draft"
             :rows="multiline ? 2 : 1"
             :disabled="disabled"
-            :placeholder="disabled ? '连接 Agent 后即可发送' : '给 Agent 发送消息…'"
+            :readonly="sending"
+            :aria-busy="sending"
+            :placeholder="
+              sending ? '正在发送消息…' : disabled ? '连接 Agent 后即可发送' : '给 Agent 发送消息…'
+            "
             aria-label="给 Agent 发送消息"
             @input="resizeTextarea"
             @keydown="onKeydown"
@@ -135,7 +153,7 @@ defineExpose({ focus })
             ref="modelTrigger"
             type="button"
             class="prompt-bar__model"
-            :disabled="disabled"
+            :disabled="disabled || sending"
             :aria-label="`切换会话模型：${currentModel?.name ?? modelId}`"
             aria-haspopup="listbox"
             :aria-expanded="modelOpen"
@@ -145,8 +163,9 @@ defineExpose({ focus })
             ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
           </button>
           <span v-else class="prompt-bar__caption">云端 Agent</span>
+          <span v-if="sending" class="prompt-bar__action" role="status">正在发送…</span>
           <SkButton
-            v-if="runState !== 'idle'"
+            v-else-if="runState !== 'idle'"
             class="prompt-bar__action"
             :disabled="disabled || runState === 'cancelling'"
             @click="emit('stop')"

@@ -38,7 +38,7 @@ test('发送消息并接收流式回答', async ({ page }) => {
   await expect(page.getByText('正在生成')).toHaveCount(0)
 })
 
-test('空状态新建复用当前会话，草稿和唯一会话保留', async ({ page, isMobile }) => {
+test('新建返回本地草稿，首次发送后才进入会话列表', async ({ page, isMobile }) => {
   const composer = page.getByRole('textbox', { name: '给 Agent 发送消息' })
   await composer.fill('未发送的草稿')
   await page.getByRole('button', { name: '新建会话' }).first().click()
@@ -51,8 +51,15 @@ test('空状态新建复用当前会话，草稿和唯一会话保留', async ({
   const sessionRegion = isMobile
     ? page.getByRole('dialog', { name: '会话栏' }).getByRole('navigation', { name: '会话列表' })
     : page.getByRole('navigation', { name: '会话列表' })
-  await expect(sessionRegion.getByRole('button')).toHaveCount(1)
-  await expect(sessionRegion.getByRole('button', { name: /新的会话/ })).toHaveAttribute(
+  await expect(sessionRegion.getByRole('button')).toHaveCount(0)
+  if (isMobile) await page.getByRole('button', { name: '关闭会话栏' }).click()
+  await page.getByRole('button', { name: '发送消息' }).click()
+  await expect(page.getByRole('article', { name: '用户消息', exact: true })).toContainText(
+    '未发送的草稿',
+  )
+  const sessions = await openSessions(page)
+  await expect(sessions.getByRole('button')).toHaveCount(1)
+  await expect(sessions.getByRole('button', { name: /未发送的草稿/ })).toHaveAttribute(
     'aria-current',
     'page',
   )
@@ -93,13 +100,13 @@ test('会话草稿独立保存，新会话为空，返回原会话后恢复', as
   await expect(composer).toHaveValue('')
   await composer.fill('新会话草稿')
   await openSessions(page)
-  await sessions.getByRole('button').nth(1).click()
+  await sessions.getByRole('button', { name: /原会话消息/ }).click()
   await expect(composer).toHaveValue('原会话草稿\n第二行')
   await openSessions(page)
   await page.getByRole('button', { name: '新建会话', exact: true }).first().click()
   await expect(composer).toHaveValue('新会话草稿')
   await openSessions(page)
-  await expect(sessions.getByRole('button')).toHaveCount(2)
+  await expect(sessions.getByRole('button')).toHaveCount(1)
 })
 
 test('中屏两侧抽屉均可打开、关闭并恢复焦点', async ({ page, isMobile }) => {
@@ -265,6 +272,11 @@ test('主题切换时按钮和会话选中色同步更新，保留常规动效',
     Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0 })
   })
   await page.reload()
+  await sendMessage(page, '主题颜色验证会话')
+  const session = page
+    .getByRole('navigation', { name: '会话列表' })
+    .getByRole('button', { name: /主题颜色验证会话/ })
+  await expect(session).toHaveAttribute('aria-current', 'page')
   const toggle = page.getByRole('button', { name: '切换明暗主题' })
   let previousPrimaryBackground = ''
   for (const theme of ['light', 'dark', 'light']) {
@@ -286,11 +298,14 @@ test('主题切换时按钮和会话选中色同步更新，保留常规动效',
     await expect(
       page.locator('.sidebar-nav-card__item.is-active .sidebar-nav-card__icon'),
     ).toHaveCSS('color', label)
+    await page.getByRole('button', { name: '新建会话', exact: true }).first().click()
     const primaryBackground = await page
       .locator('.chat-product__empty .button')
       .evaluate((element) => getComputedStyle(element).backgroundColor)
     if (previousPrimaryBackground) expect(primaryBackground).not.toBe(previousPrimaryBackground)
     previousPrimaryBackground = primaryBackground
+    await session.click()
+    await expect(session).toHaveAttribute('aria-current', 'page')
   }
 })
 

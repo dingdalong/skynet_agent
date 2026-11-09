@@ -18,14 +18,14 @@ const fromHex = (text: string) => Uint8Array.from(text.match(/../g) ?? [], (v) =
 describe('agent gateway binary codec', () => {
   it('与 Lua 共享请求、快照、推送及各终态二进制向量', () => {
     expect(fnv1a32('skynet.agent.v1.LoginReq')).toBe(vectors.hashes.login_req)
-    expect(fnv1a32('skynet.agent.v1.MessageSendReq')).toBe(vectors.hashes.message_send_req)
+    expect(fnv1a32('skynet.agent.v1.ChatReq')).toBe(vectors.hashes.chat_req)
     expect(decodeMessage(fromHex(vectors.frames.login_request!))).toMatchObject({
       name: 'LoginReq',
       messageId: 1,
       payload: { username: 'alice' },
     })
-    expect(decodeMessage(fromHex(vectors.frames.message_send!))).toMatchObject({
-      name: 'MessageSendReq',
+    expect(decodeMessage(fromHex(vectors.frames.chat_request!))).toMatchObject({
+      name: 'ChatReq',
       payload: { sessionId: 'session-1', text: '你好' },
     })
     expect(decodeServerMessage(fromHex(vectors.frames.login_success!))).toMatchObject({
@@ -45,15 +45,14 @@ describe('agent gateway binary codec', () => {
       expect(decodeServerMessage(fromHex(vectors.frames[key]!))).toMatchObject({
         name: 'SessionUpdatedNtf',
         messageId: 0,
-        payload: { session: { messages: [{ status }] } },
+        payload: { chatSession: { session: { messages: [{ status }] } } },
       })
     }
   })
   it.each([
     ['LoginReq', 1, { username: '用户' }],
-    ['SessionCreateReq', 2, {}],
     ['UserSnapshotReq', 3, {}],
-    ['MessageSendReq', 4, { sessionId: 's1', text: '你好', retryRunId: 'r1' }],
+    ['ChatReq', 4, { sessionId: 's1', text: '你好', retryRunId: 'r1' }],
     ['MessageCancelReq', 5, { sessionId: 's1', runId: 'r1' }],
     ['MessageDeltaNtf', 0, { delta: '片段' }],
   ])('编码解码 %s', (name, messageId, payload) => {

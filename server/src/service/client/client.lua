@@ -6,6 +6,42 @@ local codes = require("enum.error_code")
 local skynet = require("skynet")
 local username = require("helper.username")
 local Prompts = require("agent.prompts")
+local file = require("file")
+
+---@return table[]
+---@return integer
+local function load_request_handlers()
+    local handler_path = assert(package.searchpath("user.handler", package.path))
+    local user_directory = assert(handler_path:match("^(.*)[/\\]handler%.lua$"), "无法定位 User 模块目录")
+    local mods_directory = user_directory .. "/mods"
+    local directories, list_error = file.list_directories(mods_directory)
+    assert(directories, "读取 User 模块目录失败 dir=" .. mods_directory .. ": " .. tostring(list_error))
+    local module_names = { "user.handler" }
+    for _, name in ipairs(directories) do
+        local directory = mods_directory .. "/" .. name
+        local filenames, read_error = file.list_files(directory)
+        assert(filenames, "读取 User 模块目录失败 dir=" .. directory .. ": " .. tostring(read_error))
+        for _, filename in ipairs(filenames) do
+            if filename == "handler.lua" then
+                module_names[#module_names + 1] = "user.mods." .. name .. ".handler"
+            end
+        end
+    end
+    local handlers, registered, count = {}, {}, 0
+    for _, module_name in ipairs(module_names) do
+        local handler = require(module_name)
+        assert(type(handler) == "table" and type(handler.REQUEST) == "table",
+            "客户端请求 handler 必须导出 REQUEST 表: " .. module_name)
+        local requests = handler.REQUEST
+        for name in pairs(requests) do
+            assert(not registered[name], "客户端请求重复注册: " .. name)
+            registered[name] = true
+            count = count + 1
+        end
+        handlers[#handlers + 1] = requests
+    end
+    return handlers, count
+end
 
 ---@class client.ConnectionState
 ---@field user user.User
@@ -15,8 +51,9 @@ local Prompts = require("agent.prompts")
 ---@field new fun(self: client.Service): client.Service
 ---@field users table<string, user.User>
 ---@field connections table<string, client.ConnectionState>
----@field pending_runs table<user.Run, boolean>
+---@field pending_runs table<agent.Run, boolean>
 ---@field prompt_templates agent.PromptTemplates?
+---@field request_handlers table<string, function>[]
 local ClientService = class()
 
 ClientService.commands = { open = "open", handle_request = "handle_request", disconnect = "disconnect" }
@@ -27,12 +64,16 @@ function ClientService:ctor()
     self.connections = {}
     self.pending_runs = {}
     self.prompt_templates = nil
+    self.request_handlers = {}
 end
 
 function ClientService:init()
     assert(not self.prompt_templates, "Agent 提示词模板已经加载")
-    self.prompt_templates = Prompts.load_templates()
-    log.info("client", "init", "Agent 提示词模板已加载")
+    local handlers, count = load_request_handlers()
+    local templates = Prompts.load_templates()
+    self.request_handlers = handlers
+    self.prompt_templates = templates
+    log.info("client", "init", "客户端请求已注册 count=%d，Agent 提示词模板已加载", count)
 end
 
 ---@param user user.User
@@ -58,8 +99,6 @@ function ClientService:open(_, id, websocket_address, name)
     local user = self.users[name]
     if not user then
         user = User:new(name, self)
-        local response = user:SessionCreateReq()
-        if response.ret ~= codes.succ then return nil end
         self.users[name] = user
         log.info("client", "open", "创建用户 user=%s", user.id)
     end
@@ -78,7 +117,11 @@ function ClientService:handle_request(context, id, message_id, name, args)
         log.info("client", "handle_request", "连接来源无效 connection=%s source=%s", id, context.source)
         return
     end
-    local method = state.user[name]
+    local method
+    for _, requests in ipairs(self.request_handlers) do
+        method = requests[name]
+        if method ~= nil then break end
+    end
     if type(method) ~= "function" then
         log.info("client", "handle_request", "未知请求 connection=%s name=%s", id, name)
         rpc.send(state.websocket_address, "close_connection", id, codes.websocket_policy_violation, "未知请求")
@@ -113,9 +156,7 @@ function ClientService:close()
             log.failure("client", "close", run.close_error)
         end
     end
-    for _, user in pairs(self.users) do
-        for _, session in pairs(user.sessions) do session.agent:close() end
-    end
+    for _, user in pairs(self.users) do user:close() end
     return succeeded
 end
 

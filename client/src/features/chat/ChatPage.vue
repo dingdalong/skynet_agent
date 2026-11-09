@@ -32,7 +32,11 @@ const title = computed(() => store.activeSession?.title || '新的会话')
 const subtitle = computed(() => {
   if (store.connectionState === 'connecting') return '正在连接云端 Agent'
   if (store.connectionState === 'connected')
-    return store.runState !== 'idle' ? '云端 Agent 正在生成' : '云端 Agent · 随时开始对话'
+    return store.sending
+      ? '正在发送消息'
+      : store.runState !== 'idle'
+        ? '云端 Agent 正在生成'
+        : '云端 Agent · 随时开始对话'
   return '连接已断开'
 })
 
@@ -143,7 +147,6 @@ onBeforeUnmount(() => {
         :sessions="store.sessions"
         :active-session-id="store.activeSessionId"
         :disabled="!store.canOperateSessions"
-        :busy="store.sessionBusy"
         @create="createSession"
         @select="selectSession"
       />
@@ -201,11 +204,7 @@ onBeforeUnmount(() => {
               description="告诉 Agent 你想完成什么，一起把想法变成结果。"
             >
               <template #icon><Sparkles :size="24" aria-hidden="true" /></template>
-              <SkButton
-                :disabled="!store.canOperateSessions"
-                :loading="store.sessionBusy"
-                @click="createSession"
-              >
+              <SkButton :disabled="!store.canOperateSessions" @click="createSession">
                 <template #leading><Plus :size="15" aria-hidden="true" /></template>新建会话
               </SkButton>
             </SkEmptyState>
@@ -233,10 +232,11 @@ onBeforeUnmount(() => {
           compact
           multiline
           variant="Rounded"
-          :disabled="store.connectionState !== 'connected' || store.sessionBusy"
+          :disabled="store.connectionState !== 'connected'"
           :can-send="store.canSend"
+          :sending="store.sending"
           :models="store.models"
-          :model-id="store.activeSession?.modelId"
+          :model-id="store.modelId"
           :run-state="store.runState"
           @model="store.setModel"
           @send="sendMessage"
@@ -253,7 +253,6 @@ onBeforeUnmount(() => {
         :sessions="store.sessions"
         :active-session-id="store.activeSessionId"
         :disabled="!store.canOperateSessions"
-        :busy="store.sessionBusy"
         :error="store.errorMessage"
         @create="createSession"
         @select="selectSession"

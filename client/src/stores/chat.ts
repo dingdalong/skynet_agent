@@ -8,10 +8,21 @@ export const useChatStore = defineStore('chat', () => {
   const username = computed(() => state.value.username)
   const userId = computed(() => state.value.userId)
   const sessionViews = computed(() => state.value.sessionViews)
-  const activeSessionId = computed(() => state.value.activeSessionId)
+  const selection = computed(() => state.value.selection)
+  const localDraft = computed(() => state.value.localDraft)
+  const activeSessionId = computed(() =>
+    selection.value?.kind === 'session' ? selection.value.sessionId : null,
+  )
+  const activeDraft = computed(() => (selection.value?.kind === 'draft' ? localDraft.value : null))
+  const sending = computed(() => activeDraft.value?.sending === true)
+  const modelId = computed(() => activeDraft.value?.modelId ?? activeSession.value?.modelId ?? '')
+  const permissionModelId = computed(() =>
+    activeDraft.value
+      ? state.value.permissionModelId || activeDraft.value.modelId
+      : (activeSession.value?.permissionModelId ?? ''),
+  )
   const connectionState = computed(() => state.value.connectionState)
   const connectionError = computed(() => state.value.connectionError)
-  const sessionOperations = computed(() => state.value.sessionOperations)
   const pendingSends = computed(() => state.value.pendingSends)
   const sessions = computed(() =>
     [...sessionViews.value.values()].sort(
@@ -21,7 +32,7 @@ export const useChatStore = defineStore('chat', () => {
   const activeSession = computed(() => sessionViews.value.get(activeSessionId.value ?? ''))
   const messages = computed(() => activeSession.value?.messages ?? [])
   const draft = computed({
-    get: () => activeSession.value?.draft ?? '',
+    get: () => activeDraft.value?.text ?? activeSession.value?.draft ?? '',
     set: (value: string) => runtime.value.setDraft(value),
   })
   const runState = computed<'idle' | 'running' | 'cancelling'>(() => {
@@ -30,19 +41,22 @@ export const useChatStore = defineStore('chat', () => {
       ? 'running'
       : 'idle'
   })
-  const sessionBusy = computed(() => sessionOperations.value > 0)
-  const canOperateSessions = computed(
-    () => connectionState.value === 'connected' && !sessionBusy.value,
-  )
+  const canOperateSessions = computed(() => connectionState.value === 'connected')
   const canSend = computed(
-    () => canOperateSessions.value && runState.value === 'idle' && !!activeSession.value,
+    () =>
+      canOperateSessions.value &&
+      runState.value === 'idle' &&
+      !sending.value &&
+      (!!activeDraft.value || !!activeSession.value),
   )
   const retryAvailable = computed(() => {
     const last = messages.value.at(-1)
     return connectionState.value === 'connected' && last?.status === 'error' && last.retryable
   })
   const canRetry = computed(() => retryAvailable.value && canSend.value)
-  const errorMessage = computed(() => connectionError.value || activeSession.value?.error || '')
+  const errorMessage = computed(
+    () => connectionError.value || activeDraft.value?.error || activeSession.value?.error || '',
+  )
 
   function setRuntime(next: ChatRuntime) {
     runtime.value.detach()
@@ -54,17 +68,20 @@ export const useChatStore = defineStore('chat', () => {
     username,
     userId,
     sessionViews,
+    selection,
+    localDraft,
+    sending,
+    modelId,
+    permissionModelId,
     activeSessionId,
     activeSession,
     connectionState,
     connectionError,
-    sessionOperations,
     pendingSends,
     sessions,
     messages,
     draft,
     runState,
-    sessionBusy,
     canOperateSessions,
     canSend,
     retryAvailable,

@@ -69,9 +69,11 @@ describe("websocket", function()
             return codes.succ, true
         end
         message(1, 1)
-        message(1, 2, "SessionCreateReq")
-        message(1, 2, "SessionCreateReq")
-        assert.same({ 30, "handle_request", connection.id, 2, "SessionCreateReq", {} }, sent[1])
+        message(1, 2, "ChatReq")
+        message(1, 2, "ChatReq")
+        assert.same({ 30, "handle_request", connection.id, 2, "ChatReq", {
+            session_id = "", text = "", retry_run_id = "", model_id = "",
+        } }, sent[1])
         assert.are.equal(1, #sent)
     end)
     it("同步等待只阻塞当前连接，回调可绑定并写响应", function()

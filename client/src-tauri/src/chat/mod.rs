@@ -4,7 +4,7 @@ pub mod state;
 
 use protocol::{pb, Server};
 use serde::Serialize;
-use state::{Action, Cache, RuntimeState, Session};
+use state::{Action, Cache, RuntimeState, Selection, Session};
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -60,29 +60,15 @@ enum Purpose {
         view: String,
         session: String,
     },
-    Create {
-        view: String,
-    },
     Send {
         view: String,
-        session: String,
+        target: Selection,
         draft: Option<String>,
     },
     Cancel {
         view: String,
         session: String,
     },
-}
-impl Purpose {
-    fn target(&self) -> Option<(&str, Option<&str>)> {
-        match self {
-            Self::Create { view } => Some((view, None)),
-            Self::Send { view, session, .. }
-            | Self::Cancel { view, session }
-            | Self::Model { view, session } => Some((view, Some(session))),
-            _ => None,
-        }
-    }
 }
 enum Input {
     Attach {
@@ -354,7 +340,9 @@ impl Actor {
         }
         self.cache.pending_sends.clear();
         for view in self.cache.views.values_mut() {
-            view.creating = 0;
+            if let Some(draft) = &mut view.local_draft {
+                draft.sending = false;
+            }
         }
     }
     fn connect(&mut self, name: String, reply: Option<Reply>) {
@@ -480,22 +468,28 @@ impl Actor {
             Action::SelectSession { session_id } => {
                 let exists = self.cache.sessions.contains_key(&session_id);
                 if exists {
-                    self.cache.view(&label).selected = Some(session_id);
+                    self.cache.view(&label).selected = Some(Selection::Session { session_id });
                 }
                 self.emit_state();
                 let _ = reply.send(Ok(exists));
             }
-            Action::SetDraft { session_id, value } => {
-                if self.cache.sessions.contains_key(&session_id) {
-                    self.cache.view(&label).drafts.insert(session_id, value);
-                }
+            Action::SetDraft { target, value } => {
+                self.cache.set_draft(&label, &target, value);
                 self.emit_state();
                 let _ = reply.send(Ok(true));
             }
             Action::DismissError => {
                 let view = self.cache.view(&label);
-                if let Some(id) = view.selected.clone() {
-                    view.errors.insert(id, String::new());
+                match &view.selected {
+                    Some(Selection::Session { session_id }) => {
+                        view.errors.insert(session_id.clone(), String::new());
+                    }
+                    Some(Selection::Draft { .. }) => {
+                        if let Some(draft) = &mut view.local_draft {
+                            draft.error.clear();
+                        }
+                    }
+                    None => {}
                 }
                 self.emit_state();
                 let _ = reply.send(Ok(true));
@@ -507,65 +501,75 @@ impl Actor {
                     return;
                 }
                 match action {
-                    Action::CreateSession => {
-                        if let Some(id) = self
-                            .cache
-                            .sessions
-                            .values()
-                            .filter(|session| session.messages.is_empty())
-                            .max_by(|a, b| {
-                                a.updated_at
-                                    .cmp(&b.updated_at)
-                                    .then_with(|| a.id.cmp(&b.id))
-                            })
-                            .map(|session| session.id.clone())
-                        {
-                            self.cache.view(&label).selected = Some(id);
-                            self.emit_state();
-                            let _ = reply.send(Ok(true));
-                            return;
+                    Action::CreateSession { draft_id } => {
+                        let valid = draft_id.as_ref().is_none_or(|id| {
+                            self.cache
+                                .view(&label)
+                                .local_draft
+                                .as_ref()
+                                .is_some_and(|draft| draft.id == *id)
+                        });
+                        if valid {
+                            self.cache.new_draft(&label);
                         }
-                        if self.cache.view(&label).creating > 0 {
-                            self.emit_state();
-                            let _ = reply.send(Ok(false));
-                            return;
-                        }
-                        self.cache.view(&label).creating += 1;
                         self.emit_state();
-                        self.request(
-                            "SessionCreateReq",
-                            &pb::SessionCreateReq {},
-                            "SessionCreateRes",
-                            Purpose::Create { view: label },
-                            Some(reply),
-                        );
+                        let _ = reply.send(Ok(valid));
                     }
                     Action::SetModel { model_id } => {
-                        let selected = self.cache.view(&label).selected.clone().unwrap_or_default();
-                        if selected.is_empty() {
+                        if !self.cache.models.iter().any(|model| model.id == model_id) {
                             let _ = reply.send(Ok(false));
                             return;
                         }
-                        self.request(
-                            "SessionModelSetReq",
-                            &pb::SessionModelSetReq {
-                                session_id: selected.clone(),
-                                model_id,
-                            },
-                            "SessionModelSetRes",
-                            Purpose::Model {
-                                view: label,
-                                session: selected,
-                            },
-                            Some(reply),
-                        );
+                        let view = self.cache.view(&label);
+                        match view.selected.clone() {
+                            Some(Selection::Draft { draft_id }) => {
+                                let valid = if let Some(draft) = view
+                                    .local_draft
+                                    .as_mut()
+                                    .filter(|draft| draft.id == draft_id && !draft.sending)
+                                {
+                                    draft.model_id = model_id;
+                                    true
+                                } else {
+                                    false
+                                };
+                                self.emit_state();
+                                let _ = reply.send(Ok(valid));
+                            }
+                            Some(Selection::Session { session_id }) => {
+                                self.emit_state();
+                                self.request(
+                                    "SessionModelSetReq",
+                                    &pb::SessionModelSetReq {
+                                        session_id: session_id.clone(),
+                                        model_id,
+                                    },
+                                    "SessionModelSetRes",
+                                    Purpose::Model {
+                                        view: label,
+                                        session: session_id,
+                                    },
+                                    Some(reply),
+                                );
+                            }
+                            None => {
+                                let _ = reply.send(Ok(false));
+                            }
+                        }
                     }
                     Action::SendMessage { text } => {
                         self.send(label, text.trim().into(), false, reply)
                     }
                     Action::RetryLastMessage => self.send(label, String::new(), true, reply),
                     Action::CancelRun => {
-                        let selected = self.cache.view(&label).selected.clone().unwrap_or_default();
+                        let selected = self
+                            .cache
+                            .view(&label)
+                            .selected
+                            .as_ref()
+                            .and_then(Selection::session_id)
+                            .unwrap_or_default()
+                            .to_owned();
                         let Some(session) = self.cache.sessions.get(&selected) else {
                             let _ = reply.send(Ok(false));
                             return;
@@ -595,54 +599,85 @@ impl Actor {
     }
     fn send(&mut self, label: String, text: String, retry: bool, reply: Reply) {
         let view = self.cache.view(&label);
-        let selected = view.selected.clone().unwrap_or_default();
-        let creating = view.creating;
-        let draft = view.drafts.get(&selected).cloned().unwrap_or_default();
-        let Some(session) = self.cache.sessions.get(&selected) else {
-            self.emit_state();
+        let Some(target) = view.selected.clone() else {
             let _ = reply.send(Ok(false));
             return;
         };
-        if creating > 0
-            || !session.run_id.is_empty()
-            || self.cache.pending_sends.contains(&selected)
-            || (!retry && text.is_empty())
-        {
+        if !retry && text.is_empty() {
             self.emit_state();
             let _ = reply.send(Ok(false));
             return;
         }
-        let retry_run_id = if retry {
-            let Some(last) = session
-                .messages
-                .last()
-                .filter(|message| message.status == "error" && message.retryable)
-            else {
-                let _ = reply.send(Ok(false));
-                return;
-            };
-            last.run_id.clone()
-        } else {
-            String::new()
+        let (session_id, model_id, retry_run_id, draft) = match &target {
+            Selection::Draft { draft_id } => {
+                let Some(draft) = view
+                    .local_draft
+                    .as_mut()
+                    .filter(|draft| draft.id == *draft_id && !draft.sending && !retry)
+                else {
+                    let _ = reply.send(Ok(false));
+                    return;
+                };
+                draft.sending = true;
+                draft.error.clear();
+                (
+                    String::new(),
+                    draft.model_id.clone(),
+                    String::new(),
+                    Some(draft.text.clone()),
+                )
+            }
+            Selection::Session { session_id } => {
+                let draft = view.drafts.get(session_id).cloned().unwrap_or_default();
+                let Some(session) = self.cache.sessions.get(session_id) else {
+                    let _ = reply.send(Ok(false));
+                    return;
+                };
+                if !session.run_id.is_empty() || self.cache.pending_sends.contains(session_id) {
+                    self.emit_state();
+                    let _ = reply.send(Ok(false));
+                    return;
+                }
+                let retry_run_id = if retry {
+                    let Some(last) = session
+                        .messages
+                        .last()
+                        .filter(|message| message.status == "error" && message.retryable)
+                    else {
+                        let _ = reply.send(Ok(false));
+                        return;
+                    };
+                    last.run_id.clone()
+                } else {
+                    String::new()
+                };
+                self.cache.pending_sends.insert(session_id.clone());
+                self.cache
+                    .view(&label)
+                    .errors
+                    .insert(session_id.clone(), String::new());
+                (
+                    session_id.clone(),
+                    String::new(),
+                    retry_run_id,
+                    if retry { None } else { Some(draft) },
+                )
+            }
         };
-        self.cache.pending_sends.insert(selected.clone());
-        self.cache
-            .view(&label)
-            .errors
-            .insert(selected.clone(), String::new());
         self.emit_state();
         self.request(
-            "MessageSendReq",
-            &pb::MessageSendReq {
-                session_id: selected.clone(),
+            "ChatReq",
+            &pb::ChatReq {
+                session_id,
                 text,
                 retry_run_id,
+                model_id,
             },
-            "MessageSendRes",
+            "ChatRes",
             Purpose::Send {
                 view: label,
-                session: selected,
-                draft: if retry { None } else { Some(draft) },
+                target,
+                draft,
             },
             Some(reply),
         );
@@ -665,22 +700,39 @@ impl Actor {
                 pending.expected
             );
         }
-        if let Some((view, session)) = pending.purpose.target() {
-            if let Err(error) = &result {
-                let selected = session
-                    .map(str::to_string)
-                    .or_else(|| self.cache.view(view).selected.clone());
-                if let Some(id) = selected {
-                    self.cache.view(view).errors.insert(id, error.clone());
+        match &pending.purpose {
+            Purpose::Send { view, target, .. } => {
+                if let Selection::Session { session_id } = target {
+                    self.cache.pending_sends.remove(session_id);
+                }
+                if let Some(view) = self.cache.views.get_mut(view) {
+                    match target {
+                        Selection::Draft { draft_id } => {
+                            if let Some(draft) = view
+                                .local_draft
+                                .as_mut()
+                                .filter(|draft| draft.id == *draft_id)
+                            {
+                                draft.sending = false;
+                                if let Err(error) = &result {
+                                    draft.error = error.clone();
+                                }
+                            }
+                        }
+                        Selection::Session { session_id } => {
+                            if let Err(error) = &result {
+                                view.errors.insert(session_id.clone(), error.clone());
+                            }
+                        }
+                    }
                 }
             }
-        }
-        match &pending.purpose {
-            Purpose::Create { view } => {
-                self.cache.view(view).creating = self.cache.view(view).creating.saturating_sub(1);
-            }
-            Purpose::Send { session, .. } => {
-                self.cache.pending_sends.remove(session);
+            Purpose::Model { view, session } | Purpose::Cancel { view, session } => {
+                if let Some(view) = self.cache.views.get_mut(view) {
+                    if let Err(error) = &result {
+                        view.errors.insert(session.clone(), error.clone());
+                    }
+                }
             }
             _ => {}
         }
@@ -728,34 +780,58 @@ impl Actor {
                     return Err("用户数据版本不连续，请重新连接".into());
                 }
             }
-            Server::Create(response) => {
+            Server::Model(response) => {
                 protocol::check(response.ret, response.error.as_ref())?;
-                let session = Session::try_from(response.session.ok_or("Agent 未返回会话")?)?;
-                if let Purpose::Create { view } = purpose {
-                    self.cache.view(view).selected = Some(session.id.clone());
+                let session = Session::try_from(response.chat_session.ok_or("Agent 未返回会话")?)?;
+                if let Purpose::Model {
+                    session: expected, ..
+                } = purpose
+                {
+                    if session.id != *expected {
+                        return Err("模型响应会话不匹配".into());
+                    }
                 }
                 self.cache.merge(session);
             }
-            Server::Model(response) => {
+            Server::Chat(response) => {
                 protocol::check(response.ret, response.error.as_ref())?;
-                self.cache.merge(Session::try_from(
-                    response.session.ok_or("Agent 未返回会话")?,
-                )?);
-            }
-            Server::Send(response) => {
-                protocol::check(response.ret, response.error.as_ref())?;
-                self.cache.merge(Session::try_from(
-                    response.session.ok_or("Agent 未返回会话")?,
-                )?);
+                let session = Session::try_from(response.chat_session.ok_or("Agent 未返回会话")?)?;
                 if let Purpose::Send {
-                    view,
-                    session,
-                    draft: Some(draft),
+                    target: Selection::Session { session_id },
+                    ..
                 } = purpose
                 {
-                    let drafts = &mut self.cache.view(view).drafts;
-                    if drafts.get(session).map(String::as_str).unwrap_or_default() == draft {
-                        drafts.insert(session.clone(), String::new());
+                    if session.id != *session_id {
+                        return Err("聊天响应会话不匹配".into());
+                    }
+                }
+                let session_id = session.id.clone();
+                self.cache.merge(session);
+                if let Purpose::Send {
+                    view,
+                    target,
+                    draft,
+                } = purpose
+                {
+                    match target {
+                        Selection::Draft { draft_id } => {
+                            self.cache.bind_draft(view, draft_id, &session_id)
+                        }
+                        Selection::Session { session_id } => {
+                            if let (Some(view), Some(draft)) =
+                                (self.cache.views.get_mut(view), draft)
+                            {
+                                if view
+                                    .drafts
+                                    .get(session_id)
+                                    .map(String::as_str)
+                                    .unwrap_or_default()
+                                    == draft
+                                {
+                                    view.drafts.insert(session_id.clone(), String::new());
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -786,7 +862,7 @@ impl Actor {
         match message {
             Server::Session(message) => {
                 self.cache.merge(Session::try_from(
-                    message.session.clone().ok_or("会话推送缺少状态")?,
+                    message.chat_session.clone().ok_or("会话推送缺少状态")?,
                 )?);
                 self.emit_state();
                 Ok(true)
@@ -856,7 +932,274 @@ impl Actor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prost::Message;
     use std::sync::{Arc, Mutex};
+
+    #[tokio::test]
+    async fn local_draft_creation_and_model_selection_do_not_send_requests() {
+        let (mut actor, mut wire) = actor();
+        actor.cache.models.push(state::ModelOption {
+            id: "pro".into(),
+            name: "Pro".into(),
+            model: "pro".into(),
+        });
+        let (reply, received) = oneshot::channel();
+        actor.action(
+            "main".into(),
+            Action::CreateSession { draft_id: None },
+            reply,
+        );
+        assert!(received.await.unwrap().unwrap());
+        let target = actor.cache.view("main").selected.clone().unwrap();
+        actor.cache.set_draft("main", &target, "首个问题".into());
+        let (reply, received) = oneshot::channel();
+        actor.action(
+            "main".into(),
+            Action::SetModel {
+                model_id: "pro".into(),
+            },
+            reply,
+        );
+        assert!(received.await.unwrap().unwrap());
+        let (reply, received) = oneshot::channel();
+        actor.action(
+            "main".into(),
+            Action::CreateSession { draft_id: None },
+            reply,
+        );
+        assert!(received.await.unwrap().unwrap());
+        assert_eq!(actor.cache.view("main").selected, Some(target));
+        let draft = actor.cache.view("main").local_draft.as_ref().unwrap();
+        assert_eq!(draft.text, "首个问题");
+        assert_eq!(draft.model_id, "pro");
+        assert!(wire.try_recv().is_err());
+        assert_eq!(actor.cache.sessions.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn first_chat_binds_after_early_notifications_without_overwriting_newer_state() {
+        let (mut actor, mut wire) = actor();
+        actor.cache.new_draft("main");
+        let target = actor.cache.view("main").selected.clone().unwrap();
+        actor.cache.set_draft("main", &target, "第一条".into());
+        let (reply, received) = oneshot::channel();
+        actor.send("main".into(), "第一条".into(), false, reply);
+        let frame = wire.try_recv().unwrap();
+        assert_eq!(
+            u32::from_be_bytes(frame[5..9].try_into().unwrap()),
+            protocol::hash("ChatReq")
+        );
+        let request = pb::ChatReq::decode(&frame[9..]).unwrap();
+        assert_eq!(request.session_id, "");
+        assert_eq!(request.model_id, "test");
+        assert!(
+            actor
+                .cache
+                .view("main")
+                .local_draft
+                .as_ref()
+                .unwrap()
+                .sending
+        );
+        let (reply, duplicate) = oneshot::channel();
+        actor.send("main".into(), "重复".into(), false, reply);
+        assert!(!duplicate.await.unwrap().unwrap());
+        assert!(wire.try_recv().is_err());
+        actor
+            .notification(Server::Session(pb::SessionUpdatedNtf {
+                chat_session: Some(response("new", 2, true)),
+            }))
+            .unwrap();
+        actor
+            .notification(Server::Delta(pb::MessageDeltaNtf {
+                session_id: "new".into(),
+                message_id: "m1".into(),
+                run_id: "r1".into(),
+                revision: 3,
+                delta: "更新".into(),
+            }))
+            .unwrap();
+        assert_eq!(actor.cache.view("main").selected, Some(target));
+        actor
+            .receive(&protocol::encode(
+                1,
+                "ChatRes",
+                &pb::ChatRes {
+                    ret: 1,
+                    chat_session: Some(response("new", 2, true)),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+        assert!(received.await.unwrap().unwrap());
+        assert_eq!(
+            actor
+                .cache
+                .view("main")
+                .selected
+                .as_ref()
+                .and_then(Selection::session_id),
+            Some("new")
+        );
+        assert!(actor.cache.view("main").local_draft.is_none());
+        assert_eq!(actor.cache.sessions["new"].messages[0].content, "回答更新");
+        assert_eq!(actor.cache.sessions.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn first_chat_response_keeps_navigation_and_ignores_closed_source_views() {
+        let (mut actor, mut wire) = actor();
+        actor.cache.new_draft("main");
+        let (reply, received) = oneshot::channel();
+        actor.send("main".into(), "第一条".into(), false, reply);
+        wire.try_recv().unwrap();
+        actor.cache.view("main").selected = Some(Selection::Session {
+            session_id: "s1".into(),
+        });
+        actor
+            .receive(&protocol::encode(
+                1,
+                "ChatRes",
+                &pb::ChatRes {
+                    ret: 1,
+                    chat_session: Some(response("new", 1, true)),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+        assert!(received.await.unwrap().unwrap());
+        assert_eq!(
+            actor
+                .cache
+                .view("main")
+                .selected
+                .as_ref()
+                .and_then(Selection::session_id),
+            Some("s1")
+        );
+        assert!(actor.cache.view("main").local_draft.is_none());
+        actor.cache.new_draft("main");
+        let (reply, _) = oneshot::channel();
+        actor.send("main".into(), "第二条".into(), false, reply);
+        wire.try_recv().unwrap();
+        actor.cache.views.remove("main");
+        actor.cache.new_draft("main");
+        let selection = actor.cache.view("main").selected.clone();
+        actor
+            .receive(&protocol::encode(
+                2,
+                "ChatRes",
+                &pb::ChatRes {
+                    ret: 1,
+                    chat_session: Some(response("other", 1, true)),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+        assert_eq!(actor.cache.view("main").selected, selection);
+        assert!(actor.cache.view("main").local_draft.is_some());
+        assert!(actor.cache.sessions.contains_key("other"));
+    }
+
+    #[tokio::test]
+    async fn new_session_action_targets_the_draft_seen_before_its_confirmation() {
+        let (mut actor, mut wire) = actor();
+        actor.cache.new_draft("main");
+        let draft_id = actor
+            .cache
+            .view("main")
+            .local_draft
+            .as_ref()
+            .unwrap()
+            .id
+            .clone();
+        let (reply, _) = oneshot::channel();
+        actor.send("main".into(), "首发".into(), false, reply);
+        wire.try_recv().unwrap();
+        // 点击时仍看到旧草稿，IPC 执行前服务器已经确认并消耗了它。
+        actor
+            .receive(&protocol::encode(
+                1,
+                "ChatRes",
+                &pb::ChatRes {
+                    ret: 1,
+                    chat_session: Some(response("new", 1, true)),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+        let (reply, received) = oneshot::channel();
+        actor.action(
+            "main".into(),
+            Action::CreateSession {
+                draft_id: Some(draft_id),
+            },
+            reply,
+        );
+        assert!(!received.await.unwrap().unwrap());
+        assert!(actor.cache.view("main").local_draft.is_none());
+        assert_eq!(
+            actor
+                .cache
+                .view("main")
+                .selected
+                .as_ref()
+                .and_then(Selection::session_id),
+            Some("new")
+        );
+        assert!(wire.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn first_chat_rejection_and_timeout_keep_draft_without_replay() {
+        let (mut actor, mut wire) = actor();
+        actor.cache.new_draft("main");
+        let target = actor.cache.view("main").selected.clone().unwrap();
+        actor.cache.set_draft("main", &target, "原稿".into());
+        let (reply, received) = oneshot::channel();
+        actor.send("main".into(), "原稿".into(), false, reply);
+        wire.try_recv().unwrap();
+        actor
+            .receive(&protocol::encode(
+                1,
+                "ChatRes",
+                &pb::ChatRes {
+                    ret: 17,
+                    error: Some(pb::ErrorInfo {
+                        message: "创建失败".into(),
+                        retryable: true,
+                    }),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+        assert!(!received.await.unwrap().unwrap());
+        let draft = actor.cache.view("main").local_draft.as_ref().unwrap();
+        assert_eq!(draft.text, "原稿");
+        assert_eq!(draft.model_id, "test");
+        assert!(!draft.sending);
+        assert!(draft.error.contains("创建失败"));
+        let (reply, received) = oneshot::channel();
+        actor.send("main".into(), "原稿".into(), false, reply);
+        wire.try_recv().unwrap();
+        actor.pending.get_mut(&2).unwrap().deadline = Instant::now();
+        actor.tick(Instant::now());
+        assert!(received.await.unwrap().is_err());
+        assert!(
+            !actor
+                .cache
+                .view("main")
+                .local_draft
+                .as_ref()
+                .unwrap()
+                .sending
+        );
+        assert_eq!(
+            actor.cache.view("main").local_draft.as_ref().unwrap().text,
+            "原稿"
+        );
+        assert!(wire.try_recv().is_err());
+    }
 
     #[test]
     fn reasoning_notification_serializes_the_page_discriminant() {
@@ -910,15 +1253,25 @@ mod tests {
         actor
             .cache
             .snapshot(pb::UserSnapshot {
-                models: vec![],
+                models: vec![pb::ModelOption {
+                    id: "test".into(),
+                    name: "Test".into(),
+                    model: "test".into(),
+                }],
+                default_model_id: "test".into(),
                 user_id: "u1".into(),
                 username: "alice".into(),
-                sessions: vec![pb::SessionState {
-                    id: "s1".into(),
-                    title: "会话".into(),
-                    revision: 1,
-                    ..Default::default()
+                chat_sessions: vec![pb::ChatSession {
+                    session: Some(pb::SessionState {
+                        id: "s1".into(),
+                        title: "会话".into(),
+                        revision: 1,
+                        ..Default::default()
+                    }),
+                    model_id: "test".into(),
+                    permission_model_id: "test".into(),
                 }],
+                ..Default::default()
             })
             .unwrap();
         actor.connection_state = "connected";
@@ -926,21 +1279,25 @@ mod tests {
         actor.writer = Some(writer);
         (actor, rx)
     }
-    fn response(session: &str, revision: u32, running: bool) -> pb::SessionState {
-        pb::SessionState {
-            id: session.into(),
-            title: "会话".into(),
-            revision,
-            run_id: if running { "r1".into() } else { String::new() },
-            messages: vec![pb::ChatMessage {
-                id: "m1".into(),
-                role: 2,
-                status: if running { 1 } else { 2 },
-                run_id: "r1".into(),
-                content: "回答".into(),
+    fn response(session: &str, revision: u32, running: bool) -> pb::ChatSession {
+        pb::ChatSession {
+            session: Some(pb::SessionState {
+                id: session.into(),
+                title: "会话".into(),
+                revision,
+                run_id: if running { "r1".into() } else { String::new() },
+                messages: vec![pb::ChatMessage {
+                    id: "m1".into(),
+                    role: 2,
+                    status: if running { 1 } else { 2 },
+                    run_id: "r1".into(),
+                    content: "回答".into(),
+                    ..Default::default()
+                }],
                 ..Default::default()
-            }],
-            ..Default::default()
+            }),
+            model_id: "test".into(),
+            permission_model_id: "test".into(),
         }
     }
     #[tokio::test]
@@ -985,10 +1342,10 @@ mod tests {
         actor
             .receive(&protocol::encode(
                 1,
-                "MessageSendRes",
-                &pb::MessageSendRes {
+                "ChatRes",
+                &pb::ChatRes {
                     ret: 1,
-                    session: Some(response("s1", 2, false)),
+                    chat_session: Some(response("s1", 2, false)),
                     ..Default::default()
                 },
             ))
@@ -1036,10 +1393,16 @@ mod tests {
                 &pb::UserSnapshotRes {
                     ret: 1,
                     snapshot: Some(pb::UserSnapshot {
-                        models: vec![],
+                        models: vec![pb::ModelOption {
+                            id: "test".into(),
+                            name: "Test".into(),
+                            model: "test".into(),
+                        }],
+                        default_model_id: "test".into(),
                         user_id: "u1".into(),
                         username: "alice".into(),
-                        sessions: vec![response("s1", 4, true)],
+                        chat_sessions: vec![response("s1", 4, true)],
+                        ..Default::default()
                     }),
                     ..Default::default()
                 },
@@ -1083,8 +1446,8 @@ mod tests {
         actor
             .receive(&protocol::encode(
                 1,
-                "MessageSendRes",
-                &pb::MessageSendRes {
+                "ChatRes",
+                &pb::ChatRes {
                     ret: 12,
                     error: Some(pb::ErrorInfo {
                         message: "内容过长".into(),

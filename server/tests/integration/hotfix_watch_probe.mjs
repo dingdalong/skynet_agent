@@ -77,7 +77,7 @@ function hashName(name) {
 }
 
 function request(socket, id, name, args, predicate = () => true) {
-  const responseName = name === "MessageSendReq" ? "SessionUpdatedNtf" : name.replace(/Req$/, "Res");
+  const responseName = name === "ChatReq" ? "SessionUpdatedNtf" : name.replace(/Req$/, "Res");
   const response = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.removeEventListener("message", onMessage);
@@ -87,7 +87,7 @@ function request(socket, id, name, args, predicate = () => true) {
       const frame = new Uint8Array(event.data);
       const view = new DataView(frame.buffer);
       if (
-        view.getUint32(1) !== (name === "MessageSendReq" ? 0 : id) ||
+        view.getUint32(1) !== (name === "ChatReq" ? 0 : id) ||
         view.getUint32(5) !== hashName(responseName)
       )
         return;
@@ -137,11 +137,12 @@ async function connect() {
   });
   const login = await request(socket, 1, "LoginReq", { username: `hotfix-${sockets.length}` });
   assert.equal(login.ret, 1);
-  return { socket, sessionId: login.snapshot.sessions[0].id };
+  assert.equal(login.snapshot.chatSessions.length, 0);
+  return { socket, userId: login.snapshot.userId, sessionId: undefined };
 }
 
 function completed(value) {
-  return !value.session.runId && value.session.messages.at(-1)?.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED;
+  return !value.chatSession.session.runId && value.chatSession.session.messages.at(-1)?.status === proto.MessageStatus.MESSAGE_STATUS_COMPLETED;
 }
 
 function marked(source, signature, marker) {
@@ -149,6 +150,14 @@ function marked(source, signature, marker) {
   return source.replace(
     signature,
     `${signature}\n    skynet.error("${marker}", skynet.address(skynet.self()))`,
+  );
+}
+
+function markedHandler(source, signature, marker) {
+  assert.ok(source.includes(signature), `找不到请求处理入口 ${signature}`);
+  return source.replace(
+    signature,
+    `${signature}\n    local skynet = require("skynet")\n    skynet.error("${marker}", skynet.address(skynet.self()))`,
   );
 }
 
@@ -228,15 +237,17 @@ try {
   // 不同用户名分布到两个 client；四条连接同时覆盖两个 WebSocket 实例。
   const connections = [];
   for (let index = 0; index < 4; index++) connections.push(await connect());
-  for (const { socket, sessionId } of connections) {
+  for (const connection of connections) {
+    const { socket, sessionId } = connection;
     const response = await request(
       socket,
       2,
-      "MessageSendReq",
+      "ChatReq",
       { sessionId, text: "[e2e:history-set]" },
       completed,
     );
-    assert.equal(response.session.messages.at(-1).content, "E2E 历史已保存");
+    assert.equal(response.chatSession.session.messages.at(-1).content, "E2E 历史已保存");
+    connection.sessionId = response.chatSession.session.id;
   }
 
   const wsPath = "src/service/websocket/websocket.lua";
@@ -260,16 +271,16 @@ try {
       sessionId,
     });
     assert.equal(selected.ret, 1);
-    assert.equal(selected.snapshot.sessions[0].messages.length, 2);
-    assert.equal(selected.snapshot.sessions[0].messages[1].content, "E2E 历史已保存");
+    assert.equal(selected.snapshot.chatSessions[0].session.messages.length, 2);
+    assert.equal(selected.snapshot.chatSessions[0].session.messages[1].content, "E2E 历史已保存");
     const response = await request(
       socket,
       4,
-      "MessageSendReq",
+      "ChatReq",
       { sessionId, text: "[e2e:history-check]" },
       completed,
     );
-    assert.equal(response.session.messages.at(-1).content, "E2E 历史通过");
+    assert.equal(response.chatSession.session.messages.at(-1).content, "E2E 历史通过");
   }
   await until(
     () =>
@@ -319,7 +330,7 @@ try {
   const recoveredOffset = serverLog.length;
   for (const { socket, sessionId } of connections) {
     assert.equal(
-      (await request(socket, 6, "UserSnapshotReq", { sessionId })).snapshot.sessions[0].messages
+      (await request(socket, 6, "UserSnapshotReq", { sessionId })).snapshot.chatSessions[0].session.messages
         .length,
       4,
     );
@@ -484,6 +495,81 @@ try {
     "主节点和共享基础模块未自动更新",
   );
 
+  // 存量用户不重新登录；只替换稳定 REQUEST 表中的函数体，不能重建用户或会话。
+  const snapshots = new Map();
+  for (const { socket, userId, sessionId } of connections) {
+    const response = await request(socket, 12, "UserSnapshotReq", {});
+    assert.equal(response.snapshot.userId, userId);
+    assert.equal(response.snapshot.chatSessions[0].session.id, sessionId);
+    snapshots.set(socket, response.snapshot);
+  }
+  const userHandlerPath = "src/lualib/user/handler.lua";
+  const chatHandlerPath = "src/lualib/user/mods/chat/handler.lua";
+  const userHandlerSource = await readFile(join(server, userHandlerPath), "utf8");
+  let chatHandlerSource = await readFile(join(server, chatHandlerPath), "utf8");
+  const handlerMarkers = [
+    ["ChatReq", "AUTO_CHAT_REQUEST_V2"],
+    ["MessageCancelReq", "AUTO_CHAT_CANCEL_V2"],
+    ["SessionModelSetReq", "AUTO_CHAT_MODEL_V2"],
+  ];
+  for (const [name, marker] of handlerMarkers) {
+    chatHandlerSource = markedHandler(
+      chatHandlerSource,
+      `function REQUEST:${name}(args)`,
+      marker,
+    );
+  }
+  const handlerBatch = await saveBatch([
+    [
+      userHandlerPath,
+      markedHandler(
+        userHandlerSource,
+        "function REQUEST:UserSnapshotReq()",
+        "AUTO_USER_SNAPSHOT_V2",
+      ),
+    ],
+    [chatHandlerPath, chatHandlerSource],
+  ]);
+  assert.deepEqual(updatedFiles(handlerBatch), [userHandlerPath, chatHandlerPath]);
+  const handlerOffset = serverLog.length;
+  for (const { socket, userId, sessionId } of connections) {
+    const response = await request(socket, 13, "UserSnapshotReq", {});
+    assert.equal(response.ret, 1);
+    assert.equal(response.snapshot.userId, userId);
+    assert.deepEqual(response.snapshot, snapshots.get(socket));
+    const completedResponse = await request(
+      socket,
+      14,
+      "ChatReq",
+      { sessionId, text: "[e2e:history-check]" },
+      completed,
+    );
+    const session = completedResponse.chatSession.session;
+    const previous = snapshots.get(socket).chatSessions[0].session;
+    assert.equal(session.id, sessionId);
+    assert.deepEqual(session.messages.slice(0, previous.messages.length), previous.messages);
+    assert.equal(session.messages.length, previous.messages.length + 2);
+    assert.equal(session.messages.at(-1).content, "E2E 历史通过");
+    const switched = await request(socket, 15, "SessionModelSetReq", {
+      sessionId,
+      modelId: response.snapshot.defaultModelId,
+    });
+    assert.equal(switched.ret, 1);
+    assert.equal(switched.chatSession.session.id, sessionId);
+    const cancelled = await request(socket, 16, "MessageCancelReq", {
+      sessionId,
+      runId: session.messages.at(-1).runId,
+    });
+    assert.equal(cancelled.ret, 1);
+  }
+  await until(
+    () =>
+      ["AUTO_USER_SNAPSHOT_V2", ...handlerMarkers.map(([, marker]) => marker)].every(
+        (marker) => markerAddresses(serverLog.slice(handlerOffset), marker).size === 2,
+      ),
+    "存量已登录用户未在两个 client 实例调用热修后的 REQUEST 方法",
+  );
+
   const closing = connections.map(
     ({ socket }) =>
       new Promise((resolve) => {
@@ -503,7 +589,7 @@ try {
   assert.equal(code, 0);
   assert.equal(signal, null);
   console.log(
-    "auto hotfix smoke passed: 统一预检查、单次文件日志、全部实例、存量历史、失败恢复、正常关服",
+    "auto hotfix smoke passed: 统一预检查、单次文件日志、全部实例、存量历史、REQUEST 方法热修、失败恢复、正常关服",
   );
 } catch (error) {
   console.error(serverLog);

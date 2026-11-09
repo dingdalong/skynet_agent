@@ -101,6 +101,16 @@
     await wait(() => input() && !input().disabled, '真实网关登录完成', 30000)
     const token = fixture.token
     if (progress.phase === 0) {
+      await draft('首次发送前的本地草稿')
+      button('新建会话').click()
+      await wait(() => input()?.value === '首次发送前的本地草稿', '返回本地草稿')
+      await chooseModel('DeepSeek Pro')
+      await chooseModel('DeepSeek Flash')
+      assert(
+        document.querySelectorAll('nav[aria-label="会话列表"] button').length === 0,
+        '首次发送前出现了服务端会话',
+      )
+      progress.steps.push({ step: 'local-draft-and-model-before-first-chat', tools: [] })
       await complete(
         `请在当前会话目录实际完成文件编辑验收：先使用 apply_patch 创建 note.txt，内容为 initial:${token} 加一个换行；` +
           `再使用 apply_patch 把内容改为 updated:${token} 加一个换行，并移动到 result.txt。` +
@@ -113,6 +123,10 @@
       assert(
         tools().some((tool) => tool.name === 'Bash' && tool.output?.includes(`updated:${token}`)),
         '页面没有真实 Bash 读取结果',
+      )
+      assert(
+        document.querySelectorAll('nav[aria-label="会话列表"] button').length === 1,
+        '首次发送没有形成唯一正式会话',
       )
       await draft('重载后应保留这条草稿')
       save('patch-and-bash', 1)

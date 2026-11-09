@@ -10,7 +10,6 @@ withDefaults(
     sessions: ChatSessionSummary[]
     activeSessionId: string | null
     disabled: boolean
-    busy: boolean
     error?: string
   }>(),
   { embedded: false, error: '' },
@@ -44,7 +43,6 @@ function formatUpdatedAt(timestamp: number) {
       新建会话
       <template #trailing><Plus :size="16" aria-hidden="true" /></template>
     </SkButton>
-    <p v-if="busy" class="sidebar-nav-card__feedback" role="status">正在处理会话…</p>
     <p
       v-if="error"
       class="sidebar-nav-card__feedback sidebar-nav-card__feedback--error"
@@ -52,7 +50,7 @@ function formatUpdatedAt(timestamp: number) {
     >
       {{ error }}
     </p>
-    <nav class="sidebar-nav-card__nav" aria-label="会话列表" :aria-busy="busy">
+    <nav class="sidebar-nav-card__nav" aria-label="会话列表">
       <p class="sidebar-nav-card__section-label">最近会话</p>
       <button
         v-for="session in sessions"

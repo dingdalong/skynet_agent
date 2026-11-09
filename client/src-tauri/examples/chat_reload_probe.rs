@@ -175,7 +175,13 @@ fn main() {
                 .unwrap();
             writeln!(file, "{}", serde_json::to_string(&event).unwrap()).unwrap();
             if let Event::State { state } = &event {
-                if !state.pending_sends.is_empty() && probe.arm.swap(0, Ordering::SeqCst) == 1 {
+                if (!state.pending_sends.is_empty()
+                    || state
+                        .sessions
+                        .iter()
+                        .any(|session| !session.session.run_id.is_empty()))
+                    && probe.arm.swap(0, Ordering::SeqCst) == 1
+                {
                     handle.get_webview_window("main").unwrap().reload().unwrap();
                 }
             }

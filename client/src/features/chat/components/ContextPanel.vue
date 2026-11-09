@@ -39,20 +39,17 @@ const connectionLabel = computed(() => {
       <div>
         <dt>会话模型</dt>
         <dd>
-          {{
-            store.models.find((model) => model.id === store.activeSession?.modelId)?.name ??
-            '未选择'
-          }}
+          {{ store.models.find((model) => model.id === store.modelId)?.name ?? '未选择' }}
         </dd>
       </div>
       <div>
         <dt>权限模型</dt>
         <dd>
           {{
-            store.activeSession?.permissionModelId === store.activeSession?.modelId
+            store.permissionModelId === store.modelId
               ? '跟随会话模型'
-              : (store.models.find((model) => model.id === store.activeSession?.permissionModelId)
-                  ?.name ?? '未选择')
+              : (store.models.find((model) => model.id === store.permissionModelId)?.name ??
+                '未选择')
           }}
         </dd>
       </div>

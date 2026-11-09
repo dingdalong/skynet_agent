@@ -62,7 +62,7 @@ function Executor:specs()
 end
 
 function Executor:publish(run, record)
-    if self.owner then self.owner:_on_tool_update(self.session_id, run.message_id, record) end
+    if self.owner then self.owner:_on_tool_update(run.message_id, record) end
 end
 
 local function number(args, name, default, minimum, maximum)

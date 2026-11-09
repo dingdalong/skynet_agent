@@ -25,10 +25,10 @@ export function createBrowserChatRuntime(
     username,
     userId,
     sessionViews,
-    activeSessionId,
+    selection,
+    localDraft,
     connectionState,
     connectionError,
-    sessionOperations,
     pendingSends,
   } = toRefs(state)
   const sessions = computed(() =>
@@ -36,12 +36,20 @@ export function createBrowserChatRuntime(
       (a, b) => b.updatedAt - a.updatedAt || b.id.localeCompare(a.id),
     ),
   )
+  const activeSessionId = computed(() =>
+    selection.value?.kind === 'session' ? selection.value.sessionId : null,
+  )
   const activeView = computed(() => sessionViews.value.get(activeSessionId.value ?? ''))
   const messages = computed(() => activeView.value?.messages ?? [])
   const draft = computed({
-    get: () => activeView.value?.draft ?? '',
+    get: () =>
+      selection.value?.kind === 'draft'
+        ? (localDraft.value?.text ?? '')
+        : (activeView.value?.draft ?? ''),
     set: (value: string) => {
-      if (activeView.value) activeView.value.draft = value
+      if (selection.value?.kind === 'draft') {
+        if (localDraft.value && !localDraft.value.sending) localDraft.value.text = value
+      } else if (activeView.value) activeView.value.draft = value
     },
   })
   const runState = computed<'idle' | 'running' | 'cancelling'>(() => {
@@ -50,12 +58,14 @@ export function createBrowserChatRuntime(
       ? 'running'
       : 'idle'
   })
-  const sessionBusy = computed(() => sessionOperations.value > 0)
-  const canOperateSessions = computed(
-    () => connectionState.value === 'connected' && !sessionBusy.value,
-  )
+  const canOperateSessions = computed(() => connectionState.value === 'connected')
   const canSend = computed(
-    () => canOperateSessions.value && runState.value === 'idle' && !!activeView.value,
+    () =>
+      canOperateSessions.value &&
+      runState.value === 'idle' &&
+      (selection.value?.kind === 'draft'
+        ? !!localDraft.value && !localDraft.value.sending
+        : !!activeView.value),
   )
   const retryAvailable = computed(() => {
     const last = messages.value.at(-1)
@@ -81,14 +91,20 @@ export function createBrowserChatRuntime(
     if (snapshot.username !== username.value) throw new Error('用户快照身份不匹配')
     if (userId.value !== snapshot.userId) {
       sessionViews.value.clear()
-      activeSessionId.value = null
+      selection.value = null
+      localDraft.value = null
       userId.value = snapshot.userId
     }
     state.models = snapshot.models ?? []
-    for (const session of snapshot.sessions) mergeSession(session)
+    state.defaultModelId = snapshot.defaultModelId
+    state.permissionModelId = snapshot.permissionModelId
+    for (const session of snapshot.chatSessions) mergeSession(session)
+    if (selection.value?.kind === 'draft' && localDraft.value) return
     if (!activeSessionId.value || !sessionViews.value.has(activeSessionId.value)) {
       const selected = readSelectedSession(username.value)
-      activeSessionId.value = sessionViews.value.has(selected) ? selected : sessions.value[0]!.id
+      const id = sessionViews.value.has(selected) ? selected : sessions.value[0]?.id
+      if (id) selection.value = { kind: 'session', sessionId: id }
+      else selectLocalDraft()
     }
   }
 
@@ -170,7 +186,7 @@ export function createBrowserChatRuntime(
     buffered = []
     syncing = false
     pendingSends.value.clear()
-    sessionOperations.value = 0
+    if (localDraft.value) localDraft.value.sending = false
     transport.close()
   }
 
@@ -185,7 +201,8 @@ export function createBrowserChatRuntime(
     releaseConnection()
     if (normalized !== username.value) {
       sessionViews.value.clear()
-      activeSessionId.value = null
+      selection.value = null
+      localDraft.value = null
       userId.value = ''
     }
     username.value = normalized
@@ -208,6 +225,7 @@ export function createBrowserChatRuntime(
       connectionState.value = state
       connectionError.value = messageError(error)
       pendingSends.value.clear()
+      if (localDraft.value) localDraft.value.sending = false
       if (!wasConnecting) scheduleReconnect()
     })
     unsubscribe = () => {
@@ -245,58 +263,82 @@ export function createBrowserChatRuntime(
     userId.value = ''
     saveUsername('')
     sessionViews.value.clear()
-    activeSessionId.value = null
+    selection.value = null
+    localDraft.value = null
     connectionError.value = ''
   }
 
   function selectSession(sessionId: string): Promise<boolean> {
     if (!sessionViews.value.has(sessionId)) return Promise.resolve(false)
-    activeSessionId.value = sessionId
+    selection.value = { kind: 'session', sessionId }
     saveSelectedSession(username.value, sessionId)
     return Promise.resolve(true)
   }
 
-  async function createSession(): Promise<boolean> {
-    if (!canOperateSessions.value) return false
-    const empty = sessions.value.find((item) => item.messages.length === 0)
-    if (empty) return selectSession(empty.id)
-    const current = generation
-    sessionOperations.value++
-    try {
-      const session = await transport.createSession()
-      if (current !== generation) return false
-      mergeSession(session)
-      await selectSession(session.id)
-      return true
-    } catch (error) {
-      if (current === generation && activeView.value) activeView.value.error = messageError(error)
-      return false
-    } finally {
-      if (current === generation) sessionOperations.value--
+  function selectLocalDraft() {
+    localDraft.value ??= {
+      id: crypto.randomUUID(),
+      text: '',
+      modelId: state.defaultModelId,
+      error: '',
+      sending: false,
     }
+    selection.value = { kind: 'draft', draftId: localDraft.value.id }
+  }
+
+  function createSession(): Promise<boolean> {
+    if (!canOperateSessions.value) return Promise.resolve(false)
+    selectLocalDraft()
+    return Promise.resolve(true)
   }
 
   function startMessage(text: string, retryRunId?: string): boolean {
+    if (!canSend.value) return false
+    const source = selection.value
     const view = activeView.value
-    if (!canSend.value || !view) return false
+    const draftSession = source?.kind === 'draft' ? localDraft.value : null
+    if (!source || (!view && !draftSession)) return false
     const current = generation
-    const originalDraft = view.draft
-    pendingSends.value.add(view.id)
-    view.error = ''
+    const originalDraft = draftSession?.text ?? view!.draft
+    if (draftSession) {
+      draftSession.sending = true
+      draftSession.error = ''
+    } else {
+      pendingSends.value.add(view!.id)
+      view!.error = ''
+    }
     void (async () => {
       try {
-        const session = await transport.sendMessage({ sessionId: view.id, text, retryRunId })
+        const session = await transport.sendMessage(
+          source.kind === 'draft'
+            ? { text, modelId: draftSession!.modelId }
+            : { sessionId: source.sessionId, text, retryRunId },
+        )
         if (current !== generation) return
         mergeSession(session)
-        const latest = sessionViews.value.get(view.id)
-        if (!retryRunId && latest?.draft === originalDraft) latest.draft = ''
+        if (source.kind === 'draft') {
+          if (localDraft.value?.id !== source.draftId) return
+          if (selection.value?.kind === 'draft' && selection.value.draftId === source.draftId)
+            await selectSession(session.id)
+          localDraft.value = null
+        } else {
+          const latest = sessionViews.value.get(source.sessionId)
+          if (!retryRunId && latest?.draft === originalDraft) latest.draft = ''
+        }
       } catch (error) {
-        if (current === generation) {
-          const latest = sessionViews.value.get(view.id)
+        if (current !== generation) return
+        if (source.kind === 'draft') {
+          if (localDraft.value?.id === source.draftId) localDraft.value.error = messageError(error)
+        } else {
+          const latest = sessionViews.value.get(source.sessionId)
           if (latest) latest.error = messageError(error)
         }
       } finally {
-        if (current === generation) pendingSends.value.delete(view.id)
+        if (current === generation) {
+          if (source.kind === 'draft') {
+            if (localDraft.value?.id === source.draftId) localDraft.value.sending = false
+          } else pendingSends.value.delete(source.sessionId)
+        }
       }
     })()
     return true
@@ -326,7 +368,8 @@ export function createBrowserChatRuntime(
   }
 
   function dismissError() {
-    if (activeView.value) activeView.value.error = ''
+    if (selection.value?.kind === 'draft' && localDraft.value) localDraft.value.error = ''
+    else if (activeView.value) activeView.value.error = ''
   }
 
   return {
@@ -339,6 +382,13 @@ export function createBrowserChatRuntime(
     disconnect,
     switchUser,
     async setModel(modelId) {
+      if (selection.value?.kind === 'draft') {
+        if (!localDraft.value || localDraft.value.sending || connectionState.value !== 'connected')
+          return false
+        if (!state.models.some((model) => model.id === modelId)) return false
+        localDraft.value.modelId = modelId
+        return true
+      }
       const view = activeView.value
       if (!view || connectionState.value !== 'connected') return false
       const current = generation

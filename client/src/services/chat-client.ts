@@ -70,36 +70,28 @@ export class ChatClient implements ChatTransport {
     return toSnapshot(response.payload.snapshot)
   }
 
-  async createSession(): Promise<ChatSession> {
-    this.assertReady()
-    const response = await this.requests.request('SessionCreateReq', {}).completed
-    if (response.name !== 'SessionCreateRes') throw new Error('创建会话响应类型无效')
-    checkResponse(response.payload)
-    if (!response.payload.session) throw new Error('Agent 未返回会话')
-    return toSession(response.payload.session)
-  }
-
   async setModel(sessionId: string, modelId: string): Promise<ChatSession> {
     this.assertReady()
     const response = await this.requests.request('SessionModelSetReq', { sessionId, modelId })
       .completed
     if (response.name !== 'SessionModelSetRes') throw new Error('模型切换响应类型无效')
     checkResponse(response.payload)
-    if (!response.payload.session) throw new Error('Agent 未返回会话')
-    return toSession(response.payload.session)
+    if (!response.payload.chatSession) throw new Error('Agent 未返回会话')
+    return toSession(response.payload.chatSession)
   }
 
   async sendMessage(input: {
-    sessionId: string
+    sessionId?: string
+    modelId?: string
     text: string
     retryRunId?: string
   }): Promise<ChatSession> {
     this.assertReady()
-    const response = await this.requests.request('MessageSendReq', input).completed
-    if (response.name !== 'MessageSendRes') throw new Error('生成响应类型无效')
+    const response = await this.requests.request('ChatReq', input).completed
+    if (response.name !== 'ChatRes') throw new Error('生成响应类型无效')
     checkResponse(response.payload)
-    if (!response.payload.session) throw new Error('Agent 未返回会话')
-    return toSession(response.payload.session)
+    if (!response.payload.chatSession) throw new Error('Agent 未返回会话')
+    return toSession(response.payload.chatSession)
   }
 
   async cancelRun(sessionId: string, runId: string): Promise<void> {

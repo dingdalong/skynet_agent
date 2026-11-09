@@ -7,9 +7,9 @@ local class = require("class")
 ---@field processes table<string, agent.Processes>
 ---@field id string
 ---@field session_id string?
----@field owner user.User?
+---@field owner agent_session.AgentSession?
 ---@field message_id string
----@field assistant user.Message
+---@field assistant agent_session.Message
 ---@field retry boolean?
 ---@field close_error string?
 local Run = class()

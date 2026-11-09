@@ -22,7 +22,13 @@ const session = (id = 's1', revision = 1): ChatSession => ({
 const snapshot = (): UserSnapshot => ({
   userId: 'u1',
   username: 'alice',
-  sessions: [session(), session('s2')],
+  defaultModelId: 'flash',
+  permissionModelId: '',
+  models: [
+    { id: 'flash', name: 'Flash', model: 'flash' },
+    { id: 'pro', name: 'Pro', model: 'pro' },
+  ],
+  chatSessions: [session(), session('s2')],
 })
 const assistant = (status: 'streaming' | 'complete' | 'error' = 'streaming') => ({
   id: 'm1',
@@ -51,7 +57,6 @@ function fixture() {
     setModel: vi.fn<ChatTransport['setModel']>(),
     connect: vi.fn<ChatTransport['connect']>().mockImplementation(async () => snapshot()),
     snapshot: vi.fn<ChatTransport['snapshot']>().mockImplementation(async () => snapshot()),
-    createSession: vi.fn<ChatTransport['createSession']>().mockResolvedValue(session('s3')),
     sendMessage: vi.fn<ChatTransport['sendMessage']>().mockResolvedValue(session('s1', 2)),
     cancelRun: vi.fn<ChatTransport['cancelRun']>().mockResolvedValue(),
     close: vi.fn(),
@@ -107,6 +112,144 @@ describe('用户聊天状态', () => {
     await store.connect()
     expect(store.activeSessionId).toBe('s2')
     expect(localStorage.getItem('skynet.username')).toBe('alice')
+    store.disconnect()
+  })
+
+  it('空快照可编辑本地草稿，重复新建和预选模型不请求服务器', async () => {
+    const { store, transport } = fixture()
+    transport.connect.mockResolvedValue({ ...snapshot(), chatSessions: [] })
+    await store.connect('alice')
+    expect(store.canSend).toBe(true)
+    expect(store.sessions).toHaveLength(0)
+    expect(store.modelId).toBe('flash')
+    expect(store.permissionModelId).toBe('flash')
+    store.draft = '首条消息'
+    const id = store.localDraft?.id
+    await store.createSession()
+    await store.createSession()
+    await store.setModel('pro')
+    expect(store.localDraft?.id).toBe(id)
+    expect(store.draft).toBe('首条消息')
+    expect(store.modelId).toBe('pro')
+    expect(store.activeSessionId).toBeNull()
+    expect(transport.setModel).not.toHaveBeenCalled()
+    expect(transport.sendMessage).not.toHaveBeenCalled()
+    store.disconnect()
+  })
+
+  it('首发无会话ID，等待确认时冻结草稿和模型，通知早到不回滚版本', async () => {
+    const { store, transport, update } = fixture()
+    transport.connect.mockResolvedValue({ ...snapshot(), chatSessions: [] })
+    await store.connect('alice')
+    await store.setModel('pro')
+    store.draft = '首条消息'
+    const pending = deferred<ChatSession>()
+    transport.sendMessage.mockReturnValue(pending.promise)
+    expect(store.sendMessage('首条消息')).toBe(true)
+    expect(store.sendMessage('重复')).toBe(false)
+    expect(store.sending).toBe(true)
+    expect(store.canOperateSessions).toBe(true)
+    store.draft = '被阻止的编辑'
+    expect(await store.setModel('flash')).toBe(false)
+    await store.createSession()
+    expect(store.draft).toBe('首条消息')
+    expect(store.modelId).toBe('pro')
+    expect(transport.sendMessage).toHaveBeenCalledWith({ text: '首条消息', modelId: 'pro' })
+    update({
+      type: 'session',
+      session: { ...session('created', 3), title: '较新状态', modelId: 'pro' },
+    })
+    expect(store.activeSessionId).toBeNull()
+    pending.resolve({ ...session('created', 2), title: '旧确认', modelId: 'pro' })
+    await flush()
+    expect(store.activeSessionId).toBe('created')
+    expect(store.activeSession?.title).toBe('较新状态')
+    expect(store.localDraft).toBeNull()
+    expect(store.draft).toBe('')
+    store.disconnect()
+  })
+
+  it('首发确认不抢走已切换的会话，既有会话仍可并发发送', async () => {
+    const { store, transport } = fixture()
+    await store.connect('alice')
+    await store.createSession()
+    store.draft = '新问题'
+    const pending = deferred<ChatSession>()
+    transport.sendMessage.mockReturnValueOnce(pending.promise)
+    store.sendMessage('新问题')
+    await store.selectSession('s2')
+    expect(store.sendMessage('另一个问题')).toBe(true)
+    await flush()
+    pending.resolve(session('created'))
+    await flush()
+    expect(store.activeSessionId).toBe('s2')
+    expect(store.localDraft).toBeNull()
+    expect(store.sessions).toHaveLength(3)
+    await store.createSession()
+    expect(store.draft).toBe('')
+    expect(store.modelId).toBe('flash')
+    store.disconnect()
+  })
+
+  it('首发拒绝保留草稿和模型，错误只属于该草稿', async () => {
+    const { store, transport } = fixture()
+    await store.connect('alice')
+    await store.createSession()
+    await store.setModel('pro')
+    store.draft = '保留内容'
+    transport.sendMessage.mockRejectedValueOnce(new Error('创建被拒绝'))
+    store.sendMessage('保留内容')
+    await flush()
+    expect(store.sending).toBe(false)
+    expect(store.canSend).toBe(true)
+    expect(store.errorMessage).toBe('创建被拒绝')
+    await store.selectSession('s1')
+    expect(store.errorMessage).toBe('')
+    await store.createSession()
+    expect(store.draft).toBe('保留内容')
+    expect(store.modelId).toBe('pro')
+    store.dismissError()
+    expect(store.errorMessage).toBe('')
+    store.disconnect()
+  })
+
+  it('本地草稿跨同用户重连保留，首发确认丢失不猜测关联或重放', async () => {
+    vi.useFakeTimers()
+    const { store, transport, offline } = fixture()
+    await store.connect('alice')
+    await store.createSession()
+    store.draft = '确认丢失'
+    const pending = deferred<ChatSession>()
+    transport.sendMessage.mockReturnValueOnce(pending.promise)
+    store.sendMessage('确认丢失')
+    offline()
+    transport.connect.mockResolvedValue({
+      ...snapshot(),
+      chatSessions: [session('server-created')],
+    })
+    await vi.advanceTimersByTimeAsync(1000)
+    pending.resolve(session('server-created', 99))
+    await flush()
+    expect(store.activeSessionId).toBeNull()
+    expect(store.draft).toBe('确认丢失')
+    expect(store.sending).toBe(false)
+    expect(store.sessionViews.get('server-created')?.revision).toBe(1)
+    expect(transport.sendMessage).toHaveBeenCalledTimes(1)
+    store.switchUser()
+    expect(store.localDraft).toBeNull()
+  })
+
+  it('Web页面的新运行时从快照恢复真实会话，不恢复页面内草稿', async () => {
+    const { store, transport } = fixture()
+    await store.connect('alice')
+    await store.selectSession('s1')
+    await store.createSession()
+    store.draft = '仅页面内保存'
+    store.setRuntime(createBrowserChatRuntime(transport))
+    await store.connect('alice')
+    expect(store.activeSessionId).toBe('s1')
+    expect(store.localDraft).toBeNull()
+    expect(store.draft).toBe('')
     store.disconnect()
   })
 
@@ -219,7 +362,7 @@ describe('用户聊天状态', () => {
     })
     pending.resolve({
       ...snapshot(),
-      sessions: [
+      chatSessions: [
         { ...session('s1', 4), runId: 'r1', messages: [{ ...assistant(), content: '四' }] },
       ],
     })
@@ -284,7 +427,7 @@ describe('用户聊天状态', () => {
     const { store, transport } = fixture()
     transport.connect.mockResolvedValue({
       ...snapshot(),
-      sessions: [{ ...session(), messages: [assistant('error')] }],
+      chatSessions: [{ ...session(), messages: [assistant('error')] }],
     })
     await store.connect('alice')
     expect(store.errorMessage).toBe('失败')
@@ -345,9 +488,10 @@ describe('用户聊天状态', () => {
     const { store, transport } = fixture()
     await store.connect('alice')
     transport.connect.mockResolvedValue({
+      ...snapshot(),
       userId: 'u2',
       username: 'alice',
-      sessions: [session('fresh')],
+      chatSessions: [session('fresh')],
     })
     await store.connect()
     expect(store.sessions.map((item) => item.id)).toEqual(['fresh'])

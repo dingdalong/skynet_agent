@@ -20,10 +20,12 @@ vi.mock('@tauri-apps/api/core', () => ({
 const state = (): NativeChatState => ({
   username: 'alice',
   userId: 'u1',
-  activeSessionId: 's1',
+  selection: { kind: 'session', sessionId: 's1' },
+  localDraft: null,
+  defaultModelId: 'flash',
+  permissionModelId: '',
   connectionState: 'connected',
   connectionError: '',
-  sessionOperations: 0,
   pendingSends: [],
   sessions: [
     {
@@ -45,6 +47,13 @@ async function flush() {
 function publish(value = state(), channel = channels[0]!) {
   channel.onmessage({ type: 'state', state: value })
 }
+function draftState(): NativeChatState {
+  return {
+    ...state(),
+    selection: { kind: 'draft', draftId: 'd1' },
+    localDraft: { id: 'd1', text: '首条草稿', modelId: 'pro', error: '', sending: false },
+  }
+}
 
 beforeEach(() => {
   channels.length = 0
@@ -55,6 +64,130 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Rust 客户端界面适配', () => {
+  it('本地草稿使用独立target，迟到回显不覆盖输入，首发绑定后清理本地投影', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish(draftState())
+    runtime.setDraft('本地新输入')
+    publish(draftState())
+    expect(runtime.state.localDraft?.text).toBe('本地新输入')
+    await flush()
+    expect(invoke).toHaveBeenCalledWith('chat_action', {
+      subscription: 'binding',
+      action: { type: 'setDraft', target: { kind: 'draft', draftId: 'd1' }, value: '本地新输入' },
+    })
+    publish(state())
+    expect(runtime.state.localDraft).toBeNull()
+    expect(runtime.state.selection).toEqual({ kind: 'session', sessionId: 's1' })
+    runtime.detach()
+  })
+  it('首发立即冻结草稿且迟到状态不解除占用，其他会话仍可选择', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish(draftState())
+    expect(runtime.sendMessage('首条草稿')).toBe(true)
+    publish(draftState())
+    expect(runtime.state.localDraft?.sending).toBe(true)
+    expect(runtime.sendMessage('重复')).toBe(false)
+    runtime.setDraft('被阻止')
+    expect(runtime.state.localDraft?.text).toBe('首条草稿')
+    expect(await runtime.setModel('flash')).toBe(false)
+    await runtime.selectSession('s1')
+    expect(runtime.state.selection).toEqual({ kind: 'session', sessionId: 's1' })
+    publish({ ...state(), localDraft: { ...draftState().localDraft!, sending: true } })
+    expect(runtime.state.localDraft?.sending).toBe(true)
+    publish(state())
+    expect(runtime.state.localDraft).toBeNull()
+    expect(runtime.state.selection).toEqual({ kind: 'session', sessionId: 's1' })
+    runtime.detach()
+  })
+  it('重新订阅直接恢复Rust中的待确认草稿，不发新的发送命令', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish({ ...draftState(), localDraft: { ...draftState().localDraft!, sending: true } })
+    runtime.detach()
+    await runtime.attach()
+    publish(
+      { ...draftState(), localDraft: { ...draftState().localDraft!, sending: true } },
+      channels[1]!,
+    )
+    expect(runtime.state.localDraft?.text).toBe('首条草稿')
+    expect(runtime.state.localDraft?.sending).toBe(true)
+    expect(runtime.sendMessage('重复')).toBe(false)
+    expect(
+      vi.mocked(invoke).mock.calls.filter(([command]) => command === 'chat_action'),
+    ).toHaveLength(0)
+    runtime.detach()
+  })
+  it('核心拒绝首发时解除乐观占用，保留草稿', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish(draftState())
+    vi.mocked(invoke).mockResolvedValueOnce(false)
+    runtime.sendMessage('首条草稿')
+    await flush()
+    expect(runtime.state.localDraft?.sending).toBe(false)
+    expect(runtime.state.localDraft?.text).toBe('首条草稿')
+    runtime.detach()
+  })
+  it('同草稿旧发送的拒绝回包迟到，不解除下一次发送的占用', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish(draftState())
+    let firstReply!: (value: boolean) => void
+    vi.mocked(invoke).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          firstReply = resolve
+        }),
+    )
+    runtime.sendMessage('第一次发送')
+    await flush()
+    publish({ ...draftState(), localDraft: { ...draftState().localDraft!, sending: true } })
+    publish({ ...draftState(), localDraft: { ...draftState().localDraft!, error: '首次被拒绝' } })
+    let secondReply!: (value: boolean) => void
+    vi.mocked(invoke).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          secondReply = resolve
+        }),
+    )
+    expect(runtime.sendMessage('再次发送')).toBe(true)
+    await flush()
+    firstReply(false)
+    await flush()
+    expect(runtime.state.localDraft?.sending).toBe(true)
+    expect(runtime.sendMessage('重复发送')).toBe(false)
+    secondReply(false)
+    await flush()
+    expect(runtime.state.localDraft?.sending).toBe(false)
+    runtime.detach()
+  })
+  it('新建复用指定草稿，首发抢先完成时不会留下过期的乐观选择', async () => {
+    const runtime = createNativeChatRuntime()
+    await runtime.attach()
+    publish({ ...draftState(), selection: { kind: 'session', sessionId: 's1' } })
+    let reply!: (value: boolean) => void
+    vi.mocked(invoke).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          reply = resolve
+        }),
+    )
+    const create = runtime.createSession()
+    expect(runtime.state.selection).toEqual({ kind: 'draft', draftId: 'd1' })
+    await flush()
+    expect(invoke).toHaveBeenLastCalledWith('chat_action', {
+      subscription: 'binding',
+      action: { type: 'createSession', draftId: 'd1' },
+    })
+    publish(state())
+    reply(false)
+    await create
+    expect(runtime.state.selection).toEqual({ kind: 'session', sessionId: 's1' })
+    expect(runtime.state.localDraft).toBeNull()
+    runtime.detach()
+  })
   it('合并重复挂载，只解除页面订阅，旧页面更新不会写入新页面', async () => {
     const runtime = createNativeChatRuntime()
     await Promise.all([runtime.attach(), runtime.attach()])
@@ -86,7 +219,7 @@ describe('Rust 客户端界面适配', () => {
     await flush()
     expect(invoke).toHaveBeenCalledWith('chat_action', {
       subscription: 'binding',
-      action: { type: 'setDraft', sessionId: 's1', value: '新输入二' },
+      action: { type: 'setDraft', target: { kind: 'session', sessionId: 's1' }, value: '新输入二' },
     })
     runtime.detach()
   })

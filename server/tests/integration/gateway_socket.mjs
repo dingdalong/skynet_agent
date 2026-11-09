@@ -191,10 +191,10 @@ export async function login(url, username = 'probe-' + crypto.randomUUID().slice
   return { socket, snapshot: result.snapshot, username }
 }
 export async function waitRun(socket, runId, timeout = 5000) {
-  return (await socket.waitFor((event) => event.name === 'SessionUpdatedNtf' && !event.payload.session.runId && event.payload.session.messages.at(-1)?.runId === runId, timeout)).payload.session
+  return (await socket.waitFor((event) => event.name === 'SessionUpdatedNtf' && !event.payload.chatSession.session.runId && event.payload.chatSession.session.messages.at(-1)?.runId === runId, timeout)).payload.chatSession.session
 }
 export async function sendMessage(socket, sessionId, text, timeout = 5000) {
-  const ack = await request(socket, 'MessageSendReq', { sessionId, text })
+  const ack = await request(socket, 'ChatReq', { sessionId, text })
   if (ack.ret !== 1) throw new Error('发送失败: ' + JSON.stringify(ack))
-  return waitRun(socket, ack.session.runId, timeout)
+  return waitRun(socket, ack.chatSession.session.runId, timeout)
 }

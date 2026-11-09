@@ -18,7 +18,7 @@ function Processes:ctor(root, config, owner, session_id)
 end
 
 function Processes:publish(process)
-    if self.owner then self.owner:_on_tool_update(self.session_id, process.message_id, process.record) end
+    if self.owner then self.owner:_on_tool_update(process.message_id, process.record) end
 end
 
 local function text_bytes(bytes, final)

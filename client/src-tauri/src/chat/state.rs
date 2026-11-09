@@ -120,9 +120,10 @@ pub struct Session {
     pub model_id: String,
     pub permission_model_id: String,
 }
-impl TryFrom<pb::SessionState> for Session {
+impl TryFrom<pb::ChatSession> for Session {
     type Error = String;
-    fn try_from(value: pb::SessionState) -> Result<Self, String> {
+    fn try_from(chat: pb::ChatSession) -> Result<Self, String> {
+        let value = chat.session.ok_or("聊天会话缺少状态")?;
         if value.id.is_empty() || value.revision == 0 || value.updated_at > 9_007_199_254_740_991 {
             return Err("会话身份、版本或时间无效".into());
         }
@@ -176,27 +177,57 @@ impl TryFrom<pb::SessionState> for Session {
             messages,
             run_id: value.run_id,
             cancelling: value.cancelling,
-            model_id: value.model_id,
-            permission_model_id: value.permission_model_id,
+            model_id: chat.model_id,
+            permission_model_id: chat.permission_model_id,
         })
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum Selection {
+    Draft { draft_id: String },
+    Session { session_id: String },
+}
+impl Selection {
+    pub fn session_id(&self) -> Option<&str> {
+        match self {
+            Self::Session { session_id } => Some(session_id),
+            Self::Draft { .. } => None,
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalDraft {
+    pub id: String,
+    pub text: String,
+    pub model_id: String,
+    pub error: String,
+    pub sending: bool,
+}
 #[derive(Default, Debug)]
 pub struct View {
-    pub selected: Option<String>,
+    pub selected: Option<Selection>,
+    pub local_draft: Option<LocalDraft>,
     pub drafts: HashMap<String, String>,
     pub errors: HashMap<String, String>,
-    pub creating: usize,
 }
 #[derive(Debug, Default)]
 pub struct Cache {
     pub models: Vec<ModelOption>,
+    pub default_model_id: String,
+    pub permission_model_id: String,
     pub username: String,
     pub user_id: String,
     pub sessions: BTreeMap<String, Session>,
     pub views: HashMap<String, View>,
     pub pending_sends: HashSet<String>,
+    pub(super) next_draft_id: u64,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -210,30 +241,41 @@ pub struct SessionView {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeState {
     pub models: Vec<ModelOption>,
+    pub default_model_id: String,
+    pub permission_model_id: String,
     pub username: String,
     pub user_id: String,
     pub sessions: Vec<SessionView>,
-    pub active_session_id: Option<String>,
+    pub selection: Option<Selection>,
+    pub local_draft: Option<LocalDraft>,
     pub connection_state: String,
     pub connection_error: String,
-    pub session_operations: usize,
     pub pending_sends: Vec<String>,
 }
 
 impl Cache {
     pub fn snapshot(&mut self, snapshot: pb::UserSnapshot) -> Result<(), String> {
-        if snapshot.username != self.username
-            || snapshot.user_id.is_empty()
-            || snapshot.sessions.is_empty()
-        {
-            return Err("用户快照身份或会话无效".into());
+        if snapshot.username != self.username || snapshot.user_id.is_empty() {
+            return Err("用户快照身份无效".into());
         }
         // 先完整验证，避免坏快照部分覆盖当前基线。
         let sessions = snapshot
-            .sessions
+            .chat_sessions
             .into_iter()
             .map(Session::try_from)
             .collect::<Result<Vec<_>, _>>()?;
+        if !snapshot
+            .models
+            .iter()
+            .any(|model| model.id == snapshot.default_model_id)
+            || (!snapshot.permission_model_id.is_empty()
+                && !snapshot
+                    .models
+                    .iter()
+                    .any(|model| model.id == snapshot.permission_model_id))
+        {
+            return Err("用户快照模型配置无效".into());
+        }
         if self.user_id != snapshot.user_id {
             self.sessions.clear();
             self.pending_sends.clear();
@@ -242,6 +284,8 @@ impl Cache {
             }
             self.user_id = snapshot.user_id;
         }
+        self.default_model_id = snapshot.default_model_id;
+        self.permission_model_id = snapshot.permission_model_id;
         self.models = snapshot
             .models
             .into_iter()
@@ -254,23 +298,9 @@ impl Cache {
         for session in sessions {
             self.merge(session);
         }
-        let selected = self
-            .sessions
-            .values()
-            .max_by(|a, b| {
-                a.updated_at
-                    .cmp(&b.updated_at)
-                    .then_with(|| a.id.cmp(&b.id))
-            })
-            .map(|session| session.id.clone());
-        for view in self.views.values_mut() {
-            if view
-                .selected
-                .as_ref()
-                .is_none_or(|id| !self.sessions.contains_key(id))
-            {
-                view.selected = selected.clone();
-            }
+        let labels = self.views.keys().cloned().collect::<Vec<_>>();
+        for label in labels {
+            self.view(&label);
         }
         Ok(())
     }
@@ -396,25 +426,101 @@ impl Cache {
         session.revision = delta.revision;
         Ok(true)
     }
-    pub fn view(&mut self, label: &str) -> &mut View {
-        let selected = self
-            .sessions
+    fn latest_session(&self) -> Option<Selection> {
+        self.sessions
             .values()
             .max_by(|a, b| {
                 a.updated_at
                     .cmp(&b.updated_at)
                     .then_with(|| a.id.cmp(&b.id))
             })
-            .map(|session| session.id.clone());
-        self.views.entry(label.into()).or_insert_with(|| View {
-            selected,
-            ..View::default()
-        })
+            .map(|session| Selection::Session {
+                session_id: session.id.clone(),
+            })
+    }
+    pub fn new_draft(&mut self, label: &str) {
+        let view = self.views.entry(label.into()).or_default();
+        if view.local_draft.is_none() {
+            self.next_draft_id += 1;
+            view.local_draft = Some(LocalDraft {
+                id: format!("draft-{}", self.next_draft_id),
+                text: String::new(),
+                model_id: self.default_model_id.clone(),
+                error: String::new(),
+                sending: false,
+            });
+        }
+        view.selected = Some(Selection::Draft {
+            draft_id: view.local_draft.as_ref().unwrap().id.clone(),
+        });
+    }
+    pub fn view(&mut self, label: &str) -> &mut View {
+        let latest = self.latest_session();
+        let view = self.views.entry(label.into()).or_default();
+        let valid = match &view.selected {
+            Some(Selection::Session { session_id }) => self.sessions.contains_key(session_id),
+            Some(Selection::Draft { draft_id }) => view
+                .local_draft
+                .as_ref()
+                .is_some_and(|draft| draft.id == *draft_id),
+            None => false,
+        };
+        if !valid && !self.user_id.is_empty() {
+            view.selected = latest;
+            if view.selected.is_none() {
+                self.new_draft(label);
+            }
+        }
+        self.views.get_mut(label).unwrap()
+    }
+    pub fn set_draft(&mut self, label: &str, target: &Selection, value: String) {
+        let Some(view) = self.views.get_mut(label) else {
+            return;
+        };
+        match target {
+            Selection::Draft { draft_id } => {
+                if let Some(draft) = view
+                    .local_draft
+                    .as_mut()
+                    .filter(|draft| draft.id == *draft_id && !draft.sending)
+                {
+                    draft.text = value;
+                }
+            }
+            Selection::Session { session_id } if self.sessions.contains_key(session_id) => {
+                view.drafts.insert(session_id.clone(), value);
+            }
+            _ => {}
+        }
+    }
+    pub fn bind_draft(&mut self, label: &str, draft_id: &str, session_id: &str) {
+        let Some(view) = self.views.get_mut(label) else {
+            return;
+        };
+        if !view
+            .local_draft
+            .as_ref()
+            .is_some_and(|draft| draft.id == draft_id)
+        {
+            return;
+        }
+        if view.selected
+            == Some(Selection::Draft {
+                draft_id: draft_id.into(),
+            })
+        {
+            view.selected = Some(Selection::Session {
+                session_id: session_id.into(),
+            });
+        }
+        view.local_draft = None;
     }
     pub fn state(&self, label: &str, connection_state: &str, error: &str) -> RuntimeState {
         let view = self.views.get(label);
         RuntimeState {
             models: self.models.clone(),
+            default_model_id: self.default_model_id.clone(),
+            permission_model_id: self.permission_model_id.clone(),
             username: self.username.clone(),
             user_id: self.user_id.clone(),
             sessions: self
@@ -438,10 +544,10 @@ impl Cache {
                         }),
                 })
                 .collect(),
-            active_session_id: view.and_then(|view| view.selected.clone()),
+            selection: view.and_then(|view| view.selected.clone()),
+            local_draft: view.and_then(|view| view.local_draft.clone()),
             connection_state: connection_state.into(),
             connection_error: error.into(),
-            session_operations: view.map(|view| view.creating).unwrap_or(0),
             pending_sends: self.pending_sends.iter().cloned().collect(),
         }
     }
@@ -457,10 +563,10 @@ pub enum Action {
     Connect { username: String },
     Disconnect,
     SwitchUser,
-    CreateSession,
+    CreateSession { draft_id: Option<String> },
     SetModel { model_id: String },
     SelectSession { session_id: String },
-    SetDraft { session_id: String, value: String },
+    SetDraft { target: Selection, value: String },
     SendMessage { text: String },
     RetryLastMessage,
     CancelRun,
@@ -481,6 +587,81 @@ pub fn normalize_username(name: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn empty_snapshot_creates_independent_window_drafts_and_keeps_them_on_reconnect() {
+        let mut cache = Cache {
+            username: "alice".into(),
+            ..Default::default()
+        };
+        cache.view("main");
+        let mut empty = snapshot("u1", 1);
+        empty.chat_sessions.clear();
+        empty.models.insert(
+            0,
+            pb::ModelOption {
+                id: "other".into(),
+                name: "Other".into(),
+                model: "other".into(),
+            },
+        );
+        cache.snapshot(empty.clone()).unwrap();
+        let target = cache.view("main").selected.clone().unwrap();
+        cache.set_draft("main", &target, "未发送内容".into());
+        cache.new_draft("main");
+        assert_eq!(cache.view("main").selected, Some(target.clone()));
+        assert_eq!(
+            cache.view("main").local_draft.as_ref().unwrap().model_id,
+            "test"
+        );
+        assert_eq!(
+            cache.view("main").local_draft.as_ref().unwrap().text,
+            "未发送内容"
+        );
+        let other = cache.view("other").selected.clone().unwrap();
+        assert_ne!(other, target);
+        cache.snapshot(empty).unwrap();
+        assert_eq!(cache.view("main").selected, Some(target));
+        assert_eq!(
+            cache.view("main").local_draft.as_ref().unwrap().text,
+            "未发送内容"
+        );
+        let state = serde_json::to_value(cache.state("main", "connected", "")).unwrap();
+        assert_eq!(state["selection"]["kind"], "draft");
+        assert_eq!(state["localDraft"]["text"], "未发送内容");
+        assert_eq!(state["sessions"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn pending_drafts_reject_edits_and_stale_targets_do_not_change_recreated_windows() {
+        let mut cache = Cache {
+            username: "alice".into(),
+            ..Default::default()
+        };
+        cache.snapshot(snapshot("u1", 1)).unwrap();
+        cache.new_draft("main");
+        let target = cache.view("main").selected.clone().unwrap();
+        cache.set_draft("main", &target, "原稿".into());
+        cache.view("main").local_draft.as_mut().unwrap().sending = true;
+        cache.set_draft("main", &target, "迟到输入".into());
+        assert_eq!(
+            cache.view("main").local_draft.as_ref().unwrap().text,
+            "原稿"
+        );
+        let Selection::Draft { draft_id } = &target else {
+            panic!()
+        };
+        cache.views.remove("main");
+        cache.new_draft("main");
+        let new_target = cache.view("main").selected.clone();
+        cache.set_draft("main", &target, "旧页面输入".into());
+        cache.bind_draft("main", draft_id, "s1");
+        assert_eq!(cache.view("main").selected, new_target);
+        assert_eq!(cache.view("main").local_draft.as_ref().unwrap().text, "");
+        cache.views.remove("main");
+        cache.bind_draft("main", draft_id, "s1");
+        assert!(!cache.views.contains_key("main"));
+    }
+
     #[test]
     fn reasoning_deltas_keep_blocks_across_statuses_and_reject_gaps() {
         let mut cache = Cache {
@@ -554,22 +735,32 @@ mod tests {
     }
     pub fn snapshot(id: &str, revision: u32) -> pb::UserSnapshot {
         pb::UserSnapshot {
-            models: vec![],
+            models: vec![pb::ModelOption {
+                id: "test".into(),
+                name: "Test".into(),
+                model: "test".into(),
+            }],
+            default_model_id: "test".into(),
+            permission_model_id: String::new(),
             user_id: id.into(),
             username: "alice".into(),
-            sessions: vec![pb::SessionState {
-                id: "s1".into(),
-                title: "会话".into(),
-                revision,
-                run_id: "r1".into(),
-                messages: vec![pb::ChatMessage {
-                    id: "m1".into(),
-                    role: 2,
-                    status: 1,
+            chat_sessions: vec![pb::ChatSession {
+                session: Some(pb::SessionState {
+                    id: "s1".into(),
+                    title: "会话".into(),
+                    revision,
                     run_id: "r1".into(),
+                    messages: vec![pb::ChatMessage {
+                        id: "m1".into(),
+                        role: 2,
+                        status: 1,
+                        run_id: "r1".into(),
+                        ..Default::default()
+                    }],
                     ..Default::default()
-                }],
-                ..Default::default()
+                }),
+                model_id: "test".into(),
+                permission_model_id: "test".into(),
             }],
         }
     }

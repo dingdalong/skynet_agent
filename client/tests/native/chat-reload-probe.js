@@ -61,6 +61,17 @@
     if (phase === 0) {
       await invoke('probe_menu_check')
       await draft('完整重载保留草稿')
+      button('新建会话').click()
+      await wait(() => input()?.value === '完整重载保留草稿', '复用未发送草稿')
+      assert(
+        document.querySelectorAll('nav[aria-label="会话列表"] button').length === 0,
+        '未发送草稿进入会话列表',
+      )
+      const evidence = await invoke('probe_evidence')
+      assert(
+        evidence.requests.length === 1 && evidence.requests[0].name === 'LoginReq',
+        '打开新会话产生服务器请求',
+      )
       await reload(1)
     } else if (phase === 1) {
       assert(input().value === '完整重载保留草稿', 'Rust 重载后草稿丢失')
@@ -83,8 +94,12 @@
       const evidence = await invoke('probe_evidence')
       assert(evidence.connections === 1 && evidence.closes === 0, '发送期间重载改变连接')
       assert(
-        evidence.requests.filter((request) => request.name === 'MessageSendReq').length === 1,
+        evidence.requests.filter((request) => request.name === 'ChatReq').length === 1,
         '发送期间重载重复命令',
+      )
+      assert(
+        evidence.requests.find((request) => request.name === 'ChatReq').sessionId === '',
+        '首发携带了服务器会话 ID',
       )
       await draft('JS reload 后继续保留')
       await reload(3, true)
@@ -96,9 +111,8 @@
       button('重试').click()
       await wait(
         async () =>
-          (await invoke('probe_evidence')).requests.filter(
-            (request) => request.name === 'MessageSendReq',
-          ).length === 5 &&
+          (await invoke('probe_evidence')).requests.filter((request) => request.name === 'ChatReq')
+            .length === 5 &&
           button('重试') &&
           !button('重试').disabled,
         '失败原位重试',
@@ -116,7 +130,7 @@
       await reload(4)
     } else if (phase === 4) {
       assert(input().value === '会话一草稿', '重载未恢复选中会话及草稿')
-      select('新的会话')
+      button('新建会话').click()
       await wait(() => input()?.value === '会话二草稿', '重载后的另一会话草稿')
       await draft('[e2e:stall]')
       button('发送消息').click()
@@ -134,8 +148,8 @@
       assert(input().value === '真实断线恢复草稿', '真实断线丢失草稿')
       const after = await invoke('probe_evidence')
       assert(
-        after.requests.filter((request) => request.name === 'MessageSendReq').length ===
-          before.requests.filter((request) => request.name === 'MessageSendReq').length,
+        after.requests.filter((request) => request.name === 'ChatReq').length ===
+          before.requests.filter((request) => request.name === 'ChatReq').length,
         '断线自动重放发送',
       )
       button('切换用户').click()

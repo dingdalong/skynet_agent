@@ -1,5 +1,11 @@
 import { isTauri } from '@tauri-apps/api/core'
-import type { ChatSessionView, ConnectionState, ModelOption } from '../types/chat'
+import type {
+  ChatSessionView,
+  ConnectionState,
+  ModelOption,
+  ConversationSelection,
+  LocalDraftSession,
+} from '../types/chat'
 import { readUsername } from './user-preferences'
 import { createBrowserChatRuntime } from './browser-chat-runtime'
 import { createNativeChatRuntime } from './native-chat-runtime'
@@ -9,10 +15,12 @@ export interface ChatRuntimeState {
   username: string
   userId: string
   sessionViews: Map<string, ChatSessionView>
-  activeSessionId: string | null
+  selection: ConversationSelection
+  localDraft: LocalDraftSession | null
+  defaultModelId: string
+  permissionModelId: string
   connectionState: ConnectionState
   connectionError: string
-  sessionOperations: number
   pendingSends: Set<string>
 }
 
@@ -39,10 +47,12 @@ export function initialChatState(): ChatRuntimeState {
     username: readUsername(),
     userId: '',
     sessionViews: new Map(),
-    activeSessionId: null,
+    selection: null,
+    localDraft: null,
+    defaultModelId: '',
+    permissionModelId: '',
     connectionState: 'idle',
     connectionError: '',
-    sessionOperations: 0,
     pendingSends: new Set(),
   }
 }

@@ -53,7 +53,7 @@ describe("logind", function()
     it("等待失败响应真正写入后才关闭", function()
         write_callback = function() coroutine.yield("writing") end
         local co = coroutine.create(function()
-            instance:handle_request({ source = 20 }, "c", 1, "SessionCreateReq", {})
+            instance:handle_request({ source = 20 }, "c", 1, "ChatReq", {})
         end)
         assert.same({ true, "writing" }, { coroutine.resume(co) })
         assert.are.equal(1, #calls)

@@ -61,13 +61,26 @@ export interface ChatSession extends ChatSessionSummary {
   permissionModelId?: string
 }
 
+export type ConversationSelection =
+  { kind: 'draft'; draftId: string } | { kind: 'session'; sessionId: string } | null
+
+export interface LocalDraftSession {
+  id: string
+  text: string
+  modelId: string
+  error: string
+  sending: boolean
+}
+
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
 
 export interface UserSnapshot {
   userId: string
   username: string
-  sessions: ChatSession[]
+  chatSessions: ChatSession[]
   models?: ModelOption[]
+  defaultModelId: string
+  permissionModelId: string
 }
 
 export interface ChatSessionView extends ChatSession {
@@ -105,9 +118,13 @@ export type TransportConnectionListener = (event: TransportConnectionEvent) => v
 export interface ChatTransport {
   connect(username: string): Promise<UserSnapshot>
   snapshot(): Promise<UserSnapshot>
-  createSession(): Promise<ChatSession>
   setModel(sessionId: string, modelId: string): Promise<ChatSession>
-  sendMessage(input: { sessionId: string; text: string; retryRunId?: string }): Promise<ChatSession>
+  sendMessage(input: {
+    sessionId?: string
+    text: string
+    retryRunId?: string
+    modelId?: string
+  }): Promise<ChatSession>
   cancelRun(sessionId: string, runId: string): Promise<void>
   subscribeUpdates(listener: (update: ChatUpdate) => void): () => void
   subscribeConnection(listener: TransportConnectionListener): () => void

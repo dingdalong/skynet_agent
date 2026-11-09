@@ -6,24 +6,26 @@ const last = (session) => session.messages.at(-1)
 
 async function chatFlow() {
   const { socket, snapshot, username } = await login(url)
-  const sessionId = snapshot.sessions[0].id
   try {
-    assert.equal(last(await sendMessage(socket, sessionId, '[e2e:success]')).content, 'E2E 成功')
+    assert.equal(snapshot.chatSessions.length, 0)
+    const first = await sendMessage(socket, undefined, '[e2e:success]')
+    const sessionId = first.id
+    assert.equal(last(first).content, 'E2E 成功')
     await sendMessage(socket, sessionId, '[e2e:history-set]')
     socket.close()
     await socket.waitForClose()
     const restored = await login(url, username)
     try {
       assert.equal(restored.snapshot.userId, snapshot.userId)
-      assert.equal(restored.snapshot.sessions[0].messages.length, 4)
+      assert.equal(restored.snapshot.chatSessions[0].session.messages.length, 4)
       assert.equal(last(await sendMessage(restored.socket, sessionId, '[e2e:history-check]')).content, 'E2E 历史通过')
       const failed = await sendMessage(restored.socket, sessionId, '[e2e:error]')
       assert.equal(last(failed).status, 4)
       assert.equal(last(failed).ret, 17)
-      const retry = await request(restored.socket, 'MessageSendReq', { sessionId, retryRunId: last(failed).runId })
-      assert.equal(retry.session.messages.length, failed.messages.length)
-      assert.equal(last(retry.session).id, last(failed).id)
-      assert.equal(last(await waitRun(restored.socket, retry.session.runId)).status, 4)
+      const retry = await request(restored.socket, 'ChatReq', { sessionId, retryRunId: last(failed).runId })
+      assert.equal(retry.chatSession.session.messages.length, failed.messages.length)
+      assert.equal(last(retry.chatSession.session).id, last(failed).id)
+      assert.equal(last(await waitRun(restored.socket, retry.chatSession.session.runId)).status, 4)
       const timeout = await sendMessage(restored.socket, sessionId, '[e2e:stall]', 10000)
       assert.equal(last(timeout).status, 4)
       assert.equal(last(await sendMessage(restored.socket, sessionId, '[e2e:success]')).content, 'E2E 成功')
@@ -36,30 +38,31 @@ async function multiUserFlow() {
   const b = await login(url, a.username)
   const other = await login(url)
   try {
-    const sessionId = a.snapshot.sessions[0].id
-    const ack = await request(a.socket, 'MessageSendReq', { sessionId, text: '[e2e:slow]' })
-    const runId = ack.session.runId
-    const started = await b.socket.waitFor((event) => event.name === 'SessionUpdatedNtf' && event.payload.session.runId === runId)
-    assert.equal(started.payload.session.id, sessionId)
-    assert.equal((await request(b.socket, 'MessageSendReq', { sessionId, text: '竞争' })).ret, 4)
+    assert.equal(a.snapshot.chatSessions.length, 0)
+    assert.equal(b.snapshot.chatSessions.length, 0)
+    const ack = await request(a.socket, 'ChatReq', { text: '[e2e:slow]' })
+    const sessionId = ack.chatSession.session.id
+    const runId = ack.chatSession.session.runId
+    const started = await b.socket.waitFor((event) => event.name === 'SessionUpdatedNtf' && event.payload.chatSession.session.runId === runId)
+    assert.equal(started.payload.chatSession.session.id, sessionId)
+    assert.equal((await request(b.socket, 'ChatReq', { sessionId, text: '竞争' })).ret, 4)
     assert.equal((await request(other.socket, 'MessageCancelReq', { sessionId, runId })).ret, 2)
-    const created = await request(b.socket, 'SessionCreateReq')
-    assert.equal(last(await sendMessage(b.socket, created.session.id, '[e2e:success]')).status, 2)
+    assert.equal(last(await sendMessage(b.socket, undefined, '[e2e:success]')).status, 2)
     assert.equal((await request(b.socket, 'MessageCancelReq', { sessionId, runId })).ret, 1)
     assert.equal(last(await waitRun(a.socket, runId)).status, 3)
     assert.equal(last(await waitRun(b.socket, runId)).status, 3)
     // 生成任务脱离全部连接，稍后按用户名取回完成结果。
-    const offline = await request(a.socket, 'MessageSendReq', { sessionId, text: '[e2e:slow]' })
+    const offline = await request(a.socket, 'ChatReq', { sessionId, text: '[e2e:slow]' })
     a.socket.close(); b.socket.close()
     await Promise.all([a.socket.waitForClose(), b.socket.waitForClose()])
     const restored = await login(url, a.username)
     try {
-      const state = restored.snapshot.sessions.find((session) => session.id === sessionId)
-      const complete = state.runId ? await waitRun(restored.socket, offline.session.runId) : state
+      const state = restored.snapshot.chatSessions.find((item) => item.session.id === sessionId).session
+      const complete = state.runId ? await waitRun(restored.socket, offline.chatSession.session.runId) : state
       assert.equal(last(complete).status, 2)
       assert.equal(last(complete).content, 'E2E 慢速完成')
     } finally { restored.socket.close() }
-    assert.equal((await request(other.socket, 'UserSnapshotReq')).snapshot.sessions.length, 1)
+    assert.equal((await request(other.socket, 'UserSnapshotReq')).snapshot.chatSessions.length, 0)
   } finally { a.socket.close(); b.socket.close(); other.socket.close() }
 }
 
@@ -87,13 +90,13 @@ async function protocolFlow() {
   assert.equal(await empty.waitForClose(), 1008)
   const prelogin = new AgentSocket(url)
   await prelogin.connect()
-  prelogin.sendRequest(1, 'skynet.agent.v1.SessionCreateReq', proto.SessionCreateReq, {})
+  prelogin.sendRequest(1, 'skynet.agent.v1.ChatReq', proto.ChatReq, {})
   assert.equal((await prelogin.waitFor((event) => event.name === 'LoginRes')).payload.ret, 12)
   assert.equal(await prelogin.waitForClose(), 1008)
   const ordered = new AgentSocket(url)
   await ordered.connect()
   ordered.sendRequest(1, 'skynet.agent.v1.LoginReq', proto.LoginReq, { username: crypto.randomUUID().slice(0, 24) })
-  ordered.sendRequest(2, 'skynet.agent.v1.SessionCreateReq', proto.SessionCreateReq, {})
+  ordered.sendRequest(2, 'skynet.agent.v1.ChatReq', proto.ChatReq, { text: '[e2e:success]' })
   assert.equal((await ordered.waitFor((event) => event.messageId === 1)).payload.ret, 1)
   assert.equal((await ordered.waitFor((event) => event.messageId === 2)).payload.ret, 1)
   ordered.sendRequest(3, 'skynet.agent.v1.LoginReq', proto.LoginReq, { username: 'second' })
@@ -104,7 +107,7 @@ async function main() {
   if (process.argv.includes('--ready')) { const { socket } = await login(url); socket.close(); return }
   if (process.argv.includes('--live')) {
     const { socket, snapshot } = await login(url)
-    try { console.log(last(await sendMessage(socket, snapshot.sessions[0].id, process.env.AGENT_LIVE_PROMPT ?? '请只回复：live-ok', 120000)).content) }
+    try { console.log(last(await sendMessage(socket, undefined, process.env.AGENT_LIVE_PROMPT ?? '请只回复：live-ok', 120000)).content) }
     finally { socket.close() }
     return
   }

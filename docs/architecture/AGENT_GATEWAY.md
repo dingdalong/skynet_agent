@@ -8,25 +8,30 @@ Web 和 Tauri 客户端通过 WebSocket 连接 Skynet。模型对话、会话历
 
 ## 术语与职责
 
-| 名称         | 含义                                                   |
-| ------------ | ------------------------------------------------------ |
-| `client`     | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
-| `connection` | 单条网络连接及用户订阅                                 |
-| `session`    | 聊天会话，保存展示消息与生成任务                       |
-| `Agent`      | 模型调用与历史管理对象，由 `agent` 导出                |
-| `user`       | 用户身份、会话集合和后台任务的所有者                   |
+| 名称           | 含义                                                   |
+| -------------- | ------------------------------------------------------ |
+| `client`       | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
+| `connection`   | 单条网络连接及用户订阅                                 |
+| `Chat`         | 用户聊天模块，管理会话集合、请求编排与通知             |
+| `AgentSession` | 单个会话，保存展示消息、模型选择与生成任务             |
+| `ChatSession`  | 单会话协议包装，包含会话状态及模型 ID                  |
+| `Agent`        | 模型调用与历史管理对象，由 `agent.agent` 导出          |
+| `user`         | 用户身份、会话集合和后台任务的所有者                   |
 
 ```mermaid
 flowchart LR
     C["client 服务"] -->|"1:N"| U["user"]
     U -->|"1:N"| N["connection 订阅"]
-    U -->|"1:N"| S["session"]
+    U -->|"1:1"| H["Chat"]
+    H -->|"1:N"| S["AgentSession"]
     S -->|"1:1"| A["🧠 Agent"]
 ```
 
 服务池实例数表示承载容量；连接数、用户数与智能体数分别描述。每个会话持有一个 Agent。
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
-client 服务初始化时加载共享提示词模板，创建会话时与工具、权限和工作目录配置一起交给 Agent。
+client 服务初始化时加载共享提示词模板。登录只创建用户及 Chat 模块；收到没有 `session_id` 的
+首条 `ChatReq` 后，才创建 AgentSession、工作目录和 Agent，并立即开始该轮生成。
+模板在创建 Agent 时与工具、权限和工作目录配置一起传入。
 基础行为、运行时环境与项目规则分别组装，详见 [Agent 提示词](PROMPTS.md)。
 
 ## 服务生命周期
@@ -50,7 +55,9 @@ WebSocket、登录和 client 服务，等待在途命令、连接读循环和后
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `user.lua`、`agent/`                            | 用户业务状态、模型对话与历史提交                            |
+| `user.lua`、`user/handler.lua`                  | 用户身份、快照及用户请求                                    |
+| `user/mods/chat/`                               | Chat 业务模块及聊天请求 handler                             |
+| `agent_session.lua`、`agent/`                   | 单会话生命周期、模型对话与历史提交                          |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
 独立脚本和 Skynet 内置服务优先于公共入口。`src/service/<name>/<name>.lua` 返回稳定类表，
@@ -128,12 +135,16 @@ sequenceDiagram
     L->>W: call send_response(LoginRes)
     W-->>C: LoginRes
     L-->>W: 已处理
-    C->>W: MessageSendReq
+    C->>W: ChatReq(session_id?, text, model_id?)
     W->>A: send handle_request(connection_id, ...)
-    A->>W: send send_response(MessageSendRes)
-    W-->>C: 任务已接受
+    A->>A: 动态查找 handler.REQUEST.ChatReq，以 User 为 self 调用
+    A->>A: 查找或创建 AgentSession，登记本轮生成
+    A->>W: send send_response(SessionUpdatedNtf)
+    W-->>C: 已包含首条消息的 ChatSession
+    A->>W: send send_response(ChatRes)
+    W-->>C: 任务已接受及 ChatSession
     A->>W: 向用户所有连接推送更新
-    W-->>C: SessionUpdatedNtf / MessageDeltaNtf
+    W-->>C: MessageDeltaNtf / SessionUpdatedNtf
 ```
 
 WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同步等待 logind，暂停当前连接的读取；
@@ -156,7 +167,18 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
 WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-client 服务以 WebSocket 的消息来源地址校验连接归属，再按协议短消息名调用 User 的同名方法。
+client 在初始化时通过 `package.searchpath("user.handler", package.path)` 定位 `user` 目录，
+固定接入根 `user.handler`，并按目录名排序扫描 `mods` 的第一层子目录。
+只有存在 `handler.lua` 的子目录才加载为 `user.mods.<name>.handler`，不递归扫描。
+目录定位或扫描、`require`、模块返回值及 `REQUEST` 类型校验、请求重名检查任一步失败都会使服务启动失败。
+全部 handler 在局部列表中加载和校验完成后，才将稳定 `REQUEST` 表的引用保存到 `self.request_handlers`，
+每个 client 实例只在初始化时发现一次模块。
+
+请求到达时，client 先以 WebSocket 的消息来源地址校验连接归属，再从已保存的 `REQUEST` 表中
+按协议短消息名动态查找同名函数，以 User 实例作为 `self` 调用；请求期间不扫描目录或读盘，
+不把处理函数复制到 User 类或其他分发表。新增模块通过重启接入，已有 handler 的兼容方法体修复继续支持原位热修。
+`UserSnapshotReq` 由 `user/handler.lua` 处理；`ChatReq`、`MessageCancelReq`、`SessionModelSetReq`
+由 `user/mods/chat/handler.lua` 处理并通过 `self.chat` 委托同目录的 `chat.lua`。
 命名与分发规则见[隐式约定](../../隐式约定.md)。
 未知业务请求（包括重复登录）以 1008 关闭，处理异常以 1011 关闭。
 
@@ -197,15 +219,23 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 普通响应复用请求 ID；`Ntf` 主动推送使用 ID 0，不进入请求的 pending 表。
 `ret` 与 `common/enum/error_code.lua` 一致，1 为成功。错误详情与供应商堆栈只记录在服务器。
 
-| 请求                                              | 成功内容                           |
-| ------------------------------------------------- | ---------------------------------- |
-| `LoginReq(username)`                              | 用户身份和所有会话的完整快照       |
-| `UserSnapshotReq`                                 | 最新用户快照，用于重新建立同步基线 |
-| `SessionCreateReq`                                | 新会话完整状态                     |
-| `MessageSendReq(session_id, text, retry_run_id?)` | 接受确认和当前会话状态             |
-| `MessageCancelReq(session_id, run_id)`            | 取消已确认，任务退出后再推送终态   |
+| 请求                                                   | 成功内容                           |
+| ------------------------------------------------------ | ---------------------------------- |
+| `LoginReq(username)`                                   | 用户身份和所有会话的完整快照       |
+| `UserSnapshotReq`                                      | 最新用户快照，用于重新建立同步基线 |
+| `ChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
+| `MessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
+| `SessionModelSetReq(session_id, model_id)`             | 更新后的 `ChatSession`             |
 
-`SessionUpdatedNtf` 在创建、开始生成、取消请求和最终完成时携带完整会话状态；
+`UserSnapshot.chat_sessions` 是 `ChatSession` 列表，允许为空。每项的 `session` 为 `SessionState`，
+包含会话身份、标题、消息、revision 和运行状态；`model_id`、`permission_model_id` 为该会话的实际模型 ID。
+快照的 `models` 提供公开模型清单，`default_model_id` 用于新草稿；快照中的 `permission_model_id`
+为空时表示权限模型跟随会话选择，否则使用指定模型。
+
+`ChatReq.session_id` 缺省或空串时，先校验文本、模型和重试参数，再创建会话并发送首条消息。
+无会话 ID 不能重试；非空但不存在的 ID 返回失败，不创建会话。`model_id` 仅在首次创建时生效。
+`ChatRes`、`SessionModelSetRes` 与 `SessionUpdatedNtf` 统一通过 `chat_session` 返回完整包装。
+`SessionUpdatedNtf` 在开始生成、模型切换、取消请求和最终完成时携带完整会话包装；
 `MessageDeltaNtf` 携带会话、任务、消息 ID、增量和递增会话版本。
 快照包含消息状态、部分回答和活动任务。消息状态分为生成中、完成、停止和失败。
 时间为毫秒时间戳，业务 ID 为不透明字符串；`run_id` 跨连接稳定，与线路请求编号分离。
@@ -225,11 +255,16 @@ Web 的浏览器数据层保留三层协议实现：`WebSocketChannel` 管 socke
 消息 ID、pending、超时和连接代次，`ChatClient` 转换业务对象。Mock 复用相同的二进制协议。
 Rust 的 Protobuf 类型在构建时从 `common/proto` 生成，使用相同的二进制协议向量验证。
 
-浏览器 `ChatTransport` 的 `connect(username)` 返回用户快照；`snapshot`、`createSession`、`sendMessage`、`cancelRun`
+浏览器 `ChatTransport` 的 `connect(username)` 返回用户快照；`snapshot`、`sendMessage`、`cancelRun`
 返回普通 Promise。主动更新通过 `subscribeUpdates` 订阅，连接状态通过 `subscribeConnection` 订阅。
 Rust 核心同样按请求编号配对响应。超时、损坏响应或类型错配关闭连接并结束等待请求；
 业务错误只结束对应请求并展示错误。
 旧 socket、旧登录和旧命令的迟到结果不能修改新连接状态。
+
+“新建会话”只打开本页面或窗口的一份本地草稿，不调用服务端。文字和模型选择保留在草稿中，
+草稿不进入侧边栏列表；首次发送被接受后，正式会话才进入列表。首发等待确认时显示“正在发送”，
+禁止该草稿重复提交，仍可切换到已有会话。通知可先于响应到达，通知只按真实会话 ID 合并，
+对应 `ChatRes` 再将来源草稿绑定到正式会话；用户已切换选择时不抢回当前会话。
 
 客户端先安装快照基线，再按会话版本合并登录期间缓冲的更新。重复和旧版本无副作用；
 增量出现缺口时拉取完整快照，期间继续缓冲。完整会话状态可以跨版本直接覆盖较旧记录。
@@ -239,7 +274,10 @@ Rust 核心同样按请求编号配对响应。超时、损坏响应或类型错
 App 的草稿、错误展示和会话选择按窗口保存在核心内存，重载后恢复，窗口关闭或退出 App 时清理。
 Web 的会话选择按用户名保存在 sessionStorage，草稿仅保留页面内存。各端的选择和草稿互不干扰，
 不修改服务端用户数据。
+本地新会话草稿也遵循相同生命周期：原生重载保留，Web 完整刷新清空。只保存真实会话的选择，
+不把草稿身份当作服务器 `session_id`。
 断线保留已有展示，自动重连后取回用户数据，不自动重放发送命令。存储不可用时仍可输入用户名进入。
+若首次发送已接受而确认丢失，真实会话通过重连快照恢复，本地草稿保留，不按文本猜测两者归属。
 服务器重启后用户 ID 改变，客户端清除旧缓存并使用新快照。
 
 每个会话最多一个生成，不同会话可以并发。生成任务由用户持有，全部连接离线后仍继续执行。
@@ -290,7 +328,7 @@ Web 与原生核心均检查版本连续性，出现缺口获取完整快照，�
 ## 会话模型与思考流
 
 模型清单由 config 提供；登录和用户快照只包含公开模型描述。`SessionModelSetReq/Res` 按会话设置模型，
-会话状态同时返回当前模型和实际权限模型 ID。切换不取消正在进行的模型请求，后续请求获取最新配置快照。
+`ChatSession` 包装同时返回当前模型和实际权限模型 ID。切换不取消正在进行的模型请求，后续请求获取最新配置快照。
 `agent.llm.base` 统一管理模型配置、客户端生命周期、流式响应、思考通知与用量日志。
 主模型与权限模型各持有独立实例；SDK 适配和单次 HTTP 请求的取消状态由同模块的
 `Base.Client`、`Base.Request` 管理，类表从模块导出以支持原位热修。`agent.Run` 管理整轮任务。

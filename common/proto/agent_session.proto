@@ -12,7 +12,7 @@ message SessionModelSetReq {
 message SessionModelSetRes {
   int32 ret = 2;
   ErrorInfo error = 3;
-  SessionState session = 4;
+  ChatSession chat_session = 4;
 }
 
 message ReasoningDeltaNtf {
@@ -24,24 +24,17 @@ message ReasoningDeltaNtf {
   uint32 revision = 5;
 }
 
-message SessionCreateReq {}
-
-message SessionCreateRes {
-  int32 ret = 2;
-  ErrorInfo error = 3;
-  SessionState session = 4;
-}
-
-message MessageSendReq {
+message ChatReq {
   string session_id = 2;
   string text = 3;
   string retry_run_id = 4;
+  string model_id = 5;
 }
 
-message MessageSendRes {
+message ChatRes {
   int32 ret = 2;
   ErrorInfo error = 3;
-  SessionState session = 4;
+  ChatSession chat_session = 4;
 }
 
 message MessageCancelReq {
@@ -55,7 +48,7 @@ message MessageCancelRes {
 }
 
 message SessionUpdatedNtf {
-  SessionState session = 1;
+  ChatSession chat_session = 1;
 }
 
 message MessageDeltaNtf {

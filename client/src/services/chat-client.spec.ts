@@ -92,7 +92,10 @@ function acceptLogin(socket: FakeWebSocket) {
     snapshot: {
       userId: 'user-1',
       username: 'alice',
-      sessions: [{ id: 'session-1', title: '新的会话', updatedAt: 1, revision: 1, messages: [] }],
+      chatSessions: [],
+      models: [{ id: 'flash', name: 'Flash', model: 'flash' }],
+      defaultModelId: 'flash',
+      permissionModelId: '',
     },
   })
 }
@@ -151,15 +154,19 @@ describe('ChatClient', () => {
     const { socket } = await connectAndLogin(client)
     const pending = client.sendMessage({ sessionId: 'session-1', text: '问题' })
     const sent = sentMessage(socket, 1)
-    receiveMessage(socket, sent.messageId, 'MessageSendRes', {
+    receiveMessage(socket, sent.messageId, 'ChatRes', {
       ret: 1,
-      session: {
-        id: 'session-1',
-        title: '问题',
-        updatedAt: 1,
-        revision: 2,
-        runId: 'run-1',
-        messages: [],
+      chatSession: {
+        modelId: 'flash',
+        permissionModelId: 'flash',
+        session: {
+          id: 'session-1',
+          title: '问题',
+          updatedAt: 1,
+          revision: 2,
+          runId: 'run-1',
+          messages: [],
+        },
       },
     })
     expect((await pending).runId).toBe('run-1')
@@ -169,6 +176,55 @@ describe('ChatClient', () => {
     })
     receiveMessage(socket, 3, 'MessageCancelRes', { ret: 1 })
     await cancel
+    client.close()
+  })
+
+  it('空用户快照可登录，首次ChatReq省略会话ID并携带预选模型', async () => {
+    const client = new ChatClient(new WebSocketChannel())
+    const { socket, snapshot } = await connectAndLogin(client)
+    expect(snapshot.chatSessions).toHaveLength(0)
+    expect(snapshot.defaultModelId).toBe('flash')
+    const pending = client.sendMessage({ text: '首次', modelId: 'pro' })
+    const sent = sentMessage(socket, 1)
+    expect(sent).toMatchObject({ name: 'ChatReq', payload: { text: '首次', modelId: 'pro' } })
+    expect((sent.payload as { sessionId?: string }).sessionId ?? '').toBe('')
+    receiveMessage(socket, sent.messageId, 'ChatRes', {
+      ret: 1,
+      chatSession: {
+        session: { id: 'created', title: '首次', updatedAt: 1, revision: 1, messages: [] },
+        modelId: 'pro',
+        permissionModelId: 'judge',
+      },
+    })
+    expect(await pending).toMatchObject({
+      id: 'created',
+      modelId: 'pro',
+      permissionModelId: 'judge',
+    })
+    client.close()
+  })
+
+  it('按聊天会话包装解码通知和模型响应，缺少Agent会话时拒绝', async () => {
+    const client = new ChatClient(new WebSocketChannel())
+    const updates = vi.fn()
+    client.subscribeUpdates(updates)
+    const { socket } = await connectAndLogin(client)
+    const chatSession = {
+      session: { id: 's1', title: '已有', updatedAt: 1, revision: 1, messages: [] },
+      modelId: 'pro',
+      permissionModelId: 'judge',
+    }
+    receiveMessage(socket, 0, 'SessionUpdatedNtf', { chatSession })
+    expect(updates).toHaveBeenCalledWith({
+      type: 'session',
+      session: expect.objectContaining({ id: 's1', modelId: 'pro', permissionModelId: 'judge' }),
+    })
+    const model = client.setModel('s1', 'pro')
+    receiveMessage(socket, 2, 'SessionModelSetRes', { ret: 1, chatSession })
+    expect(await model).toMatchObject({ id: 's1', modelId: 'pro', permissionModelId: 'judge' })
+    const broken = client.sendMessage({ text: 'broken' })
+    receiveMessage(socket, 3, 'ChatRes', { ret: 1, chatSession: { modelId: 'pro' } })
+    await expect(broken).rejects.toThrow('聊天会话缺少 Agent 会话')
     client.close()
   })
 
@@ -202,7 +258,7 @@ describe('ChatClient', () => {
     await flush()
     acceptLogin(currentSocket())
     await connected
-    const pending = client.createSession()
+    const pending = client.sendMessage({ text: 'first' })
     receiveMessage(currentSocket(), 2, 'MessageCancelRes', { ret: 1 })
     await expect(pending).rejects.toThrow('不匹配')
     client.close()
@@ -213,14 +269,46 @@ describe('ChatClient', () => {
     const name = crypto.randomUUID()
     const client = new ChatClient(new MockAgentChannel())
     const initial = await client.connect(name)
-    const id = initial.sessions[0]!.id
-    await client.sendMessage({ sessionId: id, text: '继续生成' })
+    expect(initial.chatSessions).toHaveLength(0)
+    await client.sendMessage({ text: '继续生成', modelId: 'deepseek-flash' })
     client.close()
     await vi.advanceTimersByTimeAsync(3000)
     const other = new ChatClient(new MockAgentChannel())
     const restored = await other.connect(name)
     expect(restored.userId).toBe(initial.userId)
-    expect(restored.sessions[0]!.messages.at(-1)?.status).toBe('complete')
+    expect(restored.chatSessions[0]!.messages.at(-1)?.status).toBe('complete')
     other.close()
+  })
+
+  it.each([undefined, ''])('Mock 首发模型缺省为 %j 时采用快照默认模型', async (modelId) => {
+    vi.useFakeTimers()
+    const client = new ChatClient(new MockAgentChannel())
+    const initial = await client.connect(crypto.randomUUID())
+    const session = await client.sendMessage({ text: '默认模型', modelId })
+    expect(session.modelId).toBe(initial.defaultModelId)
+    expect(session.permissionModelId).toBe(initial.defaultModelId)
+    expect((await client.snapshot()).chatSessions).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(3000)
+    client.close()
+  })
+
+  it.each([
+    { text: '' },
+    { text: '界'.repeat(6667) },
+    { text: '首次', modelId: 'unknown' },
+    { text: '首次', retryRunId: 'old' },
+    { text: '首次', sessionId: 'unknown' },
+  ])('Mock 拒绝无效首发且不登记会话 %#', async (input) => {
+    const client = new ChatClient(new MockAgentChannel())
+    const updates = vi.fn()
+    client.subscribeUpdates(updates)
+    await client.connect(crypto.randomUUID())
+    await expect(client.sendMessage(input)).rejects.toMatchObject({
+      code: 'sessionId' in input ? errorCode.fail : errorCode.invalid_param,
+      retryable: false,
+    })
+    expect((await client.snapshot()).chatSessions).toHaveLength(0)
+    expect(updates).not.toHaveBeenCalled()
+    client.close()
   })
 })

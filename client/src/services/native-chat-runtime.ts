@@ -1,6 +1,11 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { reactive } from 'vue'
-import type { ChatSessionView, ChatUpdate } from '../types/chat'
+import type {
+  ChatSessionView,
+  ChatUpdate,
+  ConversationSelection,
+  LocalDraftSession,
+} from '../types/chat'
 import { initialChatState, type ChatRuntime } from './chat-runtime'
 import { normalizeUsername, saveUsername } from './user-preferences'
 import { appendReasoning } from '../protocol/reasoning'
@@ -11,10 +16,12 @@ export interface NativeChatState {
   username: string
   userId: string
   sessions: ChatSessionView[]
-  activeSessionId: string | null
+  selection: ConversationSelection
+  localDraft: LocalDraftSession | null
+  defaultModelId: string
+  permissionModelId: string
   connectionState: 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
   connectionError: string
-  sessionOperations: number
   pendingSends: string[]
 }
 export type NativeChatEvent =
@@ -25,11 +32,12 @@ export type NativeChatEvent =
 type Action =
   | { type: 'setModel'; modelId: string }
   | { type: 'connect'; username: string }
-  | { type: 'disconnect' | 'switchUser' | 'createSession' | 'dismissError' | 'retryLastMessage' }
+  | { type: 'disconnect' | 'switchUser' | 'dismissError' | 'retryLastMessage' }
+  | { type: 'createSession'; draftId?: string }
   | { type: 'selectSession'; sessionId: string }
   | { type: 'sendMessage'; text: string }
   | { type: 'cancelRun' }
-  | { type: 'setDraft'; sessionId: string; value: string }
+  | { type: 'setDraft'; target: ConversationSelection; value: string }
 
 export function createNativeChatRuntime(): ChatRuntime {
   const state = reactive(initialChatState())
@@ -38,7 +46,16 @@ export function createNativeChatRuntime(): ChatRuntime {
   let generation = 0
   let stateRevision = 0
   const pendingDrafts = new Map<string, string>()
-  let pendingSelection: string | null = null
+  let pendingSelection: ConversationSelection | undefined
+  let pendingLocalDraft: { id: string; text: string } | null = null
+  let pendingDraftSend: { draftId: string } | null = null
+
+  function sameSelection(a: ConversationSelection | undefined, b: ConversationSelection) {
+    if (a == null || b == null) return a === b
+    return a.kind === 'draft'
+      ? b.kind === 'draft' && a.draftId === b.draftId
+      : b.kind === 'session' && a.sessionId === b.sessionId
+  }
 
   function receive(event: NativeChatEvent) {
     stateRevision++
@@ -46,7 +63,9 @@ export function createNativeChatRuntime(): ChatRuntime {
       const next = event.state
       if (next.username !== state.username || next.userId !== state.userId) {
         pendingDrafts.clear()
-        pendingSelection = null
+        pendingSelection = undefined
+        pendingLocalDraft = null
+        pendingDraftSend = null
       }
       const { sessions, pendingSends, ...rest } = next
       for (const session of sessions) {
@@ -55,10 +74,32 @@ export function createNativeChatRuntime(): ChatRuntime {
         if (session.draft === pending) pendingDrafts.delete(session.id)
         else session.draft = pending
       }
-      if (pendingSelection === rest.activeSessionId) pendingSelection = null
+      if (pendingLocalDraft) {
+        if (
+          !rest.localDraft ||
+          rest.localDraft.id !== pendingLocalDraft.id ||
+          rest.localDraft.text === pendingLocalDraft.text
+        )
+          pendingLocalDraft = null
+        else rest.localDraft.text = pendingLocalDraft.text
+      }
+      if (pendingDraftSend) {
+        if (
+          rest.connectionState !== 'connected' ||
+          rest.localDraft?.id !== pendingDraftSend.draftId ||
+          rest.localDraft.sending
+        )
+          pendingDraftSend = null
+        else rest.localDraft.sending = true
+      }
+      if (
+        sameSelection(pendingSelection, rest.selection) ||
+        (pendingSelection?.kind === 'draft' && rest.localDraft?.id !== pendingSelection.draftId)
+      )
+        pendingSelection = undefined
       Object.assign(state, rest, {
         models: next.models ?? [],
-        activeSessionId: pendingSelection ?? rest.activeSessionId,
+        selection: pendingSelection === undefined ? rest.selection : pendingSelection,
         sessionViews: new Map(sessions.map((session) => [session.id, session])),
         pendingSends: new Set(pendingSends),
       })
@@ -114,22 +155,24 @@ export function createNativeChatRuntime(): ChatRuntime {
       console.error('[NativeChatRuntime.action]', value.type, error)
       if (current === generation && issuedAt === stateRevision) {
         state.connectionError = String(error)
-        state.sessionOperations = 0
         state.pendingSends.clear()
+        if (state.localDraft) state.localDraft.sending = false
+        pendingDraftSend = null
       }
       return false
     }
   }
   function active() {
-    return state.sessionViews.get(state.activeSessionId ?? '')
+    return state.selection?.kind === 'session'
+      ? state.sessionViews.get(state.selection.sessionId)
+      : undefined
   }
   function canSend() {
     return (
       state.connectionState === 'connected' &&
-      state.sessionOperations === 0 &&
-      !!active() &&
-      !active()!.runId &&
-      !state.pendingSends.has(state.activeSessionId ?? '')
+      (state.selection?.kind === 'draft'
+        ? !!state.localDraft && !state.localDraft.sending
+        : !!active() && !active()!.runId && !state.pendingSends.has(active()!.id))
     )
   }
   return {
@@ -137,6 +180,9 @@ export function createNativeChatRuntime(): ChatRuntime {
     attach,
     detach() {
       generation++
+      pendingSelection = undefined
+      pendingLocalDraft = null
+      pendingDraftSend = null
       const id = subscription
       subscription = null
       attaching = null
@@ -159,27 +205,52 @@ export function createNativeChatRuntime(): ChatRuntime {
       void action({ type: 'switchUser' })
     },
     async createSession() {
-      if (state.connectionState !== 'connected' || state.sessionOperations > 0) return false
-      state.sessionOperations++
-      return action({ type: 'createSession' })
+      if (state.connectionState !== 'connected') return false
+      const previous = state.selection
+      const draftId = state.localDraft?.id
+      const issuedAt = stateRevision
+      if (draftId) {
+        pendingSelection = { kind: 'draft', draftId }
+        state.selection = pendingSelection
+      }
+      const accepted = await action(
+        draftId ? { type: 'createSession', draftId } : { type: 'createSession' },
+      )
+      if (!accepted && pendingSelection?.kind === 'draft' && pendingSelection.draftId === draftId) {
+        pendingSelection = undefined
+        if (issuedAt === stateRevision) state.selection = previous
+      }
+      return accepted
     },
     async setModel(modelId) {
+      if (state.selection?.kind === 'draft' && state.localDraft?.sending) return false
       return action({ type: 'setModel', modelId })
     },
     async selectSession(sessionId) {
       if (!state.sessionViews.has(sessionId)) return false
-      pendingSelection = sessionId
-      state.activeSessionId = sessionId
+      pendingSelection = { kind: 'session', sessionId }
+      state.selection = pendingSelection
       return action({ type: 'selectSession', sessionId })
     },
     sendMessage(text) {
       if (!text.trim() || !canSend()) return false
-      state.pendingSends.add(state.activeSessionId!)
-      void action({ type: 'sendMessage', text: text.trim() })
+      const draftId = state.selection?.kind === 'draft' ? state.localDraft?.id : undefined
+      const current = generation
+      const optimistic = draftId ? { draftId } : null
+      if (optimistic && state.localDraft) {
+        state.localDraft.sending = true
+        pendingDraftSend = optimistic
+      } else if (active()) state.pendingSends.add(active()!.id)
+      void action({ type: 'sendMessage', text: text.trim() }).then((accepted) => {
+        if (!accepted && current === generation && optimistic && pendingDraftSend === optimistic) {
+          pendingDraftSend = null
+          if (state.localDraft?.id === optimistic.draftId) state.localDraft.sending = false
+        }
+      })
       return true
     },
     retryLastMessage() {
-      if (canSend()) void action({ type: 'retryLastMessage' })
+      if (active() && canSend()) void action({ type: 'retryLastMessage' })
     },
     async cancelRun() {
       await action({ type: 'cancelRun' })
@@ -188,11 +259,18 @@ export function createNativeChatRuntime(): ChatRuntime {
       void action({ type: 'dismissError' })
     },
     setDraft(value) {
-      const session = active()
-      if (!session) return
-      session.draft = value
-      pendingDrafts.set(session.id, value)
-      void action({ type: 'setDraft', sessionId: session.id, value })
+      const target = state.selection
+      if (target?.kind === 'draft') {
+        if (!state.localDraft || state.localDraft.sending) return
+        state.localDraft.text = value
+        pendingLocalDraft = { id: state.localDraft.id, text: value }
+      } else {
+        const session = active()
+        if (!session) return
+        session.draft = value
+        pendingDrafts.set(session.id, value)
+      }
+      void action({ type: 'setDraft', target, value })
     },
   }
 }

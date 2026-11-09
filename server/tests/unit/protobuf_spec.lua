@@ -98,14 +98,16 @@ describe("protobuf", function()
         protocol:init()
 
         assert_round_trip("skynet.agent.v1.LoginReq", { username = "alice" }, { username = "alice" })
-        assert_round_trip("skynet.agent.v1.MessageSendReq", {
+        assert_round_trip("skynet.agent.v1.ChatReq", {
             session_id = "session-1",
             text = "你好",
             retry_run_id = "",
+            model_id = "",
         }, {
             session_id = "session-1",
             text = "你好",
             retry_run_id = "",
+            model_id = "",
         })
 
         local login_hash = hash.fnv1a32("skynet.agent.v1.LoginReq")
@@ -136,27 +138,29 @@ describe("protobuf", function()
         assert.is_true(protobuf.load(AGENT_PROTO_DIR))
         protocol:init()
 
-        local frame = protocol:encode_msg(42, "MessageSendReq", {
+        local frame = protocol:encode_msg(42, "ChatReq", {
             session_id = "session-1",
             text = "你好",
             retry_run_id = "",
+            model_id = "",
         })
         local compression, message_id, type_hash, offset =
             string.unpack(HEADER_FORMAT, frame)
         assert.are.equal(0, compression)
         assert.are.equal(42, message_id)
         assert.are.equal(
-            hash.fnv1a32("skynet.agent.v1.MessageSendReq"),
+            hash.fnv1a32("skynet.agent.v1.ChatReq"),
             type_hash
         )
 
         local decoded_id, name, args = protocol:decode_msg(frame)
         assert.are.equal(42, decoded_id)
-        assert.are.equal("MessageSendReq", name)
+        assert.are.equal("ChatReq", name)
         assert.same({
             session_id = "session-1",
             text = "你好",
             retry_run_id = "",
+            model_id = "",
         }, args)
     end)
 
@@ -164,6 +168,7 @@ describe("protobuf", function()
         assert.is_true(protobuf.load(AGENT_PROTO_DIR))
         protocol:init()
         local vectors = load_protocol_vectors()
+        assert.are.equal(hash.fnv1a32("skynet.agent.v1.ChatReq"), vectors.hashes.chat_req)
 
         local login_request = decode_hex(vectors.frames.login_request)
         local message_id, name, args = protocol:decode_msg(login_request)
@@ -172,7 +177,8 @@ describe("protobuf", function()
         assert.are.equal("alice", args.username)
         assert.are.equal(login_request, protocol:encode_msg(1, "LoginReq", { username = "alice" }))
         local expectations = {
-            message_send = "MessageSendReq", login_success = "LoginRes", message_accepted = "MessageSendRes",
+            chat_request = "ChatReq", chat_first_request = "ChatReq",
+            login_success = "LoginRes", message_accepted = "ChatRes",
             message_streaming = "MessageDeltaNtf", message_completed = "SessionUpdatedNtf",
             message_cancelled = "SessionUpdatedNtf", message_failed = "SessionUpdatedNtf",
         }
@@ -181,10 +187,14 @@ describe("protobuf", function()
             assert.are.equal(expected, decoded_name)
             if expected:match("Ntf$") then assert.are.equal(0, id) end
             if key == "login_success" then assert.are.equal("user-1", payload.snapshot.user_id) end
+            if key == "chat_first_request" then
+                assert.are.equal("", payload.session_id)
+                assert.are.equal("model-1", payload.model_id)
+            end
             if key == "message_streaming" then assert.are.equal("你好", payload.delta) end
             if key == "message_failed" then
-                assert.are.equal("上游失败", payload.session.messages[1].error.message)
-                assert.are.equal("MESSAGE_STATUS_FAILED", payload.session.messages[1].status)
+                assert.are.equal("上游失败", payload.chat_session.session.messages[1].error.message)
+                assert.are.equal("MESSAGE_STATUS_FAILED", payload.chat_session.session.messages[1].status)
             end
         end
     end)
@@ -284,7 +294,7 @@ describe("protobuf", function()
         assert.is_false(ok)
         assert.matches("does not exists", tostring(err))
 
-        ok, err = pcall(protobuf.decode, "skynet.agent.v1.MessageSendReq", "\18\255")
+        ok, err = pcall(protobuf.decode, "skynet.agent.v1.ChatReq", "\18\255")
         assert.is_false(ok)
         assert.matches("invalid bytes length", tostring(err))
 
@@ -292,7 +302,7 @@ describe("protobuf", function()
         assert.is_false(ok)
         assert.matches("消息类型不能为空", tostring(err))
 
-        ok, err = pcall(protobuf.decode, "skynet.agent.v1.MessageSendReq", nil)
+        ok, err = pcall(protobuf.decode, "skynet.agent.v1.ChatReq", nil)
         assert.is_false(ok)
         assert.matches("必须是 string", tostring(err))
     end)

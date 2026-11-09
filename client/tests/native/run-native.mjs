@@ -4,9 +4,10 @@ import net from 'node:net'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { Buffer } from 'node:buffer'
-import { setInterval, clearInterval } from 'node:timers'
+import { setInterval, clearInterval, setTimeout } from 'node:timers'
 import { fileURLToPath, URL } from 'node:url'
 import { fnv1a32 } from '../../../server/tests/integration/gateway_socket.mjs'
+import { skynet } from '../../src/protocol/generated/agent_gateway.js'
 
 if (process.platform !== 'darwin') throw new Error('原生重载夹具当前在 macOS 验证')
 const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -17,14 +18,14 @@ const artifactRoot = integration
   : fixture.evidenceDirectory
 fs.mkdirSync(artifactRoot, { recursive: true })
 const directory = fs.mkdtempSync(path.join(artifactRoot, 'native-'))
-const evidence = { connections: 0, closes: 0, requests: [] }
+const evidence = { connections: 0, closes: 0, delayedChatResponses: 0, requests: [] }
 const save = () => {
   const temporary = path.join(directory, 'evidence.tmp')
   fs.writeFileSync(temporary, JSON.stringify(evidence))
   fs.renameSync(temporary, path.join(directory, 'evidence.json'))
 }
 const names = new Map(
-  ['LoginReq', 'UserSnapshotReq', 'MessageSendReq', 'MessageCancelReq', 'SessionCreateReq'].map(
+  ['LoginReq', 'UserSnapshotReq', 'ChatReq', 'MessageCancelReq', 'SessionModelSetReq'].map(
     (name) => [fnv1a32(`skynet.agent.v1.${name}`), name],
   ),
 )
@@ -65,10 +66,13 @@ const server = net.createServer((client) => {
       const payload = Buffer.from(buffered.subarray(offset, offset + length))
       if (masked) for (let i = 0; i < length; i++) payload[i] ^= buffered[mask + (i % 4)]
       if (opcode === 2 && payload.length >= 9) {
+        const name = names.get(payload.readUInt32BE(5)) ?? 'unknown'
+        const chat = name === 'ChatReq' ? skynet.agent.v1.ChatReq.decode(payload.subarray(9)) : null
         evidence.requests.push({
           connection,
           messageId: payload.readUInt32BE(1),
-          name: names.get(payload.readUInt32BE(5)) ?? 'unknown',
+          name,
+          ...(chat ? { sessionId: chat.sessionId, modelId: chat.modelId } : {}),
         })
         save()
       }
@@ -76,7 +80,52 @@ const server = net.createServer((client) => {
     }
   })
   client.pipe(upstream)
-  upstream.pipe(client)
+  if (!integration) upstream.pipe(client)
+  else {
+    let responseBuffer = Buffer.alloc(0)
+    let responseHandshake = false
+    upstream.on('data', (chunk) => {
+      responseBuffer = Buffer.concat([responseBuffer, chunk])
+      if (!responseHandshake) {
+        const end = responseBuffer.indexOf('\r\n\r\n')
+        if (end < 0) return
+        client.write(responseBuffer.subarray(0, end + 4))
+        responseBuffer = responseBuffer.subarray(end + 4)
+        responseHandshake = true
+      }
+      while (responseBuffer.length >= 2) {
+        let length = responseBuffer[1] & 127
+        let offset = 2
+        if (length === 126) {
+          if (responseBuffer.length < 4) return
+          length = responseBuffer.readUInt16BE(2)
+          offset = 4
+        } else if (length === 127) {
+          if (responseBuffer.length < 10) return
+          length = Number(responseBuffer.readBigUInt64BE(2))
+          offset = 10
+        }
+        if (responseBuffer.length < offset + length) return
+        const frame = Buffer.from(responseBuffer.subarray(0, offset + length))
+        const payload = frame.subarray(offset)
+        if (
+          (frame[0] & 15) === 2 &&
+          payload.length >= 9 &&
+          payload.readUInt32BE(5) === fnv1a32('skynet.agent.v1.ChatRes') &&
+          evidence.delayedChatResponses === 0
+        ) {
+          // 完整会话通知先通过，实际重载期间仍等待首发确认。
+          evidence.delayedChatResponses++
+          save()
+          setTimeout(() => {
+            if (!client.destroyed && !client.writableEnded) client.write(frame)
+          }, 300)
+        } else client.write(frame)
+        responseBuffer = responseBuffer.subarray(offset + length)
+      }
+    })
+    upstream.on('end', () => client.end())
+  }
   client.on('close', () => {
     evidence.closes++
     sockets.delete(client)
@@ -149,6 +198,7 @@ try {
   const navigations = Number(fs.readFileSync(path.join(directory, 'navigations'), 'utf8'))
   assert.ok(navigations >= (integration ? 5 : 3), `没有执行足够的实际文档重载: ${navigations}`)
   assert.equal(evidence.connections, integration ? 3 : 1)
+  assert.equal(evidence.delayedChatResponses, integration ? 1 : 0)
   assert.equal(evidence.requests.filter((request) => request.name === 'UserSnapshotReq').length, 0)
   for (const connection of integration ? [1, 2, 3] : [1]) {
     const requests = evidence.requests.filter((request) => request.connection === connection)
@@ -157,6 +207,16 @@ try {
     assert.equal(requests.filter((request) => request.name === 'LoginReq').length, 1)
     requests.forEach((request, index) => assert.equal(request.messageId, index + 1))
   }
+  const chats = evidence.requests.filter((request) => request.name === 'ChatReq')
+  const firstChat = evidence.requests.findIndex((request) => request.name === 'ChatReq')
+  assert.deepEqual(
+    evidence.requests.slice(0, firstChat).map((request) => request.name),
+    ['LoginReq'],
+  )
+  assert.ok(chats.length > 1, '没有验证首次创建后的继续对话')
+  assert.equal(chats[0].sessionId, '', '首次发送应由服务器创建会话')
+  assert.ok(chats[0].modelId, '首次发送未携带草稿所选模型')
+  assert.ok(chats[1].sessionId, '后续发送未携带已创建的会话 ID')
   if (!integration)
     fs.writeFileSync(path.join(artifactRoot, 'native.json'), JSON.stringify(result, null, 2) + '\n')
   console.log(

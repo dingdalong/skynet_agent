@@ -4,8 +4,7 @@ export interface RequestPayloads {
   SessionModelSetReq: skynet.agent.v1.SessionModelSetReq.$Properties
   LoginReq: skynet.agent.v1.LoginReq.$Properties
   UserSnapshotReq: skynet.agent.v1.UserSnapshotReq.$Properties
-  SessionCreateReq: skynet.agent.v1.SessionCreateReq.$Properties
-  MessageSendReq: skynet.agent.v1.MessageSendReq.$Properties
+  ChatReq: skynet.agent.v1.ChatReq.$Properties
   MessageCancelReq: skynet.agent.v1.MessageCancelReq.$Properties
 }
 
@@ -14,8 +13,7 @@ export interface ServerMessagePayloads {
   ReasoningDeltaNtf: skynet.agent.v1.ReasoningDeltaNtf.$Properties
   LoginRes: skynet.agent.v1.LoginRes.$Properties
   UserSnapshotRes: skynet.agent.v1.UserSnapshotRes.$Properties
-  SessionCreateRes: skynet.agent.v1.SessionCreateRes.$Properties
-  MessageSendRes: skynet.agent.v1.MessageSendRes.$Properties
+  ChatRes: skynet.agent.v1.ChatRes.$Properties
   MessageCancelRes: skynet.agent.v1.MessageCancelRes.$Properties
   SessionUpdatedNtf: skynet.agent.v1.SessionUpdatedNtf.$Properties
   MessageDeltaNtf: skynet.agent.v1.MessageDeltaNtf.$Properties
