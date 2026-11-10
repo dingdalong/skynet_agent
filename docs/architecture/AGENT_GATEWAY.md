@@ -1,10 +1,14 @@
 # Agent WebSocket 网关
 
+本文说明运行机制与接口。环境、启动、测试和热修操作见[开发指南](../DEVELOPMENT.md)，
+参数、可用值与部署边界见[配置说明](../CONFIGURATION.md)。
+
 ## 边界
 
 Web 和 Tauri 客户端通过 WebSocket 连接 Skynet。模型对话、会话历史、模型配置和 API Key
 都位于服务端，以 `user` 为所有者，服务器重启前保留。客户端输入用户名进入，同名共享数据并实时同步；
 页面重载、断线和退出均不删除会话或停止生成；App 页面重载复用 Rust 核心中的连接。用户名识别不提供密码认证，数据暂不落盘。
+用户名区分大小写，长度为 1–32 个 Unicode 字符。
 
 ## 术语与职责
 
@@ -90,6 +94,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 基础层不对整个服务加串行锁，因为同一服务中的其他连接及跨服务回调必须继续运行。
 长期对象的状态保存在实例中，方法位于模块导出的稳定类表，长期回调通过 `self:method()` 查找实现。
 结构、接口、schema 和配置变化通过重启发布；后续兼容的缺陷修复才使用热修。
+已进入执行的方法继续运行旧字节码，新方法调用使用更新后的实现；服务、对象和数据不会重建。
 服务主体也通过稳定模块表热修，例如 `dbgcmd .gateway HOTFIX gateway`。
 `node` 导出稳定的 `Node` 类表，公共运行期方法的缺陷修复可使用 `dbgcmd .main HOTFIX node`。
 节点启动回调只执行一次，不保存在节点实例中；业务编排与公共启动流程的调整通过重启生效。
@@ -104,16 +109,14 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 某实例失败或响应超时，其完整待更新模块集保留至后续源码变更时合并重试，其他实例仍可完成更新。
 服务不单独记录热修日志。节点根据实际更新结果，将模块映射为文件路径、去重排序，统一记录一次；
 失败或部分成功也只输出一次汇总，全部跳过时不输出成功日志。
+各 VM 的更新结果独立，不保证跨 VM 同时生效。
 节点关闭先停止监听并等待在途批次结束，之后再清理业务服务。
 
 内部调用使用 `rpc.call`、`call_no_timeout` 和 `send`。`call` 有默认超时，`call_no_timeout`
 用于无超时等待服务初始化和清理完成。RPC 不自动重试：超时表示调用方停止等待，远端仍可能完成。
 `send` 成功仅表示消息已交给 Skynet，不能当作远端执行确认。
 
-服务使用 `./server/start.sh` 启动，管理命令为 `./server/control.sh status`、
-`./server/control.sh stop` 和 `./server/control.sh force-stop`；可选第二个参数指定控制台端口。
-它们通过回环地址的控制台访问 `.main`；普通关闭等待清理完成，强制关闭可在启动、运行或关服等待期间
-由脚本显式触发，重复触发保持幂等。控制响应表示命令已接收，进程退出码表示最终结果。
+控制台通过 `.main` 查询状态或发起关闭，操作入口见[服务管理](../DEVELOPMENT.md#服务管理)。
 工作服务使用 `.client_1`、`.logind_1`、`.websocket_1` 等注册名，
 网关使用 `.gateway`。状态查询并行收集服务状态，失联服务显示 `unavailable`。
 
@@ -184,32 +187,42 @@ client 在初始化时通过 `package.searchpath("user.handler", package.path)` 
 
 ## 配置与传输
 
-服务器配置由 `server/etc/cfg/common.lua` 和 `channel/<name>.lua` 合并并统一校验，渠道通过
-`SKYNET_CFG_CHANNEL` 选择。配置在启动时加载，变更后重启。
-
-| 配置                                   | 可用值 / 含义                                                  |
-| -------------------------------------- | -------------------------------------------------------------- |
-| `runtime.control_port`                 | 1..65535，仅回环监听的管理端口                                 |
-| `agent_gateway.socket`                 | `host`、`port`、以 `/` 开头的 `path`                           |
-| `agent_gateway.instance`               | `client`、`logind`、`websocket` 各为 1..32                     |
-| `agent_gateway.login_timeout_ticks`    | 正整数，未绑定连接的存活时间                                   |
-| `agent.llm`                            | `api_key`、`base_url`、`model`、正整数 `request_timeout_ticks` |
-| `agent`                                | 正整数 `max_message_length` 与 `session_title_length`          |
-| `agent.project_instructions_max_bytes` | 非负整数，自动加载根项目规则的字节上限；`0` 关闭自动加载       |
-| `protocol.agent_gateway_schema_dir`    | schema 目录                                                    |
-
-所有 `_ticks` 时间单位为厘秒。模型请求使用从发送到流结束的总截止时间，包含停滞流；超时后关闭
+渠道加载、监听地址、服务实例数、模型与工具参数统一见[配置说明](../CONFIGURATION.md)。
+模型请求使用从发送到流结束的总截止时间，包含停滞流；超时后关闭
 供应商连接并释放该会话的本轮占用。客户端发送命令只等待接受确认，任务通过推送跟踪。
-本地回环连接可使用 `ws://`，其他地址必须使用 `wss://`，由反向代理终止 TLS。
 
 `helper.protobuf.load` 只由 main 执行。消费者初始化时 `attach` 共享只读 schema，再由各自 VM 中的
 `network.protocol` 对象建立本地类型映射。require 顶层不进行文件读取或切换 Protobuf 状态。
 main 在整个进程生命周期内存活，不提前释放 schema。
 
+### Protobuf 编解码
+
+`helper.protobuf.load(schema_directory)` 加载目录第一层的全部 `.proto`，文件按名称排序，
+通过标准 import 关系一次加载。存在 `pb.bytes` 时只加载该预编译 FileDescriptorSet，
+不再扫描或校验 proto；预编译需带 `--include_imports`，多个 proto 仍生成一个文件。
+
+业务服务在初始化阶段调用 `attach()`，随后按完整消息类型名编解码，例如：
+
+```lua
+local protobuf = require("helper.protobuf")
+
+-- main 已完成唯一 schema 的加载，当前服务接入只读 schema。
+protobuf.attach()
+
+local data = protobuf.encode("skynet.agent.v1.LoginReq", {
+    username = "example",
+})
+local message = protobuf.decode("skynet.agent.v1.LoginReq", data)
+```
+
+helper 失败时抛出 Lua error，需要捕获时由调用方使用 `pcall`。`network.protocol` 独立管理
+9 字节帧及类型哈希，每个 WebSocket 服务在自身 VM 中初始化协议对象。
+schema、helper 公开接口或 `pb.so` 变化后必须重启；共享 schema 的持有者不能提前退出。
+
 ## 外部消息格式
 
 共享协议位于 `common/proto`，客户端生成代码位于 `client/src/protocol/generated`。
-修改后执行 `make proto-generate` 和 `pnpm --dir client proto:check`。
+生成与检查入口见[开发指南](../DEVELOPMENT.md#开发运行与构建)。
 
 每帧是 `压缩标志 uint8 | 消息 ID uint32 | 类型哈希 uint32 | Protobuf args`，固定头为 9 字节，
 多字节整数使用网络字节序。类型哈希按完整 Protobuf 消息名计算 FNV-1a 32 位哈希。
@@ -294,13 +307,8 @@ Web 的会话选择按用户名保存在 sessionStorage，草稿仅保留页面�
 当前没有身份认证，非回环监听限于受控网络；对公网发布前需要认证、授权、限流和连接配额。
 Tauri 不启用 shell、文件系统或任意命令插件，WSS 证书配置由反向代理管理。
 
-`make check` 覆盖两端格式与静态检查，以及 Lua、TypeScript 和 Rust 单测。
-`make check-full` 在此基础上追加服务端全部专项集成、原生/Web 假模型集成、连接真实供应商的
-原生与 Web 全链路、本地及远程执行验收、Storybook 构建及
-多浏览器 UI 回归。服务端专项测试直接使用 `make -C server`，客户端专项测试使用 `pnpm --dir client`。
-任务端到端验收要求统一见[编码与协作规范](../../编码与协作规范.md#测试用例)。
-假模型仅用于稳定复现取消、供应商失败和停滞流超时等集成场景；任务端到端验收必须连接真实模型供应商，
-涉及权限判断时独立权限模型也使用真实请求。真实调用失败直接报告，不以假模型替代。
+测试入口、真实模型凭据和产物位置见[测试与验收](../DEVELOPMENT.md#测试与验收)，
+验收层级以[编码与协作规范](../../编码与协作规范.md#测试用例)为准。
 
 ## 工具执行与权限
 

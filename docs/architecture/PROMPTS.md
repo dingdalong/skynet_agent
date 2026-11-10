@@ -8,6 +8,7 @@
 `agent.prompts` 负责加载文本和组装消息。Markdown 模板位于
 `server/src/lualib/agent/prompts/templates/`，按基础行为、工具使用、权限说明和独立权限判断拆分。
 基础行为适用于通用助手；工具与权限说明只在实际提供工具时加入。
+基础行为作为首条 system 消息发送，不使用 Responses API 顶层的 `instructions` 参数。
 
 每个 client 服务在初始化时调用 `Prompts.load_templates()`，将同一份模板交给它管理的 Agent。
 模块加载本身不读取文件，模板变更通过重启服务生效。模板缺失、空白或不是有效 UTF-8 文本时，
@@ -73,6 +74,27 @@ Agent 在每次新用户任务开始时检查会话根目录，优先使用 `AGE
 
 `Agent:new(llm_config, prompt_templates, options)` 接收已加载模板，`options` 提供会话工作目录、
 工具与权限配置。独立调用可只传模型配置和模板；网关通过 client 服务与 user 的会话创建流程统一接入。
+
+下面的代码在 Skynet 服务中演示不启用工具的独立对话。`llm_config` 由调用方从
+[模型配置](../CONFIGURATION.md#模型与会话)中解析，包含连接信息与请求超时；模板在服务初始化时加载并复用。
+
+```lua
+local Agent = require("agent.agent")
+local Prompts = require("agent.prompts")
+
+local prompt_templates = Prompts.load_templates()
+local agent = Agent:new(llm_config, prompt_templates)
+
+local text, err = agent:chat("介绍一下 Lua", function(delta)
+    io.write(delta)
+end)
+```
+
+Agent 保留对话历史，首次请求时按需创建模型客户端。调用方需串行执行同一对象的 `chat`。
+运行时可调用 `agent:set_llm(llm_config, permission_config)` 更新主模型及权限模型配置，保留已有历史；
+省略权限模型配置时跟随主模型。正在进行的模型请求继续使用原配置，下一次请求使用新配置。
+底层 `agent.llm.base` 导出 Base 类，独立使用时通过 `Base:new(config, purpose)` 创建，
+以 `set_config` 更新配置、`stream` 处理 Responses API 流。
 
 单元与集成测试覆盖消息角色、规则选择、替换与失效、失败重试快照、请求内部字段过滤和权限来源。
 真实端到端场景从客户端发送任务，实际创建及更新项目规则，核对下一轮成果的目录、子目录规则读取记录
