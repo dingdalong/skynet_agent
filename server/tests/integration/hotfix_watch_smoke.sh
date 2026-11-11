@@ -2,4 +2,4 @@
 set -eu
 
 project_root=$(CDPATH= cd -P "$(dirname "$0")/../.." && pwd)
-exec node "$project_root/tests/integration/hotfix_watch_probe.mjs"
+exec "$project_root/tests/integration/run_with_fake_gateway.sh" hotfix_watch_probe

@@ -3,8 +3,12 @@
 *.log
 *.pid
 *.dSYM/
-client/.env.local
 .agents/experience/
+.tools/
+/client/.dart_tool/
+/client/**/.dart_tool/
+/client/**/build/
+/client/**/coverage/
+/client/test-artifacts/
 
 /common/native/agent_runtime/build/
-/client/src-tauri/resources/native/

@@ -20,9 +20,7 @@
     "workspace.checkThirdParty": "Apply",
     "workspace.ignoreDir": [
         ".vscode",
-        "client/.pnpm-store",
-        "client/node_modules",
-        "client/src-tauri/target",
+        "client",
         "server/cservice",
         "server/logs",
         "server/luaclib"

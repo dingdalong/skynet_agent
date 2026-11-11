@@ -12,15 +12,14 @@
 
 ## 架构与接口
 
+- [客户端运行时](architecture/CLIENT_RUNTIME.md)：Actor、表现订阅、生命周期与并发规则。
+
 - [Agent WebSocket 网关](architecture/AGENT_GATEWAY.md)：服务生命周期、会话同步、二进制协议和工具执行。
 - [Agent 提示词](architecture/PROMPTS.md)：提示词、项目规则、对话历史与 Agent 接入示例。
-- [共用工具运行时](../common/native/agent_runtime/README.md)：服务端与桌面共用的 C 核心。
+- [共用工具运行时](../common/native/agent_runtime/README.md)：服务端使用的公共 C 核心。
 
 ## 客户端设计
 
-- [设计语言](design/DESIGN_LANGUAGE.md)：主题、字体、颜色与布局。
-- [组件规范](design/COMPONENTS.md)：组件状态与交互。
-- [Agent 交互模式](design/AGENT_PATTERNS.md)：会话、思考和工具记录的展示。
-- [无障碍](design/ACCESSIBILITY.md)：键盘、焦点与可访问性要求。
-- [平台矩阵](design/PLATFORM_MATRIX.md)：平台能力、适配和发布门槛。
-- [设计决策](design/DECISIONS.md)：客户端设计原则。
+- [Flutter Apple 设计规范](design/APPLE_FLUTTER_DESIGN.md)：新客户端的视觉、跨平台交互、辅助功能与审查要求。
+- [macOS 组件画廊](design/COMPONENT_GALLERY.md)：共享 UI 包、组件示例与运行验证。
+- [hig-mcp](https://github.com/aka-kika/hig-mcp)：Apple HIG 与语义令牌查询。

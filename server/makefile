@@ -63,7 +63,7 @@ BUSTED_CPATH := ./luaclib/?.so
 
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
 .NOTPARALLEL:
-.PHONY: help build check check-format test test-integration test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
+.PHONY: help build check check-format test test-integration test-probe-support test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
 	cjson protobuf lfs process filesystem native test-native linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
 	clean cleanall
 
@@ -82,6 +82,7 @@ help:
 		"  make test       共用 C 核心与离线 Busted 单元测试" \
 		"  make native     构建共用工具核心与辅助程序" \
 		"  make test-integration     构建并运行全部假模型与运行时集成测试" \
+		"  make test-probe-support   验证 Lua 网络探针的等待、断线与边界" \
 		"  make test-protobuf-shared  验证 protobuf schema 跨 VM 共享" \
 		"  make test-agent-gateway    运行假模型与四服务网关聊天测试" \
 		"  make test-service-runtime  验证服务命令、RPC 超时与热修" \
@@ -204,6 +205,9 @@ test-protobuf-shared: protobuf lfs
 test-agent-gateway:
 	@"$(PROJECT_ROOT)/tests/integration/agent_gateway_smoke.sh"
 
+test-probe-support:
+	@"$(PROJECT_ROOT)/tests/integration/run_probe.sh" probe_support_probe
+
 test-live: build
 	@"$(PROJECT_ROOT)/tests/integration/live_smoke.sh"
 
@@ -221,9 +225,9 @@ test-service-runtime:
 
 test-service-control:
 	@"$(PROJECT_ROOT)/tests/integration/shutdown_runtime_smoke.sh"
-	@"$(PROJECT_ROOT)/tests/integration/run_with_fake_gateway.sh" node "$(PROJECT_ROOT)/tests/integration/service_control_probe.mjs"
+	@"$(PROJECT_ROOT)/tests/integration/run_with_fake_gateway.sh" service_control_probe
 
-test-integration: build test-tool-process test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
+test-integration: build test-tool-process test-protobuf-shared test-probe-support test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
 
 check: check-format test test-integration
 

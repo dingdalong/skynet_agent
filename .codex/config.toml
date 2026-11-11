@@ -1,3 +1,50 @@
-# 本项目使用统一电脑操作插件验证 Web 与 macOS 客户端。
-[plugins."unified-computer-use@openai-bundled"]
+# 本项目使用电脑操作与浏览器插件验证 macOS 和旧客户端。
+[plugins."computer-use@openai-bundled"]
 enabled = true
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+# Apple HIG 与语义令牌；仅在本项目启用。
+[mcp_servers.hig]
+command = "/Users/dingdalong/github/skynet_agent/.codex/mcp/hig/.venv/bin/hig-mcp"
+cwd = "/Users/dingdalong/github/skynet_agent"
+enabled = true
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.hig.env]
+HIG_MCP_CALL_LOG = "/Users/dingdalong/github/skynet_agent/.codex/mcp/hig/state/calls.jsonl"
+
+# Apple 文档与 WWDC 设计讲解，仅在本项目启用。
+[mcp_servers.sosumi]
+url = "https://sosumi.ai/mcp"
+enabled = true
+startup_timeout_sec = 30
+tool_timeout_sec = 90
+enabled_tools = ["searchAppleDocumentation", "fetchAppleDocumentation", "fetchAppleVideoTranscript"]
+
+# HIG 审查：Flutter 与旧 Vue 客户端不启用 SwiftUI 源码检查。
+[mcp_servers.hig-review]
+command = "/opt/homebrew/bin/node"
+args = ["/Users/dingdalong/github/skynet_agent/.codex/mcp/hig-review/runtime/server.mjs"]
+cwd = "/Users/dingdalong/github/skynet_agent"
+enabled = true
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+enabled_tools = ["hig_checklist", "check_contrast", "search_hig", "get_guideline", "browse_hig", "server_info"]
+
+[mcp_servers.hig-review.env]
+HIG_CACHE_DIR = "/Users/dingdalong/github/skynet_agent/.codex/mcp/hig-review/cache"
+
+# 官方 Dart / Flutter MCP 使用项目 SDK；根目录通过 MCP roots 协议提供。
+[mcp_servers.dart]
+command = "/Users/dingdalong/github/skynet_agent/.tools/flutter/bin/dart"
+args = ["mcp-server", "--flutter-sdk", "/Users/dingdalong/github/skynet_agent/.tools/flutter", "--enable", "cli,flutter_app_lifecycle"]
+cwd = "/Users/dingdalong/github/skynet_agent/client"
+enabled = true
+startup_timeout_sec = 120
+tool_timeout_sec = 120
+
+[mcp_servers.dart.env]
+DEVELOPER_DIR = "/Applications/Xcode.app/Contents/Developer"

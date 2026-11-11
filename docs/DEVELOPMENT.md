@@ -1,101 +1,55 @@
 # 开发指南
 
-首次启动步骤见[项目首页](../README.md#快速开始)。本文说明环境准备、日常开发和验证入口；
-参数及生效方式见[配置说明](CONFIGURATION.md)。下列命令除特别说明外，均在项目根目录执行。
+首次启动见[项目首页](../README.md#快速开始)，服务端配置见[配置说明](CONFIGURATION.md)。
+除特别说明外，命令均在项目根目录执行。
 
 ## 环境准备
 
-当前以 macOS App 和 Web 为主要验证平台。其他平台的能力与发布要求见
-[平台矩阵](design/PLATFORM_MATRIX.md)，编译支持不代表已完成发布验收。
+| 依赖 | 用途 |
+| --- | --- |
+| Git 与 GitHub SSH | 仓库及子模块 |
+| 项目 `.tools/flutter` SDK | Dart、Flutter 开发与测试；可通过根 makefile 变量覆盖 |
+| 完整 Xcode 与 macOS SDK | macOS 原生宿主、Swift Package Manager 与签名构建 |
+| Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
+| Lua 5.5、LuaRocks、Busted | 服务端单元测试 |
+| netcat（nc） | 服务端控制脚本 |
 
-| 依赖                           | 用途                                                                                              |
-| ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Git 与 GitHub SSH 访问         | 获取仓库及子模块；部分子模块使用 SSH 地址                                                         |
-| Node.js LTS 与 pnpm            | 客户端开发；Node.js 需满足依赖的 `engines`，pnpm 版本见 `client/package.json` 的 `packageManager` |
-| Rust 稳定工具链与 Cargo        | 构建 Tauri 桌面客户端及原生测试                                                                   |
-| Make、C 编译器、静态库归档工具 | 构建 Skynet、Lua C 模块及共用工具运行时                                                           |
-| OpenSSL 3 以上开发文件         | 服务端 TLS 支持                                                                                   |
-| Lua 5.5、LuaRocks 与 Busted    | 运行 Lua 单元测试；Skynet 自带运行所需的 Lua 源码                                                 |
-| netcat（`nc`）                 | 使用服务端控制脚本                                                                                |
-
-macOS 安装 Xcode Command Line Tools，提供编译器和系统 SDK；OpenSSL 可通过 Homebrew 安装：
-
-```bash
-xcode-select --install
-brew install openssl@3
-```
-
-服务端构建默认通过 Homebrew 查找 OpenSSL。使用其他安装位置时，可传入 `OPENSSL_PREFIX`，
-或分别传入 `OPENSSL_INCLUDE_DIR` 和 `OPENSSL_LIB_DIR`。MinGW 交叉构建需使用目标平台的 OpenSSL。
-
-Linux 服务端构建还需 autoconf；本地工具执行需 bubblewrap，并允许创建 user/PID namespace
-和挂载独立 proc。macOS 使用系统 `sandbox-exec`。隔离能力不可用时工具返回错误。
-
-已有仓库可补齐子模块：
-
-```bash
-git submodule update --init --recursive
-```
-
-测试前安装 Busted，并确保它使用 Lua 5.5；客户端界面和 Web 端到端测试还需要 Playwright 浏览器：
-
-```bash
-luarocks install busted
-pnpm --dir client exec playwright install chromium webkit
-```
+已有仓库补齐子模块：`git submodule update --init --recursive`。
+macOS 可通过 Homebrew 安装 OpenSSL；服务端默认从 Homebrew 查找，其他位置可指定
+`OPENSSL_PREFIX`，或 `OPENSSL_INCLUDE_DIR`、`OPENSSL_LIB_DIR`。
+使用 `luarocks install busted` 安装测试入口，并确认其使用 Lua 5.5。
+Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 namespace 能力。
 
 ## 目录与日常命令
 
-| 目录      | 内容                                                       |
-| --------- | ---------------------------------------------------------- |
-| `client/` | Vue/TypeScript 界面、设计系统、Tauri Rust 核心及客户端测试 |
-| `server/` | Skynet 服务端、渠道配置、第三方依赖和服务端测试            |
-| `common/` | Protobuf 协议、公共枚举及共用 C 工具核心                   |
-| `docs/`   | 开发、配置、架构与客户端设计文档                           |
+| 目录 | 内容 |
+| --- | --- |
+| `client/apps/client` | 正式 Flutter 客户端、macOS 宿主及测试 |
+| `client/packages/apple_ui` | 统一 Apple 主题、图标与共享控件 |
+| `client/apps/component_gallery` | 独立的可选组件预览 |
+| `client/tool` | UI 与依赖边界检查 |
+| `server` | Skynet 服务端及 Lua 单元、网络集成与真实模型测试 |
+| `common` | 公共协议、测试向量及 C 工具核心 |
 
-根目录提供统一入口，专项操作使用子项目命令：
+运行 `make install` 安装 Flutter 工作区依赖。服务端测试复用现有 Skynet 与 Lua 库。
+`make dev` 启动 macOS 开发态客户端，可在终端输入 `r` 热重载、`R` 热重启、`q` 退出。
+客户端当前提供工作区、设置与空白 Chat，无需服务端即可验证界面。
+业务接入边界和并发模型见[客户端运行时](architecture/CLIENT_RUNTIME.md)。
 
-| 命令                  | 用途                                                     |
-| --------------------- | -------------------------------------------------------- |
-| `make install`        | 安装客户端依赖并生成设计 Token；不构建或启动服务端       |
-| `make dev`            | 启动桌面 App 开发模式及 Web 开发服务器；服务端另行启动   |
-| `make build`          | 构建当前平台服务端和桌面 App                             |
-| `make check`          | 两端格式与静态检查，以及 Lua、TypeScript、Rust 单测      |
-| `make check-full`     | 基础回归、集成测试、原生/Web 真实模型端到端及多浏览器 UI |
-| `make proto-generate` | 从共享 schema 生成客户端协议代码                         |
-| `make help`           | 显示入口说明                                             |
+服务端独立执行 `make -C server build` 与 `./server/start.sh`；模型密钥按配置文档准备。
+修改公共 C 核心后重新构建并重启；Lua 的兼容方法修复可使用下文热更新。
 
-## 开发运行与构建
+`make gallery-dev` 启动现有组件预览；开发新页面无需先登记画廊。
+`make client-build` 构建正式 macOS App，`make build` 同时构建服务端。
+产物位于 `client/apps/client/build/macos/Build/Products/Release/Skynet Agent.app`。
+本机构建使用 ad-hoc 签名，正式分发需另行配置开发者签名与公证。
 
-服务端先完成构建，再使用 `./server/start.sh` 前台启动。它读取环境文件并检查模型密钥，
-具体配置见[配置说明](CONFIGURATION.md#环境文件)。日常启动 App 使用 `make dev`。
+公共协议位于 `common/proto`，服务端和 Lua 网络探针直接加载 schema，无需生成测试代码。
+修改协议后执行 `make check-full`，验证固定二进制向量、多 VM 编解码及真实网关交互。
+Lua 静态诊断配置见 `.luarc.json`。
 
-只开发 Web 时可单独启动开发服务器，地址以终端输出和 `client/vite.config.ts` 为准：
-
-```bash
-pnpm --dir client dev
-```
-
-组件与视觉样例使用 Storybook：
-
-```bash
-pnpm --dir client storybook
-```
-
-客户端连接地址由 Vite 环境配置提供。修改原生连接地址或 Rust 代码后重启桌面开发进程；
-修改 C 工具核心后重新构建并重启。Lua 的兼容方法修复可使用[热更新](#热更新)。
-
-需要打包态验收时运行 `make build`，使用本次生成的 App 或安装包。
-macOS 本地构建使用 ad-hoc 签名；正式分发另需开发者签名与公证。
-
-协议文件位于 `common/proto`。修改后执行：
-
-```bash
-make proto-generate
-pnpm --dir client proto:check
-```
-
-静态诊断使用 VS Code 的 sumneko.lua 插件，`.luarc.json` 声明 Lua 5.5 与代码风格检查。
+开发、构建和测试不依赖 Node.js 或 pnpm。项目级 HIG Review MCP 独立使用 Node.js，
+仅供设计规范查询与审查辅助；安装说明见[工具说明](../.codex/mcp/hig-review/README.md)。
 
 ## 服务管理
 
@@ -138,54 +92,31 @@ dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base
 
 ## 测试与验收
 
-验收层级及执行频率以[编码与协作规范](../编码与协作规范.md#测试用例)为准。
-日常执行 `make check` 完成基础回归；任务收尾还需覆盖本次改动的端到端验收。
-公共协议、连接框架、跨子系统变更及发布前按规范执行 `make check-full`。
+验收频率遵循[编码与协作规范](../编码与协作规范.md#测试用例)。
 
-业务端到端从真实客户端操作开始，连接真实网关与模型供应商。原生与 Web 入口为：
+| 命令 | 覆盖 |
+| --- | --- |
+| `make check` | 服务端格式与单元测试（含公共协议和固定二进制向量）、Flutter 基础检查 |
+| `make -C server check` | 服务端格式、单元测试及全部服务端集成 |
+| `make client-check` | Dart 格式、分析、UI/导入边界、工具及全部组件/单元测试 |
+| `make client-e2e` | macOS Profile 真实交互、生命周期、偏好保存及帧耗时 |
+| `make gallery-e2e` | 可选组件画廊的 macOS 原生交互 |
+| `make check-full` | 基础回归、服务端集成及上述两组原生 E2E |
+| `make -C server test-live` | 服务端真实模型网关探针 |
+| `make build` | 服务端与最新 macOS Release 构建 |
 
-```bash
-make -C server build
-pnpm --dir client test:native
-pnpm --dir client test:e2e:full
-pnpm --dir client test:execution
-```
+服务端集成覆盖 Protobuf 跨 VM、生命周期、RPC、管理命令、热修、工具进程与假模型网关。
+网络探针与 HTTP/SSE 假模型均使用 Lua，运行在独立 Skynet 进程，通过真实网络访问被测服务。
+Shell 包装负责启动、日志与进程回收；自动热修测试只修改临时源码副本。
+仅修改服务端测试或脚本时，验收相应服务端流程，无需运行客户端和组件画廊 E2E。
+`make -C server test-probe-support` 单独验证探针的响应等待、超时恢复、断线与消息编号边界。
+真实模型探针读取 `server/.env` 或 `SKYNET_ENV_FILE`，使用已有模型配置并产生实际用量。
+缺少凭据、供应商失败或协议不兼容时明确失败，不回退假模型。
 
-原生夹具驱动真实 Vue 页面和 Rust 核心，运行整组场景。Web 全链路可追加
-`--grep '<场景名称或正则表达式>'`，其他 Playwright 参数也会传递给测试。
-`test:execution` 覆盖本地与远程执行。
+当前客户端未接入聊天，因此工作区 E2E 不代表真实聊天或连接持续已验收。
+真实业务接入后，按规范补充从页面到真实网关、模型与结果页面的全链路测试。
+其他平台首次支持时分别验收；共享界面的日常体验以 macOS App 为主。
 
-主模型与权限模型复用 `server/.env` 或 `SKYNET_ENV_FILE` 中的凭据，使用开发渠道模型配置，
-可通过 `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 覆盖。真实验收会产生模型用量；
-缺少凭据、供应商失败或协议不兼容时测试失败，不跳过或回退假模型。
-项目规则场景验证新任务重新加载根规则、更新与子目录规则；权限场景验证伪造授权不能放行越权动作。
-
-确定性的异常注入、断流、超时及失败重试由假模型集成覆盖：
-
-```bash
-pnpm --dir client test:integration:native
-pnpm --dir client test:integration:web
-```
-
-`make check-full` 顺序执行基础回归、服务端专项集成、原生/Web 假模型集成、原生/Web
-真实模型验收、本地/远程执行验收、Storybook 构建及 Chromium、WebKit 和移动视口 UI 回归。
-固定端口测试与会生成资源的构建顺序执行。原生夹具可生成测试资源，无需生成正式 App 或 DMG。
-
-专项检查可直接使用子项目入口：
-
-```bash
-make -C server help
-make -C server test
-make -C server test-integration
-pnpm --dir client check
-pnpm --dir client check:native
-pnpm --dir client test:e2e
-```
-
-服务端 `test-integration` 覆盖 Protobuf 跨 VM、服务生命周期、RPC、管理命令、热修、工具进程
-和假模型网关。仅需验证真实模型网关连接时可运行 `make -C server test-live`，
-它同样读取服务端凭据并消耗模型额度，不能替代客户端端到端验收。
-
-测试截图、trace 和脱敏证据统一写入被忽略的 `client/test-artifacts/`：
-`real-model/` 保存真实模型结果，`ui/` 保存 UI 产物，`web/` 保存 Web 全链路产物。
-截图用于排查与人工查看，不维护像素基线；功能、布局、主题、颜色和无障碍继续通过断言验证。
+同一 Flutter 工作区的依赖解析、分析、构建和原生测试串行执行。
+原生测试结束后再执行外部辅助功能检查，避免干扰测试语义生命周期。
+截图、性能报告与脱敏证据统一写入被忽略的 `client/test-artifacts/`，不维护像素基线。

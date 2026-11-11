@@ -1,0 +1,22 @@
+name: component_gallery
+description: Interactive macOS gallery for the shared Apple-style UI.
+publish_to: 'none'
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  apple_ui:
+    path: ../../packages/apple_ui
+  cupertino_ui: 1.1.6
+  cupertino_icons: 2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter

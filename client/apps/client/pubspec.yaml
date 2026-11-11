@@ -1,0 +1,24 @@
+name: skynet_client
+description: Apple-style workspace for the Skynet client.
+publish_to: none
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  apple_ui:
+    path: ../../packages/apple_ui
+  cupertino_ui: 1.1.6
+  shared_preferences: ^2.5.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter

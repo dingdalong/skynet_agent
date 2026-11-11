@@ -1,0 +1,15 @@
+name: apple_ui
+description: Shared Apple-style surfaces and desktop interactions for Skynet clients.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+environment:
+  sdk: ^3.13.7
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_ui: 1.1.6
+  cupertino_icons: 2.0.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

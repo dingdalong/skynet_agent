@@ -439,15 +439,20 @@
 - 触发：保存方法体后行为未改变，或某个服务的 HOTFIX 成功但其他服务仍执行旧代码。
 - 根因：保存源码本身不执行 HOTFIX；各服务拥有独立模块缓存，单目标命令只更新一个 VM。
   未加载模块原先会跳过并返回成功，不能据此推断目标业务模块或其他实例已经更新。
+  当前 client 按用户名 FNV 哈希选路，随机用户名和连接数量也不能保证覆盖全部实例。
 - 解法：返回 updated/skipped 报告；按用户决定，仅 develop 在节点业务启动完成后监听源码内容，
   将变更发给 .main 和全部登记且已就绪的实例。各 VM 整批校验，失败实例保留完整批次至下次源码变更重试。
 - 证据：173 项单测与完整 make server-check 通过；隔离源码副本建立四条连接后，直接保存方法修改，
   未发送 HOTFIX，两个 WebSocket 与两个 client 的存量连接均调用新实现，显示历史与模型上下文保留。
   语法错误阻止同 VM 整批提交，修正单文件后完整重试通过；.main 与共享 rpc 模块自动更新，正常关服退出 0。
+  2026-11-13 Lua 探针迁移使用随机用户名时漏掉一个 client；以 hotfix-1/3/5/7 稳定复现，
+  恢复覆盖两个哈希桶的 hotfix-1/2/3/4 后，同一自动热修测试与全部服务端集成通过。
+  证据见 client/test-artifacts/server-lua-migration/routing-reproduction.log 与 check-full.log。
 - Done right：自动监听集成使用独立源码树与测试进程；先建立连接再修改副本，通过实例地址和真实业务结果
-  验证覆盖范围。每个 logind 独立轮询 client，连接数量应覆盖各池的完整分配周期。
-- Seen: 1× (2026-11-06; task: 20261106T105138-develop-auto-hotfix.md)
+  验证覆盖范围；按当前选路规则使用覆盖各哈希桶的固定用户名，不能仅增加随机连接数。
+- Seen: 2× (2026-11-06; task: 20261106T105138-develop-auto-hotfix.md; 2026-11-13; task: 20261113T005931-server-tests-lua.md)
 - 备注：新增监听器是启动流程变更，首次启用需重启；热修仍只用于接口、方法集合与数据格式兼容的缺陷修复。
+  2026-11-13 已按当前实现替换不再适用的 logind 独立轮询 client 提示。
 
 ### L-032: 多 VM 热修先统一编译，由节点集中记录批次结果
 
@@ -541,10 +546,11 @@
 - 根因：管理清单保留禁用 MCP，也可能列出不进入模型可见目录的系统技能；清单条目数量不能代表实际启用状态。
 - 解法：分别检查实际提示目录、技能的 repo 来源、有效配置覆盖和运行时连接状态；禁用 MCP 应为 disabled 且零工具。
   用户技能按规范路径禁用后，项目使用独立副本，避免软链接解析到同一原件。
+  `skills/list` 包含禁用的用户级副本，验收时同时判断 `scope` 与 `enabled`，不能仅断言名称不存在。
 - 证据：桌面版及 Homebrew CLI 的项目提示目录均为 7 项技能，项目外为 4 项；skills/list 确认项目技能来源，
   临时会话确认统一电脑操作插件 connected，三个直接 MCP 均 disabled 且零工具。
 - Done right：保留原始文件和修改前备份，通过项目配置与实际目录验证效果；浏览器宿主不可用单独记录，不扩大为配置失败。
-- Seen: 1× (2026-11-06; task: 20261106T232329-codex-project-extensions.md)
+- Seen: 2× (2026-11-06, 2026-11-10; tasks: 20261106T232329-codex-project-extensions.md, 20261110T144855-hig-mcp-project-install.md)
 - 备注：原生应用只读验证通过；当前会话浏览器访问宿主不可用，浏览器页面实操未完成。
 
 ### L-038: 远程组件接入同时核对基路径、完整导入链与共享样式
@@ -734,18 +740,19 @@
 - Done right：验证退出码与宿主文件结果，不能只检查宿主未变化；注意工作目录与临时目录的祖先重叠。
 - Seen: 1× (2026-11-08; task: 20261108T151343-agent-tools.md)
 
-### L-051: 静态无障碍扫描等待控件状态过渡完成
+### L-051: 界面验收等待有限动画完成
 
 - 类型：Pitfall
 - 状态：Verified
-- 范围：Playwright, Axe, disabled→enabled, CSS 颜色与透明度过渡
+- 范围：Playwright, Axe, disabled→enabled, CSS 颜色、透明度与缩放过渡
 - 触发：输入用户名后立即扫描表单，或工具卡片正在淡入，报告稳定状态下合格的文字对比度不足。
-- 根因：DOM 已就绪，但配色或透明度尚在过渡；扫描读取到中间帧，而非稳定状态。
+- 根因：DOM 已就绪，但配色、透明度或缩放尚在过渡；扫描和几何测量读取到中间帧，而非稳定状态。
 - 解法：先确认控件就绪，再等待有限动画实际 finished；保留完整对比度断言与其他动效测试。
 - 证据：旧用例三次重复中两次失败，观测到不同的中间颜色；修正后完整多浏览器 UI 回归通过 71 项。
 - Done right：等待真实状态完成，不添加固定 sleep、重试或忽略无障碍违规。
 - 同日补充证据：Agent 思考与工具卡片等待有限动效结束后，三类浏览器的 15 个相关用例通过。
-- Seen: 1× (2026-11-08; tasks: 20261108T151343-agent-tools.md, 20261108T192454-agent-reasoning-models-ui.md)
+- 后续证据：2026-11-10，Demo 面板进入时的 scale 让 900px 面板被测为约 887px；等待有限动画结束后，预览往返的宽度断言与完整 20 项 E2E 通过。
+- Seen: 2× (2026-11-08, 2026-11-10; tasks: 20261108T151343-agent-tools.md, 20261108T192454-agent-reasoning-models-ui.md, 20261110T143000-liquid-glass-demo.md)
 
 ### L-052: 跨进程读取的夹具文件必须原子发布
 
@@ -922,3 +929,308 @@
   的同一断言通过，参数不变时没有重编译，编译器失败也正确传递。
 - Done right：同时验证快速参数切换和无变化重建，不能只测试干净构建或延迟后的参数变更。
 - Seen: 1× (2026-11-10; task: 20261110T102843-agent-runtime-make.md)
+
+### L-066: Vue 模板的多语句事件放入命名方法
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Vue、Prettier、Vite、独立 HTML 入口
+- 触发：无分号格式化配置下，在模板事件中连续执行赋值和函数调用。
+- 根因：格式化去掉内联语句分隔符后，模板表达式无法被 Vue 编译器解析；类型与静态检查未报告此入口的编译错误。
+- 解法：多步操作放入 setup 中的命名方法，模板仅引用方法；实际启动目标入口验证编译。
+- 证据：Demo 首轮 Vite 报 Unexpected token 并返回 500；改为 useSuggestion 方法后，三类浏览器的 20 项 E2E 通过。
+- Done right：格式化后验证实际页面，不把类型检查等同于模板编译与运行验证。
+- Seen: 1× (2026-11-10; task: 20261110T143000-liquid-glass-demo.md)
+
+### L-067: 新客户端设计采用独立的 HIG 基线
+
+- 类型：Success
+- 状态：Superseded
+- 替代说明：2026-11-11 新 Flutter 客户端采用 L-073 的清晰表面与官方 Cupertino 基线；本条只保留旧 Vue/Tauri Liquid Glass 原型的历史决定，不约束新画廊。
+- 范围：客户端完整重构、Liquid Glass、桌面与移动布局
+- 触发：从已确认的 Demo 继续设计新客户端。
+- 根因：用户明确认为旧设计的按钮、字体和布局不合适，要求整体重新设计。
+- 解法：以 hig-mcp 为规范来源，电脑采用 iPad 操作逻辑加 macOS 密度，手机采用 iOS 尺寸；重建 Token 与视觉组件。桌面已确认改为主应用 + 分屏，替换自由拖动、缩放与重叠窗口；手机为全屏应用和逐级导航。全平台目标包含动态折射、高光、背景适应、连续形变与滚动边缘，按组件角色实现；CSS 模糊近似和能力降级单独标记。
+- 后续确认：优先完成主屏、打开应用、多任务、分屏、手势与完整设置；每次启动进入主屏，应用铺满工作区，不使用展示工具栏、预览边框或应用外侧壁纸留白。外观在本地持久保存。共享 shell/settings 直接作为正式客户端的复用基础，Chat 内部业务重构暂缓，当前仍使用本地模拟内容。
+- 证据：2026-11-10 用户明确选择；统一规范为 docs/design/HIG_LIQUID_GLASS.md，Demo 范围记录在 docs/design/LIQUID_GLASS_DEMO.md。三个项目 MCP 实际调用见 client/test-artifacts/hig-review/REPORT.md；新版浏览器、动态 WebGL、对比度、性能和 macOS 体验证据见 client/test-artifacts/liquid-glass-v2/REPORT.md。其他原生平台及 Apple 渲染器光学等效性未验收。
+- Done right：复用技术与业务能力时，不把旧视觉规范、组件尺寸一并带入新设计。用 Apple 原文和 WWDC 资料核对意图；hig-review 的 verified 仅证明引用核实，界面结论另需运行、测量与动态证据。
+- 备注：规范冲突按完整来源（本地文档、技能/插件、MCP）汇总，不逐条修补；用户已确认整体移除六份旧客户端设计规范及两个旧设计技能，后续设计以 hig-mcp 为准。
+- Seen: 1× (2026-11-10; tasks: 20261110T143000-liquid-glass-demo.md, 20261110T153838-hig-liquid-glass-standard.md, 20261110T163537-liquid-glass-demo-refactor.md, 20261110T174400-shell-preview.md)
+
+### L-068: Vue 集成 Web Component 时显式区分配置属性与实例方法
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Vue 3、第三方 Web Component、simple-liquid-glass 5.7.3
+- 触发：组件配置名称恰好与 custom element 上的已有 property 或方法同名。
+- 根因：Vue 默认检测 property，`reveal="immediate"` 覆盖第三方元素的 `reveal()`，导致 `this.reveal is not a function`；独立 HTML 探针不能覆盖 Vue 的赋值路径。
+- 解法：根据库契约使用 `:reveal.attr`，重新加载全新实例验证，不能仅依赖 HMR 后的状态。
+- 证据：client/src/ui/GlassSurface.vue；两引擎、iPhone 模拟及实际 macOS App 新实例进入 WebGL；v2 dynamic.json 零 pageerror。
+- Done right：先验证渲染引擎，再通过实际框架封装验证，保留运行时错误监听。
+- Seen: 1× (2026-11-10; task: 20261110T163537-liquid-glass-demo-refactor.md)
+
+### L-069: 缓存背景的玻璃必须验证滚动像素与异步取样
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：WebGL 玻璃、HTML 背景快照、滚动导航
+- 触发：`data-material=webgl` 正常，但滚动帧或一次背景变化未更新材质。
+- 根因：固定滚动容器作为 backdrop 时位置不变，缓存内容不随子元素滚动；背景属性变化未观察，首次取样也可能早于异步快照完成。
+- 解法：绑定实际移动的内容层；观察属性变化，增加一次延迟取样并清理计时器；导航遮蔽率用真实合成背景验证。
+- 证据：修复前两引擎六秒 scrollDraws=0，修复后 354/350 帧、零滚动纹理上传；E2E 验证滚动前后 canvas 像素变化。adaptation.mjs 修复前超时、修复后 Chromium/WebKit 深浅背景切换均通过；手机导航最低取样对比度从 3.67 提升至 5.59。
+- Done right：同时检查引擎诊断、受控条纹的折射差异、实际滚动重绘和文字合成像素，不能只验收状态标记。
+- Seen: 1× (2026-11-10; task: 20261110T163537-liquid-glass-demo-refactor.md)
+
+### L-070: 移动导航历史使用可序列化且规范化的快照
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Vue、History API、移动 Web 逐级导航
+- 触发：将响应式路由写入 pushState/replaceState，或比较当前路径与历史父路径决定是否 history.back。
+- 根因：History API 的 structured clone 无法复制 Vue proxy；空路径分别保存为缺失键和空数组时，语义相同但 JSON 比较不相同，返回会错误地替换当前记录而保留多余步骤。
+- 解法：历史边界复制普通对象和路径数组，统一省略空路径；页面返回与浏览器返回共用同一历史契约。
+- 证据：初次浏览器预览出现 DataCloneError；首次移动返回 E2E 需要额外一步。修复后 Chromium、WebKit、iPhone 模拟的启动、设置层级、许可详情及浏览器返回场景通过，见 client/tests/e2e/liquid-glass.spec.ts 与 client/test-artifacts/shell/e2e.json。
+- Done right：验证混合使用页面返回和浏览器返回的完整路径，不能只检查单次路由跳转。
+- Seen: 1× (2026-11-10; task: 20261110T174400-shell-preview.md)
+
+### L-072: Flutter 多滚动区分别管理滚动控制器
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter、交互滚动条、侧栏与内容区并存
+- 触发：两个垂直滚动区默认继承 PrimaryScrollController，测试或交互滚动条需要唯一 ScrollPosition。
+- 根因：目录和内容共用宿主默认控制器，ensureVisible 触发 attached to more than one ScrollPosition。
+- 解法：各自持有并释放 ScrollController，滚动条与对应内容显式绑定同一实例，各滚动区关闭 primary。
+- 证据：画廊初次两项测试失败；修正后组件与画廊检查、macOS 原生 journey 通过，见 client/test-artifacts/component-gallery/project-check-full.log。
+- Done right：同时验证目录与内容滚动，以及窄窗口目录重新挂载；独立滚动位置不交给宿主默认值推断。
+- Seen: 1× (2026-11-11; task: 20261111T193917-apple-component-gallery.md)
+
+### L-073: Flutter Apple UI 基线与旧客户端独立演进
+
+- 类型：Success
+- 状态：Verified
+- 范围调整：2026-11-12 用户取消保留旧客户端的决定；旧工程已按 L-088 替换。
+  本条的 Apple 视觉基线继续适用，旧工程保留规则不再适用。
+- 范围：Flutter、Apple 风格、macOS 首版、项目设计规范
+- 触发：用户批准从 Vue/Tauri 设计探索转向 Flutter 全平台方案，首版仅需 macOS 组件演示。
+- 解法：官方 cupertino_ui 为基础，在 apple_ui 补齐桌面交互与语义令牌；首版使用清晰表面。HIG 与 Apple 原文用于依据查询，本机系统用于实际对照。统一规范、共享主题与图标提供开发入口，现有 Demo 用于可选预览和验收，整个旧 client 保留。
+- 证据：用户确认执行方案；docs/design/APPLE_FLUTTER_DESIGN.md、COMPONENT_GALLERY.md；独立 macOS 原生 journey 与旧项目完整回归通过。
+- Done right：保持共同的 Apple 视觉语言，并按输入方式调整密度；组件画廊的宽度预览不等同其他平台验收。
+- 备注：2026-11-12 用户确认新增用法先补统一规范，需要复用实现时补共享代码；无需向画廊登记或逐一包装官方组件。保留自动检查。不引入 Widgetbook、CDK、自动 Material/Cupertino 混搭或第三方 Liquid Glass 套件；新规范替代 L-067 对新客户端的约束。
+  同日进一步确认以实际 macOS App 建立视觉与动态体验基准，允许少量原生材质和窗口增强，再将确认的效果推广到其他平台；功能测试、令牌检查和 HIG 引用核对不能代替用户视觉确认。
+- Seen: 1× (2026-11-11; task: 20261111T193917-apple-component-gallery.md)
+
+### L-071: 后台 WebView 的布局不能等待动画时间线
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：macOS WKWebView、WAAPI、应用切换与退出动画
+- 触发：后台原生窗口恢复应用后仍显示缩略卡片，前台浏览器同路径正常。
+- 根因：实际原生诊断显示 document.hidden=true，动画为 running 但 currentTime=0；宿主暂停后台动画时间线，初帧 transform 持续影响显示，等待 finished 不能保证收敛。
+- 解法：页面隐藏时直接呈现最终状态；visibilitychange 进入后台时取消现有动画并清理退出视觉层，业务状态不依赖动画完成事件。
+- 证据：macOS 重新启动后仍复现，修复后同路径完整恢复并能分屏；E2E 覆盖隐藏页面启动和过渡中转入后台，三个配置通过。截图和诊断事实见 client/test-artifacts/shell/REPORT.md。
+- Done right：原生检查先核对页面可见性和动画时钟；背景截图不能证明前台动效完成，浏览器模拟也不能替代真实宿主行为。
+- Seen: 1× (2026-11-10; task: 20261110T174400-shell-preview.md)
+
+### L-074: Flutter 持续动画页面等待具体交互状态
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter、Widget 与原生集成测试、持续加载指示器、动态菜单
+- 触发：进入反馈页或在页面持续动画期间操作菜单。
+- 根因：pumpAndSettle 等待所有动画停止，加载指示器不会停止；仅等待已选文案消失也不可靠，状态变化可在菜单关闭前改写选项文字。
+- 解法：页面切换验证目标内容；菜单等待选项可命中，选择后等待所有菜单项从树中移除，使用有界帧等待。
+- 证据：旧等待方式在反馈页超时；仅等待文案时，辅助功能菜单关闭尚未完成即操作密度选择失败。修正后完整三项画面测试通过，见 client/test-artifacts/unified-flutter-ui/gallery-tests.log。
+- Done right：等待实际终态，保持加载动效正常工作；不通过禁用动画或无限延长超时让测试通过。
+- Seen: 1× (2026-11-12; task: 20261112T000000-unified-flutter-ui.md)
+
+### L-075: 状态反馈的恢复按钮使用独立语义边界
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter、状态提示、Semantics、可访问按钮名称
+- 触发：在带类型、说明和 live region 的状态提示内增加恢复操作。
+- 根因：父级与按钮语义合并后，AX 将整条提示作为按钮名称；仅设置父级 explicitChildNodes 不能替代按钮的独立边界。
+- 解法：提示父级保留类型、说明和 live region；恢复按钮外使用 Semantics(container: true)。
+- 证据：修复前按钮名称包含整条提示，单独设置 explicitChildNodes 后仍未通过；修复后四类反馈的组件语义测试和 macOS 原生 journey 均通过，见 client/test-artifacts/unified-flutter-ui。
+- Done right：同时验证提示内容可读和按钮独立名称、角色；实际 VoiceOver 朗读仍单独验收。
+- Seen: 1× (2026-11-12; task: 20261112T000000-unified-flutter-ui.md)
+
+### L-076: 原型端到端测试同时检查运行错误与交互结果
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：单文件 HTML、无分号 JavaScript、Playwright、应用切换与焦点
+- 触发：布局或状态已经改变，但交互处理函数后续的焦点和辅助功能逻辑可能仍抛错。
+- 根因：`render()` 后的括号表达式被自动分号插入规则解析为连续调用；仅断言页面状态不能发现后续运行错误。
+- 解法：焦点目标用局部变量承接，避免语句以括号紧接函数调用；所有原型 E2E 从加载前收集 pageerror 并在结束时断言为空。
+- 证据：补充错误断言后 11 个流程报告 `render(...) is not a function`；修正后四种浏览器与设备配置共 36 项通过，见 client/test-artifacts/workspace/e2e.log。
+- Done right：格式化后运行实际 HTML 入口；既检查页面结果，也检查同一操作是否抛出运行错误。
+- Seen: 1× (2026-11-12; task: 20261112T160000-workspace-html.md)
+
+### L-077: 工作区分屏从当前应用开始，桌面作为正式分屏区域
+
+- 类型：Success
+- 状态：Verified
+- 范围：HTML 工作区原型、后续 Flutter 外壳、应用分屏与统一导航
+- 触发：实现或调整应用分屏入口、后台恢复及 Dock 行为。
+- 解法：用户明确改为从当前应用顶部布局把手向左或右拖动，先形成“应用＋桌面”；桌面与应用共用分隔条及 1/3、1/2、2/3 吸附规则。点击桌面上的另一应用时填入该侧，保持当前比例，不要求应用位于 Dock。Dock 仅在完整桌面显示；所有平台使用顶部可见导航与键盘入口。
+- 统一导航：2026-11-12 用户进一步确认桌面与手机、平板统一操作逻辑，所有平台使用安全区内的顶部“返回桌面”和“后台应用”；桌面提供后台入口，后台提供返回桌面入口。移除底边上滑、停顿及仿系统指示条，保留应用内拖动；手机保持单应用，桌面和平板按内容宽度启用分屏。App 与 Web 同步适用；浏览器桌面模式、外接键鼠和窗口尺寸变化不切换导航方式。
+- 实时反馈：拖动应用分屏、交换位置及从分屏拖成全屏时直接显示实际布局，不用落位蓝框或确认提示；松手前可拉回，取消恢复原组合与比例，松手后保留结果。
+- 后台退出：点击卡片外区域返回桌面，空后台也可退出；不关闭已有应用或重置页面状态。
+- 证据：2026-11-12 用户最新交互决定；client/workspace-demo.html、docs/design/WORKSPACE_DEMO.md；统一导航最终四配置 108 项 E2E 及 make check 通过，见 client/test-artifacts/workspace/unified-navigation-e2e.log、unified-navigation-check.log。
+- Done right：将 desktop 与应用都作为正式 pane 管理，用同一比例和约束支持两种分屏状态；新增应用不通过 Dock 位置决定能否分屏。
+- Seen: 1× (2026-11-12; task: 20261112T121551-workspace-gestures.md)
+- 备注：替代本轮早期顶部菜单、Dock 导航按钮与底边上滑方案；Flutter macOS 工作区已实现并通过原生交互与偏好保存流程，证据见 client/test-artifacts/flutter-workspace/native-release-final.log。WebKit 拖动为鼠标路径，未宣称真实移动设备手势验收。
+
+### L-078: 拖动提交前检查内容区尺寸，不能只等待 ResizeObserver 取消
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：HTML 工作区、Pointer Events、可撤回的实时分屏与全屏布局
+- 触发：拖动中改变窗口尺寸，随后在 ResizeObserver 回调前松手。
+- 根因：尺寸通知异步执行；pointerup 可能先提交基于旧尺寸计算的全屏目标，清理手势后再收到尺寸通知也无法恢复原组合。
+- 解法：pointerdown 保存内容区宽高，pointermove 和 pointerup 同步核对当前尺寸，不一致则取消并恢复已确认布局；拖动中的实际画面由临时状态计算，松手前不修改已确认组合。将布局手势的指针捕获放在不会随布局隐藏的工作区上。
+- 证据：direct-layout-chromium.log 首轮 18/19，通过失败断言确认缩放后得到单应用 chat 而非 chat,desktop；加入尺寸校验后同一流程及四配置 80 项通过，见 client/test-artifacts/workspace/direct-layout-e2e.log。
+- Done right：测试先拖到实时全屏，再缩放并立即松手；不通过等待 ResizeObserver 完成来规避提交顺序问题。
+- Seen: 1× (2026-11-12; task: 20261112T121551-workspace-gestures.md)
+
+### L-079: 验证动效时分别检查布局终态和可控中间帧
+
+- 类型：Success
+- 状态：Verified
+- 范围：HTML 工作区、Web Animations、Playwright、可中断的手势动效
+- 触发：为立即切换的布局补充空间过渡，原有几何断言开始读到中间位置；连续操作需要核对接续位置。
+- 根因：业务状态已经提交，不代表动画到达终点；依赖固定等待或普通状态轮询取样，可能在过渡结束后才检查到画面，漏掉动画或误报布局错误。
+- 解法：功能断言等待页面中实际有限动画结束；动效断言暂停动画并设置 currentTime，分别验证起点、中间帧、反向接管和最终清理。指针几何用整数输入避免设备事件取整差异。
+- 证据：client/tests/e2e/workspace.spec.ts 中 finishMotion、motionAt 及六个动效场景；最终四配置 104 项通过，日志见 client/test-artifacts/workspace/motion-e2e.log，代表性操作录屏见 motion-demo.webm。
+- Done right：业务状态即时提交，动画完成仅清理显示层；用测试控制时间线而不关闭产品动画，离散布局使用缓动，连续跟手直接更新位置。
+- Seen: 1× (2026-11-12; task: 20261112T121551-workspace-gestures.md)
+
+### L-080: 连续布局键盘操作保留布局把手焦点
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：工作区、平板可见导航、键盘布局、焦点管理
+- 触发：为移动端添加顶部导航，并把打开应用的焦点策略复用到布局操作。
+- 根因：左右方向键完成分屏后焦点被转到“返回桌面”，下一次上方向键无法到达布局把手；状态断言单独验证第一步会漏掉此问题。
+- 解法：所有平台打开或恢复应用聚焦顶部导航入口；安排布局后保留操作把手的焦点，支持连续方向键操作。通过同一焦点下的左右键分屏、上键全屏再验证返回与后台导航。
+- 证据：client/test-artifacts/workspace/mobile-navigation-e2e.log 平板键盘场景失败；修正 arrange 焦点后定向四项和最终四配置 112 项通过，见 mobile-navigation-focused.log、mobile-navigation-final.log。
+- Done right：按操作目的决定焦点；应用切换和布局编辑不使用同一种结束焦点。
+- Seen: 1× (2026-11-12; task: 20261112T144711-mobile-workspace-navigation.md)
+
+### L-081: 共享 Flutter 工作区的检查与原生构建顺序执行
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter、macOS、Swift Package Manager、原生插件生成工程
+- 触发：新增原生插件后，同时运行 Flutter 检查、依赖解析与原生构建／集成测试。
+- 根因：多个 Flutter 流程会重写同一工作区的插件配置；构建仍引用插件临时路径时，生成的 Package.swift 已被另一个流程改为空依赖，造成编译器启动失败。
+- 解法：同一 Flutter 工作区的依赖解析、检查和原生构建按顺序执行；由执行原生测试的进程生成完整插件配置，无需修改 Xcode 或第三方包。
+- 证据：client/test-artifacts/flutter-workspace/native-first.log 首次失败；独立重跑的 native.log 与 native-release-final.log 均通过，生成配置重新包含 shared_preferences_foundation。
+- Done right：根 makefile 的 Flutter 目标保持顺序调度，避免同时启动同一工作区的检查和原生构建。
+- Seen: 1× (2026-11-12; task: 20261112T171409-flutter-workspace-demo.md)
+
+### L-082: 分屏重排与页面进出缩放分别处理
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter、分屏、可中断布局动画、文字缩放
+- 触发：持续保留的应用从图标进入、分屏拖成全屏后拉回，或在大字号下改变面板宽度。
+- 根因：把分屏按真实宽度重排的规则同时用于页面进出，会让完整应用在图标尺寸附近重新布局，造成标题溢出；隐藏页面的无效尺寸也会在下一次过渡中被复用。
+- 解法：仅对持续可见的页面按动画中的真实约束重排；隐藏页面保留有效尺寸，新进入页面按完整页面布局并执行空间缩放。
+- 证据：客户端 widget_test 的真实面板宽度、200% 文字、分屏暂时全屏后拉回与完整 journey；修复前 RenderFlex overflow，修复后 15 项客户端测试及 macOS 原生流程通过。见 client/test-artifacts/macos-visual/check.log、native-profile.log。
+- Done right：分别验证文字真实宽度和页面进入动画，覆盖中途反向与窄窗口，不能用拉伸文字避免溢出。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-083: macOS Profile 应用内采样需要 VM Service 连接权限
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter integration_test、macOS 沙箱、Profile 帧耗时采样
+- 触发：在沙箱内调用 watchPerformance，通过 localhost 连接本应用的 VM Service。
+- 根因：只有 network.server 权限不足以让应用建立客户端连接，采样报 EPERM。
+- 解法：Debug/Profile 增加 network.client，Release 保留原权限；由 flutter drive 的宿主 driver 收集 reportData。使用 --no-dds 避免应用内 VM Service 采样与 DDS 的连接限制。
+- 证据：native-profile-first.log 的 EPERM；修复后的 native-profile.log 与 native-performance.json 完成真实 macOS 流程和帧数据收集。
+- Done right：明确采样模式、沙箱权限与结果收集端；首次使用耗时保留在报告中，不把 Flutter 帧耗时解释为系统合成器或完整输入延迟。
+- 备注：原生动画采样显式使用 fullyLive 帧策略，让应用请求的动画帧正常绘制；保留首次与重复流程，不能将默认测试泵帧策略得到的少量帧直接当成完整动画性能。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-084: 原生 Flutter 测试与外部辅助功能检查串行进行
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter macOS integration_test、Computer Use、SemanticsHandle
+- 触发：原生测试运行期间，从外部读取同一 App 的辅助功能树。
+- 根因：外部辅助功能查询可启用额外的语义句柄，测试功能流程全部通过后仍在清理阶段报 A SemanticsHandle was active，干扰测试结果。
+- 解法：原生集成测试完整结束后再读取该 App 的 AX 树与截图；不通过修改第三方测试框架或跳过收尾断言规避。
+- 证据：gallery-native-ax-first.log 所有交互完成后清理失败；不同时运行外部 AX 查询的 gallery-native.log 独立复跑通过。
+- Done right：自动化流程与人工式原生检查顺序执行，保留首次失败及独立复跑证据。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-085: AppKit 可选回调不能直接假定父类有实现
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter macOS、Swift AppDelegate、NSApplicationDelegate 可选方法
+- 触发：在 FlutterAppDelegate 子类增加 applicationDidFinishLaunching，并调用 super 的同名方法。
+- 根因：协议中的可选方法可通过编译，但当前父类没有对应实现；调用 super 触发 Objective-C 消息转发异常，中断系统启动流程。
+- 解法：本次撤回额外的启动激活覆盖，恢复 Flutter 默认 AppDelegate；不要通过新增超时或改动偏好加载掩盖启动异常。
+- 证据：Release 重启黑屏；release-startup-system.log 的 NSInvalidArgumentException 调用栈定位到新增 AppDelegate 回调。恢复后独立原生双轮流程通过，最终 Release 退出重开、设置和偏好保留正常；见 client/test-artifacts/macos-visual/REVIEW.md。
+- Done right：原生宿主修改除 Flutter 流程外，还要验收打包 App 的退出与重开，检查实际原生异常；Dart 测试通过不能证明 AppKit 生命周期没有异常。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-086: 自绘焦点装饰需要订阅焦点变化
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter FocusNode、自绘布局把手、分屏键盘操作
+- 触发：通过键盘安排分屏后打开另一应用，旧布局把手的焦点颜色仍保留，新应用按钮同时显示焦点。
+- 根因：装饰只在父页面构建时读取 hasFocus，后续焦点转移没有触发该装饰重新构建。
+- 解法：布局把手与分隔条通过 onFocusChange 更新显示；指针与键盘的可见性仍由 AppleFocusVisibility 统一决定。
+- 证据：Release 分屏截图发现旧把手和新按钮同时强调；widget_test 的连续键盘测试补充旧把手颜色检查后通过，make check 与 macOS 原生流程通过。
+- Done right：分别断言焦点位置和焦点外观，覆盖导航后旧焦点装饰清除，不以操作仍可执行代替视觉状态验证。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-087: 中断 macOS 测试后核对 App 子进程是否仍存在
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Flutter macOS、Debug/Profile/Release 同应用标识、原生验收
+- 触发：中断驱动后重新测试，或在多份同标识产物之间用工具查看窗口。
+- 根因：驱动父进程结束不代表 App 子进程结束，残留 App 可由 PID 1 接管；同标识多实例会干扰置前和窗口选择。
+- 解法：检查本项目 App 的完整路径、PID 与父 PID，只清理本任务遗留实例；自动化验收与 Release 人工检查分别运行。
+- 证据：本轮 ps 显示已中断 Debug/Profile 的 App 由 PID 1 接管；工具按同名或标识误读到 Test finished 窗口。清理后原生两轮在 resumed 状态完成，结束时没有残留 Demo 进程。
+- Done right：中断后同时核对驱动与 App 子进程，不通过修改第三方 Flutter 工具或重写正常宿主生命周期处理窗口误选；个别历史等待超时的全部原因未独立确认。
+- Seen: 1× (2026-11-12; task: 20261112T183000-macos-visual-standard.md)
+
+### L-088: Flutter 客户端由宿主拥有状态，表现重建只替换订阅
+
+- 类型：Success
+- 状态：Verified
+- 范围：Flutter 客户端替换、Actor、界面重建、服务端测试协议
+- 触发：用户要求删除旧客户端、保留服务端，并要求界面重建不打断业务。
+- 解法：Flutter 工作区统一迁入 client；删除 Vue/Tauri 与客户端 Rust，保留公共 C 核心。
+  宿主持有 Actor 和数据资源，页面持有可失效订阅；同步消息转换后提交不可变状态，
+  异步结果重新入队，界面代次与业务任务身份分开。真实重计算出现后再引入有界 isolate，
+  Web 保持同一消息语义并分块执行，不预建无业务使用的线程池。
+- 证据：客户端 runtime/widget/build-failure 测试、macOS Profile 生命周期流程、Release 退出重开与偏好恢复通过；
+  服务端测试协议迁出后 260 项单测、全部集成及真实网关探针通过。
+  见 client/test-artifacts/client-replacement-review.md。
+- Done right：删除前先迁出服务端反向依赖；先定义所有权、消息顺序和失效条件，再拆分目录。
+  不把空白 Chat 的状态恢复测试表述为真实 WebSocket 不断连已验收。
+- Seen: 1× (2026-11-13; task: 20261112T230000-flutter-client-replacement.md)
+
+### L-089: 服务端测试改动按受影响流程验收
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：服务端测试迁移、Shell 入口、任务验收范围
+- 触发：只修改服务端测试和工具链，却因任务收尾要求运行 `make check-full`。
+- 根因：将“完成覆盖本次改动的端到端测试”扩大解释为必须执行客户端与画廊原生 E2E。
+- 解法：服务端测试迁移验证真实服务进程、网络探针、管理命令和异常清理；
+  真实模型探针本身发生迁移时验证其实际入口。客户端和画廊 E2E 不作为此类任务的验收条件。
+- 证据：2026-11-13 用户明确纠正；本次服务端全部集成通过，故障、中断与缺凭据路径通过。
+  编码与协作规范及开发指南已明确范围。
+- Done right：先根据改动选择服务端、客户端或跨系统流程，再选执行命令；不以总入口扩大测试范围。
+- Seen: 1× (2026-11-13; task: 20261113T005931-server-tests-lua.md)
