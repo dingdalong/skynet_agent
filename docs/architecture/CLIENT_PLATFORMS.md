@@ -74,7 +74,7 @@ CI 的 `client-core.yml` 提供 macOS、Linux、Windows 编译测试矩阵；未
 ## 能力与体验
 
 原生快照声明真实能力。当前 macOS 支持分屏、动态开发包安装、独立业务进程，
-但开发执行器尚未接入，因此 localDevelopment 为 false。平台能力来自可信宿主，不由子应用自报。
+已接入本地项目执行器，因此 localDevelopment 为 true。平台能力来自可信宿主，不由子应用自报。
 手机与 Web 以远程开发为目标；桌面与服务器拥有实际工作目录。
 现有服务端路由保留，Windows 执行目标和路径支持在执行器接入阶段补齐。
 

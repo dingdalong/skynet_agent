@@ -19,6 +19,10 @@ await cp(
     path.join(contents, "Helpers/process_launcher"),
 );
 await cp(
+    `${root}native/.build/c-core/agent_worker`,
+    path.join(contents, "Helpers/agent_worker"),
+);
+await cp(
     `${root}native/.build/out/Products/${process.env.CONFIGURATION ?? "Release"}/SkynetAppRuntime`,
     path.join(contents, "Helpers/SkynetAppRuntime"),
 );

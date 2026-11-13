@@ -57,7 +57,7 @@ export const tokens = {
         "gripThreshold": 72,
         "snapEnter": 20,
         "snapRelease": 32,
-        "collapseDistance": 48
+        "collapseDistance": 112
     },
     "motion": {
         "quick": 140,

@@ -4,6 +4,8 @@
   "private": true,
   "packageManager": "pnpm@11.5.2",
   "scripts": {
+    "protocol:generate": "node tooling/generate-protocol.mjs",
+    "protocol:check": "node tooling/generate-protocol.mjs --check",
     "format": "prettier --write apps/host/src builtins packages tooling vitest.config.mts && node tooling/format-native.mjs",
     "format:check": "prettier --check apps/host/src builtins packages tooling vitest.config.mts && node tooling/format-native.mjs --check",
     "typecheck": "tsc --noEmit",
@@ -19,10 +21,14 @@
     "shadcn": "shadcn"
   },
   "dependencies": {
+    "@kayahr/text-encoding": "2.2.0",
+    "protobufjs": "8.8.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-markdown": "10.1.0",
     "react-native": "0.83.10",
-    "react-native-macos": "0.83.0"
+    "react-native-macos": "0.83.0",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@babel/runtime": "7.29.14",

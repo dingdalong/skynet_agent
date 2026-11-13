@@ -52,6 +52,7 @@ check-full: check
 client-check:
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" run format:check
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" run typecheck
+	@cd "$(CLIENT_DIR)" && "$(PNPM)" run protocol:check
 	@node client/tooling/generate-tokens.mjs --check
 	@node client/tooling/check-boundaries.mjs
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" test

@@ -69,10 +69,16 @@ export function request(
             return;
         }
         const requestId = crypto.randomUUID();
-        const timer = setTimeout(() => {
-            pending.delete(requestId);
-            reject(new Error(`请求超时：${kind}`));
-        }, 15_000);
+        const timer = setTimeout(
+            () => {
+                pending.delete(requestId);
+                reject(new Error(`请求超时：${kind}`));
+            },
+            kind === "agent.directory.choose" ||
+                kind === "agent.server.authorize"
+                ? 300_000
+                : 15_000,
+        );
         pending.set(requestId, { resolve, reject, timer });
         try {
             handler.postMessage({

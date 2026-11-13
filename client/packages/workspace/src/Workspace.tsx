@@ -57,6 +57,7 @@ function WorkspaceContent() {
     const [divider, setDivider] = useState<{
         ratio: number;
         active: boolean;
+        collapse?: Placement;
     }>();
     useEffect(() => {
         void AccessibilityInfo.isReduceMotionEnabled().then(
@@ -128,7 +129,11 @@ function WorkspaceContent() {
               ]
             : actual.panes;
     const showDesktop = mode === "desktop";
-    const showWorkspaceToolbar = showDesktop || mode === "overview";
+    const previewDesktop =
+        !!divider?.collapse &&
+        actual.panes[divider.collapse === "left" ? 1 : 0] === null;
+    const desktopChrome = showDesktop || previewDesktop;
+    const showWorkspaceToolbar = desktopChrome || mode === "overview";
     const setPlacement = (appId: string, placement?: Placement) => {
         if (!placement) {
             setDraft(undefined);
@@ -155,7 +160,7 @@ function WorkspaceContent() {
             />
             {showWorkspaceToolbar && (
                 <View style={styles.topbar}>
-                    {showDesktop ? (
+                    {desktopChrome ? (
                         <Text
                             style={[
                                 styles.wordmark,
@@ -176,13 +181,13 @@ function WorkspaceContent() {
                         style={[
                             styles.topTitle,
                             {
-                                color: showDesktop
+                                color: desktopChrome
                                     ? palette.desktopForeground
                                     : palette.foreground,
                             },
                         ]}
                     >
-                        {showDesktop
+                        {desktopChrome
                             ? "WORKSPACE"
                             : mode === "overview"
                               ? "后台应用"
@@ -236,12 +241,18 @@ function WorkspaceContent() {
                                     style={[
                                         styles.pane,
                                         {
-                                            flex:
-                                                panes.length === 1
+                                            flex: divider?.collapse
+                                                ? index ===
+                                                  (divider.collapse === "left"
+                                                      ? 1
+                                                      : 0)
                                                     ? 1
-                                                    : index === 0
-                                                      ? actual.ratio
-                                                      : 1 - actual.ratio,
+                                                    : 0
+                                                : panes.length === 1
+                                                  ? 1
+                                                  : index === 0
+                                                    ? actual.ratio
+                                                    : 1 - actual.ratio,
                                         },
                                     ]}
                                 >
@@ -253,14 +264,16 @@ function WorkspaceContent() {
                                             palette={palette}
                                             width={workspaceWidth}
                                             paneWidth={
-                                                panes.length === 1
+                                                divider?.collapse
                                                     ? workspaceWidth
-                                                    : (workspaceWidth -
-                                                          tokens.shell
-                                                              .divider) *
-                                                      (index === 0
-                                                          ? actual.ratio
-                                                          : 1 - actual.ratio)
+                                                    : panes.length === 1
+                                                      ? workspaceWidth
+                                                      : (workspaceWidth -
+                                                            tokens.shell
+                                                                .divider) *
+                                                        (index === 0
+                                                            ? actual.ratio
+                                                            : 1 - actual.ratio)
                                             }
                                             reducedMotion={!!reducedMotion}
                                             execute={execute}
@@ -285,7 +298,7 @@ function WorkspaceContent() {
                                             palette={palette}
                                             reducedMotion={!!reducedMotion}
                                             execute={execute}
-                                            inPane
+                                            inPane={!previewDesktop}
                                         />
                                     )}
                                 </Scene>
@@ -298,10 +311,13 @@ function WorkspaceContent() {
                                               key="divider"
                                               width={workspaceWidth}
                                               ratio={actual.ratio}
+                                              previewingFullscreen={
+                                                  !!divider?.collapse
+                                              }
                                               palette={palette}
                                               onChange={(value) =>
                                                   setDivider({
-                                                      ratio: value,
+                                                      ...value,
                                                       active: true,
                                                   })
                                               }
@@ -310,7 +326,7 @@ function WorkspaceContent() {
                                               }
                                               onEnd={(value) => {
                                                   setDivider({
-                                                      ratio: value.ratio,
+                                                      ...value,
                                                       active: false,
                                                   });
                                                   if (value.collapse)
@@ -751,6 +767,7 @@ function AppPane({
 function Divider({
     width,
     ratio,
+    previewingFullscreen,
     palette,
     onChange,
     onCancel,
@@ -758,32 +775,30 @@ function Divider({
 }: {
     width: number;
     ratio: number;
+    previewingFullscreen: boolean;
     palette: Palette;
-    onChange(value: number): void;
+    onChange(value: DividerAdjustment): void;
     onCancel(): void;
     onEnd(value: DividerAdjustment): void;
 }) {
     const { focusProps, dragProps } = useWorkspacePlatform();
     const latest = useRef({ width, ratio, onChange, onCancel, onEnd });
     latest.current = { width, ratio, onChange, onCancel, onEnd };
-    const latch = useRef<number | undefined>(undefined);
     const last = useRef<ReturnType<typeof dividerPosition>>({ ratio });
     const pan = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onPanResponderGrant: () => {
-                latch.current = undefined;
                 last.current = { ratio: latest.current.ratio };
             },
             onPanResponderMove: (_, gesture) => {
                 const next = dividerPosition(
                     gesture.moveX,
                     latest.current.width,
-                    latch.current,
+                    last.current,
                 );
-                latch.current = next.latched;
                 last.current = next;
-                latest.current.onChange(next.ratio);
+                latest.current.onChange(next);
             },
             onPanResponderRelease: () => latest.current.onEnd(last.current),
             onPanResponderTerminate: () => latest.current.onCancel(),
@@ -796,7 +811,10 @@ function Divider({
             focusable
             {...dragProps}
             {...focusProps}
-            style={styles.divider}
+            style={[
+                styles.divider,
+                previewingFullscreen && { width: 0, opacity: 0 },
+            ]}
             accessibilityRole="adjustable"
             accessibilityLabel="调整分屏比例"
             accessibilityValue={{

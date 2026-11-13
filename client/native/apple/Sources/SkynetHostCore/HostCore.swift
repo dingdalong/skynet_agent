@@ -13,6 +13,7 @@ public final class HostCore {
     private let documentURL: URL
     private let launcher: URL
     private let executable: URL
+    private let agentServices: AgentServices
     private let profile: URL
     private var document: HostDocument
     private var revision = 0
@@ -23,6 +24,7 @@ public final class HostCore {
     private let logger = Logger(subsystem: "app.skynet.agent", category: "HostCore")
     private var stopped = false
     private lazy var resources = ResourceBroker(queue: queue) { [weak self] appId, event in
+        if appId == "agent", event["error"] != nil { self?.agentServices.close() }
         self?.enqueue(appId, type: "command", name: "$resource", payload: event) { _ in }
     }
 
@@ -48,6 +50,7 @@ public final class HostCore {
         try FileManager.default.createDirectory(at: dataRoot, withIntermediateDirectories: true)
         self.launcher = launcher
         self.executable = executable
+        self.agentServices = try AgentServices(root: dataRoot, launcher: launcher)
         self.store = try DocumentStore(root: dataRoot.appendingPathComponent("state"))
         self.documentURL = dataRoot.appendingPathComponent("host.json")
         self.profile = dataRoot.appendingPathComponent("runtime.sb")
@@ -143,6 +146,30 @@ public final class HostCore {
                 }
                 switch kind {
                 case "snapshot": reply(.success(self.appSnapshot(appId)))
+                case "agent.directory.choose", "agent.server.authorize", "agent.remote.set":
+                    try self.requireBuiltinAgent(appId)
+                    let completed: Reply = { result in
+                        self.queue.async {
+                            if case .success(let value) = result, value["cancelled"] as? Bool != true {
+                                self.enqueue(
+                                    appId, type: "command", name: "$agent.context",
+                                    payload: value["context"] ?? value
+                                ) { _ in }
+                            }
+                            reply(result)
+                        }
+                    }
+                    if kind == "agent.directory.choose" {
+                        self.agentServices.chooseDirectory(completion: completed)
+                    } else if kind == "agent.server.authorize" {
+                        guard let url = input["url"] as? String else { throw failure("network", "服务器地址必填") }
+                        self.agentServices.authorize(url, completion: completed)
+                    } else {
+                        guard let value = input["enabled"] as? NSNumber,
+                            CFGetTypeID(value) == CFBooleanGetTypeID()
+                        else { throw failure("permission", "远程执行设置无效") }
+                        self.agentServices.setRemote(value.boolValue, completion: completed)
+                    }
                 case "view.error":
                     let message = String((input["message"] as? String ?? "Unknown view failure").prefix(2048))
                     self.report(failure("view", message), appId: appId)
@@ -250,6 +277,7 @@ public final class HostCore {
             actor.ready = false
             actor.tasks.removeAll()
             self.resources.close(appId: id)
+            if id == "agent" { self.agentServices.close() }
             let pending = actor.mailbox
             actor.mailbox.removeAll()
             for (_, reply) in pending { reply(.failure(error)) }
@@ -262,13 +290,19 @@ public final class HostCore {
             do {
                 let value = try result.get()
                 try self.commit(actor, state: value["state"] ?? NSNull())
-                actor.ready = true
+                var startup: [([String: Any], Reply)] = []
                 if !actor.interrupted.isEmpty {
-                    let interrupted = actor.interrupted
-                    self.enqueue(id, type: "command", name: "$interrupted", payload: ["tasks": interrupted]) {
-                        _ in
-                    }
+                    startup.append(
+                        (
+                            [
+                                "type": "command", "name": "$interrupted",
+                                "payload": ["tasks": actor.interrupted],
+                            ], { _ in }
+                        ))
                 }
+                startup.append((["type": "start", "name": "$start", "payload": NSNull()], { _ in }))
+                actor.mailbox.insert(contentsOf: startup, at: 0)
+                actor.ready = true
                 self.pump(actor)
             } catch {
                 actor.error = String(describing: error)
@@ -380,9 +414,37 @@ public final class HostCore {
                     completion: complete)
             case "socket.open", "socket.send", "socket.close":
                 try require(appId, "network")
+                if appId == "agent", kind == "socket.close" { agentServices.close() }
+                if appId == "agent", actor.entry.builtin, kind == "socket.open" {
+                    agentServices.origins { origins in
+                        self.queue.async {
+                            guard self.apps[appId] === actor, actor.tasks[id] == token else { return }
+                            do {
+                                try self.resources.request(
+                                    appId: appId, generation: actor.generation,
+                                    kind: kind, input: input,
+                                    origins: actor.entry.manifest.networkOrigins + origins,
+                                    completion: complete)
+                            } catch { complete(.failure(error)) }
+                        }
+                    }
+                } else {
+                    try resources.request(
+                        appId: appId, generation: actor.generation, kind: kind, input: input,
+                        origins: actor.entry.manifest.networkOrigins, completion: complete)
+                }
+            case "agent.context", "agent.execute":
+                try requireBuiltinAgent(appId)
+                let reply: Reply = { result in self.queue.async { complete(result) } }
+                if kind == "agent.context" {
+                    agentServices.context(reset: true, completion: reply)
+                } else {
+                    agentServices.execute(input, completion: reply)
+                }
+            case "timer.wait":
                 try resources.request(
                     appId: appId, generation: actor.generation, kind: kind, input: input,
-                    origins: actor.entry.manifest.networkOrigins, completion: complete)
+                    origins: [], completion: complete)
             default: throw failure("capability", "Unsupported effect")
             }
         } catch { complete(.failure(error)) }
@@ -404,6 +466,11 @@ public final class HostCore {
             entry.builtin || (document.grants[appId] ?? []).contains(permission)
         else {
             throw failure("permission", "\(appId) lacks \(permission)")
+        }
+    }
+    private func requireBuiltinAgent(_ appId: String) throws {
+        guard appId == "agent", catalog.entries[appId]?.builtin == true else {
+            throw failure("permission", "仅受信任的内置 Agent 可以使用本机开发与服务器授权")
         }
     }
 
@@ -470,7 +537,7 @@ public final class HostCore {
             "revision": revision, "workspace": document.workspace.snapshot, "preferences": preferences(),
             "capabilities": [
                 "platform": "macos", "splitView": true, "installApplications": true,
-                "localDevelopment": false, "runtimeIsolation": "process",
+                "localDevelopment": true, "runtimeIsolation": "process",
             ],
             "apps": catalog.entries.values.sorted { $0.manifest.id < $1.manifest.id }.map(summary),
         ]
@@ -490,6 +557,7 @@ public final class HostCore {
         guard let actor = apps.removeValue(forKey: id) else { return }
         actor.runtime?.stop()
         resources.close(appId: id)
+        if id == "agent" { agentServices.close() }
         for (_, reply) in actor.mailbox { reply(.failure(failure("stopped", "App closed"))) }
     }
     private func restart(_ id: String) throws {

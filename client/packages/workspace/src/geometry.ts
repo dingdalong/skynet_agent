@@ -2,6 +2,10 @@ import { tokens } from "@skynet/tokens";
 
 export type Placement = "left" | "right";
 export type DividerAdjustment = { ratio: number; collapse?: Placement };
+export type DividerPreview = DividerAdjustment & {
+    latched?: number;
+    barrier?: { edge: Placement; x: number };
+};
 const splitStops = [1 / 3, 1 / 2, 2 / 3];
 
 export function stepDivider(
@@ -56,14 +60,35 @@ export function splitLayout(
 export function dividerPosition(
     x: number,
     width: number,
-    latched?: number,
-): DividerAdjustment & { latched?: number } {
+    previous?: DividerPreview,
+): DividerPreview {
     const available = Math.max(1, width - tokens.shell.divider);
     const raw = x - tokens.shell.divider / 2;
-    if (raw <= available / 3 - tokens.shell.collapseDistance)
-        return { ratio: 1 / 3, latched: 1 / 3, collapse: "left" };
-    if (raw >= (available * 2) / 3 + tokens.shell.collapseDistance)
-        return { ratio: 2 / 3, latched: 2 / 3, collapse: "right" };
+    const edge: Placement | undefined =
+        raw <= available / 3
+            ? "left"
+            : raw >= (available * 2) / 3
+              ? "right"
+              : undefined;
+    if (edge) {
+        // Reaching the stop and pushing through it are separate intentions.
+        // The first event at the stop cannot collapse, even after a fast drag.
+        const barrier =
+            previous?.barrier?.edge === edge ? previous.barrier : { edge, x };
+        const distance = (x - barrier.x) * (edge === "right" ? 1 : -1);
+        const threshold =
+            previous?.collapse === edge
+                ? tokens.shell.snapRelease
+                : tokens.shell.collapseDistance;
+        const ratio = edge === "left" ? 1 / 3 : 2 / 3;
+        return {
+            ratio,
+            latched: ratio,
+            barrier,
+            ...(distance >= threshold ? { collapse: edge } : {}),
+        };
+    }
+    const latched = previous?.latched;
     if (
         latched !== undefined &&
         Math.abs(raw - available * latched) <= tokens.shell.snapRelease

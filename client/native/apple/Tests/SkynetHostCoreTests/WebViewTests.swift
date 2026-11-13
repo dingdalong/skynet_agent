@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import WebKit
 import XCTest
 
@@ -8,6 +9,114 @@ import XCTest
 /// acceptance remains in XCUITest; this catches scheme, CSP and bridge failures.
 @MainActor
 final class WebViewTests: XCTestCase {
+    func testPackagedAgentChatDraftReloadAndNarrowLayout() async throws {
+        _ = NSApplication.shared
+        let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let client = native.deletingLastPathComponent()
+        let data = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "skynet-agent-web-\(UUID().uuidString)")
+        let builtins = data.appendingPathComponent("builtins")
+        try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: client.appendingPathComponent("dist/builtins"), to: builtins)
+        let environment = ProcessInfo.processInfo.environment
+        let url = try XCTUnwrap(environment["SKYNET_TEST_SOCKET"])
+        let runtime = try Data(
+            contentsOf: URL(fileURLWithPath: XCTUnwrap(environment["SKYNET_TEST_AGENT_RUNTIME"])))
+        let agent = builtins.appendingPathComponent("agent.skapp")
+        try runtime.write(to: agent.appendingPathComponent("runtime.js"))
+        let manifestURL = agent.appendingPathComponent("manifest.json")
+        var manifest = try dictionary(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)))
+        manifest["networkOrigins"] = [url]
+        var files = dictionary(manifest["files"])
+        files["runtime.js"] = SHA256.hash(data: runtime).map { String(format: "%02x", $0) }.joined()
+        manifest["files"] = files
+        try jsonData(manifest).write(to: manifestURL)
+        let core = try HostCore(
+            dataRoot: data.appendingPathComponent("data"), builtins: builtins,
+            launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
+            executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
+        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
+        defer {
+            harness.close()
+            core.shutdown()
+            try? FileManager.default.removeItem(at: data)
+        }
+        try await harness.until("document.body.innerText.includes('连接你的 Agent')")
+        try await harness.click("连接设置")
+        try await harness.until("document.getElementById('agent-url')!==null")
+        let address = String(data: try jsonData("\(url)/agent"), encoding: .utf8)!
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            document.getElementById('agent-url').value = \(address);
+            document.getElementById('agent-username').value = 'webkit-agent';
+            """)
+        try await harness.click("连接")
+        try await harness.until("document.body.innerText.includes('已连接')")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{ const e=document.getElementById('agent-message');
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'WebKit chat');
+            e.dispatchEvent(new Event('input',{bubbles:true})); })()
+            """)
+        try await harness.until("!document.querySelector('[aria-label=\"发送消息\"]').disabled")
+        try await harness.click("发送消息")
+        try await harness.until("document.body.textContent.includes('binary✓')")
+        try await harness.until("!document.body.textContent.includes('正在生成')")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{const e=document.querySelector('[data-slot=message-scroller-viewport]');
+            e.dispatchEvent(new WheelEvent('wheel',{deltaY:-300,bubbles:true}));
+            e.scrollTop=230;e.dispatchEvent(new Event('scroll'));})()
+            """)
+        // Let content-visibility and the scroller's observers settle before recording.
+        try await Task.sleep(for: .milliseconds(250))
+        let before =
+            try await harness.web.evaluateJavaScript(
+                "document.querySelector('[data-slot=message-scroller-viewport]').scrollTop") as! Double
+        try await harness.click("选择模型")
+        try await harness.until(
+            "Array.from(document.querySelectorAll('[role=option]')).some(e=>e.textContent.trim()==='Fixture 2')"
+        )
+        _ = try await harness.web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.trim()==='Fixture 2').click()"
+        )
+        try await harness.until(
+            "document.querySelector('[aria-label=\"选择模型\"]').textContent.includes('Fixture 2')")
+        try await Task.sleep(for: .milliseconds(250))
+        let after =
+            try await harness.web.evaluateJavaScript(
+                "document.querySelector('[data-slot=message-scroller-viewport]').scrollTop") as! Double
+        XCTAssertEqual(
+            after, before, accuracy: 2, "model-only updates must preserve the transcript reading position")
+        try await harness.until("!document.body.textContent.includes('模型切换正在进行')")
+        try await harness.capture(client.appendingPathComponent("test-artifacts/agent-webkit.png"))
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{const e=document.getElementById('agent-message');
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'保留这份草稿');
+            e.dispatchEvent(new Event('input',{bubbles:true})); })()
+            """)
+        try await harness.until("document.getElementById('agent-message').value==='保留这份草稿'")
+        let persisted = expectation(description: "Agent draft durably committed")
+        var once = false
+        let observer = core.attach(appId: "agent") { snapshot in
+            if dictionary(dictionary(snapshot["state"])["drafts"])["session"] as? String == "保留这份草稿", !once {
+                once = true
+                persisted.fulfill()
+            }
+        }
+        await fulfillment(of: [persisted], timeout: 4)
+        core.detach(observer)
+        harness.web.reload()
+        try await harness.until("document.getElementById('agent-message')?.value==='保留这份草稿'")
+        try await harness.until("document.body.textContent.includes('binary✓')")
+        harness.web.setFrameSize(NSSize(width: 420, height: 700))
+        try await harness.until("getComputedStyle(document.querySelector('aside')).display==='none'")
+        try await harness.until("document.documentElement.scrollWidth<=420")
+        try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
+    }
+
     func testPackagedSettingsBridgeThemeAndResponsiveLayout() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

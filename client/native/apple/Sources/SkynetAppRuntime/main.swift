@@ -28,6 +28,13 @@ context.evaluateScript(
             return {state, result: null};
         }
         const state = message.state;
+        if (message.type === "start") {
+            const value = app.start ? app.start(state) : {state};
+            if (!value || typeof value.then === "function"
+                || !Object.prototype.hasOwnProperty.call(value, "state"))
+                throw Error("Start must return a synchronous transition");
+            return value;
+        }
         const handler = message.type === "action" ? app.actions?.[message.name] : app.reduce;
         if (typeof handler !== "function") throw Error("Unknown command or action");
         const value = message.type === "action"
@@ -38,7 +45,11 @@ context.evaluateScript(
             throw Error("Reducer must return state");
         return value;
     };
+    globalThis.__invokeJSON = function(json) {
+        return JSON.stringify(__invoke(JSON.parse(json)));
+    };
     """)
+let invoke = context.objectForKeyedSubscript("__invokeJSON")!
 var buffer = Data()
 let maximumFrame = 1_048_576
 while true {
@@ -53,42 +64,50 @@ while true {
     while let newline = buffer.firstIndex(of: 10) {
         let frame = buffer.prefix(upTo: newline)
         buffer.removeSubrange(...newline)
-        var response: [String: Any] = [:]
-        do {
-            guard let message = try JSONSerialization.jsonObject(with: frame) as? [String: Any],
-                let id = message["id"] as? String,
-                let generation = message["generation"] as? Int
-            else { exit(65) }
-            response = ["id": id, "generation": generation, "pid": getpid()]
-            exception = nil
-            if message["type"] as? String == "load" {
-                guard let code = message["code"] as? String else { throw RuntimeError.invalid }
-                context.evaluateScript(code, withSourceURL: URL(string: "skynet-runtime://app/runtime.js"))
+        // This command-line process has no AppKit run loop to drain temporary
+        // Foundation/JSValue objects. Each mailbox turn must release its frame.
+        try autoreleasepool {
+            var response: [String: Any] = [:]
+            do {
+                guard let message = try JSONSerialization.jsonObject(with: frame) as? [String: Any],
+                    let id = message["id"] as? String,
+                    let generation = message["generation"] as? Int
+                else { exit(65) }
+                response = ["id": id, "generation": generation, "pid": getpid()]
+                exception = nil
+                if message["type"] as? String == "load" {
+                    guard let code = message["code"] as? String else { throw RuntimeError.invalid }
+                    context.evaluateScript(
+                        code, withSourceURL: URL(string: "skynet-runtime://app/runtime.js"))
+                    if let exception { throw RuntimeError.script(exception) }
+                }
+                let json = String(data: try JSONSerialization.data(withJSONObject: message), encoding: .utf8)!
+                // Data stays an argument; do not compile a new script containing
+                // the entire state for every token or timer update.
+                let value = invoke.call(withArguments: [json])?.toString()
                 if let exception { throw RuntimeError.script(exception) }
+                guard let value,
+                    let result = try JSONSerialization.jsonObject(
+                        with: Data(value.utf8)
+                    ) as? [String: Any]
+                else { throw RuntimeError.invalid }
+                response["value"] = result
+            } catch {
+                response["error"] = String(describing: error)
             }
-            let json = String(data: try JSONSerialization.data(withJSONObject: message), encoding: .utf8)!
-            let value = context.evaluateScript("JSON.stringify(__invoke(\(json)))")?.toString()
-            if let exception { throw RuntimeError.script(exception) }
-            guard let value,
-                let result = try JSONSerialization.jsonObject(
-                    with: Data(value.utf8)
-                ) as? [String: Any]
-            else { throw RuntimeError.invalid }
-            response["value"] = result
-        } catch {
-            response["error"] = String(describing: error)
-        }
-        var output = try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys])
-        output.append(10)
-        if output.count > maximumFrame { exit(65) }
-        var offset = 0
-        while offset < output.count {
-            let count = output.withUnsafeBytes { pointer in
-                Darwin.write(STDOUT_FILENO, pointer.baseAddress!.advanced(by: offset), output.count - offset)
+            var output = try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys])
+            output.append(10)
+            if output.count > maximumFrame { exit(65) }
+            var offset = 0
+            while offset < output.count {
+                let count = output.withUnsafeBytes { pointer in
+                    Darwin.write(
+                        STDOUT_FILENO, pointer.baseAddress!.advanced(by: offset), output.count - offset)
+                }
+                if count < 0, errno == EINTR { continue }
+                if count <= 0 { exit(74) }
+                offset += count
             }
-            if count < 0, errno == EINTR { continue }
-            if count <= 0 { exit(74) }
-            offset += count
         }
     }
 }

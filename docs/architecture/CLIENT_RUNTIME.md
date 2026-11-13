@@ -1,7 +1,9 @@
 # 客户端运行时
 
 客户端由 React Native macOS 工作区、独立 WebView 表现和每个应用独立的 JavaScriptCore 业务进程组成。
-当前内置设置与空白 Agent；聊天、Agent 开发应用和远程分发尚未接入。首版只支持 macOS。
+当前内置设置与 Agent。Agent 已接入服务器会话、流式任务、模型选择、取消与失败重试；
+已接入 macOS 本地项目执行器；Agent 生成并安装应用和远程分发尚未接入。首版只支持 macOS。
+业务协议和恢复规则见 [Agent 客户端](CLIENT_AGENT.md)。
 UI 规格见[客户端设计规范](../design/CLIENT_DESIGN.md)。
 公共代码、能力边界和实际平台支持见[平台接入](CLIENT_PLATFORMS.md)。
 
@@ -71,9 +73,20 @@ SDK 在首屏提交后发送 `view.ready`；可见文档额外等待绘制帧，
 - `src/runtime.ts`：纯同步状态转换，可导出带输入、输出 schema 的动作。
 - `src/view.tsx`：shadcn 表现，通过 SDK 订阅状态和请求命令。
 
-当前支持 `socket.open`、`socket.send`、`socket.close` 和 `apps.call` 效果。
+当前支持 `socket.open`、`socket.send`、`socket.close`、`timer.wait` 和 `apps.call` 效果。
+内置 Agent 独占 `agent.context`、`agent.execute` 及原生目录、服务器授权入口；
+即使普通包声明相似权限，也不能获得这些能力。目录、设备与工具进程由原生宿主管理。
+`socket.send` 在 `text` 与 base64 `data` 之间二选一，收包使用相同字段区分帧类型；
+可以绑定 `connectionId` 拒绝旧连接发送。消息上限为 256 KiB。
+`timer.wait` 由宿主执行，按应用和 key 管理，替换同 key 时旧任务收到失败；退出应用时清理。
+计时范围和并发数量有硬限制，不能在 reducer 或 Web 页面持有业务重连计时器。
 网络权限需要 manifest 声明并得到安装授权；仅允许精确 `wss` 来源及显式回环 `ws`。
+内置 Agent 还可由用户在原生确认框中授权新服务器；额外来源仅对该内置应用生效。
 连接由 ResourceBroker 持有，不因 WebView 卸载而关闭。
+应用可定义同步 `start(state)`，在业务进程加载并处理上次中断后执行一次；
+安装探测和界面订阅不会执行它。恢复连接等启动效果仍遵循先持久提交、后执行的规则。
+运行时构建注入纯 JavaScript 的标准文本编解码实现，补足 JavaScriptCore 的环境差异；
+不导出文件或网络对象。
 
 跨应用调用必须同时满足调用方声明、用户授权和目标动作存在。原生校验输入和输出，
 返回值不符合 schema 时不提交目标状态。schema 使用封闭子集，未知关键字、无效类型及边界在安装时拒绝，

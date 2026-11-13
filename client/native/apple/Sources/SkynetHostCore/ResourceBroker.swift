@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 private final class SocketPolicy: NSObject, URLSessionTaskDelegate {
@@ -21,6 +22,12 @@ final class ResourceBroker {
     private let queue: DispatchQueue
     private let event: (String, [String: Any]) -> Void
     private var connections: [String: [String: Connection]] = [:]
+    private struct Timer {
+        let token: UUID
+        let work: DispatchWorkItem
+        let completion: HostCore.Reply
+    }
+    private var timers: [String: [String: Timer]] = [:]
     private let session: URLSession
 
     init(queue: DispatchQueue, event: @escaping (String, [String: Any]) -> Void) {
@@ -41,6 +48,25 @@ final class ResourceBroker {
             throw failure("resource", "Resource key required")
         }
         switch kind {
+        case "timer.wait":
+            guard let value = input["milliseconds"] as? NSNumber,
+                CFGetTypeID(value) != CFBooleanGetTypeID(),
+                value.doubleValue.isFinite, value.doubleValue.rounded() == value.doubleValue,
+                (100...60_000).contains(value.intValue),
+                timers[appId]?[key] != nil || (timers[appId]?.count ?? 0) < 8
+            else { throw failure("timer", "Invalid delay or timer limit exceeded") }
+            if let previous = timers[appId]?.removeValue(forKey: key) {
+                previous.work.cancel()
+                previous.completion(.failure(failure("timer", "Timer replaced")))
+            }
+            let token = UUID()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, self.timers[appId]?[key]?.token == token else { return }
+                self.timers[appId]?[key] = nil
+                completion(.success([:]))
+            }
+            timers[appId, default: [:]][key] = Timer(token: token, work: work, completion: completion)
+            queue.asyncAfter(deadline: .now() + value.doubleValue / 1000, execute: work)
         case "socket.open":
             if let existing = connections[appId]?[key] {
                 completion(.success(["connectionId": existing.token.uuidString]))
@@ -64,13 +90,27 @@ final class ResourceBroker {
         case "socket.send":
             guard let connection = connections[appId]?[key],
                 connection.generation == generation,
-                let text = input["text"] as? String, text.utf8.count <= 262_144
+                input["connectionId"] == nil
+                    || input["connectionId"] as? String == connection.token.uuidString
             else {
-                throw failure("resource", "Missing socket or oversized message")
+                throw failure("resource", "Missing or stale socket")
             }
-            connection.task.send(.string(text)) { error in
+            let message: URLSessionWebSocketTask.Message
+            if let text = input["text"] as? String, input["data"] == nil, text.utf8.count <= 262_144 {
+                message = .string(text)
+            } else if let raw = input["data"] as? String, input["text"] == nil,
+                raw.utf8.count <= 349_528, let data = Data(base64Encoded: raw), data.count <= 262_144
+            {
+                message = .data(data)
+            } else {
+                throw failure("resource", "Provide one bounded text or base64 binary message")
+            }
+            connection.task.send(message) { error in
                 self.queue.async {
-                    guard self.connections[appId]?[key]?.token == connection.token else { return }
+                    guard self.connections[appId]?[key]?.token == connection.token else {
+                        completion(.failure(failure("resource", "Socket closed before send completed")))
+                        return
+                    }
                     if let error {
                         completion(.failure(error))
                     } else {
@@ -91,14 +131,13 @@ final class ResourceBroker {
                 guard self.connections[appId]?[key]?.token == connection.token else { return }
                 switch result {
                 case .success(let message):
-                    let text: String
+                    var event: [String: Any] = ["key": key, "connectionId": connection.token.uuidString]
                     switch message {
-                    case .string(let value): text = value
-                    case .data(let data): text = data.base64EncodedString()
+                    case .string(let value): event["text"] = value
+                    case .data(let data): event["data"] = data.base64EncodedString()
                     @unknown default: return
                     }
-                    self.event(
-                        appId, ["key": key, "connectionId": connection.token.uuidString, "text": text])
+                    self.event(appId, event)
                     self.receive(appId: appId, key: key, connection: connection)
                 case .failure(let error):
                     self.connections[appId]?[key] = nil
@@ -113,6 +152,7 @@ final class ResourceBroker {
         }
     }
     func close(appId: String) {
+        for timer in (timers.removeValue(forKey: appId) ?? [:]).values { timer.work.cancel() }
         let sockets = connections.removeValue(forKey: appId) ?? [:]
         for connection in sockets.values { connection.task.cancel(with: .goingAway, reason: nil) }
     }

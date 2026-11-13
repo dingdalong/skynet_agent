@@ -13,8 +13,14 @@ describe("workspace direct manipulation", () => {
         const width = 1280;
         const third = (width - 8) / 3 + 4;
         expect(dividerPosition(third + 19, width).ratio).toBe(1 / 3);
-        expect(dividerPosition(third + 31, width, 1 / 3).ratio).toBe(1 / 3);
-        expect(dividerPosition(third + 33, width, 1 / 3).ratio).not.toBe(1 / 3);
+        expect(
+            dividerPosition(third + 31, width, { ratio: 1 / 3, latched: 1 / 3 })
+                .ratio,
+        ).toBe(1 / 3);
+        expect(
+            dividerPosition(third + 33, width, { ratio: 1 / 3, latched: 1 / 3 })
+                .ratio,
+        ).not.toBe(1 / 3);
         expect(dividerPosition(width / 2 + 18, width).ratio).toBe(1 / 2);
         expect(dividerPosition(width - third, width).ratio).toBe(2 / 3);
     });
@@ -33,38 +39,48 @@ describe("workspace direct manipulation", () => {
             const third =
                 (width - tokens.shell.divider) / 3 + tokens.shell.divider / 2;
             const distance = tokens.shell.collapseDistance;
+            const leftStop = dividerPosition(third, width);
+            expect(leftStop.collapse).toBeUndefined();
             expect(
-                dividerPosition(third, width, 1 / 3).collapse,
+                dividerPosition(third - distance + 1, width, leftStop).collapse,
             ).toBeUndefined();
-            expect(
-                dividerPosition(third - distance + 1, width, 1 / 3).collapse,
-            ).toBeUndefined();
-            const left = dividerPosition(third - distance, width, 1 / 3);
+            const left = dividerPosition(third - distance, width, leftStop);
             expect(left).toMatchObject({ ratio: 1 / 3, collapse: "left" });
-            expect(dividerPosition(third, width, left.latched)).toEqual({
-                ratio: 1 / 3,
-                latched: 1 / 3,
-            });
             expect(
-                dividerPosition(width - third, width, 2 / 3).collapse,
+                dividerPosition(third, width, left).collapse,
             ).toBeUndefined();
+            const rightStop = dividerPosition(width - third, width);
+            expect(rightStop.collapse).toBeUndefined();
             expect(
-                dividerPosition(width - third + distance - 1, width, 2 / 3)
+                dividerPosition(width - third + distance - 1, width, rightStop)
                     .collapse,
             ).toBeUndefined();
             const right = dividerPosition(
                 width - third + distance,
                 width,
-                2 / 3,
+                rightStop,
             );
             expect(right).toMatchObject({ ratio: 2 / 3, collapse: "right" });
             expect(
-                dividerPosition(width - third, width, right.latched),
-            ).toEqual({
-                ratio: 2 / 3,
-                latched: 2 / 3,
-            });
+                dividerPosition(width - third, width, right).collapse,
+            ).toBeUndefined();
         }
+    });
+    it("stops a fast first movement at the boundary before a further push can preview fullscreen", () => {
+        const stop = dividerPosition(1100, 1280);
+        expect(stop.collapse).toBeUndefined();
+        expect(stop.ratio).toBe(2 / 3);
+        const full = dividerPosition(
+            1100 + tokens.shell.collapseDistance,
+            1280,
+            stop,
+        );
+        expect(full.collapse).toBe("right");
+        expect(
+            dividerPosition(1100 + tokens.shell.snapRelease + 1, 1280, full)
+                .collapse,
+        ).toBe("right");
+        expect(dividerPosition(1100, 1280, full).collapse).toBeUndefined();
     });
     it("releases live placement when the grip is pulled back", () => {
         expect(gripPlacement(100, -400, 1280)).toBe("left");

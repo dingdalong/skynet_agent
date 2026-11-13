@@ -7,7 +7,8 @@
 
 网关通过 WebSocket 提供接口。模型对话、会话历史、模型配置和 API Key 位于服务端，
 以 `user` 为所有者，在服务器重启前保留。用户名识别不提供密码认证，数据暂不落盘。
-连接断开不删除会话或停止生成。新客户端尚未接入该接口，当前只提供工作区、设置与空白 Agent。
+连接断开不删除会话或停止生成。客户端 Agent 已通过宿主持有的二进制 WebSocket 接入；
+业务缓存与重连规则见 [Agent 客户端](CLIENT_AGENT.md)。
 用户名区分大小写，长度为 1–32 个 Unicode 字符。
 
 ## 术语与职责
@@ -295,7 +296,8 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 `exec_command` 启动 bash，`write_stdin` 继续访问所属会话的执行进程，`apply_patch` 处理文本补丁。
 `common/native/agent_runtime/` 是服务端使用的公共 C 核心，统一补丁、文件访问、沙盒、进程与 PTY。
 服务端 `lualib-src/process.c`、`filesystem.c` 只做 Lua 绑定，描述符接入 Skynet 调度。
-macOS 客户端通过 Swift 绑定该核心的进程 C ABI；本机工具执行尚未接入。`agent_worker` 在沙盒子进程执行补丁，私有临时输入随任务回收；
+macOS 客户端通过 Swift 绑定同一 C ABI，在原生宿主授权的本机目录内执行工具。
+`agent_worker` 在沙盒子进程执行补丁，私有临时输入随任务回收；
 `process_launcher` 监督进程组，在控制连接关闭时终止子进程。C 变更需重新构建和重启。
 
 会话 `execution_target` 为空时使用云端工作区，否则路由到指定桌面和工作区绑定。

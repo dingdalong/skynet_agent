@@ -112,6 +112,12 @@ if (command === "install") {
             "-",
             `${app}/Contents/Helpers/process_launcher`,
         ]);
+        await run("codesign", [
+            "--force",
+            "--sign",
+            "-",
+            `${app}/Contents/Helpers/agent_worker`,
+        ]);
         await run("codesign", ["--force", "--deep", "--sign", "-", app]);
         if (command === "dev") await run("open", ["-n", app]);
         else {

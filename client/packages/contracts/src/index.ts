@@ -67,7 +67,14 @@ export interface AppSnapshot<State = Json> {
 
 export interface Effect {
     id: string;
-    kind: "socket.open" | "socket.send" | "socket.close" | "apps.call";
+    kind:
+        | "socket.open"
+        | "socket.send"
+        | "socket.close"
+        | "timer.wait"
+        | "agent.context"
+        | "agent.execute"
+        | "apps.call";
     input: Record<string, Json>;
 }
 
@@ -84,6 +91,8 @@ export interface Command {
 
 export interface AppDefinition<State> {
     initialState(): State;
+    /** Runs once per business process, never when a presentation subscribes. */
+    start?(state: State): Transition<State>;
     reduce(state: State, command: Command): Transition<State>;
     actions?: Record<string, (state: State, input: Json) => Transition<State>>;
 }

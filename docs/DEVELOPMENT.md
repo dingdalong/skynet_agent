@@ -28,7 +28,7 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 | --- | --- |
 | `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 UI 验收 |
 | `client/native` | 公共 C++ 状态规则、苹果平台宿主资源与原生集成测试 |
-| `client/builtins` | 设置与空白 Agent，各自包含清单、同步业务与 Web 表现 |
+| `client/builtins` | 设置与 Agent 对话，各自包含清单、同步业务与 Web 表现 |
 | `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、shadcn 组件与令牌 |
 | `client/tooling` | 构建、应用包模板、边界检查和原生验收 |
 | `server` | Skynet 服务端及 Lua 单元、网络集成与真实模型测试 |
@@ -38,7 +38,7 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 `make dev` 构建并启动 macOS 客户端，修改源码后重新执行；菜单“工作空间 / 重新载入界面”
 重建当前包内的 React 表现，保留原生宿主资源。需要 Metro 开发时，在 `client/apps/host` 启动
 `pnpm exec react-native start`，再以 `SKYNET_METRO=1` 启动 App 的可执行文件。
-客户端当前提供工作区、设置与空白 Agent，无需服务端即可验证界面。
+客户端的工作区与设置可独立运行；Agent 对话需要启动服务端并配置连接。
 业务接入边界和并发模型见[客户端运行时](architecture/CLIENT_RUNTIME.md)。
 
 服务端独立执行 `make -C server build` 与 `./server/start.sh`；模型密钥按配置文档准备。

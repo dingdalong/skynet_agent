@@ -13,7 +13,7 @@
 ## 架构与接口
 
 - [客户端运行时](architecture/CLIENT_RUNTIME.md)：Actor、表现订阅、生命周期与并发规则。
-
+- [Agent 客户端](architecture/CLIENT_AGENT.md)：会话、流式任务、服务器连接与恢复边界。
 - [Agent WebSocket 网关](architecture/AGENT_GATEWAY.md)：服务生命周期、会话同步、二进制协议和工具执行。
 - [Agent 提示词](architecture/PROMPTS.md)：提示词、项目规则、对话历史与 Agent 接入示例。
 - [共用工具运行时](../common/native/agent_runtime/README.md)：服务端工具与客户端子进程使用的公共 C 核心。

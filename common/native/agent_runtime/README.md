@@ -1,10 +1,10 @@
 # 共用工具核心
 
-服务端 Lua 通过 `agent_runtime.h` 使用文件、补丁、沙盒和进程实现。macOS 客户端通过 Swift 绑定进程 C ABI，用于监督独立 JavaScriptCore 子应用；客户端本机工具执行尚未接入。
+服务端 Lua 通过 `agent_runtime.h` 使用文件、补丁、沙盒和进程实现。macOS 客户端通过 Swift 绑定 C ABI，用于监督独立 JavaScriptCore 子应用，以及执行已授权本机项目的命令和补丁。
 核心不持有用户、会话或连接状态；权限判断由云端执行器负责，工作区绑定由宿主负责。
 每个进程句柄只能由一个调用方持有，跨线程访问需要宿主加锁。
 
-构建需要 Make、C 编译器和静态库归档工具。服务端 `make native`、桌面 Cargo 构建会自动编译静态库及
+构建需要 Make、C 编译器和静态库归档工具。服务端 `make native`、客户端原生构建会自动编译静态库及
 `process_launcher`、`agent_worker`。macOS 使用 Seatbelt，Linux 运行时依赖 bubblewrap。
 其他平台不编译本地执行模块，也不携带这两个辅助程序。
 

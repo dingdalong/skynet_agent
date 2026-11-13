@@ -13,6 +13,8 @@
     "paths": {
       "@skynet/contracts": ["./packages/contracts/src/index.ts"],
       "@skynet/app-runtime": ["./packages/app-runtime/src/index.ts"],
+      "@skynet/agent-client": ["./packages/agent-client/src/index.ts"],
+      "@skynet/agent-client/*": ["./packages/agent-client/src/*"],
       "@skynet/app-sdk": ["./packages/app-sdk/src/bridge.ts"],
       "@skynet/app-sdk/react": ["./packages/app-sdk/src/react.tsx"],
       "@skynet/ui/*": ["./packages/ui/src/*"],

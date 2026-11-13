@@ -22,6 +22,7 @@ async function inspect(folder) {
         const source = await readFile(file, "utf8");
         const isBuiltin = relative.startsWith("builtins/");
         const isRuntime = isBuiltin && /runtime\.ts$/.test(relative);
+        const isAgentClient = relative.startsWith("packages/agent-client/");
         const isWorkspace = relative.startsWith("packages/workspace/");
         const isBridge = relative.startsWith("packages/host-bridge/");
         const imports = [
@@ -40,10 +41,21 @@ async function inspect(folder) {
                 isRuntime &&
                 !name.startsWith("@skynet/contracts") &&
                 !name.startsWith("@skynet/app-runtime") &&
+                name !== "@skynet/agent-client" &&
+                name !== "../manifest.json" &&
                 !name.startsWith("./")
             )
                 failures.push(
                     `${relative}: runtime dependency ${name} crosses its boundary`,
+                );
+            if (
+                isAgentClient &&
+                !name.startsWith("./") &&
+                name !== "@skynet/contracts" &&
+                name !== "protobufjs/light"
+            )
+                failures.push(
+                    `${relative}: business protocol layer cannot import ${name}`,
                 );
             if (
                 relative.startsWith("apps/host/src/") &&
@@ -90,8 +102,8 @@ async function inspect(folder) {
                 `${relative}: use SDK capabilities; do not own native resources in the view`,
             );
         if (
-            isRuntime &&
-            /\b(window|document|navigator|setTimeout|setInterval)\b/.test(
+            (isRuntime || isAgentClient) &&
+            /\b(window|document|navigator|setTimeout|setInterval|fetch|WebSocket|Worker|XMLHttpRequest)\b/.test(
                 source,
             )
         )

@@ -7,6 +7,7 @@ import { readdir, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import "./generate-tokens.mjs";
+import "./generate-protocol.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const aliases = {
@@ -14,6 +15,9 @@ const aliases = {
     react: `${root}node_modules/react`,
     "@skynet/contracts": `${root}packages/contracts/src/index.ts`,
     "@skynet/app-runtime": `${root}packages/app-runtime/src/index.ts`,
+    "@skynet/agent-client/selectors": `${root}packages/agent-client/src/selectors.ts`,
+    "@skynet/agent-client/types": `${root}packages/agent-client/src/types.ts`,
+    "@skynet/agent-client": `${root}packages/agent-client/src/index.ts`,
     "@skynet/app-sdk/react": `${root}packages/app-sdk/src/react.tsx`,
     "@skynet/app-sdk": `${root}packages/app-sdk/src/bridge.ts`,
     "@skynet/ui": `${root}packages/ui/src`,
@@ -54,6 +58,7 @@ export async function packageApp(source, output) {
         format: "iife",
         globalName: "SkynetRuntime",
         target: "es2020",
+        inject: [`${root}packages/app-runtime/src/text-codec.ts`],
         alias: aliases,
         footer: { js: "globalThis.SkynetApp = SkynetRuntime.default;" },
     });

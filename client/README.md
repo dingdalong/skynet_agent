@@ -6,10 +6,11 @@ Node.js 只用于开发构建，不随 App 分发。
 
 ```text
 apps/host/          原生宿主、工作区表现、macOS 桥接和进程监督
-builtins/          设置与空白 Agent，分别包含 manifest、runtime 与 view
+builtins/          设置与 Agent 对话，分别包含 manifest、runtime 与 view
 packages/contracts 消息、清单和状态契约
 packages/app-sdk   Web 表现桥接与可失效订阅
 packages/app-runtime 同步 Actor 定义
+packages/agent-client 二进制协议、会话、流式任务和恢复规则
 packages/ui        官方 shadcn 组件源码与共享样式
 packages/tokens    单一令牌源与生成主题
 tooling/           构建、打包、架构检查、原生验收与应用模板

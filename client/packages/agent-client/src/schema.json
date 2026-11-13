@@ -1,0 +1,316 @@
+{
+  "nested": {
+    "skynet": {
+      "nested": {
+        "agent": {
+          "nested": {
+            "v1": {
+              "nested": {
+                "ChatMessage": {
+                  "fields": {
+                    "content": { "id": 3, "type": "string" },
+                    "created_at": { "id": 4, "type": "uint64" },
+                    "error": { "id": 7, "type": "ErrorInfo" },
+                    "id": { "id": 1, "type": "string" },
+                    "reasoning": {
+                      "id": 10,
+                      "rule": "repeated",
+                      "type": "ReasoningBlock"
+                    },
+                    "ret": { "id": 8, "type": "int32" },
+                    "role": { "id": 2, "type": "MessageRole" },
+                    "run_id": { "id": 6, "type": "string" },
+                    "status": { "id": 5, "type": "MessageStatus" },
+                    "tool_calls": {
+                      "id": 9,
+                      "rule": "repeated",
+                      "type": "ToolCall"
+                    }
+                  }
+                },
+                "ChatReq": {
+                  "fields": {
+                    "execution_target": { "id": 6, "type": "ExecutionTarget" },
+                    "model_id": { "id": 5, "type": "string" },
+                    "retry_run_id": { "id": 4, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" },
+                    "text": { "id": 3, "type": "string" }
+                  }
+                },
+                "ChatRes": {
+                  "fields": {
+                    "chat_session": { "id": 4, "type": "ChatSession" },
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "ChatSession": {
+                  "fields": {
+                    "execution_target": { "id": 4, "type": "ExecutionTarget" },
+                    "model_id": { "id": 2, "type": "string" },
+                    "permission_model_id": { "id": 3, "type": "string" },
+                    "session": { "id": 1, "type": "SessionState" }
+                  }
+                },
+                "DesktopDevice": {
+                  "fields": {
+                    "id": { "id": 1, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "online": { "id": 3, "type": "bool" },
+                    "remote_enabled": { "id": 4, "type": "bool" }
+                  }
+                },
+                "DesktopRegisterReq": {
+                  "fields": {
+                    "authorization_id": { "id": 4, "type": "string" },
+                    "device_id": { "id": 1, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "remote_enabled": { "id": 3, "type": "bool" }
+                  }
+                },
+                "DesktopRegisterRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "DesktopUpdatedNtf": {
+                  "fields": { "device": { "id": 1, "type": "DesktopDevice" } }
+                },
+                "ErrorInfo": {
+                  "fields": {
+                    "message": { "id": 2, "type": "string" },
+                    "retryable": { "id": 3, "type": "bool" }
+                  },
+                  "reserved": [[1, 1], "code"]
+                },
+                "ExecutionActionNtf": {
+                  "fields": {
+                    "arguments": { "id": 6, "type": "string" },
+                    "authorization_id": { "id": 9, "type": "string" },
+                    "operation": { "id": 5, "type": "string" },
+                    "remote": { "id": 8, "type": "bool" },
+                    "request_id": { "id": 1, "type": "string" },
+                    "run_id": { "id": 3, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" },
+                    "tool_call_id": { "id": 4, "type": "string" },
+                    "workspace_id": { "id": 7, "type": "string" }
+                  }
+                },
+                "ExecutionResultReq": {
+                  "fields": {
+                    "request_id": { "id": 1, "type": "string" },
+                    "result": { "id": 2, "type": "string" }
+                  }
+                },
+                "ExecutionResultRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "ExecutionTarget": {
+                  "fields": {
+                    "device_id": { "id": 1, "type": "string" },
+                    "directory": { "id": 3, "type": "string" },
+                    "platform": { "id": 4, "type": "string" },
+                    "workspace_id": { "id": 2, "type": "string" }
+                  }
+                },
+                "LoginReq": {
+                  "fields": { "username": { "id": 1, "type": "string" } }
+                },
+                "LoginRes": {
+                  "fields": {
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" },
+                    "snapshot": { "id": 4, "type": "UserSnapshot" }
+                  }
+                },
+                "MessageCancelReq": {
+                  "fields": {
+                    "run_id": { "id": 3, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" }
+                  }
+                },
+                "MessageCancelRes": {
+                  "fields": {
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "MessageDeltaNtf": {
+                  "fields": {
+                    "delta": { "id": 4, "type": "string" },
+                    "message_id": { "id": 3, "type": "string" },
+                    "revision": { "id": 5, "type": "uint32" },
+                    "run_id": { "id": 2, "type": "string" },
+                    "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "MessageRole": {
+                  "values": {
+                    "MESSAGE_ROLE_ASSISTANT": 2,
+                    "MESSAGE_ROLE_UNSPECIFIED": 0,
+                    "MESSAGE_ROLE_USER": 1
+                  }
+                },
+                "MessageStatus": {
+                  "values": {
+                    "MESSAGE_STATUS_CANCELLED": 3,
+                    "MESSAGE_STATUS_COMPLETED": 2,
+                    "MESSAGE_STATUS_FAILED": 4,
+                    "MESSAGE_STATUS_STREAMING": 1,
+                    "MESSAGE_STATUS_UNSPECIFIED": 0
+                  }
+                },
+                "ModelOption": {
+                  "fields": {
+                    "id": { "id": 1, "type": "string" },
+                    "model": { "id": 3, "type": "string" },
+                    "name": { "id": 2, "type": "string" }
+                  }
+                },
+                "ReasoningBlock": {
+                  "fields": {
+                    "id": { "id": 1, "type": "string" },
+                    "model_id": { "id": 3, "type": "string" },
+                    "run_id": { "id": 2, "type": "string" },
+                    "status": { "id": 5, "type": "string" },
+                    "text": { "id": 4, "type": "string" }
+                  }
+                },
+                "ReasoningDeltaNtf": {
+                  "fields": {
+                    "block": { "id": 4, "type": "ReasoningBlock" },
+                    "message_id": { "id": 2, "type": "string" },
+                    "revision": { "id": 5, "type": "uint32" },
+                    "session_id": { "id": 1, "type": "string" },
+                    "tool_call_id": { "id": 3, "type": "string" }
+                  }
+                },
+                "SessionExecutionSetReq": {
+                  "fields": {
+                    "session_id": { "id": 1, "type": "string" },
+                    "target": { "id": 2, "type": "ExecutionTarget" }
+                  }
+                },
+                "SessionExecutionSetRes": {
+                  "fields": {
+                    "chat_session": { "id": 3, "type": "ChatSession" },
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "SessionModelSetReq": {
+                  "fields": {
+                    "model_id": { "id": 2, "type": "string" },
+                    "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "SessionModelSetRes": {
+                  "fields": {
+                    "chat_session": { "id": 4, "type": "ChatSession" },
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "SessionState": {
+                  "fields": {
+                    "cancelling": { "id": 7, "type": "bool" },
+                    "id": { "id": 1, "type": "string" },
+                    "messages": {
+                      "id": 5,
+                      "rule": "repeated",
+                      "type": "ChatMessage"
+                    },
+                    "revision": { "id": 4, "type": "uint32" },
+                    "run_id": { "id": 6, "type": "string" },
+                    "title": { "id": 2, "type": "string" },
+                    "updated_at": { "id": 3, "type": "uint64" }
+                  }
+                },
+                "SessionUpdatedNtf": {
+                  "fields": {
+                    "chat_session": { "id": 1, "type": "ChatSession" }
+                  }
+                },
+                "ToolCall": {
+                  "fields": {
+                    "arguments": { "id": 3, "type": "string" },
+                    "changed_files": {
+                      "id": 10,
+                      "rule": "repeated",
+                      "type": "string"
+                    },
+                    "error": { "id": 11, "type": "string" },
+                    "exit_code": {
+                      "id": 8,
+                      "options": { "proto3_optional": true },
+                      "type": "int32"
+                    },
+                    "id": { "id": 1, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "output": { "id": 7, "type": "string" },
+                    "permission_mode": { "id": 6, "type": "string" },
+                    "permission_reason": { "id": 5, "type": "string" },
+                    "process_id": { "id": 12, "type": "string" },
+                    "reasoning": {
+                      "id": 15,
+                      "rule": "repeated",
+                      "type": "ReasoningBlock"
+                    },
+                    "run_id": { "id": 13, "type": "string" },
+                    "status": { "id": 4, "type": "string" },
+                    "truncated": { "id": 9, "type": "bool" },
+                    "working_directory": { "id": 14, "type": "string" }
+                  },
+                  "oneofs": { "_exit_code": { "oneof": ["exit_code"] } }
+                },
+                "ToolUpdatedNtf": {
+                  "fields": {
+                    "message_id": { "id": 2, "type": "string" },
+                    "revision": { "id": 4, "type": "uint32" },
+                    "session_id": { "id": 1, "type": "string" },
+                    "tool": { "id": 3, "type": "ToolCall" }
+                  }
+                },
+                "UserSnapshot": {
+                  "fields": {
+                    "chat_sessions": {
+                      "id": 3,
+                      "rule": "repeated",
+                      "type": "ChatSession"
+                    },
+                    "default_model_id": { "id": 5, "type": "string" },
+                    "desktops": {
+                      "id": 7,
+                      "rule": "repeated",
+                      "type": "DesktopDevice"
+                    },
+                    "models": {
+                      "id": 4,
+                      "rule": "repeated",
+                      "type": "ModelOption"
+                    },
+                    "permission_model_id": { "id": 6, "type": "string" },
+                    "user_id": { "id": 1, "type": "string" },
+                    "username": { "id": 2, "type": "string" }
+                  }
+                },
+                "UserSnapshotReq": { "fields": {} },
+                "UserSnapshotRes": {
+                  "fields": {
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" },
+                    "snapshot": { "id": 4, "type": "UserSnapshot" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

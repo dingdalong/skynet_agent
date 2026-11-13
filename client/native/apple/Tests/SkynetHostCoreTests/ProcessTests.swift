@@ -344,6 +344,29 @@ final class ProcessTests: XCTestCase {
         host.detach(second)
     }
 
+    func testRepeatedBoundedStateTransitionsDoNotRetainOldFrames() throws {
+        let code = """
+            globalThis.SkynetApp = {
+              initialState(){return {text:"x".repeat(65536), count:0}},
+              reduce(state){return {state:{...state,count:state.count+1},result:state.count+1}}
+            };
+            """
+        install(try package("test.frames", code: code))
+        let lease = host.attach(appId: "test.frames") { _ in }
+        defer { host.detach(lease) }
+        for index in 1...512 {
+            let done = expectation(description: "bounded transition \(index)")
+            var response: Result<[String: Any], Error>?
+            host.request(lease: lease, kind: "command", input: ["name": "increment"]) {
+                response = $0
+                done.fulfill()
+            }
+            wait(for: [done], timeout: 4)
+            let value = try XCTUnwrap(response).get()
+            XCTAssertEqual(value["result"] as? Int, index)
+        }
+    }
+
     func testMemoryGrowthIsTerminated() throws {
         let code = """
             globalThis.SkynetApp = {
@@ -363,6 +386,190 @@ final class ProcessTests: XCTestCase {
             failed.fulfill()
         }
         wait(for: [failed], timeout: 4)
+        host.detach(lease)
+    }
+
+    func testBinarySocketAndNativeTimerSurviveViewDetach() throws {
+        let url = try XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"])
+        let code = """
+            globalThis.SkynetApp = {
+              initialState(){return {events:[],connectionId:"",data:"",timer:false}},
+              start(state){return {state,effects:[{id:"open",kind:"socket.open",input:{key:"binary",url:"\(url)"}}]}},
+              reduce(state,command){
+                if(command.type==="$effect"){
+                  const event=command.payload;
+                  if(event.id==="open") return {state:{...state,connectionId:event.value.connectionId}};
+                  if(event.id==="timer") return {state:{...state,timer:true}};
+                  return {state:{...state,events:[...state.events,event]}};
+                }
+                if(command.type==="$resource") return {state:{...state,data:command.payload.data ?? ""}};
+                if(command.type==="send") return {state,effects:[
+                  {id:"send",kind:"socket.send",input:{key:"binary",connectionId:state.connectionId,data:"AP9/gA=="}},
+                  {id:"timer",kind:"timer.wait",input:{key:"clock",milliseconds:200}}
+                ]};
+                if(command.type==="invalid") return {state,effects:[
+                  {id:"mixed",kind:"socket.send",input:{key:"binary",text:"text",data:"AA=="}},
+                  {id:"stale",kind:"socket.send",input:{key:"binary",connectionId:"expired",data:"AA=="}},
+                  {id:"oversize",kind:"socket.send",input:{key:"binary",data:"A".repeat(349532)}},
+                  {id:"delay",kind:"timer.wait",input:{key:"bad",milliseconds:true}}
+                ]};
+                if(command.type==="closeDuringSend") return {state,effects:[
+                  {id:"closed-send",kind:"socket.send",input:{key:"binary",data:"AA=="}},
+                  {id:"close",kind:"socket.close",input:{key:"binary"}}
+                ]};
+                return {state};
+              }
+            };
+            """
+        install(
+            try package("test.binary", code: code, permissions: ["network"], origins: [url]),
+            permissions: ["network"])
+        let connected = expectation(description: "startup owns binary socket")
+        var once = false
+        let lease = host.attach(appId: "test.binary") { snapshot in
+            if let id = dictionary(snapshot["state"])["connectionId"] as? String, !id.isEmpty, !once {
+                once = true
+                connected.fulfill()
+            }
+        }
+        wait(for: [connected], timeout: 5)
+        let sent = expectation(description: "binary and timer effects committed")
+        host.request(lease: lease, kind: "command", input: ["name": "send"]) { _ in sent.fulfill() }
+        wait(for: [sent], timeout: 4)
+        host.detach(lease)
+        let received = expectation(description: "native resources outlive presentation")
+        var receivedOnce = false
+        let second = host.attach(appId: "test.binary") { snapshot in
+            let state = dictionary(snapshot["state"])
+            if state["data"] as? String == "AP9/gA==", state["timer"] as? Bool == true, !receivedOnce {
+                receivedOnce = true
+                received.fulfill()
+            }
+        }
+        wait(for: [received], timeout: 5)
+        let rejected = expectation(description: "malformed resource operations rejected independently")
+        var rejectedOnce = false
+        let third = host.attach(appId: "test.binary") { snapshot in
+            let events = dictionary(snapshot["state"])["events"] as? [[String: Any]] ?? []
+            let errors = events.filter { $0["error"] is String }
+            if errors.count == 4, !rejectedOnce {
+                rejectedOnce = true
+                rejected.fulfill()
+            }
+        }
+        host.request(lease: second, kind: "command", input: ["name": "invalid"]) { _ in }
+        wait(for: [rejected], timeout: 5)
+        let settled = expectation(description: "closing a socket also settles its pending sends")
+        var settledOnce = false
+        let closing = host.attach(appId: "test.binary") { snapshot in
+            let events = dictionary(snapshot["state"])["events"] as? [[String: Any]] ?? []
+            if events.contains(where: { $0["id"] as? String == "closed-send" }), !settledOnce {
+                settledOnce = true
+                settled.fulfill()
+            }
+        }
+        host.request(lease: second, kind: "command", input: ["name": "closeDuringSend"]) { _ in }
+        wait(for: [settled], timeout: 5)
+        host.detach(second)
+        host.detach(third)
+        host.detach(closing)
+    }
+
+    func testRealAgentRuntimeBinaryProtocolAndPresentationReload() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let url = try XCTUnwrap(environment["SKYNET_TEST_SOCKET"])
+        let code = try String(
+            contentsOfFile: XCTUnwrap(environment["SKYNET_TEST_AGENT_RUNTIME"]), encoding: .utf8)
+        install(
+            try package("test.agent", code: code, permissions: ["network"], origins: [url]),
+            permissions: ["network"])
+        let ready = expectation(description: "Agent receives initial data in actual JavaScriptCore")
+        var once = false
+        let first = host.attach(appId: "test.agent") { snapshot in
+            if dictionary(snapshot["state"])["version"] as? Int == 1, !once {
+                once = true
+                ready.fulfill()
+            }
+        }
+        wait(for: [ready], timeout: 5)
+        host.request(
+            lease: first, kind: "command",
+            input: [
+                "name": "connection.configure",
+                "payload": ["url": "\(url)/agent", "username": "native-agent"],
+            ]
+        ) { _ in }
+        let online = expectation(description: "Agent logs in over binary socket")
+        var onlineOnce = false
+        var connectionId = ""
+        let observer = host.attach(appId: "test.agent") { snapshot in
+            let connection = dictionary(dictionary(snapshot["state"])["connection"])
+            if connection["status"] as? String == "online", !onlineOnce {
+                onlineOnce = true
+                connectionId = connection["id"] as? String ?? ""
+                online.fulfill()
+            }
+        }
+        wait(for: [online], timeout: 6)
+        let accepted = expectation(description: "chat acknowledged before detaching view")
+        var acceptedOnce = false
+        let progress = host.attach(appId: "test.agent") { snapshot in
+            let state = dictionary(snapshot["state"])
+            if state["selectedId"] as? String == "session", !acceptedOnce {
+                acceptedOnce = true
+                accepted.fulfill()
+            }
+        }
+        host.request(
+            lease: first, kind: "command",
+            input: [
+                "name": "chat.send", "payload": ["target": "", "text": "native integration"],
+            ]
+        ) { _ in }
+        wait(for: [accepted], timeout: 6)
+        host.detach(first)
+        host.detach(observer)
+        host.detach(progress)
+        let completed = expectation(
+            description: "same Agent connection receives final state after presentation reload")
+        var completedOnce = false
+        let reloaded = host.attach(appId: "test.agent") { snapshot in
+            let state = dictionary(snapshot["state"])
+            let session = dictionary(dictionary(dictionary(state["sessions"])["session"])["session"])
+            let messages = session["messages"] as? [[String: Any]] ?? []
+            let tools = messages.first?["tool_calls"] as? [[String: Any]] ?? []
+            if messages.first?["status"] as? Int == 2, tools.first?["output"] as? String == "background✓",
+                !completedOnce
+            {
+                completedOnce = true
+                XCTAssertEqual(messages.first?["content"] as? String, "binary✓")
+                XCTAssertEqual(dictionary(state["connection"])["id"] as? String, connectionId)
+                XCTAssertEqual(state["selectedId"] as? String, "session")
+                XCTAssertEqual(state["syncing"] as? Bool, false)
+                XCTAssertEqual(dictionary(state["connection"])["nextId"] as? Int, 3)
+                completed.fulfill()
+            }
+        }
+        wait(for: [completed], timeout: 6)
+        host.detach(reloaded)
+    }
+
+    func testInstalledAppCannotAcquireBuiltinAgentDirectoryOrServerAccess() throws {
+        install(try package("test.untrusted", code: counter))
+        let lease = host.attach(appId: "test.untrusted") { _ in }
+        let denied = expectation(description: "native Agent capabilities remain builtin-only")
+        denied.expectedFulfillmentCount = 3
+        for kind in ["agent.directory.choose", "agent.server.authorize", "agent.remote.set"] {
+            host.request(lease: lease, kind: kind, input: ["url": "wss://example.com", "enabled": true]) {
+                result in
+                switch result {
+                case .success: XCTFail("Installed application acquired \(kind)")
+                case .failure(let error): XCTAssertEqual((error as? HostError)?.code, "permission")
+                }
+                denied.fulfill()
+            }
+        }
+        wait(for: [denied], timeout: 4)
         host.detach(lease)
     }
 

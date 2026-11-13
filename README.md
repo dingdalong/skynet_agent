@@ -1,7 +1,8 @@
 # Skynet Agent
 
 基于 Skynet 与 Lua 的 Agent 服务端，搭配 React Native macOS 宿主与 shadcn/ui 子应用。
-客户端目前提供桌面、Dock、设置、空白 Agent、后台与双应用分屏；聊天业务尚未接入新界面。
+客户端提供桌面、Dock、设置、Agent 对话、后台与双应用分屏。
+Agent 支持会话恢复、流式消息、模型选择、取消、失败重试及服务器工具记录。
 服务端保留多会话、流式对话、模型选择、工具执行与权限管理能力。
 
 项目尚未发布。服务端按用户名识别用户，聊天数据保存在进程内存。
@@ -28,6 +29,8 @@ make -C server build
 ```
 
 服务管理使用 `./server/control.sh status|stop|force-stop`。客户端通过系统菜单或 `⌘Q` 退出。
+打开 Agent 后，在“连接设置”中填写服务器地址和用户名；可使用服务器工作目录或授权本机项目运行任务。
+连接配置、权限范围与恢复规则见 [Agent 客户端](docs/architecture/CLIENT_AGENT.md)。
 `make build` 构建服务端及正式 macOS 客户端，更多入口见 `make help`。
 
 ## 文档
