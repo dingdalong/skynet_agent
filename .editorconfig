@@ -16,9 +16,6 @@ trim_trailing_whitespace = false
 indent_style = space
 indent_size = 2
 
-[*.dart]
-indent_size = 2
-
 [*.{json,proto,yaml,yml}]
 indent_style = space
 indent_size = 2

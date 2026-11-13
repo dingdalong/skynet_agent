@@ -1,0 +1,5 @@
+module AgentRuntime [system] {
+    header "shim.h"
+    link "agent_runtime"
+    export *
+}

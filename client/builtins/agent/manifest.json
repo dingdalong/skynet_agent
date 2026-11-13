@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "minimumHostVersion": 1,
+  "stateVersion": 1,
+  "id": "agent",
+  "name": "Agent",
+  "version": "1.0.0",
+  "permissions": [],
+  "networkOrigins": [],
+  "actions": {}
+}

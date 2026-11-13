@@ -5,10 +5,16 @@
 *.dSYM/
 .agents/experience/
 .tools/
-/client/.dart_tool/
-/client/**/.dart_tool/
 /client/**/build/
 /client/**/coverage/
 /client/test-artifacts/
+/client/**/node_modules/
+/client/**/dist/
+/client/vendor/
+/client/.bundle/
+/client/**/Pods/
+/client/**/DerivedData/
+/client/**/.build/
+/.pnpm-store/
 
 /common/native/agent_runtime/build/

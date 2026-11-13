@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "minimumHostVersion": 1,
+  "stateVersion": 1,
+  "id": "settings",
+  "name": "设置",
+  "version": "1.0.0",
+  "permissions": ["host.preferences", "host.apps"],
+  "networkOrigins": [],
+  "actions": {
+    "navigation.open": {
+      "title": "打开设置分类",
+      "input": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": ["appearance", "wallpaper", "motion", "apps"]
+          }
+        },
+        "required": ["section"],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": { "section": { "type": "string" } },
+        "required": ["section"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

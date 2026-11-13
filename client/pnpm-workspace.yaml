@@ -1,0 +1,12 @@
+packages:
+  - apps/host
+  - builtins/*
+  - packages/*
+nodeLinker: hoisted
+storeDir: ../.tools/pnpm-store
+confirmModulesPurge: false
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - prettier@3.10.1
+  - ws@8.23.0

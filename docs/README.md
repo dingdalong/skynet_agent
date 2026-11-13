@@ -16,10 +16,9 @@
 
 - [Agent WebSocket 网关](architecture/AGENT_GATEWAY.md)：服务生命周期、会话同步、二进制协议和工具执行。
 - [Agent 提示词](architecture/PROMPTS.md)：提示词、项目规则、对话历史与 Agent 接入示例。
-- [共用工具运行时](../common/native/agent_runtime/README.md)：服务端使用的公共 C 核心。
+- [共用工具运行时](../common/native/agent_runtime/README.md)：服务端工具与客户端子进程使用的公共 C 核心。
 
 ## 客户端设计
 
-- [Flutter Apple 设计规范](design/APPLE_FLUTTER_DESIGN.md)：新客户端的视觉、跨平台交互、辅助功能与审查要求。
-- [macOS 组件画廊](design/COMPONENT_GALLERY.md)：共享 UI 包、组件示例与运行验证。
-- [hig-mcp](https://github.com/aka-kika/hig-mcp)：Apple HIG 与语义令牌查询。
+- [客户端设计规范](design/CLIENT_DESIGN.md)：shadcn 组件、统一令牌、工作区交互和原生验收。
+- [客户端开发](../client/README.md)：React Native 宿主、独立应用包与开发入口。

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "minimumHostVersion": 1,
+  "stateVersion": 1,
+  "id": "test.connection",
+  "name": "连接测试",
+  "version": "1.0.0",
+  "permissions": ["network"],
+  "networkOrigins": [],
+  "actions": {}
+}

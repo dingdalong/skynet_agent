@@ -1008,9 +1008,9 @@
 ### L-073: Flutter Apple UI 基线与旧客户端独立演进
 
 - 类型：Success
-- 状态：Verified
-- 范围调整：2026-11-12 用户取消保留旧客户端的决定；旧工程已按 L-088 替换。
-  本条的 Apple 视觉基线继续适用，旧工程保留规则不再适用。
+- 状态：Superseded
+- 替代说明：2026-11-13 用户改用 React Native macOS 与官方 shadcn/ui，见 L-090。
+  Flutter、Cupertino、HIG MCP 与旧工程保留决定均不约束当前实现；实际 macOS 验收原则继续适用。
 - 范围：Flutter、Apple 风格、macOS 首版、项目设计规范
 - 触发：用户批准从 Vue/Tauri 设计探索转向 Flutter 全平台方案，首版仅需 macOS 组件演示。
 - 解法：官方 cupertino_ui 为基础，在 apple_ui 补齐桌面交互与语义令牌；首版使用清晰表面。HIG 与 Apple 原文用于依据查询，本机系统用于实际对照。统一规范、共享主题与图标提供开发入口，现有 Demo 用于可选预览和验收，整个旧 client 保留。
@@ -1024,13 +1024,14 @@
 
 - 类型：Pitfall
 - 状态：Verified
-- 范围：macOS WKWebView、WAAPI、应用切换与退出动画
+- 范围：macOS WKWebView、WAAPI、requestAnimationFrame、应用切换与首屏就绪
 - 触发：后台原生窗口恢复应用后仍显示缩略卡片，前台浏览器同路径正常。
 - 根因：实际原生诊断显示 document.hidden=true，动画为 running 但 currentTime=0；宿主暂停后台动画时间线，初帧 transform 持续影响显示，等待 finished 不能保证收敛。
 - 解法：页面隐藏时直接呈现最终状态；visibilitychange 进入后台时取消现有动画并清理退出视觉层，业务状态不依赖动画完成事件。
+- 后续复现：2026-11-13，首屏在 React 提交后等待两次 requestAnimationFrame，真实无窗口 WebKit 已经 complete、主题与页面正确，却始终不发就绪通知。隐藏文档直接通知，可见文档再等待绘制帧；同一检查和完整 22 项原生集成通过。
 - 证据：macOS 重新启动后仍复现，修复后同路径完整恢复并能分屏；E2E 覆盖隐藏页面启动和过渡中转入后台，三个配置通过。截图和诊断事实见 client/test-artifacts/shell/REPORT.md。
 - Done right：原生检查先核对页面可见性和动画时钟；背景截图不能证明前台动效完成，浏览器模拟也不能替代真实宿主行为。
-- Seen: 1× (2026-11-10; task: 20261110T174400-shell-preview.md)
+- Seen: 2× (2026-11-10; task: 20261110T174400-shell-preview.md; 2026-11-13; task: 20261113T202152-workspace-transitions.md)
 
 ### L-074: Flutter 持续动画页面等待具体交互状态
 
@@ -1072,16 +1073,17 @@
 
 - 类型：Success
 - 状态：Verified
-- 范围：HTML 工作区原型、后续 Flutter 外壳、应用分屏与统一导航
+- 范围：客户端工作区、React Native macOS、应用分屏与统一导航
 - 触发：实现或调整应用分屏入口、后台恢复及 Dock 行为。
 - 解法：用户明确改为从当前应用顶部布局把手向左或右拖动，先形成“应用＋桌面”；桌面与应用共用分隔条及 1/3、1/2、2/3 吸附规则。点击桌面上的另一应用时填入该侧，保持当前比例，不要求应用位于 Dock。Dock 仅在完整桌面显示；所有平台使用顶部可见导航与键盘入口。
 - 统一导航：2026-11-12 用户进一步确认桌面与手机、平板统一操作逻辑，所有平台使用安全区内的顶部“返回桌面”和“后台应用”；桌面提供后台入口，后台提供返回桌面入口。移除底边上滑、停顿及仿系统指示条，保留应用内拖动；手机保持单应用，桌面和平板按内容宽度启用分屏。App 与 Web 同步适用；浏览器桌面模式、外接键鼠和窗口尺寸变化不切换导航方式。
-- 实时反馈：拖动应用分屏、交换位置及从分屏拖成全屏时直接显示实际布局，不用落位蓝框或确认提示；松手前可拉回，取消恢复原组合与比例，松手后保留结果。
+- 实时反馈：标题拖动只负责左右放置或交换，保留另一应用及各自宽度；拖回中间恢复原组合。分隔条在 1/3、1/2、2/3 吸附，达到最小比例后继续向外拖过阈值，松手收起这一侧，另一侧全屏；松手前拉回撤销。被收起的应用留在后台，保留侧为桌面时返回桌面。布局不使用落位蓝框或确认提示。
 - 后台退出：点击卡片外区域返回桌面，空后台也可退出；不关闭已有应用或重置页面状态。
 - 证据：2026-11-12 用户最新交互决定；client/workspace-demo.html、docs/design/WORKSPACE_DEMO.md；统一导航最终四配置 108 项 E2E 及 make check 通过，见 client/test-artifacts/workspace/unified-navigation-e2e.log、unified-navigation-check.log。
+- 后续决定与验证：2026-11-13 用户进一步区分标题交换与分隔条收起。7 项逻辑与 22 项原生集成通过，含收起后进程 ID 和状态保留；Computer Use 辅助功能动作验证两应用分屏、最小比例后收起、后台恢复与桌面保留路径。持续拖动未由后台工具完成验收。
 - Done right：将 desktop 与应用都作为正式 pane 管理，用同一比例和约束支持两种分屏状态；新增应用不通过 Dock 位置决定能否分屏。
-- Seen: 1× (2026-11-12; task: 20261112T121551-workspace-gestures.md)
-- 备注：替代本轮早期顶部菜单、Dock 导航按钮与底边上滑方案；Flutter macOS 工作区已实现并通过原生交互与偏好保存流程，证据见 client/test-artifacts/flutter-workspace/native-release-final.log。WebKit 拖动为鼠标路径，未宣称真实移动设备手势验收。
+- Seen: 2× (2026-11-12; task: 20261112T121551-workspace-gestures.md; 2026-11-13; task: 20261113T202152-workspace-transitions.md)
+- 备注：历史 HTML 与 Flutter 实现已被 React Native macOS 宿主替代；当前只验收 macOS，不宣称移动端或完整持续拖动已验收。
 
 ### L-078: 拖动提交前检查内容区尺寸，不能只等待 ResizeObserver 取消
 
@@ -1208,6 +1210,8 @@
 
 - 类型：Success
 - 状态：Verified
+- 范围调整：2026-11-13 Flutter 实现已被 L-090 替换；本条的宿主所有权与订阅原则继续适用，
+  isolate 与 Web 执行建议不约束新的独立业务进程方案。
 - 范围：Flutter 客户端替换、Actor、界面重建、服务端测试协议
 - 触发：用户要求删除旧客户端、保留服务端，并要求界面重建不打断业务。
 - 解法：Flutter 工作区统一迁入 client；删除 Vue/Tauri 与客户端 Rust，保留公共 C 核心。
@@ -1234,3 +1238,122 @@
   编码与协作规范及开发指南已明确范围。
 - Done right：先根据改动选择服务端、客户端或跨系统流程，再选执行命令；不以总入口扩大测试范围。
 - Seen: 1× (2026-11-13; task: 20261113T005931-server-tests-lua.md)
+
+### L-090: 动态子应用分别验证业务进程隔离与宿主资源生命周期
+
+- 类型：Success
+- 状态：Verified
+- 范围：React Native macOS、shadcn WebView、独立 JavaScriptCore 业务进程
+- 触发：用户要求替换 Flutter，并让未来 Agent 动态开发和串联内部应用。
+- 解法：HostCore 拥有权限、存储、任务与连接，每应用独立进程同步串行转换状态；
+  WebView 和 React Native 只持有可失效订阅。动作调用通过身份、授权与 schema 校验。
+- 证据：18 项原生集成覆盖进程挂起、崩溃、内存、安装更新、权限、取消与实际 WebKit。
+  原生 UI 流程确认整个 React 表现重载后原生连接 ID 和回环服务器物理连接 UUID 不变，
+  动态生成的应用计数在界面重载和宿主退出重开后保留。
+- Done right：分别测试 UI 重建、业务进程故障和宿主资源，不把错误边界描述为进程隔离。
+  当前只有 macOS；空白 Agent 与回环夹具不代表真实 Agent 业务已接入。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-091: 原生工作区动画需要实景与同流程采样
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：React Native macOS 0.83 Fabric、AppKit、Core Animation
+- 触发：原生驱动场景动画使画面透明；改用 JS 驱动后虽可见，用户仍报告打开卡顿。
+- 根因：AX 存在不代表画面已合成；JS 驱动整页过渡持续提交整个视图树，打开采样中有大量 Fabric 挂载和动画工作。
+- 解法：工作区改用原生合成层短过渡，最终模型层始终保持完成状态；
+  不让动画完成回调控制业务与布局。减少动态效果与系统设置优先。
+- 证据：真实 Release App 同样三次打开/返回、各 15 秒 Time Profiler，
+  Fabric 相关统计采样权重从 988 ms 降至 22 ms，JS 线程从 1072 ms 降至 18 ms。
+  原生窗口确认全屏内容可见。证据见 client/test-artifacts/open-profile-comparison.json。
+- 后续验证：同日针对分屏，面板保留旧几何并在 Fabric 布局后执行原生 FLIP；实际诊断确认全屏到半屏宽度 1280→636、左右交换位置 0↔644 均执行 240ms 过渡。返回桌面不位移。证据见 client/test-artifacts/workspace-polish/native-placement.log；系统日志没有输出本身不能证明回调未执行。
+- 入场分别处理：应用面板与后台卡片组在挂载时执行一次原生短过渡，桌面不添加入场。实际原生采样确认两者 60ms、160ms 的 presentation 值变化，模型层始终为 opacity=1、transform=identity；减少动态效果时没有入场动画。正常切换和快速进入后台后立即返回桌面均验证。证据见 client/test-artifacts/workspace-polish/native-entrance.log。
+- Done right：CPU 统计采样权重不等于帧率或动画时长；截图也不能证明整段动画流畅。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md; reused by: 20261113T202152-workspace-transitions.md)
+
+### L-092: 共享 shadcn 源码需要显式加入 Tailwind 扫描
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Tailwind 4、monorepo、共享 UI 包、实际 WebKit
+- 触发：子应用从共享包导入组件，打包后按钮、卡片和开关样式缺失。
+- 根因：默认源码扫描没有覆盖公共组件，生成 CSS 缺少工具类。
+- 解法：共享样式入口使用显式 @source 注册共享源码；真实 WebKit 验证控件布局、圆角和尺寸。
+- 证据：testPackagedSettingsBridgeThemeAndResponsiveLayout 与原生设置截图通过。
+- Done right：检查构建产物的实际样式，不能仅以源码类名存在或 TypeScript 通过判断。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-093: 逐行 IPC 必须在真实 socket 上验证短帧读取
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Swift Foundation、POSIX、公共 C 进程核心、duplex socket
+- 触发：helper 使用长度式 Foundation 读取短 JSON 帧时超时。
+- 根因：实际双向流上的读取没有按当前可用协议帧及时返回，文件读写测试不能覆盖该行为。
+- 解法：使用 POSIX 读取可用字节并自行分帧，限制单帧大小和轮询工作量。
+- 证据：真实 helper 的 32 条有序命令、超时隔离与另一应用继续响应测试通过。
+- Done right：先验证进程实际 transport 的小包和部分帧，再验证业务状态机。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-094: 带摘要的构建资源目录必须完整替换
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：macOS 应用包、资源摘要、增量构建
+- 触发：增量复制保留旧 hash 文件，新 manifest 已不再登记它们。
+- 根因：合并目录使资源真实集合与新清单不一致，启动时被完整性校验拒绝。
+- 解法：构建资源按完整目录替换，framework 拷贝保留符号链接。
+- 证据：完整性拒绝、安装更新及正式 App 内置包加载通过。
+- Done right：资源完整性校验和构建复制使用相同的文件集合语义。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-095: 本地 ad-hoc 签名通过后仍须从产物实际启动
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：macOS Release、Hermes、Hardened Runtime、动态库验证
+- 触发：编译与签名通过，但 dyld 因嵌入引擎与宿主 Team ID 验证拒绝启动。
+- 解法：本地 ad-hoc 构建不启用 Hardened Runtime；分发另行接入统一签名身份、硬化与公证。
+- 证据：修正后原生 App 可启动，设置、分屏、动态安装与连接保留场景分别通过。
+- Done right：不把本地签名验证描述为分发就绪，验收最新产物的真实启动路径。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-096: 应用访问授权不等于接管前台输入的授权
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Computer Use、macOS XCUITest、自动验收入口
+- 触发：Computer Use 失败后静默切换 XCUITest，用户无法同时使用鼠标。
+- 根因：两种工具的前台输入影响不同，不能只根据都能操作 UI 就互相替代。
+- 解法：XCUITest 入口默认拒绝，需先说明影响并安排用户确认的测试时段；
+  显式开关及 preflight 在构建和 UI 启动前检查。
+- 证据：默认脚本和 Make 入口退出 2，显式启用的 preflight 退出 0，均未启动 UI。
+- Done right：工具不可用时保留未验收项；不得自行启用前台输入开关。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-097: 插件启用后的服务配置需要由新 MCP 进程加载
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：本机 ChatGPT/Codex、Computer Use、node_repl
+- 触发：开关启用后有效配置已有 Sky，当前工具仍报 Trusted RPC service is not configured。
+- 根因：已运行的工具仍使用启用前的服务登记，重置 JavaScript 内核没有更新 MCP 启动环境。
+- 解法：核对有效配置，保留官方生成的服务入口，完整重载承载客户端后先做只读查询，再验证普通点击。
+- 证据：重载前查询持续失败，重载后真实 App 控件树、截图、设置点击均成功；
+  不需要项目覆盖官方服务路径，没有修改全局配置或重装组件。
+- Done right：服务启动恢复与拖动能力分开验收。当前后台拖动仍未通过，
+  事件到达但持续按下状态为零；底层原因未独立确认。
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
+
+### L-098: Web 子应用首屏直接使用最新状态与主题
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：WKWebView、React SDK、应用恢复和表现重载
+- 触发：设置重开先显示默认分类或浅色，随后才跳到已保存页面与深色。
+- 根因：异步桥接快照晚于第一 render，普通 effect 又晚于首屏布局；固定延迟遮罩不能保证使用正确文档。
+- 解法：原生等待业务状态初始化，每次主文档导航前注入最新快照、主题及文档身份；SDK 首次 render 直接使用快照，并在布局阶段应用主题。首屏提交后通知就绪，原生校验当前 WebView 与文档身份后局部揭开同色遮罩；超时只提供重载，不重启业务或重放命令。
+- 无障碍补充：揭开异步 Web 内容后发送原生 layoutChanged 通知。减少动态效果下恢复设置时，原生 Web 已 ready 且层级可见，Computer Use 却一直读取旧的空内容状态，Tab 后才更新；添加标准通知后两轮恢复均无需额外输入即可读取控件。工具内部缓存机制没有独立确认，不能把该现象直接归因于页面未渲染或动画卡死。
+- 证据：真实 WebKit 在保存壁纸分类和深色后重载，首屏快照与页面保持正确；空白 Agent 同样就绪。完整 22 项原生集成通过，实际 Release App 重开恢复保存分类。
+- Done right：分别检查冷开、重开、重载、隐藏文档及过期文档信号；业务初始化与可见绘制帧分开处理，后台限制见 L-071。
+- Seen: 1× (2026-11-13; task: 20261113T202152-workspace-transitions.md)
