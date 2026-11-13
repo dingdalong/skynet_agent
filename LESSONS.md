@@ -1268,8 +1268,13 @@
   原生窗口确认全屏内容可见。证据见 client/test-artifacts/open-profile-comparison.json。
 - 后续验证：同日针对分屏，面板保留旧几何并在 Fabric 布局后执行原生 FLIP；实际诊断确认全屏到半屏宽度 1280→636、左右交换位置 0↔644 均执行 240ms 过渡。返回桌面不位移。证据见 client/test-artifacts/workspace-polish/native-placement.log；系统日志没有输出本身不能证明回调未执行。
 - 入场分别处理：应用面板与后台卡片组在挂载时执行一次原生短过渡，桌面不添加入场。实际原生采样确认两者 60ms、160ms 的 presentation 值变化，模型层始终为 opacity=1、transform=identity；减少动态效果时没有入场动画。正常切换和快速进入后台后立即返回桌面均验证。证据见 client/test-artifacts/workspace-polish/native-entrance.log。
+- 图标反馈补充：共享层只提交 hover/press 目标，原生只在尺寸变化时同步布局，不在每次 layout
+  提前写入状态目标。保持 AppKit backing view 几何不变，使用 sublayerTransform 变换图标内容。
+  相同持续按下采样中，直接 transform 的末端位移为预期两倍，内容层修正后桌面/Dock
+  分别稳定在 2.04/1.56，缩放中间值连续趋近 0.94。减少动态效果的同路径对照未创建几何动画；
+  证据见 client/test-artifacts/launcher-feedback/native-animation.log。真鼠标悬停和拖出取消未验收。
 - Done right：CPU 统计采样权重不等于帧率或动画时长；截图也不能证明整段动画流畅。
-- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md; reused by: 20261113T202152-workspace-transitions.md)
+- Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md; reused by: 20261113T202152-workspace-transitions.md, 20261113T232306-launcher-feedback.md)
 
 ### L-092: 共享 shadcn 源码需要显式加入 Tailwind 扫描
 
@@ -1354,6 +1359,70 @@
 - 根因：异步桥接快照晚于第一 render，普通 effect 又晚于首屏布局；固定延迟遮罩不能保证使用正确文档。
 - 解法：原生等待业务状态初始化，每次主文档导航前注入最新快照、主题及文档身份；SDK 首次 render 直接使用快照，并在布局阶段应用主题。首屏提交后通知就绪，原生校验当前 WebView 与文档身份后局部揭开同色遮罩；超时只提供重载，不重启业务或重放命令。
 - 无障碍补充：揭开异步 Web 内容后发送原生 layoutChanged 通知。减少动态效果下恢复设置时，原生 Web 已 ready 且层级可见，Computer Use 却一直读取旧的空内容状态，Tab 后才更新；添加标准通知后两轮恢复均无需额外输入即可读取控件。工具内部缓存机制没有独立确认，不能把该现象直接归因于页面未渲染或动画卡死。
+- 验证边界补充：同日后台坐标持续点击重新打开设置时，再次出现已 ready、尺寸正常但截图和 AX
+  都空白，Tab 后恢复；普通 AX 点击与最终包冷开正常。未确认后台窗口、工具或 WebKit 的具体机制，
+  因此不能把前述两轮成功扩大为所有后台绘制情形都已修复。诊断见 launcher-feedback/surface.log，
+  没有据此修改产品生命周期。
 - 证据：真实 WebKit 在保存壁纸分类和深色后重载，首屏快照与页面保持正确；空白 Agent 同样就绪。完整 22 项原生集成通过，实际 Release App 重开恢复保存分类。
 - Done right：分别检查冷开、重开、重载、隐藏文档及过期文档信号；业务初始化与可见绘制帧分开处理，后台限制见 L-071。
 - Seen: 1× (2026-11-13; task: 20261113T202152-workspace-transitions.md)
+
+### L-099: 跨平台共享层先消除平台依赖，再逐个平台开放构建
+
+- 类型：Success
+- 状态：Verified
+- 范围：React Native 工作区、宿主通信、C++ 公共规则、多平台构建入口
+- 触发：保留 RN 宿主并让桌面本地开发、移动/Web 远程控制，尽量复用 UI 和业务。
+- 解法：公共工作区只依赖标准 RN，由平台入口注入视图、语义图标、动画与通信；
+  子应用使用宿主注入的传输。C++ 共享工作区状态转换，原生宿主继续拥有连接、任务、存储与业务进程。
+  各目标在真实宿主接入前保持 planned/blocked，构建前拒绝，不能回退到另一平台。
+- 证据：11 项 Vitest、22 项 macOS 集成及首轮 Release 原生设置/分屏/重载/后台流程通过；
+  标准 RN 的 iOS/Android 依赖图与 macOS/Linux C++ 测试通过。根 Make 的未支持目标提前拒绝。
+- Done right：分别报告依赖图、公共核心、原生构建与实际体验；Windows CI 未执行、移动原生宿主未接入、
+  Linux RN 宿主未选定。辅助功能分屏不等同持续指针拖动验收，未经采样不作帧率结论。
+- Seen: 1× (2026-11-13; task: 20261113T223424-rn-shared-host.md)
+
+### L-100: Swift 包新增 C++ 依赖后同时验证最终 Xcode 消费者
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Swift Package、C ABI、静态库、外部 Xcode App
+- 触发：包内单测成功，但消费该 Swift 静态库的 App 报 Unable to resolve module dependency: HostCoreNative。
+- 根因：导出的 Swift 模块引用 C target，外部工程只有 Swift 产品路径，无法发现 C 模块映射。
+- 解法：源码中提供稳定的 C 头文件和 module.modulemap，外部工程加入该 include 路径；
+  链接所需的 C++ 标准库，不引用 SwiftPM 临时生成目录。
+- 证据：相同 make build 修复后成功；首轮 Release 签名验证、真实启动及设置与分屏操作通过。
+- Done right：包内测试覆盖逻辑，最终 App 构建与运行覆盖模块发现、链接和打包，两层都需要验证。
+- Seen: 1× (2026-11-13; task: 20261113T223424-rn-shared-host.md)
+
+### L-101: 原生目录迁移后独立编译头文件并清理构建缓存
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Swift/C 互操作、相对 include、原生包目录迁移
+- 触发：把原生包移出平台入口后，增量测试与 App 构建通过，但路径复核发现 C shim 引用不存在。
+- 根因：C 头文件仍按旧目录层级向上查找公共头文件；之前增量构建未暴露错误，
+  未进一步确认编译器内部缓存命中的具体原因。
+- 解法：先用独立 clang -fsyntax-only 复现缺失头文件，再修正相对路径；
+  清空迁移后的 native/.build，从头运行原生测试及最终 App 构建。
+- 证据：portability-header-before.log 失败、header-after 成功；干净构建后 22 项原生测试、
+  make build 和最终 App 签名验证通过。
+- Done right：移动目录时一起扫描 include、测试夹具、模块映射、复制与链接路径；
+  独立头文件编译验证路径，最终原生体验另行检查，不互相替代。
+- Seen: 1× (2026-11-13; task: 20261113T223424-rn-shared-host.md)
+
+### L-102: 防休眠与锁屏 Computer Use 分别验证
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：macOS 本地开发、Computer Use、离开电脑后的任务执行
+- 触发：接电、防休眠和 Keep Awake 都已开启，但锁屏后无法读取窗口。
+- 根因：防休眠不授予锁屏 GUI 操作能力；此前 cgWindowNotFound 的唯一原因未复现确认。
+- 解法：按官方文档在 ChatGPT 设置的 Computer Use 中单独启用 Locked use，
+  由用户完成系统插件授权；锁屏后从连接设备发起实际 Computer Use 任务验证。
+  未开启或无法使用时保留 GUI 验收缺口，不自动改用前台 XCUITest。
+- 证据：2026-11-13 官方 learn.chatgpt.com/docs/computer-use 的 Locked use 说明；
+  用户回来后正常 API 直接恢复最终 App 窗口读取与后台操作，无需重装或重新配置。
+- Done right：区分已观察的恢复、未确认的原因与尚未运行的锁屏测试；不关闭用户锁屏保护来代替功能授权。
+- Seen: 1× (2026-11-13; task: 20261113T232306-launcher-feedback.md)
+- 备注：本轮未主动锁屏测试；功能可用性与客户端版本、账号和管理要求有关。

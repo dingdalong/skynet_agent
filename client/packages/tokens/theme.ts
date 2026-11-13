@@ -76,6 +76,90 @@ export const tokens = {
             "offsetY": 12
         }
     },
+    "launcher": {
+        "rest": {
+            "scale": 1,
+            "offsetY": 0,
+            "opacity": 1
+        },
+        "desktopHover": {
+            "scale": 1.04,
+            "offsetY": -2,
+            "opacity": 1
+        },
+        "dockHover": {
+            "scale": 1.1,
+            "offsetY": -5,
+            "opacity": 1
+        },
+        "pressed": {
+            "scale": 0.94,
+            "offsetY": 0,
+            "opacity": 0.78
+        }
+    },
+    "elevation": {
+        "light": {
+            "appIcon": [
+                {
+                    "offsetX": 0,
+                    "offsetY": 2,
+                    "blurRadius": 4,
+                    "color": "#00000026"
+                },
+                {
+                    "offsetX": 0,
+                    "offsetY": 8,
+                    "blurRadius": 16,
+                    "color": "#00000029"
+                }
+            ],
+            "dock": [
+                {
+                    "offsetX": 0,
+                    "offsetY": 2,
+                    "blurRadius": 6,
+                    "color": "#0000001a"
+                },
+                {
+                    "offsetX": 0,
+                    "offsetY": 10,
+                    "blurRadius": 28,
+                    "color": "#0000002e"
+                }
+            ]
+        },
+        "dark": {
+            "appIcon": [
+                {
+                    "offsetX": 0,
+                    "offsetY": 2,
+                    "blurRadius": 4,
+                    "color": "#0000004d"
+                },
+                {
+                    "offsetX": 0,
+                    "offsetY": 8,
+                    "blurRadius": 16,
+                    "color": "#00000066"
+                }
+            ],
+            "dock": [
+                {
+                    "offsetX": 0,
+                    "offsetY": 2,
+                    "blurRadius": 6,
+                    "color": "#00000033"
+                },
+                {
+                    "offsetX": 0,
+                    "offsetY": 10,
+                    "blurRadius": 28,
+                    "color": "#00000066"
+                }
+            ]
+        }
+    },
     "wallpapers": {
         "coast": {
             "light": [

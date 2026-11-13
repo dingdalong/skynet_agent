@@ -33,6 +33,8 @@
     --wallpaper-coast: linear-gradient(145deg, #cad7d9, #7c9fa4, #385b62);
     --wallpaper-dusk: linear-gradient(145deg, #d9c8c4, #aa8e9a, #685d7d);
     --wallpaper-forest: linear-gradient(145deg, #c7d0bd, #7a9385, #365953);
+    --shadow-app-icon: 0px 2px 4px #00000026, 0px 8px 16px #00000029;
+    --shadow-dock: 0px 2px 6px #0000001a, 0px 10px 28px #0000002e;
     --radius: 8px;
 }
 .dark {
@@ -60,4 +62,6 @@
     --wallpaper-coast: linear-gradient(145deg, #263d46, #172b34, #0c171e);
     --wallpaper-dusk: linear-gradient(145deg, #423244, #2b2336, #161320);
     --wallpaper-forest: linear-gradient(145deg, #2b4036, #1c2e29, #101c19);
+    --shadow-app-icon: 0px 2px 4px #0000004d, 0px 8px 16px #00000066;
+    --shadow-dock: 0px 2px 6px #00000033, 0px 10px 28px #00000066;
 }

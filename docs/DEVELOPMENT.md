@@ -11,6 +11,7 @@
 | Node.js 与 pnpm | 客户端 TypeScript、React Native、shadcn 构建与测试；版本见 `client/package.json` |
 | Ruby 与 Bundler | CocoaPods；`make install` 将 gem 安装到项目 `.tools/gems` |
 | 完整 Xcode 与 macOS SDK | macOS 原生宿主、Swift Package Manager 与签名构建 |
+| CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
 | Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
 | Lua 5.5、LuaRocks、Busted | 服务端单元测试 |
 | netcat（nc） | 服务端控制脚本 |
@@ -25,9 +26,10 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 
 | 目录 | 内容 |
 | --- | --- |
-| `client/apps/host` | React Native macOS 宿主、原生桥接、进程监督及测试 |
+| `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 UI 验收 |
+| `client/native` | 公共 C++ 状态规则、苹果平台宿主资源与原生集成测试 |
 | `client/builtins` | 设置与空白 Agent，各自包含清单、同步业务与 Web 表现 |
-| `client/packages` | 契约、SDK、Actor 定义、shadcn 组件与共享令牌 |
+| `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、shadcn 组件与令牌 |
 | `client/tooling` | 构建、应用包模板、边界检查和原生验收 |
 | `server` | Skynet 服务端及 Lua 单元、网络集成与真实模型测试 |
 | `common` | 公共协议、测试向量及 C 工具核心 |
@@ -42,7 +44,13 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 服务端独立执行 `make -C server build` 与 `./server/start.sh`；模型密钥按配置文档准备。
 修改公共 C 核心后重新构建并重启；Lua 的兼容方法修复可使用下文热更新。
 
-`make client-build` 构建正式 macOS App，`make build` 同时构建服务端。
+`make client-build PLATFORM=macos` 构建 macOS App，`make build` 同时构建服务端。
+`make client-dev PLATFORM=macos` 是统一的开发入口；不指定 PLATFORM 时根据当前操作系统选择。
+`make client-platforms` 查询可构建状态，`make client-doctor` 查询锁定版本与构建主机。
+未接入的平台会在产生构建副作用前明确失败，不会回退到 macOS。
+`make client-core-test` 在具备 CMake、Node 和 C++17 编译器的主机上独立验证公共内核。
+`pnpm --dir client run probe:platforms` 验证共享 RN 的 iOS/Android 依赖图；不代表完整移动应用已实现。
+支持矩阵及后续接入门槛见[客户端平台接入](architecture/CLIENT_PLATFORMS.md)。
 产物位于 `client/dist/macos/Skynet Agent.app`。
 本机构建使用 ad-hoc 签名，不启用要求 Team ID 的 Hardened Runtime 库校验。
 正式分发需配置同一开发者身份签名宿主与嵌入引擎、启用 Hardened Runtime 并公证。

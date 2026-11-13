@@ -15,10 +15,10 @@ await cp(`${root}dist/builtins`, path.join(contents, "Resources/builtins"), {
     force: true,
 });
 await cp(
-    `${root}apps/host/native/.build/c-core/process_launcher`,
+    `${root}native/.build/c-core/process_launcher`,
     path.join(contents, "Helpers/process_launcher"),
 );
 await cp(
-    `${root}apps/host/native/.build/out/Products/${process.env.CONFIGURATION ?? "Release"}/SkynetAppRuntime`,
+    `${root}native/.build/out/Products/${process.env.CONFIGURATION ?? "Release"}/SkynetAppRuntime`,
     path.join(contents, "Helpers/SkynetAppRuntime"),
 );

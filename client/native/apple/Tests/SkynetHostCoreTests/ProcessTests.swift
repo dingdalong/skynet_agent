@@ -14,7 +14,7 @@ final class ProcessTests: XCTestCase {
         let builtins = directory.appendingPathComponent("builtins")
         try FileManager.default.createDirectory(at: builtins, withIntermediateDirectories: true)
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
         let runtime = native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime")
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: runtime.path))
         host = try HostCore(

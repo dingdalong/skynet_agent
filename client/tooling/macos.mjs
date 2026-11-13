@@ -6,7 +6,7 @@ import path from "node:path";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const repository = path.dirname(root.replace(/\/$/, ""));
 const host = `${root}apps/host`;
-const native = `${host}/native`;
+const native = `${root}native`;
 const gems = `${repository}/.tools/gems`;
 const command = process.argv[2] ?? "build";
 const configuration = command === "test" ? "Debug" : "Release";

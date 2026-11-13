@@ -10,8 +10,12 @@
     "test": "vitest run",
     "check:boundaries": "node tooling/check-boundaries.mjs",
     "build:apps": "node tooling/build-apps.mjs",
-    "build:host": "node tooling/macos.mjs build",
-    "dev": "node tooling/macos.mjs dev",
+    "build:host": "node tooling/build.mjs build",
+    "dev": "node tooling/build.mjs dev",
+    "test:core": "node tooling/test-core.mjs",
+    "platforms": "node tooling/build.mjs list",
+    "doctor": "node tooling/build.mjs doctor",
+    "probe:platforms": "node tooling/probe-platforms.mjs",
     "shadcn": "shadcn"
   },
   "dependencies": {
@@ -25,6 +29,7 @@
     "@react-native-community/cli": "20.2.0",
     "@react-native-community/cli-platform-ios": "20.2.0",
     "@react-native/babel-preset": "0.83.10",
+    "@react-native/community-cli-plugin": "0.83.10",
     "@react-native/metro-config": "0.83.10",
     "@tailwindcss/vite": "4.3.5",
     "@types/node": "26.0.0",

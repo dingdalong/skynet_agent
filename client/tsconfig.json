@@ -11,14 +11,16 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "paths": {
-      "react-native": ["./node_modules/react-native-macos"],
       "@skynet/contracts": ["./packages/contracts/src/index.ts"],
       "@skynet/app-runtime": ["./packages/app-runtime/src/index.ts"],
       "@skynet/app-sdk": ["./packages/app-sdk/src/bridge.ts"],
       "@skynet/app-sdk/react": ["./packages/app-sdk/src/react.tsx"],
       "@skynet/ui/*": ["./packages/ui/src/*"],
       "@skynet/tokens": ["./packages/tokens/theme.ts"],
-      "@/*": ["./packages/ui/src/*"]
+      "@/*": ["./packages/ui/src/*"],
+      "@skynet/workspace": ["./packages/workspace/src/Workspace.tsx"],
+      "@skynet/workspace/platform": ["./packages/workspace/src/platform.tsx"],
+      "@skynet/host-bridge": ["./packages/host-bridge/src/index.ts"]
     }
   },
   "include": ["apps/host/src", "builtins", "packages", "tooling"]

@@ -33,6 +33,9 @@ importers:
       '@react-native/babel-preset':
         specifier: 0.83.10
         version: 0.83.10(@babel/core@7.29.13)
+      '@react-native/community-cli-plugin':
+        specifier: 0.83.10
+        version: 0.83.10(@react-native-community/cli@20.2.0(typescript@7.0.2))(@react-native/metro-config@0.83.10(@babel/core@7.29.13))
       '@react-native/metro-config':
         specifier: 0.83.10
         version: 0.83.10(@babel/core@7.29.13)

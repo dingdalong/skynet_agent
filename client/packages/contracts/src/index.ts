@@ -33,7 +33,27 @@ export interface HostSnapshot {
     workspace: Workspace;
     preferences: Preferences;
     apps: AppSummary[];
+    capabilities: HostCapabilities;
 }
+
+export interface HostCapabilities {
+    platform: "macos" | "ios" | "android" | "windows" | "linux" | "web";
+    splitView: boolean;
+    installApplications: boolean;
+    localDevelopment: boolean;
+    runtimeIsolation: "process" | "in-process" | "worker" | "remote";
+}
+
+export type WorkspaceCommandName =
+    | "home"
+    | "overview"
+    | "open"
+    | "restore"
+    | "close"
+    | "split"
+    | "resize"
+    | "collapse"
+    | "restart";
 
 export interface AppSnapshot<State = Json> {
     appId: string;

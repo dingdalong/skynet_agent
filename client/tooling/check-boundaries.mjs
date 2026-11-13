@@ -22,6 +22,8 @@ async function inspect(folder) {
         const source = await readFile(file, "utf8");
         const isBuiltin = relative.startsWith("builtins/");
         const isRuntime = isBuiltin && /runtime\.ts$/.test(relative);
+        const isWorkspace = relative.startsWith("packages/workspace/");
+        const isBridge = relative.startsWith("packages/host-bridge/");
         const imports = [
             ...source.matchAll(
                 /(?:from\s*|import\s*|require\s*\(\s*)["']([^"']+)["']/g,
@@ -50,7 +52,34 @@ async function inspect(folder) {
                 failures.push(
                     `${relative}: host must not import subapp presentation`,
                 );
+            if (
+                (isWorkspace || isBridge) &&
+                /^(react-native-macos|react-native-windows|@skynet\/app-sdk|node:)|apps\/host|builtins\//.test(
+                    name,
+                )
+            )
+                failures.push(
+                    `${relative}: shared layer imports platform or subapp code ${name}`,
+                );
+            if (isBridge && /^(react|react-native)(\/|$)/.test(name))
+                failures.push(
+                    `${relative}: transport store must not depend on a UI runtime`,
+                );
         }
+        if (
+            (isWorkspace || isBridge) &&
+            /\b(NativeModules|NativeEventEmitter|requireNativeComponent|mouseDownCanMoveWindow|enableFocusRing)\b/.test(
+                source,
+            )
+        )
+            failures.push(
+                `${relative}: native implementation belongs in the platform adapter`,
+            );
+        if (
+            relative.startsWith("packages/app-sdk/") &&
+            /\bwindow\.webkit\b/.test(source)
+        )
+            failures.push(`${relative}: use the host-injected transport`);
         if (
             isBuiltin &&
             /\b(fetch\s*\(|new\s+(?:WebSocket|Worker|SharedWorker)\s*\(|XMLHttpRequest|window\.webkit)/.test(

@@ -404,14 +404,15 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION)",
-					"$(SRCROOT)/../native/.build/c-core",
+					"$(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION)",
+					"$(SRCROOT)/../../../native/.build/c-core",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lSkynetHostCore",
 					"-lagent_runtime",
+					"-lc++",
 					"-framework",
 					WebKit,
 					"-framework",
@@ -420,7 +421,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.skynet.agent;
 				PRODUCT_NAME = "Skynet Agent";
 				SDKROOT = macosx;
-				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION) $(SRCROOT)/../native/Sources/AgentRuntime";
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION) $(SRCROOT)/../../../native/apple/Sources/AgentRuntime $(SRCROOT)/../../../native/core/include";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -441,14 +442,15 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION)",
-					"$(SRCROOT)/../native/.build/c-core",
+					"$(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION)",
+					"$(SRCROOT)/../../../native/.build/c-core",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lSkynetHostCore",
 					"-lagent_runtime",
+					"-lc++",
 					"-framework",
 					WebKit,
 					"-framework",
@@ -457,7 +459,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.skynet.agent;
 				PRODUCT_NAME = "Skynet Agent";
 				SDKROOT = macosx;
-				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION) $(SRCROOT)/../native/Sources/AgentRuntime";
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION) $(SRCROOT)/../../../native/apple/Sources/AgentRuntime $(SRCROOT)/../../../native/core/include";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

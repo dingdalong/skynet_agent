@@ -9,6 +9,7 @@ export default defineConfig({
             "@skynet/contracts": local("./packages/contracts/src/index.ts"),
             "@skynet/app-runtime": local("./packages/app-runtime/src/index.ts"),
             "@skynet/tokens": local("./packages/tokens/theme.ts"),
+            "@skynet/host-bridge": local("./packages/host-bridge/src/index.ts"),
         },
     },
     test: { include: ["tooling/**/*.test.ts"] },

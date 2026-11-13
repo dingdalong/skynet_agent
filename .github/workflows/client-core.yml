@@ -1,0 +1,30 @@
+name: Client portable core
+
+on:
+  push:
+    paths:
+      - "client/native/core/**"
+      - ".github/workflows/client-core.yml"
+  pull_request:
+    paths:
+      - "client/native/core/**"
+      - ".github/workflows/client-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: false
+          persist-credentials: false
+      - run: cmake -S client/native/core -B client/native/core/.build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build client/native/core/.build --config Release
+      - run: ctest --test-dir client/native/core/.build -C Release --output-on-failure

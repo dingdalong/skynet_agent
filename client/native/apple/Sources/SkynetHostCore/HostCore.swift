@@ -468,6 +468,10 @@ public final class HostCore {
     private func snapshot() -> [String: Any] {
         [
             "revision": revision, "workspace": document.workspace.snapshot, "preferences": preferences(),
+            "capabilities": [
+                "platform": "macos", "splitView": true, "installApplications": true,
+                "localDevelopment": false, "runtimeIsolation": "process",
+            ],
             "apps": catalog.entries.values.sorted { $0.manifest.id < $1.manifest.id }.map(summary),
         ]
     }

@@ -1,21 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
     AccessibilityInfo,
     Animated,
     PanResponder,
     Pressable,
-    requireNativeComponent,
     ScrollView,
     StyleSheet,
     Text,
     useColorScheme,
     useWindowDimensions,
     View,
-    type ViewProps,
 } from "react-native";
-import type { AppSummary, HostSnapshot } from "@skynet/contracts";
+import type {
+    AppSummary,
+    HostSnapshot,
+    WorkspaceCommandName,
+} from "@skynet/contracts";
 import { tokens } from "@skynet/tokens";
-import { command, useHost } from "./host";
+import {
+    PlatformContext,
+    useWorkspacePlatform,
+    type HostIcon,
+    type WorkspacePlatform,
+} from "./platform";
 import {
     dividerPosition,
     gripPlacement,
@@ -25,36 +32,23 @@ import {
     type Placement,
 } from "./geometry";
 
-const Surface = requireNativeComponent<
-    ViewProps & {
-        appId: string;
-        backgroundHex: string;
-        reducedMotion: boolean;
-        revealDurationMs: number;
-    }
->("SkynetSurface");
-const Symbol = requireNativeComponent<
-    ViewProps & { symbol: string; tint: string }
->("SkynetIcon");
-const Wallpaper = requireNativeComponent<ViewProps & { colors: string[] }>(
-    "SkynetWallpaper",
-);
-const Scene = requireNativeComponent<
-    ViewProps & {
-        transitionKey: string;
-        animateLayout: boolean;
-        reducedMotion: boolean;
-        durationMs: number;
-        entrance?: { scale: number; opacity: number; offsetY: number };
-    }
->("SkynetScene");
 type Palette = typeof tokens.light | typeof tokens.dark;
 type Layout = { panes: (string | null)[]; ratio: number };
-const iconFor = (id: string) =>
-    id === "settings" ? "gearshape" : id === "agent" ? "sparkles" : "app";
+const iconFor = (id: string): HostIcon =>
+    id === "settings" ? "settings" : id === "agent" ? "agent" : "application";
 
-export function HostApp() {
-    const snapshot = useHost();
+export function Workspace({ platform }: { platform: WorkspacePlatform }) {
+    return (
+        <PlatformContext.Provider value={platform}>
+            <WorkspaceContent />
+        </PlatformContext.Provider>
+    );
+}
+
+function WorkspaceContent() {
+    const { store, Wallpaper, Scene } = useWorkspacePlatform();
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    const command = store.command;
     const systemTheme = useColorScheme();
     const { width } = useWindowDimensions();
     const [systemReduceMotion, setSystemReduceMotion] = useState(false);
@@ -90,7 +84,7 @@ export function HostApp() {
         snapshot?.workspace.ratio,
     ]);
     const execute = (
-        name: string,
+        name: WorkspaceCommandName,
         input: Record<string, string | number> = {},
     ) => {
         setError(undefined);
@@ -120,8 +114,9 @@ export function HostApp() {
     };
     const workspaceWidth = width;
     const wide =
+        snapshot.capabilities.splitView &&
         workspaceWidth >=
-        tokens.shell.comfortablePane * 2 + tokens.shell.divider;
+            tokens.shell.comfortablePane * 2 + tokens.shell.divider;
     const panes =
         !wide && actual.panes.length === 2
             ? [
@@ -172,7 +167,7 @@ export function HostApp() {
                     ) : (
                         <IconButton
                             label="返回桌面"
-                            icon="house"
+                            icon="home"
                             onPress={() => execute("home")}
                             palette={palette}
                         />
@@ -195,7 +190,7 @@ export function HostApp() {
                     </Text>
                     <IconButton
                         label="后台应用"
-                        icon="square.stack.3d.up"
+                        icon="overview"
                         onPress={() => execute("overview")}
                         palette={palette}
                     />
@@ -215,6 +210,7 @@ export function HostApp() {
                     <Desktop
                         snapshot={snapshot}
                         palette={palette}
+                        reducedMotion={!!reducedMotion}
                         execute={execute}
                     />
                 ) : mode === "overview" ? (
@@ -287,6 +283,7 @@ export function HostApp() {
                                         <Desktop
                                             snapshot={snapshot}
                                             palette={palette}
+                                            reducedMotion={!!reducedMotion}
                                             execute={execute}
                                             inPane
                                         />
@@ -344,11 +341,12 @@ function IconButton({
     compact = false,
 }: {
     label: string;
-    icon: string;
+    icon: HostIcon;
     onPress(): void;
     palette: Palette;
     compact?: boolean;
 }) {
+    const { Icon: Symbol, focusProps } = useWorkspacePlatform();
     const [hover, setHover] = useState(false);
     const [focused, setFocused] = useState(false);
     return (
@@ -356,9 +354,9 @@ function IconButton({
             accessibilityRole="button"
             accessibilityLabel={label}
             onPress={onPress}
-            enableFocusRing={false}
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
+            {...focusProps}
+            onHoverIn={() => setHover(true)}
+            onHoverOut={() => setHover(false)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             style={[
@@ -371,7 +369,7 @@ function IconButton({
             ]}
         >
             <Symbol
-                symbol={icon}
+                name={icon}
                 tint={palette.foreground}
                 style={styles.symbol}
             />
@@ -388,6 +386,7 @@ function AppIcon({
     palette: Palette;
     size?: number;
 }) {
+    const { Icon: Symbol } = useWorkspacePlatform();
     return (
         <View
             style={[
@@ -399,11 +398,16 @@ function AppIcon({
                     backgroundColor:
                         app.id === "agent" ? palette.primary : palette.card,
                     borderColor: palette.border,
+                    boxShadow: [
+                        ...tokens.elevation[
+                            palette === tokens.dark ? "dark" : "light"
+                        ].appIcon,
+                    ],
                 },
             ]}
         >
             <Symbol
-                symbol={iconFor(app.id)}
+                name={iconFor(app.id)}
                 tint={
                     app.id === "agent"
                         ? palette.primaryForeground
@@ -415,19 +419,23 @@ function AppIcon({
     );
 }
 
-type Execute = (name: string, input?: Record<string, string | number>) => void;
+type Execute = (
+    name: WorkspaceCommandName,
+    input?: Record<string, string | number>,
+) => void;
 function Desktop({
     snapshot,
     palette,
     execute,
+    reducedMotion,
     inPane = false,
 }: {
     snapshot: HostSnapshot;
     palette: Palette;
     execute: Execute;
+    reducedMotion: boolean;
     inPane?: boolean;
 }) {
-    const [focusedApp, setFocusedApp] = useState<string>();
     return (
         <View style={styles.desktop}>
             <ScrollView contentContainerStyle={styles.desktopGrid}>
@@ -435,41 +443,14 @@ function Desktop({
                     const visible =
                         inPane && snapshot.workspace.panes.includes(app.id);
                     return (
-                        <Pressable
+                        <Launcher
                             key={app.id}
-                            accessibilityRole="button"
-                            accessibilityLabel={`打开${app.name}`}
+                            app={app}
+                            palette={palette}
+                            reducedMotion={reducedMotion}
                             disabled={visible}
-                            enableFocusRing={false}
                             onPress={() => execute("open", { appId: app.id })}
-                            onFocus={() => setFocusedApp(app.id)}
-                            onBlur={() => setFocusedApp(undefined)}
-                            style={({ pressed }) => [
-                                styles.desktopItem,
-                                {
-                                    borderColor:
-                                        focusedApp === app.id
-                                            ? palette.desktopFocus
-                                            : "transparent",
-                                    opacity: visible
-                                        ? 0.45
-                                        : pressed
-                                          ? 0.72
-                                          : 1,
-                                },
-                            ]}
-                        >
-                            <AppIcon app={app} palette={palette} />
-                            <Text
-                                style={[
-                                    styles.desktopLabel,
-                                    { color: palette.desktopForeground },
-                                ]}
-                            >
-                                {app.name}
-                                {visible ? " · 已打开" : ""}
-                            </Text>
-                        </Pressable>
+                        />
                     );
                 })}
             </ScrollView>
@@ -480,14 +461,21 @@ function Desktop({
                         {
                             backgroundColor: `${palette.card}cc`,
                             borderColor: `${palette.border}aa`,
+                            boxShadow: [
+                                ...tokens.elevation[
+                                    palette === tokens.dark ? "dark" : "light"
+                                ].dock,
+                            ],
                         },
                     ]}
                 >
                     {snapshot.apps.map((app) => (
-                        <DockItem
+                        <Launcher
                             key={app.id}
+                            dock
                             app={app}
                             palette={palette}
+                            reducedMotion={reducedMotion}
                             active={snapshot.workspace.recent.includes(app.id)}
                             onPress={() => execute("open", { appId: app.id })}
                         />
@@ -498,48 +486,93 @@ function Desktop({
     );
 }
 
-function DockItem({
+function Launcher({
     app,
     palette,
     active,
     onPress,
+    reducedMotion,
+    dock = false,
+    disabled = false,
 }: {
     app: AppSummary;
     palette: Palette;
-    active: boolean;
+    active?: boolean;
     onPress(): void;
+    reducedMotion: boolean;
+    dock?: boolean;
+    disabled?: boolean;
 }) {
+    const { focusProps, Feedback } = useWorkspacePlatform();
     const [hover, setHover] = useState(false);
+    const [pressed, setPressed] = useState(false);
     const [focused, setFocused] = useState(false);
+    const size = dock ? tokens.shell.dockIcon : tokens.shell.desktopIcon;
+    const target = disabled
+        ? tokens.launcher.rest
+        : pressed
+          ? tokens.launcher.pressed
+          : hover
+            ? dock
+                ? tokens.launcher.dockHover
+                : tokens.launcher.desktopHover
+            : tokens.launcher.rest;
     return (
         <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Dock 打开${app.name}`}
-            enableFocusRing={false}
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
+            accessibilityLabel={`${dock ? "Dock " : ""}打开${app.name}`}
+            disabled={disabled}
+            {...focusProps}
+            onHoverIn={() => setHover(true)}
+            onHoverOut={() => setHover(false)}
+            onPressIn={() => setPressed(true)}
+            onPressOut={() => setPressed(false)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onPress={onPress}
             style={[
-                styles.dockItem,
+                dock ? styles.dockItem : styles.desktopItem,
                 {
-                    transform: [{ translateY: hover ? -4 : 0 }],
-                    borderColor: focused ? palette.ring : "transparent",
+                    opacity: disabled ? 0.45 : 1,
+                    borderColor: focused
+                        ? dock
+                            ? palette.ring
+                            : palette.desktopFocus
+                        : "transparent",
                 },
             ]}
         >
-            <AppIcon app={app} palette={palette} size={tokens.shell.dockIcon} />
-            <View
-                style={[
-                    styles.runningDot,
-                    {
-                        backgroundColor: active
-                            ? palette.foreground
-                            : "transparent",
-                    },
-                ]}
-            />
+            <Feedback
+                target={target}
+                durationMs={tokens.motion.quick}
+                reducedMotion={reducedMotion}
+                pointerEvents="none"
+                style={{ width: size, height: size }}
+            >
+                <AppIcon app={app} palette={palette} size={size} />
+            </Feedback>
+            {dock ? (
+                <View
+                    style={[
+                        styles.runningDot,
+                        {
+                            backgroundColor: active
+                                ? palette.foreground
+                                : "transparent",
+                        },
+                    ]}
+                />
+            ) : (
+                <Text
+                    style={[
+                        styles.desktopLabel,
+                        { color: palette.desktopForeground },
+                    ]}
+                >
+                    {app.name}
+                    {disabled ? " · 已打开" : ""}
+                </Text>
+            )}
         </Pressable>
     );
 }
@@ -563,6 +596,7 @@ function AppPane({
     finish(value?: Placement): void;
     execute: Execute;
 }) {
+    const { Surface, focusProps, dragProps } = useWorkspacePlatform();
     const compact = paneWidth < tokens.shell.comfortablePane;
     const latest = useRef({ width, place, finish });
     latest.current = { width, place, finish };
@@ -609,7 +643,7 @@ function AppPane({
                 <View style={styles.toolbarLeading}>
                     <IconButton
                         label="返回桌面"
-                        icon="house"
+                        icon="home"
                         palette={palette}
                         compact={compact}
                         onPress={() => execute("home")}
@@ -630,8 +664,8 @@ function AppPane({
                     {...pan.panHandlers}
                     accessible
                     focusable
-                    mouseDownCanMoveWindow={false}
-                    enableFocusRing={false}
+                    {...dragProps}
+                    {...focusProps}
                     style={styles.gripArea}
                     accessibilityRole="adjustable"
                     accessibilityLabel={`拖动${app.name}进行分屏`}
@@ -648,7 +682,7 @@ function AppPane({
                     }
                 >
                     <View
-                        mouseDownCanMoveWindow={false}
+                        {...dragProps}
                         pointerEvents="none"
                         style={[styles.grip, { backgroundColor: palette.ring }]}
                     />
@@ -661,14 +695,14 @@ function AppPane({
                 >
                     <IconButton
                         label="后台应用"
-                        icon="square.stack.3d.up"
+                        icon="overview"
                         palette={palette}
                         compact={compact}
                         onPress={() => execute("overview")}
                     />
                     <IconButton
                         label={`关闭${app.name}`}
-                        icon="xmark"
+                        icon="close"
                         palette={palette}
                         compact={compact}
                         onPress={() => execute("close", { appId: app.id })}
@@ -695,7 +729,7 @@ function AppPane({
                     </Text>
                     <IconButton
                         label={`重新启动${app.name}`}
-                        icon="arrow.clockwise"
+                        icon="restart"
                         palette={palette}
                         onPress={() => execute("restart", { appId: app.id })}
                     />
@@ -729,6 +763,7 @@ function Divider({
     onCancel(): void;
     onEnd(value: DividerAdjustment): void;
 }) {
+    const { focusProps, dragProps } = useWorkspacePlatform();
     const latest = useRef({ width, ratio, onChange, onCancel, onEnd });
     latest.current = { width, ratio, onChange, onCancel, onEnd };
     const latch = useRef<number | undefined>(undefined);
@@ -759,8 +794,8 @@ function Divider({
             {...pan.panHandlers}
             accessible
             focusable
-            mouseDownCanMoveWindow={false}
-            enableFocusRing={false}
+            {...dragProps}
+            {...focusProps}
             style={styles.divider}
             accessibilityRole="adjustable"
             accessibilityLabel="调整分屏比例"
@@ -790,7 +825,7 @@ function Divider({
             }
         >
             <View
-                mouseDownCanMoveWindow={false}
+                {...dragProps}
                 pointerEvents="none"
                 style={[styles.dividerGrip, { backgroundColor: palette.ring }]}
             />
@@ -809,6 +844,7 @@ function Overview({
     reducedMotion: boolean;
     execute: Execute;
 }) {
+    const { Scene } = useWorkspacePlatform();
     const recent = snapshot.workspace.recent
         .map((id) => snapshot.apps.find((app) => app.id === id))
         .filter((app): app is AppSummary => !!app);
@@ -862,6 +898,7 @@ function OverviewCard({
     palette: Palette;
     execute: Execute;
 }) {
+    const { Icon: Symbol, dragProps } = useWorkspacePlatform();
     const translation = useRef(new Animated.Value(0)).current;
     const pan = useRef(
         PanResponder.create({
@@ -882,7 +919,7 @@ function OverviewCard({
     return (
         <Animated.View
             {...pan.panHandlers}
-            mouseDownCanMoveWindow={false}
+            {...dragProps}
             style={[
                 styles.overviewCard,
                 {
@@ -899,7 +936,7 @@ function OverviewCard({
                 </Text>
                 <IconButton
                     label={`后台关闭${app.name}`}
-                    icon="xmark"
+                    icon="close"
                     palette={palette}
                     onPress={() => execute("close", { appId: app.id })}
                 />
@@ -914,7 +951,7 @@ function OverviewCard({
                 onPress={() => execute("restore", { appId: app.id })}
             >
                 <Symbol
-                    symbol={iconFor(app.id)}
+                    name={iconFor(app.id)}
                     tint={palette.ring}
                     style={{ width: 44, height: 44 }}
                 />
@@ -1001,10 +1038,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 0.5,
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 5 },
-        shadowRadius: 10,
-        shadowOpacity: 0.2,
+        overflow: "visible",
     },
     dock: {
         alignSelf: "center",
@@ -1017,10 +1051,7 @@ const styles = StyleSheet.create({
         gap: 16,
         borderRadius: tokens.radius.dock,
         borderWidth: 0.5,
-        shadowColor: "#000000",
-        shadowRadius: 24,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.16,
+        overflow: "visible",
     },
     dockItem: {
         alignItems: "center",

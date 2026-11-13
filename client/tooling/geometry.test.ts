@@ -5,7 +5,7 @@ import {
     gripPlacement,
     splitLayout,
     stepDivider,
-} from "../apps/host/src/geometry";
+} from "../packages/workspace/src/geometry";
 import settings from "../builtins/settings/src/runtime";
 
 describe("workspace direct manipulation", () => {

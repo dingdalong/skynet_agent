@@ -25,6 +25,12 @@ RCT_EXPORT_VIEW_PROPERTY(durationMs, double)
 RCT_EXPORT_VIEW_PROPERTY(entrance, NSDictionary)
 @end
 
+@interface RCT_EXTERN_MODULE(SkynetFeedbackManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(target, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(reducedMotion, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(durationMs, double)
+@end
+
 @interface RCT_EXTERN_MODULE(SkynetIconManager, RCTViewManager)
 RCT_EXPORT_VIEW_PROPERTY(symbol, NSString)
 RCT_EXPORT_VIEW_PROPERTY(tint, NSString)

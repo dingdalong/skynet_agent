@@ -30,9 +30,9 @@ target.build_configurations.each do |config|
     config.build_settings["ENABLE_HARDENED_RUNTIME"] = "NO"
     config.build_settings["CODE_SIGN_ENTITLEMENTS"] = ""
     config.build_settings["ENABLE_USER_SCRIPT_SANDBOXING"] = "NO"
-    config.build_settings["SWIFT_INCLUDE_PATHS"] = ["$(inherited)", "$(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION)", "$(SRCROOT)/../native/Sources/AgentRuntime"]
-    config.build_settings["LIBRARY_SEARCH_PATHS"] = ["$(inherited)", "$(SRCROOT)/../native/.build/out/Products/$(CONFIGURATION)", "$(SRCROOT)/../native/.build/c-core"]
-    config.build_settings["OTHER_LDFLAGS"] = ["$(inherited)", "-lSkynetHostCore", "-lagent_runtime", "-framework", "WebKit", "-framework", "JavaScriptCore"]
+    config.build_settings["SWIFT_INCLUDE_PATHS"] = ["$(inherited)", "$(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION)", "$(SRCROOT)/../../../native/apple/Sources/AgentRuntime", "$(SRCROOT)/../../../native/core/include"]
+    config.build_settings["LIBRARY_SEARCH_PATHS"] = ["$(inherited)", "$(SRCROOT)/../../../native/.build/out/Products/$(CONFIGURATION)", "$(SRCROOT)/../../../native/.build/c-core"]
+    config.build_settings["OTHER_LDFLAGS"] = ["$(inherited)", "-lSkynetHostCore", "-lagent_runtime", "-lc++", "-framework", "WebKit", "-framework", "JavaScriptCore"]
     config.build_settings["SWIFT_VERSION"] = "5.0"
 end
 tests = project.targets.find { |item| item.name == "SkynetHostUITests" } ||

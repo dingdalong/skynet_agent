@@ -12,8 +12,8 @@ final class WebViewTests: XCTestCase {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-        let client = native.deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
+        let client = native.deletingLastPathComponent()
         let data = FileManager.default.temporaryDirectory.appendingPathComponent(
             "skynet-webkit-\(UUID().uuidString)")
         let core = try HostCore(
@@ -28,6 +28,7 @@ final class WebViewTests: XCTestCase {
             try? FileManager.default.removeItem(at: data)
         }
         try await harness.until("document.body.innerText.includes('外观模式')")
+        try await harness.until("typeof window.__skynetTransport?.postMessage === 'function'")
         try await harness.waitForPresentation(1)
         XCTAssertEqual(harness.presentations[0]["section"] as? String, "外观")
         try await harness.until(

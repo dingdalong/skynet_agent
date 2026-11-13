@@ -3,6 +3,12 @@
 客户端由 React Native macOS 工作区、独立 WebView 表现和每个应用独立的 JavaScriptCore 业务进程组成。
 当前内置设置与空白 Agent；聊天、Agent 开发应用和远程分发尚未接入。首版只支持 macOS。
 UI 规格见[客户端设计规范](../design/CLIENT_DESIGN.md)。
+公共代码、能力边界和实际平台支持见[平台接入](CLIENT_PLATFORMS.md)。
+
+工作区表现位于 `packages/workspace`，由平台入口注入原生视图与通信。
+`packages/host-bridge` 只缓存快照并管理界面订阅，不依赖 React 或持有原生资源。
+工作区状态转换由 `native/core` 的公共 C++ 实现，macOS 的 Swift 适配只转换数据；
+持久化、Actor 与连接的所有权仍在 `native/apple` 的原生 HostCore 中。
 
 ## 所有权与数据流
 

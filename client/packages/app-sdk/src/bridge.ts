@@ -4,11 +4,7 @@ declare global {
     interface Window {
         __skynetInitialSnapshot?: AppSnapshot;
         __skynetPresentationId?: string;
-        webkit?: {
-            messageHandlers: {
-                skynet: { postMessage(message: unknown): void };
-            };
-        };
+        __skynetTransport?: { postMessage(message: unknown): void };
     }
 }
 
@@ -63,7 +59,7 @@ export function request(
     input: Record<string, Json> = {},
 ): Promise<Record<string, Json>> {
     return new Promise((resolve, reject) => {
-        const handler = window.webkit?.messageHandlers.skynet;
+        const handler = window.__skynetTransport;
         if (!handler) {
             reject(new Error("此应用需要在 Skynet 宿主中运行"));
             return;
@@ -78,12 +74,18 @@ export function request(
             reject(new Error(`请求超时：${kind}`));
         }, 15_000);
         pending.set(requestId, { resolve, reject, timer });
-        handler.postMessage({
-            requestId,
-            kind,
-            input,
-            presentationId: window.__skynetPresentationId,
-        });
+        try {
+            handler.postMessage({
+                requestId,
+                kind,
+                input,
+                presentationId: window.__skynetPresentationId,
+            });
+        } catch (error) {
+            clearTimeout(timer);
+            pending.delete(requestId);
+            reject(error instanceof Error ? error : new Error(String(error)));
+        }
     });
 }
 

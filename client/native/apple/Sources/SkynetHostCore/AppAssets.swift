@@ -8,6 +8,14 @@ public enum AppPresentation {
         let identity = String(data: try jsonData(presentationId), encoding: .utf8)!
         return WKUserScript(
             source: """
+                (() => {
+                    const handler = window.webkit.messageHandlers.skynet;
+                    const post = handler.postMessage.bind(handler);
+                    Object.defineProperty(window, "__skynetTransport", {
+                        value: Object.freeze({postMessage: message => post(message)}),
+                        writable: false, configurable: false
+                    });
+                })();
                 window.__skynetInitialSnapshot = \(json);
                 window.__skynetPresentationId = \(identity);
                 (() => {
