@@ -2,9 +2,16 @@ const {
     bundleCommand,
     startCommand,
 } = require("@react-native/community-cli-plugin");
+const ios = require("@react-native-community/cli-platform-ios");
 
 module.exports = {
-    reactNativePath: "../../node_modules/react-native-macos",
+    reactNativePath:
+        process.env.SKYNET_PLATFORM === "ios"
+            ? "../../node_modules/react-native"
+            : "../../node_modules/react-native-macos",
     commands: [bundleCommand, startCommand],
-    project: { macos: { sourceDir: "macos" } },
+    platforms: {
+        ios: { projectConfig: ios.projectConfig, dependencyConfig: ios.dependencyConfig },
+    },
+    project: { macos: { sourceDir: "macos" }, ios: { sourceDir: "ios" } },
 };

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { tokens } from "@skynet/tokens";
 import {
-    dividerPosition,
+    beginDividerDrag,
+    moveDividerDrag,
+    splitFrames,
     gripPlacement,
     splitLayout,
     stepDivider,
@@ -11,76 +13,111 @@ import settings from "../builtins/settings/src/runtime";
 describe("workspace direct manipulation", () => {
     it("snaps at thirds and half with hysteresis", () => {
         const width = 1280;
-        const third = (width - 8) / 3 + 4;
-        expect(dividerPosition(third + 19, width).ratio).toBe(1 / 3);
-        expect(
-            dividerPosition(third + 31, width, { ratio: 1 / 3, latched: 1 / 3 })
-                .ratio,
-        ).toBe(1 / 3);
-        expect(
-            dividerPosition(third + 33, width, { ratio: 1 / 3, latched: 1 / 3 })
-                .ratio,
-        ).not.toBe(1 / 3);
-        expect(dividerPosition(width / 2 + 18, width).ratio).toBe(1 / 2);
-        expect(dividerPosition(width - third, width).ratio).toBe(2 / 3);
+        const start = beginDividerDrag(1 / 2, width);
+        const delta = (width - tokens.shell.divider) * (1 / 3 - 1 / 2);
+        const third = moveDividerDrag(start, delta + 19);
+        expect(third.preview.ratio).toBe(1 / 3);
+        expect(moveDividerDrag(third, delta + 31).preview.ratio).toBe(1 / 3);
+        expect(moveDividerDrag(third, delta + 33).preview.ratio).not.toBe(
+            1 / 3,
+        );
+        expect(moveDividerDrag(start, 18).preview.ratio).toBe(1 / 2);
+        expect(moveDividerDrag(start, -delta).preview.ratio).toBe(2 / 3);
     });
     it("keeps both sides at least one third while dragging", () => {
         for (const width of [728, 800, 1280, 2560]) {
-            expect(dividerPosition(-100, width).ratio).toBe(1 / 3);
-            expect(dividerPosition(width + 100, width).ratio).toBe(2 / 3);
-            const third = (width - 8) / 3 + 4;
-            expect(dividerPosition(third, width).ratio).toBe(1 / 3);
-            expect(dividerPosition(width - third, width).ratio).toBe(2 / 3);
+            const start = beginDividerDrag(1 / 2, width);
+            expect(moveDividerDrag(start, -width).preview.ratio).toBe(1 / 3);
+            expect(moveDividerDrag(start, width).preview.ratio).toBe(2 / 3);
+            const delta = (width - tokens.shell.divider) / 6;
+            expect(moveDividerDrag(start, -delta).preview.ratio).toBe(1 / 3);
+            expect(moveDividerDrag(start, delta).preview.ratio).toBe(2 / 3);
         }
-        expect(dividerPosition(0, 0).ratio).toBe(1 / 3);
     });
     it("requires a deliberate drag beyond either minimum and allows pulling back", () => {
         for (const width of [728, 800, 1280, 2560]) {
-            const third =
-                (width - tokens.shell.divider) / 3 + tokens.shell.divider / 2;
             const distance = tokens.shell.collapseDistance;
-            const leftStop = dividerPosition(third, width);
-            expect(leftStop.collapse).toBeUndefined();
+            const leftStop = beginDividerDrag(1 / 3, width);
+            expect(leftStop.preview.collapse).toBeUndefined();
             expect(
-                dividerPosition(third - distance + 1, width, leftStop).collapse,
+                moveDividerDrag(leftStop, -distance + 1).preview.collapse,
             ).toBeUndefined();
-            const left = dividerPosition(third - distance, width, leftStop);
-            expect(left).toMatchObject({ ratio: 1 / 3, collapse: "left" });
+            const left = moveDividerDrag(leftStop, -distance);
+            expect(left.preview).toMatchObject({
+                ratio: 1 / 3,
+                collapse: "left",
+            });
+            expect(moveDividerDrag(left, 0).preview.collapse).toBeUndefined();
+            const rightStop = beginDividerDrag(2 / 3, width);
+            expect(rightStop.preview.collapse).toBeUndefined();
             expect(
-                dividerPosition(third, width, left).collapse,
+                moveDividerDrag(rightStop, distance - 1).preview.collapse,
             ).toBeUndefined();
-            const rightStop = dividerPosition(width - third, width);
-            expect(rightStop.collapse).toBeUndefined();
-            expect(
-                dividerPosition(width - third + distance - 1, width, rightStop)
-                    .collapse,
-            ).toBeUndefined();
-            const right = dividerPosition(
-                width - third + distance,
-                width,
-                rightStop,
-            );
-            expect(right).toMatchObject({ ratio: 2 / 3, collapse: "right" });
-            expect(
-                dividerPosition(width - third, width, right).collapse,
-            ).toBeUndefined();
+            const right = moveDividerDrag(rightStop, distance);
+            expect(right.preview).toMatchObject({
+                ratio: 2 / 3,
+                collapse: "right",
+            });
+            expect(moveDividerDrag(right, 0).preview.collapse).toBeUndefined();
         }
     });
     it("stops a fast first movement at the boundary before a further push can preview fullscreen", () => {
-        const stop = dividerPosition(1100, 1280);
-        expect(stop.collapse).toBeUndefined();
-        expect(stop.ratio).toBe(2 / 3);
-        const full = dividerPosition(
-            1100 + tokens.shell.collapseDistance,
-            1280,
-            stop,
-        );
-        expect(full.collapse).toBe("right");
+        const start = beginDividerDrag(1 / 2, 1280);
+        const stop = moveDividerDrag(start, 460);
+        expect(stop.preview.collapse).toBeUndefined();
+        expect(stop.preview.ratio).toBe(2 / 3);
+        const full = moveDividerDrag(stop, 460 + tokens.shell.collapseDistance);
+        expect(full.preview.collapse).toBe("right");
         expect(
-            dividerPosition(1100 + tokens.shell.snapRelease + 1, 1280, full)
+            moveDividerDrag(full, 460 + tokens.shell.snapRelease + 1).preview
                 .collapse,
         ).toBe("right");
-        expect(dividerPosition(1100, 1280, full).collapse).toBeUndefined();
+        expect(moveDividerDrag(full, 460).preview.collapse).toBeUndefined();
+    });
+    it("fills the container exactly at all ratios, including zero-width collapsed content", () => {
+        for (const width of [0, 393, 728, 1024, 1280, 2560]) {
+            for (const ratio of [1 / 3, 0.4, 1 / 2, 0.6, 2 / 3]) {
+                const frame = splitFrames(width, ratio);
+                const [left, right] = frame.panes;
+                expect(left.left).toBe(0);
+                expect(frame.divider.left).toBe(left.width);
+                expect(right.left).toBeCloseTo(
+                    left.width + frame.divider.width,
+                );
+                expect(right.left + right.width).toBeCloseTo(width);
+                expect(left.width).toBeGreaterThanOrEqual(
+                    (width - frame.divider.width) / 3 - 0.00001,
+                );
+                expect(right.width).toBeGreaterThanOrEqual(
+                    (width - frame.divider.width) / 3 - 0.00001,
+                );
+            }
+            expect(splitFrames(width, 1 / 3, "left").panes).toEqual([
+                { left: 0, width: 0 },
+                { left: 0, width },
+            ]);
+            expect(splitFrames(width, 2 / 3, "right").panes).toEqual([
+                { left: 0, width },
+                { left: width, width: 0 },
+            ]);
+        }
+    });
+    it("keeps a session relative to its original container while the handle and preview move", () => {
+        let drag = beginDividerDrag(1 / 2, 1200);
+        for (const dx of [40, 80, 120, 160]) {
+            drag = moveDividerDrag(drag, dx);
+            expect(drag.preview.ratio).toBeCloseTo(1 / 2 + dx / 1192);
+        }
+        drag = moveDividerDrag(drag, 200);
+        expect(drag.preview.ratio).toBe(2 / 3);
+        expect(drag.preview.collapse).toBeUndefined();
+        drag = moveDividerDrag(drag, 311);
+        expect(drag.preview.collapse).toBeUndefined();
+        drag = moveDividerDrag(drag, 312);
+        expect(drag.preview.collapse).toBe("right");
+        drag = moveDividerDrag(drag, 0);
+        expect(drag.preview).toMatchObject({ ratio: 1 / 2 });
+        expect(drag.preview.collapse).toBeUndefined();
     });
     it("releases live placement when the grip is pulled back", () => {
         expect(gripPlacement(100, -400, 1280)).toBe("left");

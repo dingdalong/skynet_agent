@@ -201,6 +201,10 @@ function Settings() {
                             {section === "apps" && (
                                 <Apps
                                     apps={snapshot.apps}
+                                    canInstall={
+                                        snapshot.capabilities
+                                            ?.installApplications !== false
+                                    }
                                     disabled={busy}
                                     run={run}
                                 />
@@ -397,10 +401,12 @@ function Motion({ preferences, disabled, run }: PreferenceProps) {
 
 function Apps({
     apps,
+    canInstall,
     disabled,
     run,
 }: {
     apps: AppSummary[];
+    canInstall: boolean;
     disabled: boolean;
     run: Run;
 }) {
@@ -408,18 +414,24 @@ function Apps({
     return (
         <SettingCard
             title="已安装应用"
-            description="每个应用独立运行。安装和更新无需重新构建宿主。"
+            description={
+                canInstall
+                    ? "每个应用独立运行。安装和更新无需重新构建宿主。"
+                    : "内置应用随客户端更新，业务状态与界面分离保存。"
+            }
         >
             <div className="flex flex-col gap-5">
-                <div>
-                    <Button
-                        onClick={() => void run(() => app.install())}
-                        disabled={disabled}
-                    >
-                        <Download data-icon="inline-start" />
-                        安装应用
-                    </Button>
-                </div>
+                {canInstall && (
+                    <div>
+                        <Button
+                            onClick={() => void run(() => app.install())}
+                            disabled={disabled}
+                        >
+                            <Download data-icon="inline-start" />
+                            安装应用
+                        </Button>
+                    </div>
+                )}
                 {apps.map((entry) => (
                     <div key={entry.id} className="app-entry">
                         <div className="app-entry-icon bg-muted">

@@ -13,6 +13,7 @@ export type HostIcon =
 
 export type SurfaceProps = ViewProps & {
     appId: string;
+    active: boolean;
     backgroundHex: string;
     reducedMotion: boolean;
     revealDurationMs: number;
@@ -24,7 +25,13 @@ export type FeedbackProps = ViewProps & {
     reducedMotion: boolean;
     durationMs: number;
 };
+export type SceneFrameProps = ViewProps & {
+    /** Map directly to the platform's native hidden state, retaining children. */
+    visible: boolean;
+};
 export type SceneProps = ViewProps & {
+    /** Animation activation only. The shared parent owns visibility and input. */
+    active?: boolean;
     transitionKey: string;
     animateLayout: boolean;
     reducedMotion: boolean;
@@ -34,10 +41,14 @@ export type SceneProps = ViewProps & {
 
 /** Platform view details stay in the application adapter. */
 export interface WorkspacePlatform {
+    inputMode?: "pointer" | "touch";
+    prepareLayoutTransition?(reducedMotion: boolean): void;
+    setSystemChrome?(colors: string[], lightContent: boolean): void;
     store: HostStore;
     Surface: ComponentType<SurfaceProps>;
     Icon: ComponentType<IconProps>;
     Wallpaper: ComponentType<WallpaperProps>;
+    Frame: ComponentType<SceneFrameProps>;
     Scene: ComponentType<SceneProps>;
     Feedback: ComponentType<FeedbackProps>;
     focusProps: Partial<ViewProps> & Record<string, unknown>;

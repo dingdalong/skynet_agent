@@ -341,7 +341,7 @@ function ConnectionDialog({
                 <DialogHeader>
                     <DialogTitle>连接 Agent 服务器</DialogTitle>
                     <DialogDescription>
-                        模型通过服务器运行，工具可以选择服务器或本机工作目录。用户名用于恢复同一用户的会话。
+                        模型通过服务器运行，任务可在服务器或已授权的桌面项目中执行。用户名用于恢复同一用户的会话。
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -361,6 +361,8 @@ function ConnectionDialog({
                                 required
                                 defaultValue={state.configuration.url}
                                 spellCheck={false}
+                                autoCapitalize="none"
+                                autoCorrect="off"
                                 autoComplete="off"
                             />
                             <FieldDescription>
@@ -379,13 +381,16 @@ function ConnectionDialog({
                                 maxLength={64}
                                 defaultValue={state.configuration.username}
                                 autoComplete="username"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                             />
                             <FieldDescription>
                                 当前服务器按用户名识别用户；请使用自己的唯一用户名。
                             </FieldDescription>
                         </Field>
                     </FieldGroup>
-                    {state.local && (
+                    {state.local && state.supportsLocal && (
                         <Field orientation="horizontal">
                             <div className="flex flex-1 flex-col gap-1">
                                 <FieldLabel htmlFor="agent-remote">
@@ -462,7 +467,7 @@ function WorkspaceSelector({
             request.name === "SessionExecutionSetReq" &&
             request.target === state.selectedId,
     );
-    if (!state.supportsLocal)
+    if (!state.supportsLocal && !target?.device_id)
         return (
             <InputGroupText className="hidden @min-[600px]/agent:flex">
                 <Server />
@@ -504,7 +509,9 @@ function WorkspaceSelector({
                               },
                           ]
                         : []),
-                    { value: "choose", label: "选择本地目录…" },
+                    ...(state.supportsLocal
+                        ? [{ value: "choose", label: "选择本地目录…" }]
+                        : []),
                 ]}
                 value={
                     target?.device_id
@@ -543,10 +550,12 @@ function WorkspaceSelector({
                                 远程桌面 · {target.directory.split("/").at(-1)}
                             </SelectItem>
                         )}
-                        <SelectItem value="choose">
-                            <Plus data-icon="inline-start" />
-                            选择本地目录…
-                        </SelectItem>
+                        {state.supportsLocal && (
+                            <SelectItem value="choose">
+                                <Plus data-icon="inline-start" />
+                                选择本地目录…
+                            </SelectItem>
+                        )}
                     </SelectGroup>
                 </SelectContent>
             </Select>
@@ -627,7 +636,7 @@ function Composer({ state, send }: { state: AgentState; send: Send }) {
         state.defaultModelId;
     return (
         <form
-            className="mx-auto flex w-full max-w-3xl flex-col gap-2 p-4 pt-2"
+            className="agent-composer mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-2 p-4 pt-2"
             onSubmit={(event) => {
                 event.preventDefault();
                 submit();
@@ -660,6 +669,10 @@ function Composer({ state, send }: { state: AgentState; send: Send }) {
                             if (
                                 event.key === "Enter" &&
                                 !event.shiftKey &&
+                                (!window.matchMedia("(pointer: coarse)")
+                                    .matches ||
+                                    event.metaKey ||
+                                    event.ctrlKey) &&
                                 !event.nativeEvent.isComposing &&
                                 event.keyCode !== 229
                             ) {
@@ -748,7 +761,12 @@ function Composer({ state, send }: { state: AgentState; send: Send }) {
                 </InputGroup>
             </Field>
             <p className="text-center text-xs text-muted-foreground">
-                Enter 发送 · Shift + Enter 换行
+                <span className="agent-keyboard-hint">
+                    Enter 发送 · Shift + Enter 换行
+                </span>
+                <span className="agent-touch-hint">
+                    点按箭头发送 · 回车换行
+                </span>
             </p>
         </form>
     );
@@ -772,7 +790,7 @@ function Agent() {
         return (
             <main
                 aria-label="Agent"
-                className="flex h-dvh flex-col gap-4 bg-background p-8"
+                className="flex h-full flex-col gap-4 bg-background p-8"
             >
                 <Skeleton className="h-8 w-40" />
                 <Skeleton className="h-40 w-full" />
@@ -791,7 +809,7 @@ function Agent() {
     return (
         <main
             aria-label="Agent"
-            className="@container/agent flex h-dvh min-w-0 bg-background text-foreground"
+            className="agent-app @container/agent flex h-full min-w-0 bg-background text-foreground"
         >
             <aside
                 aria-label="会话列表"
@@ -860,7 +878,7 @@ function Agent() {
                     {state.configuration.username || "连接服务器"}
                 </Button>
             </aside>
-            <section className="flex min-w-0 flex-1 flex-col">
+            <section className="agent-pane flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
                 <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3">
                     <div className="min-w-0 flex-1">
                         <h1 className="truncate font-semibold">
@@ -984,14 +1002,14 @@ function Agent() {
                         </Alert>
                     </div>
                 )}
-                <div className="min-h-0 min-w-0 flex-1">
+                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                     {messages.length ? (
                         <Transcript
                             key={state.selectedId}
                             messages={messages}
                         />
                     ) : (
-                        <Empty className="h-full">
+                        <Empty className="min-h-full">
                             <EmptyHeader>
                                 <EmptyMedia variant="icon">
                                     <MessageSquare />
@@ -1003,7 +1021,7 @@ function Agent() {
                                 </EmptyTitle>
                                 <EmptyDescription>
                                     {state.connection.status === "online"
-                                        ? "告诉 Agent 你想完成什么。选择服务器或本地工作目录，返回桌面后任务也会继续运行。"
+                                        ? "告诉 Agent 你想完成什么。任务在所选服务器或桌面项目中执行，切换内部应用后可继续查看。"
                                         : "连接后即可发送任务、接收实时进度，并恢复服务器中的历史会话。"}
                                 </EmptyDescription>
                             </EmptyHeader>

@@ -22,6 +22,15 @@ private final class WeakHandler: NSObject, WKScriptMessageHandler {
 /// Each view has its own data store and lease. Detaching a view releases neither
 /// business processes nor connections. WebKit may share rendering processes.
 final class AppSurface: NSView, WKNavigationDelegate {
+    @objc var active: Bool = true {
+        didSet {
+            if !active, let web, let responder = window?.firstResponder as? NSView,
+                responder === web || responder.isDescendant(of: web)
+            {
+                window?.makeFirstResponder(nil)
+            }
+        }
+    }
     @objc var appId: String = "" { didSet { if oldValue != appId { loadApp() } } }
     @objc var backgroundHex: String = "#fafafa" {
         didSet { cover?.layer?.backgroundColor = NSColor(hex: backgroundHex).cgColor }
@@ -39,8 +48,17 @@ final class AppSurface: NSView, WKNavigationDelegate {
     private var lastSnapshot: [String: Any]?
     private var failureView: NSView?
     private let core = HostServices.core
+    private var loadStarted = ProcessInfo.processInfo.systemUptime
+
+    private func trace(_ phase: String) {
+        NSLog(
+            "AppSurface startup app=%@ phase=%@ elapsed=%.1fms", appId, phase,
+            (ProcessInfo.processInfo.systemUptime - loadStarted) * 1000)
+    }
 
     private func loadApp() {
+        loadStarted = ProcessInfo.processInfo.systemUptime
+        trace("requested")
         readinessTimeout?.cancel()
         if let lease { core.detach(lease) }
         lease = nil
@@ -74,11 +92,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
                         if self.web != nil {
                             self.emit(["kind": "snapshot", "value": value])
                         } else {
-                            let apps = value["apps"] as? [[String: Any]] ?? []
-                            guard
-                                apps.first(where: { $0["id"] as? String == id })?["status"] as? String
-                                    != "starting"
-                            else { return }
+                            self.trace("snapshotReceived")
                             self.createWeb(entry)
                         }
                     }
@@ -88,6 +102,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
     }
 
     private func createWeb(_ entry: AppCatalog.Entry) {
+        trace("createWeb")
         let controller = WKUserContentController()
         controller.add(WeakHandler(self), name: "skynet")
         let config = WKWebViewConfiguration()
@@ -106,6 +121,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
         #endif
         addSubview(web)
         self.web = web
+        trace("loadDocument")
         web.load(URLRequest(url: URL(string: "skynet-app://\(appId)/ui/index.html")!))
     }
 
@@ -161,6 +177,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
             guard body["presentationId"] as? String == presentationId else { return }
             readinessTimeout?.cancel()
             if cover != nil, failureView == nil {
+                trace("visible")
                 cover?.removeFromSuperview()
                 cover = nil
                 // Web content becomes accessible asynchronously after the native layout has settled.
@@ -238,7 +255,14 @@ final class AppSurface: NSView, WKNavigationDelegate {
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === web else { return }
+        trace("navigationFinished")
         if let lastSnapshot { emit(["kind": "snapshot", "value": lastSnapshot]) }
+    }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if webView === web { trace("navigationStarted") }
+    }
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if webView === web { trace("documentCommitted") }
     }
     func webView(
         _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,

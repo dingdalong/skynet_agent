@@ -219,9 +219,10 @@ class Turn {
         )
             this.state.selectedId = "";
         if (login) {
-            this.state.connection.status = this.state.local
-                ? "restoring"
-                : "online";
+            this.state.connection.status =
+                this.state.local && this.state.local.canExecute !== false
+                    ? "restoring"
+                    : "online";
             this.state.connection.attempt = 0;
             this.state.error = "";
             if (this.state.local) this.register();
@@ -233,7 +234,7 @@ class Turn {
     }
     register() {
         const local = this.state.local;
-        if (!local) return;
+        if (!local || local.canExecute === false) return;
         this.request("DesktopRegisterReq", {
             device_id: local.deviceId,
             name: local.name,
@@ -417,6 +418,7 @@ class Turn {
                 return;
             }
             this.state.local = payload.value as LocalContext;
+            this.state.supportsLocal = this.state.local.canExecute !== false;
             if (connection.status === "connecting") this.openSocket();
             return;
         }
@@ -516,6 +518,7 @@ export function startAgent(
     turn.state.syncing = false;
     connection.status = "offline";
     turn.state.supportsLocal = localExecution;
+    turn.state.local = null;
     turn.state.localEffects = {};
     turn.state.localRequest = "";
     if (turn.state.configuration.enabled) turn.connect();
@@ -541,6 +544,7 @@ export function reduceAgent(
                 break;
             case "$agent.context":
                 state.local = body as unknown as LocalContext;
+                state.supportsLocal = state.local.canExecute !== false;
                 if (state.connection.status === "online") turn.register();
                 break;
             case "$resource":

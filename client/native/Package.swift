@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "SkynetHostCore",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v14), .iOS("16.4")],
     products: [
         .library(name: "SkynetHostCore", type: .static, targets: ["SkynetHostCore"]),
         .executable(name: "SkynetAppRuntime", targets: ["SkynetAppRuntime"]),
@@ -16,7 +16,11 @@ let package = Package(
             sources: ["src/workspace.cpp", "src/workspace_c.cpp"],
             publicHeadersPath: "include", cxxSettings: [.headerSearchPath("private")]),
         .target(
-            name: "SkynetHostCore", dependencies: ["AgentRuntime", "HostCoreNative"],
+            name: "SkynetHostCore",
+            dependencies: [
+                .target(name: "AgentRuntime", condition: .when(platforms: [.macOS])),
+                "HostCoreNative",
+            ],
             path: "apple/Sources/SkynetHostCore"),
         .executableTarget(
             name: "SkynetAppRuntime", path: "apple/Sources/SkynetAppRuntime",

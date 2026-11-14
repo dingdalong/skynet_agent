@@ -96,10 +96,14 @@ class Client {
         };
     }
     connect() {
-        const result = this.command("connection.configure", {
+        let result = this.command("connection.configure", {
             url: `${origin}/agent`,
             username: "alice",
         });
+        const context = result.effects?.find(
+            (effect) => effect.kind === "agent.context",
+        );
+        if (context) result = this.effect(context.id, nativeContext);
         this.effect(
             result.effects!.find((effect) => effect.kind === "socket.open")!.id,
             { connectionId: "physical1" },
@@ -132,6 +136,25 @@ const nativeContext = {
 };
 
 describe("native Agent development", () => {
+    it("uses mobile native origins without registering a desktop executor", () => {
+        const client = new Client();
+        client.state = startAgent(client.state, true).state;
+        client.command("$agent.context", {
+            ...nativeContext,
+            canExecute: false,
+            workspaces: [],
+            authorizationId: "",
+        });
+        client.login();
+        expect(client.state.supportsLocal).toBe(false);
+        expect(client.state.connection.status).toBe("online");
+        expect(client.pending("DesktopRegisterReq")).toBeNaN();
+        expect(
+            client.last.effects?.some(
+                (effect) => effect.kind === "agent.execute",
+            ),
+        ).toBe(false);
+    });
     it("keeps repeated model selection idempotent without adding an error above history", () => {
         const client = new Client();
         client.login([session(1, 2)]);

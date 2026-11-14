@@ -10,7 +10,7 @@
 | Git 与 GitHub SSH | 仓库及子模块 |
 | Node.js 与 pnpm | 客户端 TypeScript、React Native、shadcn 构建与测试；版本见 `client/package.json` |
 | Ruby 与 Bundler | CocoaPods；`make install` 将 gem 安装到项目 `.tools/gems` |
-| 完整 Xcode 与 macOS SDK | macOS 原生宿主、Swift Package Manager 与签名构建 |
+| 完整 Xcode、macOS/iOS SDK 与模拟器 | 苹果平台宿主、Swift Package Manager 与签名构建 |
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
 | Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
 | Lua 5.5、LuaRocks、Busted | 服务端单元测试 |
@@ -26,7 +26,7 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 
 | 目录 | 内容 |
 | --- | --- |
-| `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 UI 验收 |
+| `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 iOS Scene |
 | `client/native` | 公共 C++ 状态规则、苹果平台宿主资源与原生集成测试 |
 | `client/builtins` | 设置与 Agent 对话，各自包含清单、同步业务与 Web 表现 |
 | `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、shadcn 组件与令牌 |
@@ -49,11 +49,16 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 `make client-platforms` 查询可构建状态，`make client-doctor` 查询锁定版本与构建主机。
 未接入的平台会在产生构建副作用前明确失败，不会回退到 macOS。
 `make client-core-test` 在具备 CMake、Node 和 C++17 编译器的主机上独立验证公共内核。
-`pnpm --dir client run probe:platforms` 验证共享 RN 的 iOS/Android 依赖图；不代表完整移动应用已实现。
+`pnpm --dir client run probe:platforms` 验证共享 RN 的 iOS/Android 依赖图；不替代原生构建和体验验收。
 支持矩阵及后续接入门槛见[客户端平台接入](architecture/CLIENT_PLATFORMS.md)。
 产物位于 `client/dist/macos/Skynet Agent.app`。
 本机构建使用 ad-hoc 签名，不启用要求 Team ID 的 Hardened Runtime 库校验。
 正式分发需配置同一开发者身份签名宿主与嵌入引擎、启用 Hardened Runtime 并公证。
+
+iPhone/iPad 使用 `make install PLATFORM=ios`、`make client-dev PLATFORM=ios`；
+`SKYNET_IOS_DEVICE` 可指定模拟器名字或 UDID。`make client-build PLATFORM=ios`
+输出通用模拟器包，`make client-archive PLATFORM=ios` 输出默认未签名真机归档。
+签名、发行边界与移动端资源生命周期见平台接入文档。iOS 不安装动态包或执行手机本地开发工具。
 
 公共协议位于 `common/proto`，服务端和 Lua 网络探针直接加载 schema，无需生成测试代码。
 修改协议后执行 `make check-full`，验证固定二进制向量、多 VM 编解码及真实网关交互。
@@ -112,6 +117,7 @@ dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base
 | `make -C server check` | 服务端格式、单元测试及全部服务端集成 |
 | `make client-check` | 格式、TypeScript、令牌、导入边界、几何逻辑与原生进程集成 |
 | `make client-test` | 实际 JSC 子进程、权限、更新、故障、任务与本地 WebSocket 生命周期 |
+| `make client-test PLATFORM=ios` | 模拟器内独立 JSC VM、移动权限、前后台恢复与真实 WebKit 触控布局 |
 | `make client-e2e` | 最新 macOS App 的 XCUITest 工作区交互与偏好持久化 |
 | `make check-full` | 基础回归、服务端集成与客户端原生 E2E |
 | `make -C server test-live` | 服务端真实模型网关探针 |
@@ -125,9 +131,9 @@ Shell 包装负责启动、日志与进程回收；自动热修测试只修改�
 真实模型探针读取 `server/.env` 或 `SKYNET_ENV_FILE`，使用已有模型配置并产生实际用量。
 缺少凭据、供应商失败或协议不兼容时明确失败，不回退假模型。
 
-当前客户端未接入聊天，因此工作区 E2E 不代表真实聊天已验收。
+工作区 E2E 不代表真实聊天已验收。
 连接生命周期测试使用独立回环 WebSocket 服务核对物理连接身份，不依赖真实模型。
-真实业务接入后，按规范补充从页面到真实网关、模型与结果页面的全链路测试。
+Agent 业务按规范从页面连接真实网关、模型并检查结果页面。
 其他平台首次支持时分别验收；共享界面的日常体验以 macOS App 为主。
 
 同一客户端工作区的依赖安装、原生构建和 UI 测试串行执行。

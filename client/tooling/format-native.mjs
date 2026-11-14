@@ -13,10 +13,13 @@ const child = spawn(
         `${root}.swift-format`,
         "--recursive",
         `${root}native/Package.swift`,
+        `${root}tooling/generate-app-icon.swift`,
         `${root}native/apple/Sources`,
         `${root}native/apple/Tests`,
         `${root}apps/host/macos/SkynetHost-macOS`,
         `${root}apps/host/macos/SkynetHostUITests`,
+        `${root}apps/host/ios/SkynetHost`,
+        `${root}apps/host/ios/SkynetHostTests`,
     ],
     {
         stdio: "inherit",

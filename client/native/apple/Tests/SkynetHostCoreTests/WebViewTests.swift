@@ -6,7 +6,7 @@ import XCTest
 @testable import SkynetHostCore
 
 /// Runs the packaged shadcn UI in the real WebKit engine. Pointer/keyboard
-/// acceptance remains in XCUITest; this catches scheme, CSP and bridge failures.
+/// acceptance is separate; this catches scheme, CSP and bridge failures.
 @MainActor
 final class WebViewTests: XCTestCase {
     func testPackagedAgentChatDraftReloadAndNarrowLayout() async throws {
@@ -214,11 +214,7 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
                 self?.snapshot = snapshot
                 guard let self else { return }
                 if self.loaded { self.emit(["kind": "snapshot", "value": snapshot]) }
-                let apps = snapshot["apps"] as? [[String: Any]] ?? []
-                if !self.started,
-                    apps.first(where: { $0["id"] as? String == entry.manifest.id })?["status"] as? String
-                        != "starting"
-                {
+                if !self.started {
                     self.started = true
                     self.web.load(
                         URLRequest(url: URL(string: "skynet-app://\(entry.manifest.id)/ui/index.html")!))

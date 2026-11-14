@@ -84,6 +84,7 @@ export interface DesktopDevice {
     remote_enabled: boolean;
 }
 export interface LocalContext {
+    canExecute?: boolean;
     deviceId: string;
     name: string;
     authorizationId: string;

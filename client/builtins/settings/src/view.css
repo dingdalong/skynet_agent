@@ -1,6 +1,6 @@
 .settings-container {
     container-type: inline-size;
-    height: 100dvh;
+    height: 100%;
     overflow: hidden;
 }
 .settings-layout {

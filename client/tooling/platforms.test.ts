@@ -12,14 +12,9 @@ describe("platform build preflight", () => {
             "supported",
         );
         expect(() => requireBuildPlatform("macos", "linux")).toThrow("darwin");
-        for (const name of [
-            "ios",
-            "android",
-            "windows",
-            "linux",
-            "web",
-            "typo",
-        ])
+        expect(requireBuildPlatform("ios", "darwin").status).toBe("supported");
+        expect(() => requireBuildPlatform("ios", "win32")).toThrow("darwin");
+        for (const name of ["android", "windows", "linux", "web", "typo"])
             expect(() => requireBuildPlatform(name, "darwin")).toThrow();
     });
 

@@ -11,6 +11,7 @@ RCT_EXPORT_VIEW_PROPERTY(colors, NSArray)
 @end
 
 @interface RCT_EXTERN_MODULE(SkynetSurfaceManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(active, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(appId, NSString)
 RCT_EXPORT_VIEW_PROPERTY(backgroundHex, NSString)
 RCT_EXPORT_VIEW_PROPERTY(reducedMotion, BOOL)
@@ -18,11 +19,16 @@ RCT_EXPORT_VIEW_PROPERTY(revealDurationMs, double)
 @end
 
 @interface RCT_EXTERN_MODULE(SkynetSceneManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(active, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(transitionKey, NSString)
 RCT_EXPORT_VIEW_PROPERTY(animateLayout, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(reducedMotion, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(durationMs, double)
 RCT_EXPORT_VIEW_PROPERTY(entrance, NSDictionary)
+@end
+
+@interface RCT_EXTERN_MODULE(SkynetSceneFrameManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(visible, BOOL)
 @end
 
 @interface RCT_EXTERN_MODULE(SkynetFeedbackManager, RCTViewManager)

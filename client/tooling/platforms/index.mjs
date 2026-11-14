@@ -10,10 +10,10 @@ export const platforms = {
         detail: "本机 ad-hoc App；正式签名与公证未接入",
     },
     ios: {
-        status: "planned",
+        status: "supported",
         host: "darwin",
         renderer: "react-native",
-        detail: "共享 RN 界面可独立打包验证；UIKit 宿主与运行时未接入",
+        detail: "iPhone/iPad 模拟器；真机、签名与 App Store 审核未验收",
     },
     android: {
         status: "planned",

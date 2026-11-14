@@ -14,6 +14,8 @@
 /client/.bundle/
 /client/**/Pods/
 /client/**/DerivedData/
+/client/**/.xcode.env.local
+/client/**/xcuserdata/
 /client/**/.build/
 /.pnpm-store/
 

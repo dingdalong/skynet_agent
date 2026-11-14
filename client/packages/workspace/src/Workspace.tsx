@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
     AccessibilityInfo,
     Animated,
+    AppState,
     PanResponder,
     Pressable,
     ScrollView,
@@ -24,11 +25,14 @@ import {
     type WorkspacePlatform,
 } from "./platform";
 import {
-    dividerPosition,
+    beginDividerDrag,
+    moveDividerDrag,
+    splitFrames,
     gripPlacement,
     splitLayout,
     stepDivider,
     type DividerAdjustment,
+    type DividerDrag,
     type Placement,
 } from "./geometry";
 
@@ -46,19 +50,42 @@ export function Workspace({ platform }: { platform: WorkspacePlatform }) {
 }
 
 function WorkspaceContent() {
-    const { store, Wallpaper, Scene } = useWorkspacePlatform();
+    const {
+        store,
+        Wallpaper,
+        Frame,
+        Scene,
+        prepareLayoutTransition,
+        setSystemChrome,
+    } = useWorkspacePlatform();
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
     const command = store.command;
     const systemTheme = useColorScheme();
     const { width } = useWindowDimensions();
+    const [availableWidth, setAvailableWidth] = useState<number>();
     const [systemReduceMotion, setSystemReduceMotion] = useState(false);
     const [error, setError] = useState<string>();
     const [draft, setDraft] = useState<Layout>();
+    const [discarded, setDiscarded] = useState<Set<string>>(new Set());
+    const interaction = useRef(0);
+    const activeApps = useRef<(string | null)[]>([]);
     const [divider, setDivider] = useState<{
         ratio: number;
         active: boolean;
         collapse?: Placement;
     }>();
+    useEffect(() => {
+        const subscription = AppState.addEventListener("memoryWarning", () => {
+            setDiscarded(
+                new Set(
+                    snapshot?.workspace.recent.filter(
+                        (id) => !activeApps.current.includes(id),
+                    ),
+                ),
+            );
+        });
+        return () => subscription.remove();
+    }, [snapshot?.workspace.recent.join(",")]);
     useEffect(() => {
         void AccessibilityInfo.isReduceMotionEnabled().then(
             setSystemReduceMotion,
@@ -77,21 +104,40 @@ function WorkspaceContent() {
     const reducedMotion = preferences?.reduceMotion || systemReduceMotion;
     const mode = snapshot?.workspace.mode;
     useEffect(() => {
+        setSystemChrome?.(
+            mode === "desktop" || mode === "overview"
+                ? [
+                      ...tokens.wallpapers[preferences?.wallpaper ?? "coast"][
+                          dark ? "dark" : "light"
+                      ],
+                  ]
+                : [palette.card],
+            dark,
+        );
+    }, [mode, preferences?.wallpaper, dark, palette.card, setSystemChrome]);
+    useEffect(() => {
         setDraft(undefined);
         setDivider(undefined);
-    }, [
-        snapshot?.workspace.mode,
-        snapshot?.workspace.panes.join(","),
-        snapshot?.workspace.ratio,
-    ]);
+    }, [snapshot?.workspace.mode, snapshot?.workspace.panes.join(",")]);
     const execute = (
         name: WorkspaceCommandName,
         input: Record<string, string | number> = {},
     ) => {
+        const owner = interaction.current;
+        if (typeof input.appId === "string")
+            setDiscarded((previous) => {
+                if (!previous.has(input.appId as string)) return previous;
+                const next = new Set(previous);
+                next.delete(input.appId as string);
+                return next;
+            });
+        if (name === "split" || name === "collapse")
+            prepareLayoutTransition?.(!!reducedMotion);
         setError(undefined);
         void command(name, input)
             .catch((error: Error) => setError(error.message))
             .finally(() => {
+                if (interaction.current !== owner) return;
                 setDraft(undefined);
                 setDivider(undefined);
             });
@@ -113,7 +159,7 @@ function WorkspaceContent() {
         panes: snapshot.workspace.panes,
         ratio: divider?.ratio ?? snapshot.workspace.ratio,
     };
-    const workspaceWidth = width;
+    const workspaceWidth = availableWidth ?? width;
     const wide =
         snapshot.capabilities.splitView &&
         workspaceWidth >=
@@ -128,13 +174,16 @@ function WorkspaceContent() {
                       null,
               ]
             : actual.panes;
+    activeApps.current = mode === "apps" ? panes : [];
+    const frames = splitFrames(workspaceWidth, actual.ratio, divider?.collapse);
     const showDesktop = mode === "desktop";
     const previewDesktop =
         !!divider?.collapse &&
         actual.panes[divider.collapse === "left" ? 1 : 0] === null;
-    const desktopChrome = showDesktop || previewDesktop;
+    const desktopChrome = showDesktop;
     const showWorkspaceToolbar = desktopChrome || mode === "overview";
     const setPlacement = (appId: string, placement?: Placement) => {
+        prepareLayoutTransition?.(!!reducedMotion);
         if (!placement) {
             setDraft(undefined);
             return;
@@ -210,139 +259,161 @@ function WorkspaceContent() {
                     <Text style={{ color: palette.destructive }}>{error}</Text>
                 </Pressable>
             )}
-            <View style={styles.scene}>
-                {showDesktop ? (
+            <View
+                style={styles.scene}
+                onLayout={(event) => {
+                    const next = event.nativeEvent.layout.width;
+                    if (
+                        availableWidth !== undefined &&
+                        next !== availableWidth
+                    ) {
+                        ++interaction.current;
+                        setDraft(undefined);
+                        setDivider(undefined);
+                    }
+                    setAvailableWidth(next);
+                }}
+            >
+                {snapshot.apps
+                    .filter(
+                        (app) =>
+                            snapshot.workspace.recent.includes(app.id) &&
+                            (!discarded.has(app.id) ||
+                                activeApps.current.includes(app.id)),
+                    )
+                    .map((app) => {
+                        const index =
+                            mode === "apps" ? panes.indexOf(app.id) : -1;
+                        const frame =
+                            panes.length === 2 && index >= 0
+                                ? frames.panes[index]
+                                : { left: 0, width: workspaceWidth };
+                        const visible = index >= 0 && frame.width > 0;
+                        return (
+                            <Frame
+                                key={app.id}
+                                testID={`app-scene-${app.id}`}
+                                visible={visible}
+                                collapsable={false}
+                                pointerEvents={visible ? "auto" : "none"}
+                                accessibilityElementsHidden={!visible}
+                                importantForAccessibility={
+                                    visible ? "auto" : "no-hide-descendants"
+                                }
+                                style={[
+                                    styles.pane,
+                                    frame,
+                                    !visible && styles.hidden,
+                                ]}
+                            >
+                                <Scene
+                                    testID={`app-transition-${app.id}`}
+                                    active={visible}
+                                    transitionKey={
+                                        visible
+                                            ? `${panes.length}:${index}`
+                                            : "hidden"
+                                    }
+                                    animateLayout={!divider?.active}
+                                    reducedMotion={!!reducedMotion}
+                                    durationMs={tokens.motion.standard}
+                                    entrance={tokens.transitions.app}
+                                    style={styles.appFrame}
+                                >
+                                    <AppPane
+                                        app={app}
+                                        palette={palette}
+                                        width={workspaceWidth}
+                                        paneWidth={frame.width}
+                                        paneLeft={frame.left}
+                                        active={visible}
+                                        reducedMotion={!!reducedMotion}
+                                        execute={execute}
+                                        begin={() => {
+                                            ++interaction.current;
+                                            setDivider(undefined);
+                                        }}
+                                        place={(placement) =>
+                                            setPlacement(app.id, placement)
+                                        }
+                                        finish={(placement) => {
+                                            if (!placement) {
+                                                setDraft(undefined);
+                                                return;
+                                            }
+                                            setPlacement(app.id, placement);
+                                            execute("split", {
+                                                appId: app.id,
+                                                edge: placement,
+                                            });
+                                        }}
+                                    />
+                                </Scene>
+                            </Frame>
+                        );
+                    })}
+                {showDesktop && (
                     <Desktop
                         snapshot={snapshot}
                         palette={palette}
                         reducedMotion={!!reducedMotion}
                         execute={execute}
                     />
-                ) : mode === "overview" ? (
+                )}
+                {mode === "apps" &&
+                    panes.map((id, index) =>
+                        id === null ? (
+                            <View
+                                key={`desktop-${index}`}
+                                style={[
+                                    styles.pane,
+                                    panes.length === 2
+                                        ? frames.panes[index]
+                                        : { left: 0, width: workspaceWidth },
+                                ]}
+                            >
+                                <Desktop
+                                    snapshot={snapshot}
+                                    palette={palette}
+                                    reducedMotion={!!reducedMotion}
+                                    execute={execute}
+                                    inPane={!previewDesktop}
+                                />
+                            </View>
+                        ) : null,
+                    )}
+                {mode === "apps" && panes.length === 2 && (
+                    <Divider
+                        width={workspaceWidth}
+                        preview={{
+                            ratio: actual.ratio,
+                            collapse: divider?.collapse,
+                        }}
+                        palette={palette}
+                        onBegin={() => {
+                            ++interaction.current;
+                            setDraft(undefined);
+                            setDivider({ ratio: actual.ratio, active: true });
+                        }}
+                        onChange={(value) =>
+                            setDivider({ ...value, active: true })
+                        }
+                        onCancel={() => setDivider(undefined)}
+                        onEnd={(value) => {
+                            setDivider({ ...value, active: false });
+                            if (value.collapse)
+                                execute("collapse", { edge: value.collapse });
+                            else execute("resize", { ratio: value.ratio });
+                        }}
+                    />
+                )}
+                {mode === "overview" && (
                     <Overview
                         snapshot={snapshot}
                         palette={palette}
                         reducedMotion={!!reducedMotion}
                         execute={execute}
                     />
-                ) : (
-                    <View style={styles.panes}>
-                        {panes
-                            .map((id, index) => (
-                                <Scene
-                                    key={id ?? `desktop-${index}`}
-                                    transitionKey={`${panes.length}:${index}`}
-                                    animateLayout={!divider?.active}
-                                    reducedMotion={!!reducedMotion}
-                                    durationMs={tokens.motion.standard}
-                                    entrance={
-                                        id ? tokens.transitions.app : undefined
-                                    }
-                                    style={[
-                                        styles.pane,
-                                        {
-                                            flex: divider?.collapse
-                                                ? index ===
-                                                  (divider.collapse === "left"
-                                                      ? 1
-                                                      : 0)
-                                                    ? 1
-                                                    : 0
-                                                : panes.length === 1
-                                                  ? 1
-                                                  : index === 0
-                                                    ? actual.ratio
-                                                    : 1 - actual.ratio,
-                                        },
-                                    ]}
-                                >
-                                    {id ? (
-                                        <AppPane
-                                            app={snapshot.apps.find(
-                                                (app) => app.id === id,
-                                            )!}
-                                            palette={palette}
-                                            width={workspaceWidth}
-                                            paneWidth={
-                                                divider?.collapse
-                                                    ? workspaceWidth
-                                                    : panes.length === 1
-                                                      ? workspaceWidth
-                                                      : (workspaceWidth -
-                                                            tokens.shell
-                                                                .divider) *
-                                                        (index === 0
-                                                            ? actual.ratio
-                                                            : 1 - actual.ratio)
-                                            }
-                                            reducedMotion={!!reducedMotion}
-                                            execute={execute}
-                                            place={(placement) =>
-                                                setPlacement(id, placement)
-                                            }
-                                            finish={(placement) => {
-                                                if (!placement) {
-                                                    setDraft(undefined);
-                                                    return;
-                                                }
-                                                setPlacement(id, placement);
-                                                execute("split", {
-                                                    appId: id,
-                                                    edge: placement,
-                                                });
-                                            }}
-                                        />
-                                    ) : (
-                                        <Desktop
-                                            snapshot={snapshot}
-                                            palette={palette}
-                                            reducedMotion={!!reducedMotion}
-                                            execute={execute}
-                                            inPane={!previewDesktop}
-                                        />
-                                    )}
-                                </Scene>
-                            ))
-                            .flatMap((pane, index) =>
-                                index === 0
-                                    ? [pane]
-                                    : [
-                                          <Divider
-                                              key="divider"
-                                              width={workspaceWidth}
-                                              ratio={actual.ratio}
-                                              previewingFullscreen={
-                                                  !!divider?.collapse
-                                              }
-                                              palette={palette}
-                                              onChange={(value) =>
-                                                  setDivider({
-                                                      ...value,
-                                                      active: true,
-                                                  })
-                                              }
-                                              onCancel={() =>
-                                                  setDivider(undefined)
-                                              }
-                                              onEnd={(value) => {
-                                                  setDivider({
-                                                      ...value,
-                                                      active: false,
-                                                  });
-                                                  if (value.collapse)
-                                                      execute("collapse", {
-                                                          edge: value.collapse,
-                                                      });
-                                                  else
-                                                      execute("resize", {
-                                                          ratio: value.ratio,
-                                                      });
-                                              }}
-                                          />,
-                                          pane,
-                                      ],
-                            )}
-                    </View>
                 )}
             </View>
         </View>
@@ -362,7 +433,7 @@ function IconButton({
     palette: Palette;
     compact?: boolean;
 }) {
-    const { Icon: Symbol, focusProps } = useWorkspacePlatform();
+    const { Icon: Symbol, focusProps, inputMode } = useWorkspacePlatform();
     const [hover, setHover] = useState(false);
     const [focused, setFocused] = useState(false);
     return (
@@ -378,6 +449,10 @@ function IconButton({
             style={[
                 styles.iconButton,
                 compact && styles.compactIconButton,
+                inputMode === "touch" && {
+                    minWidth: tokens.touch.minimumTarget,
+                    minHeight: tokens.touch.minimumTarget,
+                },
                 {
                     backgroundColor: hover ? palette.muted : "transparent",
                     borderColor: focused ? palette.ring : "transparent",
@@ -453,7 +528,7 @@ function Desktop({
     inPane?: boolean;
 }) {
     return (
-        <View style={styles.desktop}>
+        <View testID="workspace-desktop" style={styles.desktop}>
             <ScrollView contentContainerStyle={styles.desktopGrid}>
                 {snapshot.apps.map((app) => {
                     const visible =
@@ -598,7 +673,10 @@ function AppPane({
     palette,
     width,
     paneWidth,
+    paneLeft,
+    active,
     reducedMotion,
+    begin,
     place,
     finish,
     execute,
@@ -607,25 +685,44 @@ function AppPane({
     palette: Palette;
     width: number;
     paneWidth: number;
+    paneLeft: number;
+    active: boolean;
     reducedMotion: boolean;
+    begin(): void;
     place(value?: Placement): void;
     finish(value?: Placement): void;
     execute: Execute;
 }) {
-    const { Surface, focusProps, dragProps } = useWorkspacePlatform();
+    const { Surface, focusProps, dragProps, store } = useWorkspacePlatform();
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    const canSplit =
+        !!snapshot?.capabilities.splitView &&
+        width >= tokens.shell.comfortablePane * 2 + tokens.shell.divider;
     const compact = paneWidth < tokens.shell.comfortablePane;
-    const latest = useRef({ width, place, finish });
-    latest.current = { width, place, finish };
+    const latest = useRef({ width, paneWidth, paneLeft, begin, place, finish });
+    latest.current = { width, paneWidth, paneLeft, begin, place, finish };
+    const origin = useRef({ x: 0, width: 0 });
     const candidate = useRef<Placement | undefined>(undefined);
     const pan = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
+            onPanResponderGrant: () => {
+                const current = latest.current;
+                origin.current = {
+                    x: current.paneLeft + current.paneWidth / 2,
+                    width: current.width,
+                };
+                candidate.current = undefined;
+                current.begin();
+            },
+            onPanResponderTerminationRequest: () => false,
             onPanResponderMove: (_, gesture) => {
                 const current = latest.current;
+                if (origin.current.width !== current.width) return;
                 const next = gripPlacement(
-                    gesture.moveX,
+                    origin.current.x + gesture.dx,
                     gesture.dx,
-                    current.width,
+                    origin.current.width,
                 );
                 if (next !== candidate.current) {
                     candidate.current = next;
@@ -633,7 +730,8 @@ function AppPane({
                 }
             },
             onPanResponderRelease: () => {
-                latest.current.finish(candidate.current);
+                if (origin.current.width === latest.current.width)
+                    latest.current.finish(candidate.current);
                 candidate.current = undefined;
             },
             onPanResponderTerminate: () => {
@@ -676,33 +774,38 @@ function AppPane({
                         </Text>
                     )}
                 </View>
-                <View
-                    {...pan.panHandlers}
-                    accessible
-                    focusable
-                    {...dragProps}
-                    {...focusProps}
-                    style={styles.gripArea}
-                    accessibilityRole="adjustable"
-                    accessibilityLabel={`拖动${app.name}进行分屏`}
-                    accessibilityActions={[
-                        { name: "increment", label: "放到右侧" },
-                        { name: "decrement", label: "放到左侧" },
-                    ]}
-                    onAccessibilityAction={(event) =>
-                        finish(
-                            event.nativeEvent.actionName === "increment"
-                                ? "right"
-                                : "left",
-                        )
-                    }
-                >
+                {canSplit && (
                     <View
+                        {...pan.panHandlers}
+                        accessible
+                        focusable
                         {...dragProps}
-                        pointerEvents="none"
-                        style={[styles.grip, { backgroundColor: palette.ring }]}
-                    />
-                </View>
+                        {...focusProps}
+                        style={styles.gripArea}
+                        accessibilityRole="adjustable"
+                        accessibilityLabel={`拖动${app.name}进行分屏`}
+                        accessibilityActions={[
+                            { name: "increment", label: "放到右侧" },
+                            { name: "decrement", label: "放到左侧" },
+                        ]}
+                        onAccessibilityAction={(event) =>
+                            finish(
+                                event.nativeEvent.actionName === "increment"
+                                    ? "right"
+                                    : "left",
+                            )
+                        }
+                    >
+                        <View
+                            {...dragProps}
+                            pointerEvents="none"
+                            style={[
+                                styles.grip,
+                                { backgroundColor: palette.ring },
+                            ]}
+                        />
+                    </View>
+                )}
                 <View
                     style={[
                         styles.toolbarTrailing,
@@ -754,6 +857,7 @@ function AppPane({
                 <Surface
                     key={`${app.id}:${app.version}`}
                     appId={app.id}
+                    active={active}
                     backgroundHex={palette.background}
                     reducedMotion={reducedMotion}
                     revealDurationMs={tokens.motion.quick}
@@ -766,87 +870,136 @@ function AppPane({
 
 function Divider({
     width,
-    ratio,
-    previewingFullscreen,
+    preview,
     palette,
+    onBegin,
     onChange,
     onCancel,
     onEnd,
 }: {
     width: number;
-    ratio: number;
-    previewingFullscreen: boolean;
+    preview: DividerAdjustment;
     palette: Palette;
+    onBegin(): void;
     onChange(value: DividerAdjustment): void;
     onCancel(): void;
     onEnd(value: DividerAdjustment): void;
 }) {
-    const { focusProps, dragProps } = useWorkspacePlatform();
-    const latest = useRef({ width, ratio, onChange, onCancel, onEnd });
-    latest.current = { width, ratio, onChange, onCancel, onEnd };
-    const last = useRef<ReturnType<typeof dividerPosition>>({ ratio });
+    const { focusProps, dragProps, inputMode } = useWorkspacePlatform();
+    const { ratio, collapse } = preview;
+    const latest = useRef({ width, ratio, onBegin, onChange, onCancel, onEnd });
+    latest.current = { width, ratio, onBegin, onChange, onCancel, onEnd };
+    const drag = useRef<DividerDrag | undefined>(undefined);
+    useEffect(() => {
+        drag.current = undefined;
+    }, [width]);
     const pan = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onPanResponderGrant: () => {
-                last.current = { ratio: latest.current.ratio };
+                const current = latest.current;
+                drag.current = beginDividerDrag(current.ratio, current.width);
+                current.onBegin();
             },
+            onPanResponderTerminationRequest: () => false,
             onPanResponderMove: (_, gesture) => {
-                const next = dividerPosition(
-                    gesture.moveX,
-                    latest.current.width,
-                    last.current,
-                );
-                last.current = next;
-                latest.current.onChange(next);
+                if (
+                    !drag.current ||
+                    drag.current.width !== latest.current.width
+                )
+                    return;
+                drag.current = moveDividerDrag(drag.current, gesture.dx);
+                latest.current.onChange(drag.current.preview);
             },
-            onPanResponderRelease: () => latest.current.onEnd(last.current),
-            onPanResponderTerminate: () => latest.current.onCancel(),
+            onPanResponderRelease: () => {
+                if (!drag.current) return;
+                if (drag.current.width !== latest.current.width) {
+                    drag.current = undefined;
+                    latest.current.onCancel();
+                    return;
+                }
+                const value = drag.current.preview;
+                drag.current = undefined;
+                // A move and release can be batched before React renders.
+                // Both presentation and commit must use the last accepted move.
+                latest.current.onEnd(value);
+            },
+            onPanResponderTerminate: () => {
+                drag.current = undefined;
+                latest.current.onCancel();
+            },
         }),
     ).current;
     return (
         <View
             {...pan.panHandlers}
-            accessible
-            focusable
             {...dragProps}
-            {...focusProps}
-            style={[
-                styles.divider,
-                previewingFullscreen && { width: 0, opacity: 0 },
-            ]}
-            accessibilityRole="adjustable"
-            accessibilityLabel="调整分屏比例"
-            accessibilityValue={{
-                min: 1 / 3,
-                max: 2 / 3,
-                now: ratio,
-                text: `左侧 ${Math.round(ratio * 100)}%，右侧 ${Math.round((1 - ratio) * 100)}%`,
-            }}
-            accessibilityActions={[
-                {
-                    name: "increment",
-                    label: ratio >= 2 / 3 ? "收起右侧，左侧全屏" : "扩大左侧",
-                },
-                {
-                    name: "decrement",
-                    label: ratio <= 1 / 3 ? "收起左侧，右侧全屏" : "缩小左侧",
-                },
-            ]}
-            onAccessibilityAction={(event) =>
-                onEnd(
-                    stepDivider(
-                        ratio,
-                        event.nativeEvent.actionName === "increment",
-                    ),
-                )
-            }
+            style={StyleSheet.absoluteFill}
+            pointerEvents="box-none"
         >
             <View
+                accessible
+                focusable
                 {...dragProps}
-                pointerEvents="none"
-                style={[styles.dividerGrip, { backgroundColor: palette.ring }]}
-            />
+                {...focusProps}
+                style={[
+                    styles.divider,
+                    {
+                        left:
+                            (width - tokens.shell.divider) * ratio -
+                            (inputMode === "touch" ? 18 : 4),
+                        width:
+                            tokens.shell.divider +
+                            (inputMode === "touch" ? 36 : 8),
+                        opacity: collapse ? 0 : 1,
+                    },
+                ]}
+                accessibilityRole="adjustable"
+                accessibilityLabel="调整分屏比例"
+                accessibilityValue={{
+                    min: 1 / 3,
+                    max: 2 / 3,
+                    now: ratio,
+                    text: `左侧 ${Math.round(ratio * 100)}%，右侧 ${Math.round((1 - ratio) * 100)}%`,
+                }}
+                accessibilityActions={[
+                    {
+                        name: "increment",
+                        label:
+                            ratio >= 2 / 3 ? "收起右侧，左侧全屏" : "扩大左侧",
+                    },
+                    {
+                        name: "decrement",
+                        label:
+                            ratio <= 1 / 3 ? "收起左侧，右侧全屏" : "缩小左侧",
+                    },
+                ]}
+                onAccessibilityAction={(event) =>
+                    onEnd(
+                        stepDivider(
+                            ratio,
+                            event.nativeEvent.actionName === "increment",
+                        ),
+                    )
+                }
+            >
+                <View
+                    pointerEvents="none"
+                    style={[
+                        styles.dividerLine,
+                        { backgroundColor: `${palette.ring}44` },
+                    ]}
+                >
+                    <View
+                        {...dragProps}
+                        pointerEvents="none"
+                        style={[
+                            styles.dividerGrip,
+                            { backgroundColor: palette.ring },
+                        ]}
+                    />
+                </View>
+            </View>
         </View>
     );
 }
@@ -1079,14 +1232,16 @@ const styles = StyleSheet.create({
         padding: 3,
     },
     runningDot: { width: 3, height: 3, borderRadius: 2 },
-    panes: {
-        flex: 1,
-        flexDirection: "row",
+    pane: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        minWidth: 0,
         overflow: "hidden",
     },
-    pane: {
-        minWidth: 0,
-    },
+    // The stable parent owns visibility; native animation only owns its child.
+    // display:none would discard the retained Fabric/WebView subtree.
+    hidden: { opacity: 0 },
     appFrame: { flex: 1 },
     paneToolbar: {
         height: tokens.shell.toolbar,
@@ -1129,7 +1284,15 @@ const styles = StyleSheet.create({
     grip: { width: 34, height: 5, borderRadius: 3, opacity: 0.5 },
     surface: { flex: 1 },
     divider: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    dividerLine: {
         width: tokens.shell.divider,
+        height: "100%",
         alignItems: "center",
         justifyContent: "center",
     },

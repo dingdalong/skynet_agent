@@ -17,7 +17,17 @@ try {
         else if (args[index] === "--preflight") preflight = true;
         else throw new Error(`未知参数 ${args[index]}`);
     }
-    if (!["build", "dev", "test", "install", "doctor", "list"].includes(action))
+    if (
+        ![
+            "build",
+            "dev",
+            "test",
+            "install",
+            "archive",
+            "doctor",
+            "list",
+        ].includes(action)
+    )
         throw new Error(`未知构建操作 ${action}`);
     if (action === "list" || action === "doctor") {
         for (const [name, target] of Object.entries(platforms))
@@ -41,10 +51,14 @@ try {
         // Reject unsupported targets before building apps, installing tools,
         // modifying generated resources or launching any application.
         requireBuildPlatform(platform);
+        if (action === "archive" && platform !== "ios")
+            throw new Error(
+                "归档入口当前仅支持 iOS；其他平台使用 client-build",
+            );
         if (!preflight) {
             const child = spawn(
                 process.execPath,
-                [`${clientRoot}tooling/macos.mjs`, action],
+                [`${clientRoot}tooling/${platform}.mjs`, action],
                 { stdio: "inherit", env: process.env },
             );
             process.exitCode = await new Promise((resolve, reject) => {

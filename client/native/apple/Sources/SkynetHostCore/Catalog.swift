@@ -113,7 +113,7 @@ public final class AppCatalog {
     public private(set) var entries: [String: Entry] = [:]
     private let root: URL
     private let fm = FileManager.default
-    public init(root: URL, builtins: URL) throws {
+    public init(root: URL, builtins: URL, allowInstalled: Bool = true) throws {
         self.root = root
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         for folder in try fm.contentsOfDirectory(at: builtins, includingPropertiesForKeys: nil)
@@ -121,6 +121,7 @@ public final class AppCatalog {
             let manifest = try verify(folder, builtin: true)
             entries[manifest.id] = Entry(manifest: manifest, root: folder, builtin: true)
         }
+        guard allowInstalled else { return }
         for folder in try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
             if folder.lastPathComponent.hasPrefix(".stage-")
                 || folder.lastPathComponent.hasPrefix(".removed-")

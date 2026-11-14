@@ -42,3 +42,63 @@
     border: 1px solid var(--border);
     padding: 0.5em 0.75em;
 }
+
+.agent-touch-hint {
+    display: none;
+}
+@media (pointer: coarse) {
+    .agent-keyboard-hint {
+        display: none;
+    }
+    .agent-touch-hint {
+        display: inline;
+    }
+}
+
+@media (max-height: 420px) {
+    .agent-pane > header {
+        padding-block: 4px;
+        gap: 8px;
+    }
+    .agent-composer {
+        padding-block: 8px;
+    }
+    .agent-composer > p {
+        display: none;
+    }
+    .agent-composer textarea {
+        min-height: var(--touch-minimum-target);
+        max-height: 96px;
+    }
+}
+
+/* A short editing viewport needs space for the focused control before metadata.
+   This also applies to a resized desktop pane, without device-specific branches. */
+@media (max-height: 320px) {
+    .agent-app:has(#agent-message:focus) .agent-pane > header,
+    .agent-app:has(#agent-message:focus) .agent-composer > p,
+    .agent-app:has(#agent-message:focus)
+        .agent-composer
+        [data-slot="select-trigger"] {
+        display: none;
+    }
+    .agent-app:has(#agent-message:focus) .agent-composer {
+        padding: 4px;
+    }
+    .agent-app:has(#agent-message:focus)
+        .agent-composer
+        [data-slot="input-group"] {
+        flex-direction: row;
+    }
+    .agent-app:has(#agent-message:focus) .agent-composer textarea {
+        min-height: var(--touch-minimum-target);
+        max-height: var(--touch-minimum-target);
+    }
+    .agent-app:has(#agent-message:focus)
+        .agent-composer
+        [data-slot="input-group-addon"] {
+        width: auto;
+        padding: 0 4px;
+        flex-wrap: nowrap;
+    }
+}

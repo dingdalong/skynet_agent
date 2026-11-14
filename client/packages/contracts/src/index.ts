@@ -63,6 +63,7 @@ export interface AppSnapshot<State = Json> {
     preferences: Preferences;
     apps: AppSummary[];
     error: string | null;
+    capabilities?: HostCapabilities;
 }
 
 export interface Effect {

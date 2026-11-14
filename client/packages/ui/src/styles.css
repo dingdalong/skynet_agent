@@ -84,7 +84,32 @@ html {
 html.dark {
     color-scheme: dark;
 }
+html,
+body,
+#root {
+    height: 100%;
+    overflow: hidden;
+}
 body {
     margin: 0;
     font-size: var(--type-body);
+}
+@media (pointer: coarse) {
+    [data-slot="button"],
+    [data-slot="select-trigger"],
+    [data-slot="select-item"],
+    [data-slot="toggle-group-item"] {
+        min-height: var(--touch-minimum-target);
+    }
+    [data-slot="button"][data-size^="icon"] {
+        min-width: var(--touch-minimum-target);
+    }
+    input,
+    textarea {
+        font-size: max(var(--type-body), var(--touch-input-font));
+    }
+    [data-slot="dialog-content"] {
+        max-height: calc(100dvh - 2rem);
+        overflow-y: auto;
+    }
 }

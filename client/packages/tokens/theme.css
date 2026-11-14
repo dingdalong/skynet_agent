@@ -30,6 +30,8 @@
     --motion-quick: 140ms;
     --motion-standard: 240ms;
     --motion-scene: 320ms;
+    --touch-minimum-target: 44px;
+    --touch-input-font: 16px;
     --wallpaper-coast: linear-gradient(145deg, #cad7d9, #7c9fa4, #385b62);
     --wallpaper-dusk: linear-gradient(145deg, #d9c8c4, #aa8e9a, #685d7d);
     --wallpaper-forest: linear-gradient(145deg, #c7d0bd, #7a9385, #365953);

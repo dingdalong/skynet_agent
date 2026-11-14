@@ -106,8 +106,12 @@ export function useAppSnapshot<State = Json>(): AppSnapshot<State> | undefined {
         media.addEventListener("change", update);
         return () => media.removeEventListener("change", update);
     }, [snapshot?.preferences.appearance, snapshot?.preferences.reduceMotion]);
+    const initialized =
+        !!snapshot &&
+        snapshot.apps.find((app) => app.id === snapshot.appId)?.status !==
+            "starting";
     useEffect(() => {
-        if (snapshot) return revealPresentation();
-    }, [!!snapshot]);
+        if (initialized) return revealPresentation();
+    }, [initialized]);
     return snapshot as AppSnapshot<State> | undefined;
 }

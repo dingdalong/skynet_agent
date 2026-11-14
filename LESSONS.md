@@ -1083,9 +1083,11 @@
 - 后台退出：点击卡片外区域返回桌面，空后台也可退出；不关闭已有应用或重置页面状态。
 - 证据：2026-11-12 用户最新交互决定；client/workspace-demo.html、docs/design/WORKSPACE_DEMO.md；统一导航最终四配置 108 项 E2E 及 make check 通过，见 client/test-artifacts/workspace/unified-navigation-e2e.log、unified-navigation-check.log。
 - 后续决定与验证：2026-11-13 用户进一步区分标题交换与分隔条收起。7 项逻辑与 22 项原生集成通过，含收起后进程 ID 和状态保留；Computer Use 辅助功能动作验证两应用分屏、最小比例后收起、后台恢复与桌面保留路径。持续拖动未由后台工具完成验收。
+- 后续验证：2026-11-14 iPad 实际拖动验证两侧三分之一锁定、短距离外推不收起、超过确认距离后收起；
+  根因和预览提交的回归分别见 L-114、L-115。macOS 后台工具的连续鼠标拖动仍未完成验收。
 - Done right：将 desktop 与应用都作为正式 pane 管理，用同一比例和约束支持两种分屏状态；新增应用不通过 Dock 位置决定能否分屏。
 - Seen: 2× (2026-11-12; task: 20261112T121551-workspace-gestures.md; 2026-11-13; task: 20261113T202152-workspace-transitions.md)
-- 备注：历史 HTML 与 Flutter 实现已被 React Native macOS 宿主替代；当前只验收 macOS，不宣称移动端或完整持续拖动已验收。
+- 备注：历史 HTML 与 Flutter 实现已被 RN 共享工作区替代；iPhone/iPad 已接入，具体输入路径按各次实际证据报告。
 
 ### L-078: 拖动提交前检查内容区尺寸，不能只等待 ResizeObserver 取消
 
@@ -1380,9 +1382,11 @@
   各目标在真实宿主接入前保持 planned/blocked，构建前拒绝，不能回退到另一平台。
 - 证据：11 项 Vitest、22 项 macOS 集成及首轮 Release 原生设置/分屏/重载/后台流程通过；
   标准 RN 的 iOS/Android 依赖图与 macOS/Linux C++ 测试通过。根 Make 的未支持目标提前拒绝。
-- Done right：分别报告依赖图、公共核心、原生构建与实际体验；Windows CI 未执行、移动原生宿主未接入、
-  Linux RN 宿主未选定。辅助功能分屏不等同持续指针拖动验收，未经采样不作帧率结论。
-- Seen: 1× (2026-11-13; task: 20261113T223424-rn-shared-host.md)
+- 后续复用：2026-11-14 的 iOS 接入复用工作区、业务和共享苹果核心，iPhone/iPad 各 7 项原生集成通过；
+  实际分屏拖动、旋转、主题、键盘和跨系统后台会话恢复分别验证，未复制机型页面。
+- Done right：分别报告依赖图、公共核心、原生构建与实际体验；Android/Windows 原生宿主和 Linux 仍未验收。
+  辅助功能分屏不等同持续指针拖动验收，未经采样不作帧率结论。
+- Seen: 1× (2026-11-13; task: 20261113T223424-rn-shared-host.md; reused by: 20261114T020628-ios-host.md)
 
 ### L-100: Swift 包新增 C++ 依赖后同时验证最终 Xcode 消费者
 
@@ -1504,3 +1508,131 @@
   修复后全部 7 项本机执行测试通过；最终 App 真实 35 秒本地任务跨表现重载完成，连接不变、退出码 0。
 - Done right：使用发生故障的优化级别复现；核对页面终态和连接身份，文件已写出不能替代完整任务成功。
 - Seen: 1× (2026-11-14; task: 20261114T011000-local-agent-and-preview.md)
+
+### L-109: 共享布局同时定义宽度重排与高度退路
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：RN 工作区、shadcn Web 内容、键盘视口、分屏
+- 触发：按宽度已经重排，但键盘或矮窗口让空状态覆盖输入，或发送区落到视口之外。
+- 根因：只定义了横向断点；弹性内容缺少 min-height:0，标题与输入的固定总高度超过视口后没有滚动所有者。
+  根文档与原生 WebView 仍可整页滚动，未明确可用高度和滚动位置的所有权。
+- 解法：宿主统一提供安全区与键盘剩余视口；公共根文档填满容器并禁止整页滚动，iOS WebView 不重复调整 inset，
+  页面内部承担内容滚动。子应用用容器宽度重排，内容可收缩，极短视口允许面板整体滚动。
+  短视口减少辅助间距，聚焦时优先保留输入和提交，不添加机型分支。
+- 证据：实际 WebKit 的 700×180 输入可达性修复前失败、修复后通过；320～1024 宽度、断点两侧与短视口回归通过。
+  iPhone 实际横屏软键盘下输入与提交可见；连续旋转曾残留根页面偏移与底部空白，
+  收紧根视口所有权后相同操作恢复正常，内部消息仍可触控滚动。最终 iPad 分屏/主题和 macOS 分屏/消息滚动复验通过。
+  未独立确认 WebKit 自动滚动的全部时序；程序化焦点夹具的限制另记，未据此宣称全部焦点边界自动化通过。
+- Done right：先定义伸缩、最小尺寸和滚动所有者，再验证不溢出、不重叠与动作可达；真实键盘与旋转用原生操作确认。
+- Seen: 1× (2026-11-14; task: 20261114T020628-ios-host.md)
+
+### L-110: Fabric 自定义 Image loader 同时完成依赖注册
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：React Native iOS、Fabric、SF Symbols、RCTAppDependencyProvider
+- 触发：原生图标 loader 编译成功，RN 按钮有命中区，实际图标仍不显示。
+- 根因：loader 没有纳入当前宿主依赖提供者的发现列表。
+- 解法：iOS 入口通过 RCTAppDependencyProvider 注册 loader，继续使用标准 RN Image；
+  共享工作区只使用语义图标名。
+- 证据：iPhone Release 与 iPad 实际 App 的桌面、Dock 和工具栏图标可见、居中，交互入口正常。
+- Done right：分别检查原生编译、当前架构的模块发现和实际呈现，不用临时文字图标掩盖注册错误。
+- Seen: 1× (2026-11-14; task: 20261114T020628-ios-host.md)
+
+### L-111: Hosted 测试复用宿主已链接的静态核心
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：Xcode iOS 工程、Swift 静态包、hosted XCTest
+- 触发：App 与 hosted tests 同时链接 SkynetHostCore，构建图和运行时类型身份异常。
+- 根因：同一静态核心被重复装入宿主和测试 image。
+- 解法：核心只链接到 App；测试配置 TEST_HOST、BUNDLE_LOADER 和模块搜索路径，
+  不再独立链接同一静态产品。
+- 证据：工程修正后，iPhone/iPad 各 7 项真实模拟器集成通过。
+- Done right：区分独立包测试与 hosted tests；测试框架的最低系统要求也不能直接当作 App 的最低部署版本。
+- Seen: 1× (2026-11-14; task: 20261114T020628-ios-host.md)
+
+### L-112: 最低平台版本取整个 UI 技术栈的兼容交集
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：React Native、系统 WebKit、Tailwind、iOS 部署与打包
+- 触发：iOS 工程沿用 RN 的最低 15.1，但 Web 子应用使用 Tailwind 4。
+- 根因：只考虑原生框架要求，没有纳入系统 Web 引擎与 CSS 能力。
+- 解法：按 Tailwind 官方 Safari 16.4 基线，同步 Podfile、工程生成、Swift Package 和支持文档。
+- 证据：重新生成依赖、Release 与设备归档成功；归档 MinimumOSVersion 为 16.4，设备家族为 iPhone/iPad。
+- Done right：最低版本声明、目标 SDK 构建和最低版本实际运行分别报告；本次只实测 27.2，没有把声明检查当成 16.4 运行验收。
+- Seen: 1× (2026-11-14; task: 20261114T020628-ios-host.md)
+
+### L-113: 业务保留与 Web 表现缓存分别管理
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：RN Fabric、WKWebView、应用内部切换
+- 触发：应用外框立即打开，但每次返回桌面后重开都再次空白一段时间。
+- 根因：业务和连接保留了，AppPane 却被卸载；仅保留 React 组件再设 display:none，Fabric 仍会移除原生子树。
+- 解法：按稳定应用身份保留真实表现树，独立控制绘制、输入、辅助功能与键盘焦点；
+  共享父容器统一决定矩形和显隐，并由平台容器直接映射原生 hidden；平台动画只控制内部子层。
+  关闭、更新、重载或内存压力才丢弃对应缓存。动画透明度不能覆盖隐藏状态，也不能只靠透明度隐藏辅助功能内容。
+- 证据：iPhone 原复开 requested→visible 为 1584.8ms；保留实际原生视图后多次复开直接恢复原分类，
+  日志没有新的 createWeb/loadDocument。iPad 桌面透出后台页的问题在修正动画可见性后同路径消失。
+  后续用户真机仍出现偶发叠层，原始触发时序未复现，先前同路径通过不等于覆盖该故障。
+  macOS 实际辅助功能树确认普通透明父容器仍暴露后台 Web 内容；当前 RN macOS Fabric 源码没有实现
+  accessibilityElementsHidden。统一原生 hidden 后相同操作仅暴露桌面或后台卡片，复开仍保留原页面。
+  iPhone/iPad 各 10 项 hosted 集成通过，包含迟到原生动画输出、输入与辅助功能屏障、同一 WebView 恢复；
+  两端最新 Release 实际界面与 macOS 双应用三分之一布局通过。
+- Done right：缓存复开与首次冷加载分别测量；分别检查绘制、命中和辅助功能。用受控迟到动画验证容器屏障，
+  不将受控回归通过宣称为自然复现了用户的偶发故障，也不将复开无重复载入宣称为冷启动零延迟。
+- Seen: 1× (2026-11-14; tasks: 20261114T132322-split-layout-and-presentation.md, 20261114T155936-retained-scene-visibility.md)
+- 备注：iOS 26 真机原截图的偶发触发机制仍 Open；本次更新包未在该真机复验。
+
+### L-114: 分屏矩形与输入几何由同一容器计算
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：RN 共享工作区、分屏、容器与手势
+- 触发：AX 比例为三分之一，截图实际面板却约七成；全屏预览仍留下另一侧宽度。
+- 根因：比例状态没有直接约束两侧矩形，flex:0 不等于零宽；拖动又混用绝对坐标与会移动的响应区域。
+- 解法：统一计算左右面板、分隔条的明确矩形，折叠侧宽度为零；
+  手势冻结容器宽度和初始位置，以累计位移更新，响应者保持稳定尺寸。
+- 证据：macOS 1280 点容器的三分之一面板实测 424 点，截图对应；iPad 实际拖动的三档与两侧收起通过，
+  几何测试覆盖总宽、边界、零宽和回拉。macOS 连续鼠标拖动仍受后台工具验收限制。
+- Done right：同时验证实际面板宽度、命中区域和状态比例，不能只断言辅助功能百分比。
+- Seen: 1× (2026-11-14; task: 20261114T132322-split-layout-and-presentation.md)
+
+### L-115: 手势提交不能依赖上一帧渲染回调
+
+- 类型：Pitfall
+- 状态：Verified
+- 范围：RN PanResponder、批量输入、分屏预览提交
+- 触发：最后一次 move 与 release 同批到达，拖动只完成一部分，或全屏预览退回原比例。
+- 根因：用 useLayoutEffect 更新的 presented 引用提交时，可能仍是上一帧；最后一次已接受的 move 被丢弃。
+- 解法：手势状态同步保存最后一次几何预览，绘制和提交读取它，不在松手时重新解释坐标；
+  旧命令结束也不能清理新的手势预览。
+- 证据：iPad 145 点外推已计算 collapse，旧 release 却提交原 2/3；修复后同路径全屏。
+  同批事件回归在旧逻辑下 3 项失败，修正后 4 项通过；实际两侧外推与提交日志已保存。
+- Done right：测试 move→release 中间没有 React render 的路径，并验证最终宿主命令。
+- Seen: 1× (2026-11-14; task: 20261114T132322-split-layout-and-presentation.md)
+
+### L-116: WebView 冷启动先分离页面耗时与模拟器检查成本
+
+- 类型：Success
+- 状态：Verified
+- 范围：WKWebView、iOS Simulator 27.2、辅助功能、首屏性能
+- 触发：新建 WebView 的正文出现约需 1.5 秒，准备以预热或缓存解决。
+- 根因：该环境的大部分等待发生在本地资源请求前；WebContent 主线程采样显示大量时间用于
+  `AXWebProcessLoader` 加载辅助功能包，空 HTML 与不含 RN 的最小 App 同样复现。
+- 解法：保留导航开始与文档提交计时，使用相同正式资源做最小对照；同一临时模拟器 UI 检查前
+  AX=0，三个新视图约 0.68/0.42/0.40 秒就绪，检查后 AX=1，约 1.73/1.48/1.41 秒。
+  不关闭辅助功能，也不据此新增预热池。真实设备是否需要优化仍以真机 Release 测量决定。
+- 证据：`client/test-artifacts/webview-startup-report.md`、其中引用的分段日志、系统日志和采样。
+  正式 iPhone App 本地资源读取各不足 1ms，文档提交到完成约 19ms；主延迟在此前。
+- 真机对照：同一源码 Release 在 iOS 26.3.1 (a) 的首次设置为 722.5ms，
+  后续四次销毁后新建 WebView 为 117.5～126.0ms，设置后首开 Agent 为 191.0ms。
+  重启宿主并交换顺序后，首开 Agent 为 245.7ms，随后设置为 123.8ms，未重现首轮额外等待。
+  后续新建也不是页面缓存恢复；共测两个宿主进程，且与模拟器系统版本不同，
+  不据此宣称全新引擎冷启动已解决或所有设备都无需预热。
+- Done right：每回合新建视图与隔离数据存储，分别记录首次系统启动、App 进程首次视图及后续新视图；
+  采样回合不用于速度比较，不把最小 App 的结果宣称为正式 App 或真机已修复。
+- Seen: 1× (2026-11-14; task: 20261114T145304-webview-cold-start.md)

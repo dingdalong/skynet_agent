@@ -6,7 +6,62 @@ export type DividerPreview = DividerAdjustment & {
     latched?: number;
     barrier?: { edge: Placement; x: number };
 };
+export type DividerDrag = {
+    width: number;
+    origin: number;
+    preview: DividerPreview;
+};
+export type PaneFrame = { left: number; width: number };
 const splitStops = [1 / 3, 1 / 2, 2 / 3];
+
+/** One container owns both panes and the divider; content never sets their widths. */
+export function splitFrames(
+    width: number,
+    ratio: number,
+    collapse?: Placement,
+): { panes: [PaneFrame, PaneFrame]; divider: PaneFrame } {
+    const size = Math.max(0, width);
+    const gap = collapse ? 0 : Math.min(size, tokens.shell.divider);
+    const available = size - gap;
+    const left =
+        collapse === "left"
+            ? 0
+            : collapse === "right"
+              ? size
+              : available * Math.max(1 / 3, Math.min(ratio, 2 / 3));
+    return {
+        panes: [
+            { left: 0, width: left },
+            { left: left + gap, width: available - left },
+        ],
+        divider: { left, width: gap },
+    };
+}
+
+export function beginDividerDrag(ratio: number, width: number): DividerDrag {
+    const value = Math.max(1 / 3, Math.min(ratio, 2 / 3));
+    const origin =
+        (width - tokens.shell.divider) * value + tokens.shell.divider / 2;
+    const edge =
+        value === 1 / 3 ? "left" : value === 2 / 3 ? "right" : undefined;
+    return {
+        width,
+        origin,
+        preview: {
+            ratio: value,
+            ...(splitStops.includes(value) ? { latched: value } : {}),
+            ...(edge ? { barrier: { edge, x: origin } } : {}),
+        },
+    };
+}
+
+/** Accumulated movement is independent of the responder's changing child frames. */
+export function moveDividerDrag(drag: DividerDrag, delta: number): DividerDrag {
+    return {
+        ...drag,
+        preview: dividerPosition(drag.origin + delta, drag.width, drag.preview),
+    };
+}
 
 export function stepDivider(
     ratio: number,
@@ -57,7 +112,7 @@ export function splitLayout(
     };
 }
 
-export function dividerPosition(
+function dividerPosition(
     x: number,
     width: number,
     previous?: DividerPreview,

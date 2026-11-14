@@ -2,6 +2,19 @@ import AppKit
 import QuartzCore
 import React
 
+@objc(SkynetSceneFrameManager)
+final class SceneFrameManager: RCTViewManager {
+    override static func requiresMainQueueSetup() -> Bool { true }
+    override func view() -> NSView! { SceneFrame(frame: .zero) }
+}
+
+/// No animations or lifecycle state: the shared workspace owns this value.
+private final class SceneFrame: RCTView {
+    @objc var visible = true {
+        didSet { isHidden = !visible }
+    }
+}
+
 @objc(SkynetFeedbackManager)
 final class FeedbackManager: RCTViewManager {
     override static func requiresMainQueueSetup() -> Bool { true }
@@ -100,10 +113,26 @@ final class SceneManager: RCTViewManager {
 /// Native composition handles entrance and placement without per-frame Fabric updates.
 /// The model layer always holds the final layout, opacity and transform.
 private final class WorkspaceScene: RCTView {
+    @objc var active: Bool = true {
+        didSet {
+            guard active != oldValue else { return }
+            hasEntered = false
+            entrancePending = active && entrance != nil
+            layer?.removeAnimation(forKey: "workspace.entrance")
+            layer?.removeAnimation(forKey: "workspace.placement")
+            if active { scheduleEntrance() }
+        }
+    }
     @objc var transitionKey: String = "" {
         didSet {
             guard oldValue != transitionKey else { return }
             layer?.removeAnimation(forKey: "workspace.entrance")
+            if oldValue == "hidden" || transitionKey == "hidden" {
+                transitionPending = false
+                transitionFrom = nil
+                previousFrame = nil
+                return
+            }
             if !transitionPending {
                 transitionFrom = previousFrame
                 transitionTransform = layer?.presentation()?.transform ?? CATransform3DIdentity
@@ -130,7 +159,7 @@ private final class WorkspaceScene: RCTView {
     @objc var durationMs: Double = 240
     @objc var entrance: NSDictionary? {
         didSet {
-            if !hasEntered {
+            if active, !hasEntered {
                 entrancePending = entrance != nil
                 scheduleEntrance()
             }
@@ -213,7 +242,7 @@ private final class WorkspaceScene: RCTView {
         previousFrame = current
         let displayed = transitionTransform
         layer.removeAnimation(forKey: "workspace.placement")
-        guard let previous, animateLayout, !reducedMotion,
+        guard active, let previous, animateLayout, !reducedMotion,
             !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, durationMs > 0,
             abs(current.minX - previous.minX) > 0.5 || abs(current.width - previous.width) > 0.5
         else { return }

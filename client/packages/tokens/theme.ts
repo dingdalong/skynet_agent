@@ -64,6 +64,10 @@ export const tokens = {
         "standard": 240,
         "scene": 320
     },
+    "touch": {
+        "minimumTarget": 44,
+        "inputFont": 16
+    },
     "transitions": {
         "app": {
             "scale": 0.98,

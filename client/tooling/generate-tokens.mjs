@@ -30,6 +30,9 @@ const dimensions = [
     ...Object.entries(tokens.motion).map(
         ([name, value]) => `    --motion-${kebab(name)}: ${value}ms;`,
     ),
+    ...Object.entries(tokens.touch).map(
+        ([name, value]) => `    --touch-${kebab(name)}: ${value}px;`,
+    ),
 ].join("\n");
 const wallpapers = (mode) =>
     Object.entries(tokens.wallpapers)
