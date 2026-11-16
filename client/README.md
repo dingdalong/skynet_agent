@@ -36,5 +36,6 @@ macOS 新增应用使用 `tooling/create-app.mjs`，将源码打包成 `.skapp` 
 包仅含 manifest、Web 资源与业务 JS；不支持原生扩展。子应用数据由宿主保存，
 更新失败不会清除数据，移除包也会保留数据。
 
-实现前阅读[设计规范](../docs/design/CLIENT_DESIGN.md)与[运行时规范](../docs/architecture/CLIENT_RUNTIME.md)。
+实现前遵循[客户端开发规范](AGENTS.md)，阅读[编码与协作规范](编码与协作规范.md)和[隐式约定](隐式约定.md)；
+设计与运行时细节见[设计规范](../docs/design/CLIENT_DESIGN.md)与[运行时规范](../docs/architecture/CLIENT_RUNTIME.md)。
 修改共享视觉后验证受影响的实际平台 App，浏览器预览和编译成功不代表原生体验通过。

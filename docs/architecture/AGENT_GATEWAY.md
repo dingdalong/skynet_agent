@@ -183,7 +183,8 @@ client 在初始化时通过 `package.searchpath("user.handler", package.path)` 
 不把处理函数复制到 User 类或其他分发表。新增模块通过重启接入，已有 handler 的兼容方法体修复继续支持原位热修。
 `UserSnapshotReq` 由 `user/handler.lua` 处理；`ChatReq`、`MessageCancelReq`、`SessionModelSetReq`
 由 `user/mods/chat/handler.lua` 处理并通过 `self.chat` 委托同目录的 `chat.lua`。
-命名与分发规则见[隐式约定](../../隐式约定.md)。
+协议命名见[公共隐式约定](../../隐式约定.md#公共协议)，handler 与分发规则见
+[服务端隐式约定](../../server/隐式约定.md)。
 未知业务请求（包括重复登录）以 1008 关闭，处理异常以 1011 关闭。
 
 ## 配置与传输
@@ -284,7 +285,8 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 新客户端尚未接入本机执行；WSS 证书配置由反向代理管理。
 
 测试入口、真实模型凭据和产物位置见[测试与验收](../DEVELOPMENT.md#测试与验收)，
-验收层级以[编码与协作规范](../../编码与协作规范.md#测试用例)为准。
+验收层级以[公共编码与协作规范](../../编码与协作规范.md#测试用例)为准，
+服务端验证要求见[服务端编码与协作规范](../../server/编码与协作规范.md#测试用例)。
 
 ## 工具执行与权限
 

@@ -43,7 +43,10 @@ make -C server build
 - [网关架构](docs/architecture/AGENT_GATEWAY.md)：服务、会话、协议与工具执行。
 - [客户端设计规范](docs/design/CLIENT_DESIGN.md)：共享令牌、官方 shadcn 组件和工作区交互。
 - [客户端开发](client/README.md)：宿主、独立应用包与构建入口。
-- [编码与协作规范](编码与协作规范.md)：开发约定与验收要求。
+- [仓库公共规范](AGENTS.md)：公共约束与分层阅读入口。
+- [编码与协作规范](编码与协作规范.md)：公共开发约定与验收要求。
+- [客户端规范](client/AGENTS.md)：客户端架构、编码与调用约定入口。
+- [服务端规范](server/AGENTS.md)：服务端架构、编码与请求分发约定入口。
 
 更多专题见[文档索引](docs/README.md)。
 
