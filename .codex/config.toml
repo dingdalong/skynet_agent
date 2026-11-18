@@ -13,3 +13,18 @@ cwd = "/Users/dingdalong/github/skynet_agent/client"
 enabled = true
 startup_timeout_sec = 120
 tool_timeout_sec = 120
+
+# Android/iOS 设备操作；仅在本项目启用并固定服务版本。
+[mcp_servers.mobile-mcp]
+command = "/opt/homebrew/bin/npx"
+args = ["--yes", "@mobilenext/mobile-mcp@1.0.17"]
+cwd = "/Users/dingdalong/github/skynet_agent"
+enabled = true
+startup_timeout_sec = 120
+tool_timeout_sec = 180
+
+[mcp_servers.mobile-mcp.env]
+ANDROID_HOME = "/Users/dingdalong/Library/Android/sdk"
+JAVA_HOME = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+PATH = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/bin:/Users/dingdalong/Library/Android/sdk/platform-tools:/Users/dingdalong/Library/Android/sdk/emulator:/Users/dingdalong/Library/Android/sdk/cmdline-tools/latest/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+MOBILEMCP_DISABLE_TELEMETRY = "1"
