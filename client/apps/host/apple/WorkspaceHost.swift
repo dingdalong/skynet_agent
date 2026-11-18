@@ -34,6 +34,52 @@ private final class WorkspaceMessages: NSObject, WKScriptMessageHandlerWithReply
     }
 }
 
+final class SurfaceToolbar {
+    private(set) var publication: [String: Any]?
+    private var actions = Set<String>()
+    var onChange: (() -> Void)?
+
+    func clear() {
+        guard publication != nil else { return }
+        publication = nil
+        actions.removeAll()
+        onChange?()
+    }
+
+    func publish(_ body: [String: Any], appId: String, document: String) throws {
+        guard ["settings", "agent"].contains(appId), body["presentationId"] as? String == document,
+            let input = body["input"] as? [String: Any], let items = input["items"] as? [[String: Any]],
+            items.count <= 16
+        else { throw HostError("toolbar", "工具栏声明无效") }
+        var ids = Set<String>()
+        func validate(_ item: [String: Any]) throws -> String {
+            guard let id = item["id"] as? String, !id.isEmpty, let label = item["label"] as? String,
+                !label.isEmpty, item["selected"] == nil || item["selected"] is Bool,
+                Set(item.keys).isSubset(of: ["id", "label", "choices", "selected"])
+            else { throw HostError("toolbar", "工具栏选项无效") }
+            return id
+        }
+        for item in items {
+            let id = try validate(item)
+            if let choices = item["choices"] {
+                guard let choices = choices as? [[String: Any]] else {
+                    throw HostError("toolbar", "工具栏选项无效")
+                }
+                for choice in choices { ids.insert(try validate(choice)) }
+            } else {
+                ids.insert(id)
+            }
+        }
+        actions = ids
+        publication = ["presentationId": document, "items": items]
+        onChange?()
+    }
+
+    func permits(_ action: String, document: String) -> Bool {
+        publication?["presentationId"] as? String == document && actions.contains(action)
+    }
+}
+
 final class WorkspaceHost: PlatformView, WKNavigationDelegate {
     private let page = URL(string: "skynet-host://workspace/index.html")!
     private let web: WKWebView
@@ -42,8 +88,58 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
     private var snapshot: [String: Any]?
     private var surfaces: [String: AppSurface] = [:]
     private var errors: [String: String] = [:]
+    private var menus: [CGRect] = []
     #if os(macOS)
+        private var titlebars: [CGRect] = []
+        private var buttons: [CGRect] = []
+        private var controlsFrame: CGRect?
         override var isFlipped: Bool { true }
+        override func layout() {
+            super.layout()
+            updateWindowControls()
+        }
+        private func updateWindowControls(force: Bool = false) {
+            guard let window else { return }
+            let frame = [.closeButton, .miniaturizeButton, .zoomButton].compactMap {
+                (type: NSWindow.ButtonType) -> CGRect? in
+                guard !window.styleMask.contains(.fullScreen), let button = window.standardWindowButton(type),
+                    !button.isHiddenOrHasHiddenAncestor
+                else { return nil }
+                return convert(button.bounds, from: button)
+            }.reduce(CGRect.null) { $0.union($1) }
+            guard force || frame != controlsFrame else { return }
+            controlsFrame = frame
+            send(
+                "workspace:windowControls",
+                ["end": frame.isNull ? 0 : frame.maxX, "height": frame.isNull ? 0 : frame.maxY])
+        }
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            let local = convert(point, from: superview)
+            guard bounds.contains(local) else { return nil }
+            if !menus.isEmpty { return web.hitTest(convert(local, to: web.superview)) }
+            if titlebars.contains(where: { $0.contains(local) })
+                && !buttons.contains(where: { $0.contains(local) })
+            {
+                return self
+            }
+            return super.hitTest(point)
+        }
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2 {
+                switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+                case "Minimize": window?.miniaturize(nil)
+                case "None": break
+                default: window?.performZoom(nil)
+                }
+            } else {
+                window?.performDrag(with: event)
+            }
+        }
+    #else
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            if !menus.isEmpty { return web.hitTest(convert(point, to: web), with: event) }
+            return super.hitTest(point, with: event)
+        }
     #endif
 
     override init(frame: CGRect) {
@@ -103,6 +199,19 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
         case "initial":
             reply(snapshot, nil)
             send("workspace:errors", errors)
+            sendToolbars()
+            #if os(macOS)
+                updateWindowControls(force: true)
+            #endif
+        case "toolbarAction":
+            guard let id = body["appId"] as? String, let surface = surfaces[id], !surface.isHidden,
+                let action = body["action"] as? String, let document = body["presentationId"] as? String,
+                surface.toolbar.permits(action, document: document)
+            else {
+                reply(nil, "面板操作已失效")
+                return
+            }
+            surface.activateToolbar(action, document: document, reply: reply)
         case "command":
             guard let name = body["name"] as? String else {
                 reply(nil, "缺少命令")
@@ -139,9 +248,22 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             let recent = workspace["recent"] as? [String]
         else { return }
         let preferences = snapshot?["preferences"] as? [String: Any]
+        func rectangles(_ key: String) -> [CGRect] {
+            (body[key] as? [[String: Double]] ?? []).compactMap {
+                guard let x = $0["x"], let y = $0["y"], let width = $0["width"], let height = $0["height"]
+                else { return nil }
+                return CGRect(x: x, y: y, width: width, height: height)
+            }
+        }
+        menus = rectangles("menus")
+        #if os(macOS)
+            titlebars = rectangles("titlebars")
+            buttons = rectangles("buttons")
+        #endif
         let panes = (workspace["panes"] as? [Any])?.compactMap { $0 as? String } ?? []
         for id in surfaces.keys.filter({ !recent.contains($0) }) {
             surfaces.removeValue(forKey: id)?.removeFromSuperview()
+            sendToolbars()
             if errors.removeValue(forKey: id) != nil { send("workspace:errors", errors) }
         }
         for id in recent {
@@ -155,10 +277,12 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             }
             let surface = surfaces[id] ?? AppSurface(frame: .zero)
             surface.frame = CGRect(x: left, y: top, width: width, height: height).intersection(bounds)
+            maskMenus(on: surface)
             surface.backgroundHex = body["background"] as? String ?? "#fafafa"
             surface.reducedMotion = preferences?["reduceMotion"] as? Bool == true
             if surfaces[id] == nil {
                 surfaces[id] = surface
+                surface.toolbar.onChange = { [weak self] in self?.sendToolbars() }
                 #if os(iOS)
                     surface.accessibilityIdentifier = "app-scene-\(id)"
                 #endif
@@ -179,6 +303,32 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             }
         #endif
     }
+    private func maskMenus(on surface: AppSurface) {
+        #if os(macOS)
+            surface.wantsLayer = true
+            guard let layer = surface.layer else { return }
+        #else
+            let layer = surface.layer
+        #endif
+        let holes = menus.map { surface.convert($0, from: self).intersection(surface.bounds) }.filter {
+            !$0.isNull
+        }
+        guard !holes.isEmpty else {
+            layer.mask = nil
+            return
+        }
+        let path = CGMutablePath()
+        path.addRect(surface.bounds)
+        for hole in holes { path.addRect(hole) }
+        let mask = CAShapeLayer()
+        mask.frame = surface.bounds
+        mask.fillRule = .evenOdd
+        mask.path = path
+        layer.mask = mask
+    }
+    private func sendToolbars() {
+        send("workspace:toolbars", surfaces.compactMapValues { $0.toolbar.publication })
+    }
     private func visibility(_ surface: AppSurface, _ visible: Bool) {
         if surface.active != visible { surface.active = visible }
         surface.isHidden = !visible
@@ -192,4 +342,24 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             arguments: ["name": name, "value": value], in: nil, in: .page, completionHandler: nil)
     }
     deinit { if let observation { core.unobserve(observation) } }
+}
+
+extension AppSurface {
+    func activateToolbar(_ action: String, document: String, reply: @escaping (Any?, String?) -> Void) {
+        guard let web, presentationId == document else {
+            reply(nil, "面板已重新载入")
+            return
+        }
+        web.callAsyncJavaScript(
+            """
+            if (window.__skynetPresentationId !== documentId) throw Error('面板已重新载入');
+            window.dispatchEvent(new CustomEvent('skynet:toolbar', {detail: {id, presentationId: documentId}}));
+            """, arguments: ["id": action, "documentId": document], in: nil, in: .page
+        ) { result in
+            switch result {
+            case .success: reply(nil, nil)
+            case .failure(let error): reply(nil, error.localizedDescription)
+            }
+        }
+    }
 }

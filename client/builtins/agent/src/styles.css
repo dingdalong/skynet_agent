@@ -6,7 +6,6 @@
     white-space: pre-wrap;
 }
 @media (max-height: 320px) {
-    .session-toolbar,
     form:has(#agent-message :focus) .composer-options {
         display: none;
     }

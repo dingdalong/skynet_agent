@@ -9,8 +9,6 @@ import {
     Heading,
     HStack,
     Grid,
-    Tab,
-    TabList,
     AspectRatio,
     SegmentedControl,
     SegmentedControlItem,
@@ -19,7 +17,11 @@ import {
     VStack,
 } from "@astryxdesign/core";
 import { app } from "@skynet/app-sdk";
-import { AppBoundary, useAppSnapshot } from "@skynet/app-sdk/react";
+import {
+    AppBoundary,
+    useAppSnapshot,
+    usePaneToolbar,
+} from "@skynet/app-sdk/react";
 import type { AppSummary } from "@skynet/contracts";
 import type { State } from "./runtime";
 import "../../../packages/tokens/theme.css";
@@ -65,20 +67,18 @@ function Settings() {
             setBusy(false);
         }
     };
+    usePaneToolbar(
+        snapshot?.state
+            ? sections.map(([id, label]) => ({
+                  id,
+                  label,
+                  selected: section === id,
+              }))
+            : [],
+        (id) => void run(() => app.command("navigate", { section: id })),
+    );
     return (
         <VStack as="main" gap={0} minHeight="100dvh">
-            <TabList
-                aria-label="设置分类"
-                hasDivider
-                value={section}
-                onChange={(id) =>
-                    void run(() => app.command("navigate", { section: id }))
-                }
-            >
-                {sections.map(([id, label]) => (
-                    <Tab key={id} value={id} label={label} aria-label={label} />
-                ))}
-            </TabList>
             <VStack
                 as="section"
                 data-settings-content

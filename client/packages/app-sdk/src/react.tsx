@@ -1,6 +1,7 @@
 import {
     Component,
     useEffect,
+    useEffectEvent,
     useLayoutEffect,
     useSyncExternalStore,
     type ErrorInfo,
@@ -14,7 +15,7 @@ import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
 import "./viewport.css";
-import type { AppSnapshot, Json } from "@skynet/contracts";
+import type { AppSnapshot, Json, PaneToolbarItem } from "@skynet/contracts";
 import { getSnapshot, refreshSnapshot, request, subscribe } from "./bridge";
 
 let presentationReady = false;
@@ -49,6 +50,38 @@ function revealPresentation() {
 }
 
 const messages = { "zh-CN": chinese };
+
+export function usePaneToolbar(
+    items: PaneToolbarItem[],
+    activate: (id: string) => void,
+) {
+    const declaration = JSON.stringify(items);
+    const onAction = useEffectEvent((event: Event) => {
+        const { presentationId, id } = (event as CustomEvent).detail;
+        if (presentationId !== window.__skynetPresentationId) return;
+        if (
+            items.some((item) =>
+                item.choices
+                    ? item.choices.some((choice) => choice.id === id)
+                    : item.id === id,
+            )
+        )
+            activate(id);
+    });
+    useEffect(() => {
+        const listener = (event: Event) => onAction(event);
+        window.addEventListener("skynet:toolbar", listener);
+        return () => {
+            window.removeEventListener("skynet:toolbar", listener);
+            void request("view.toolbar", { items: [] }).catch(console.error);
+        };
+    }, []);
+    useEffect(() => {
+        void request("view.toolbar", { items: JSON.parse(declaration) }).catch(
+            console.error,
+        );
+    }, [declaration]);
+}
 
 export function AppBoundary({ children }: { children: ReactNode }) {
     const snapshot = useSyncExternalStore(subscribe, getSnapshot);

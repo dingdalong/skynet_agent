@@ -32,12 +32,13 @@ final class AppSurface: NSView, WKNavigationDelegate {
         didSet { if reducedMotion { web?.layer?.removeAnimation(forKey: "surface.ready") } }
     }
     @objc var revealDurationMs: Double = 140
-    private var web: WKWebView?
+    let toolbar = SurfaceToolbar()
+    private(set) var web: WKWebView?
     private var cover: NSView?
     private var readinessTimeout: DispatchWorkItem?
     private var lease: UUID?
     private var session = UUID()
-    private var presentationId = UUID().uuidString
+    private(set) var presentationId = UUID().uuidString
     private var lastSnapshot: [String: Any]?
     var onFailure: ((String) -> Void)?
     private var failed = false
@@ -51,6 +52,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
     }
 
     private func loadApp() {
+        toolbar.clear()
         loadStarted = ProcessInfo.processInfo.systemUptime
         trace("requested")
         readinessTimeout?.cancel()
@@ -119,6 +121,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
     }
 
     private func preparePresentation() throws {
+        toolbar.clear()
         guard let web, let lastSnapshot else { return }
         presentationId = UUID().uuidString
         let controller = web.configuration.userContentController
@@ -165,6 +168,13 @@ final class AppSurface: NSView, WKNavigationDelegate {
                     self.emit(["requestId": requestId, "error": String(describing: error)])
                 }
             }
+        }
+        if kind == "view.toolbar" {
+            do {
+                try toolbar.publish(body, appId: appId, document: presentationId)
+                reply(.success([:]))
+            } catch { reply(.failure(error)) }
+            return
         }
         if kind == "view.ready" {
             guard body["presentationId"] as? String == presentationId else { return }
@@ -299,6 +309,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
         showFailure("界面载入失败：\(error.localizedDescription)")
     }
     private func showFailure(_ message: String) {
+        toolbar.clear()
         readinessTimeout?.cancel()
         cover?.removeFromSuperview()
         cover = nil

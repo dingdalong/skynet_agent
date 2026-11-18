@@ -12,6 +12,7 @@ struct SkynetApplication: App {
     var body: some Scene {
         Window("Skynet Agent", id: "main") {
             WorkspaceWindow(delegate: appDelegate)
+                .ignoresSafeArea(.container, edges: .top)
                 .frame(minWidth: 360, minHeight: 480)
                 .preferredColorScheme(appDelegate.colorScheme)
         }

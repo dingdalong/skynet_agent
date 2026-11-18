@@ -43,7 +43,7 @@ final class WebViewTests: XCTestCase {
             try? FileManager.default.removeItem(at: data)
         }
         try await harness.until("document.body.innerText.includes('连接你的 Agent')")
-        try await harness.click("连接设置")
+        try await harness.activateToolbar("connection")
         try await harness.until("document.getElementById('agent-url')!==null")
         let address = String(data: try jsonData("\(url)/agent"), encoding: .utf8)!
         _ = try await harness.web.evaluateJavaScript(
@@ -55,7 +55,7 @@ final class WebViewTests: XCTestCase {
             }
             """)
         try await harness.click("连接")
-        try await harness.until("document.body.innerText.includes('已连接')")
+        try await harness.untilToolbar("connection", labelContaining: "已连接")
         _ = try await harness.web.evaluateJavaScript(
             """
             (()=>{ const e=document.querySelector('#agent-message [contenteditable]');
@@ -79,8 +79,7 @@ final class WebViewTests: XCTestCase {
         try await harness.until("(\(thoughtButton))('思考记录')?.getAttribute('aria-expanded') === 'false'")
         try await harness.click("思考记录")
         try await harness.until("document.body.innerText.includes('先检查会话目录。')")
-        try await harness.until(
-            "document.querySelector('[aria-current=\"page\"]')?.textContent.includes('Native Agent')")
+        try await harness.untilToolbar("sessions", labelContaining: "Native Agent")
         let callRow =
             "Array.from(document.querySelectorAll('[role=button]')).find(row=>row.textContent.includes('exec_command') && row.textContent.includes('pwd'))"
         try await harness.until("\(callRow)?.getAttribute('aria-expanded') === 'false'")
@@ -144,7 +143,10 @@ final class WebViewTests: XCTestCase {
             "document.querySelector('#agent-message [contenteditable]')?.textContent==='保留这份草稿'")
         try await harness.until("document.body.textContent.includes('binary✓')")
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
-        try await harness.until("document.getElementById('agent-session')?.getBoundingClientRect().width > 0")
+        try await harness.activateToolbar("new")
+        try await harness.until("document.body.innerText.includes('开始一个新任务')")
+        try await harness.activateToolbar("session:session")
+        try await harness.until("document.body.textContent.includes('binary✓')")
         try await harness.until("document.documentElement.scrollWidth<=420")
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
     }
@@ -173,13 +175,13 @@ final class WebViewTests: XCTestCase {
         try await harness.waitForPresentation(1)
         XCTAssertEqual(harness.presentations[0]["section"] as? String, "外观")
         try await harness.until(
-            "getComputedStyle(document.querySelector('nav button')).alignItems==='center' && document.documentElement.dataset.astryxTheme==='neutral'"
+            "document.documentElement.dataset.astryxTheme==='neutral'"
         )
         try await harness.until(
             "parseFloat(getComputedStyle(document.querySelector('.astryx-card')).borderRadius)>0")
         try await harness.click("深色")
         try await harness.until("document.documentElement.dataset.theme==='dark'")
-        try await harness.click("壁纸")
+        try await harness.activateToolbar("wallpaper")
         try await harness.until("document.body.innerText.includes('选择壁纸')")
         try await harness.click("暮色")
         try await harness.until(
@@ -210,13 +212,13 @@ final class WebViewTests: XCTestCase {
         try await harness.until(
             "document.querySelector('[data-settings-content]').scrollWidth <= document.querySelector('[data-settings-content]').clientWidth"
         )
-        try await harness.click("动态效果")
+        try await harness.activateToolbar("motion")
         try await harness.until("document.body.innerText.includes('减少动态效果')")
         try await harness.until(
             "document.querySelector('input[role=switch]').parentElement.getBoundingClientRect().width>=28")
         let agent = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
         defer { agent.close() }
-        try await agent.until("document.querySelector('[role=toolbar][aria-label=\"会话操作\"]')!==null")
+        try await agent.untilToolbar("new", labelContaining: "新建会话")
         try await agent.waitForPresentation(1)
         XCTAssertEqual(agent.presentations[0]["dark"] as? Bool, true)
     }
@@ -231,6 +233,7 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
     private var loaded = false
     private var started = false
     private var presentationId = UUID().uuidString
+    private var toolbarItems: [[String: Any]] = []
     private(set) var presentations: [[String: Any]] = []
 
     init(core: HostCore, entry: AppCatalog.Entry) {
@@ -259,12 +262,17 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
         guard let body = message.body as? [String: Any], let id = body["requestId"] as? String,
             let kind = body["kind"] as? String, let lease
         else { return }
+        if kind == "view.toolbar", body["presentationId"] as? String == presentationId {
+            toolbarItems = dictionary(body["input"])["items"] as? [[String: Any]] ?? []
+            emit(["requestId": id, "value": [:]])
+            return
+        }
         if kind == "view.ready" {
             guard body["presentationId"] as? String == presentationId else { return }
             web.evaluateJavaScript(
                 """
                 ({dark: document.documentElement.dataset.theme==='dark',
-                  section: document.querySelector('[aria-current=true]')?.getAttribute('aria-label')})
+                  section: document.querySelector('h1')?.textContent})
                 """
             ) { [weak self] value, error in
                 XCTAssertNil(error)
@@ -292,6 +300,7 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
     ) {
         do {
             loaded = false
+            toolbarItems = []
             presentationId = UUID().uuidString
             let controller = web.configuration.userContentController
             controller.removeAllUserScripts()
@@ -308,6 +317,34 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
             return
         }
         web.evaluateJavaScript("window.dispatchEvent(new CustomEvent('skynet:message',{detail:\(json)}))")
+    }
+    func untilToolbar(_ action: String, labelContaining: String) async throws {
+        for _ in 0..<60 {
+            if toolbarItems.contains(where: {
+                $0["id"] as? String == action && ($0["label"] as? String)?.contains(labelContaining) == true
+            }) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        throw failure("toolbar", "Missing toolbar action: \(action)")
+    }
+    func activateToolbar(_ action: String) async throws {
+        for _ in 0..<60 {
+            let choices = toolbarItems.flatMap { ($0["choices"] as? [[String: Any]]) ?? [$0] }
+            if choices.contains(where: { $0["id"] as? String == action }) {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let available = toolbarItems.flatMap { ($0["choices"] as? [[String: Any]]) ?? [$0] }
+        guard available.contains(where: { $0["id"] as? String == action }) else {
+            XCTFail("Missing declared action \(action), available: \(available.compactMap { $0["id"] })")
+            throw failure("toolbar", "Missing action \(action)")
+        }
+        _ = try await web.callAsyncJavaScript(
+            "window.dispatchEvent(new CustomEvent('skynet:toolbar', {detail: {id, presentationId}}));",
+            arguments: ["id": action, "presentationId": presentationId], in: nil, contentWorld: .page)
     }
     func click(_ label: String) async throws {
         let json = String(data: try jsonData(label), encoding: .utf8)!

@@ -2,27 +2,22 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     AppShell,
-    Badge,
     Banner,
     Button,
     ChatLayout,
     ChatMessageList,
     EmptyState,
-    Heading,
-    Icon,
-    IconButton,
     Layout,
     LayoutHeader,
-    Selector,
-    SideNav,
-    SideNavItem,
-    SideNavSection,
     Spinner,
-    Toolbar,
     VStack,
 } from "@astryxdesign/core";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { AppBoundary, useAppSnapshot } from "@skynet/app-sdk/react";
+import {
+    AppBoundary,
+    useAppSnapshot,
+    usePaneToolbar,
+} from "@skynet/app-sdk/react";
 import { app } from "@skynet/app-sdk";
 import { isSending, latestAssistant } from "@skynet/agent-client/selectors";
 import type { AgentState } from "@skynet/agent-client/types";
@@ -55,6 +50,40 @@ function Agent() {
         }
     };
     const state = snapshot?.state;
+    const sessions = Object.values(state?.sessions ?? {}).sort(
+        (left, right) =>
+            right.session.updated_at - left.session.updated_at ||
+            right.session.id.localeCompare(left.session.id),
+    );
+    const session = state?.sessions?.[state.selectedId];
+    usePaneToolbar(
+        state?.version === 1
+            ? [
+                  {
+                      id: "sessions",
+                      label: session?.session.title || "切换会话",
+                      choices: sessions.map(({ session }) => ({
+                          id: `session:${session.id}`,
+                          label: session.title || "新会话",
+                          selected: session.id === state.selectedId,
+                      })),
+                  },
+                  { id: "new", label: "新建会话" },
+                  {
+                      id: "connection",
+                      label: `连接设置 · ${state.syncing ? "同步会话" : statusLabels[state.connection.status]}`,
+                  },
+              ]
+            : [],
+        (id) => {
+            if (id === "connection") setConnectionOpen(true);
+            else if (id === "new") void send("session.new");
+            else if (id.startsWith("session:"))
+                void send("session.select", {
+                    id: id.slice("session:".length),
+                });
+        },
+    );
     if (state?.version !== 1)
         return (
             <VStack as="main" aria-label="Agent" padding={4}>
@@ -69,16 +98,6 @@ function Agent() {
                 )}
             </VStack>
         );
-    const sessions = Object.values(state.sessions).sort(
-        (left, right) =>
-            right.session.updated_at - left.session.updated_at ||
-            right.session.id.localeCompare(left.session.id),
-    );
-    const options = sessions.map(({ session }) => ({
-        value: session.id,
-        label: session.title || "新会话",
-    }));
-    const session = state.sessions[state.selectedId];
     const messages = session?.session.messages ?? [];
     const last = latestAssistant(session);
     const error = bridgeError || state.error;
@@ -87,105 +106,12 @@ function Agent() {
         state.connection.status === "offline" ||
         state.connection.status === "error";
     const openConnection = () => setConnectionOpen(true);
-    const newSession = (
-        <Button
-            label="新会话"
-            variant={wide ? "secondary" : "ghost"}
-            onClick={() => void send("session.new")}
-        />
-    );
     return (
-        <AppShell
-            variant="wash"
-            mobileNav={{ breakpoint: "none" }}
-            sideNav={
-                wide && (
-                    <SideNav aria-label="会话列表" topContent={newSession}>
-                        <SideNavSection title="历史会话">
-                            {options.map(({ value, label }) => (
-                                <SideNavItem
-                                    key={value}
-                                    label={label}
-                                    isSelected={value === state.selectedId}
-                                    onClick={() =>
-                                        void send("session.select", {
-                                            id: value,
-                                        })
-                                    }
-                                />
-                            ))}
-                        </SideNavSection>
-                    </SideNav>
-                )
-            }
-        >
+        <AppShell variant="wash" mobileNav={{ breakpoint: "none" }}>
             <Layout
                 padding={0}
                 header={
                     <LayoutHeader padding={0}>
-                        <Toolbar
-                            className="session-toolbar"
-                            label="会话操作"
-                            size="sm"
-                            dividers={["bottom"]}
-                            startContent={
-                                wide ? (
-                                    <Heading level={2} maxLines={1}>
-                                        {session?.session.title || "新会话"}
-                                    </Heading>
-                                ) : (
-                                    <Selector
-                                        id="agent-session"
-                                        label="切换会话"
-                                        isLabelHidden
-                                        variant="ghost"
-                                        value={state.selectedId}
-                                        options={[
-                                            { value: "", label: "新会话" },
-                                            ...options,
-                                        ]}
-                                        onChange={(id) =>
-                                            void send(
-                                                id
-                                                    ? "session.select"
-                                                    : "session.new",
-                                                id ? { id } : {},
-                                            )
-                                        }
-                                    />
-                                )
-                            }
-                            endContent={
-                                <>
-                                    <Badge
-                                        role="status"
-                                        variant={
-                                            online && !state.syncing
-                                                ? "success"
-                                                : state.connection.status ===
-                                                    "error"
-                                                  ? "error"
-                                                  : "neutral"
-                                        }
-                                        label={
-                                            state.syncing
-                                                ? "同步会话"
-                                                : statusLabels[
-                                                      state.connection.status
-                                                  ]
-                                        }
-                                    />
-                                    {!wide && newSession}
-                                    <IconButton
-                                        label="连接设置"
-                                        icon={<Icon icon="wrench" />}
-                                        tooltip="连接设置"
-                                        variant="ghost"
-                                        onClick={openConnection}
-                                    />
-                                </>
-                            }
-                        />
                         {(error || state.notice) && (
                             <Banner
                                 status={error ? "error" : "warning"}

@@ -24,13 +24,14 @@ final class AppSurface: UIView, WKNavigationDelegate {
     }
     @objc var reducedMotion = false
     @objc var revealDurationMs: Double = 140
-    private var web: WKWebView?
+    let toolbar = SurfaceToolbar()
+    private(set) var web: WKWebView?
     private var cover: UIView?
     var onFailure: ((String) -> Void)?
     private var failed = false
     private var lease: UUID?
     private var session = UUID()
-    private var presentationId = UUID().uuidString
+    private(set) var presentationId = UUID().uuidString
     private var lastSnapshot: [String: Any]?
     private var timeout: DispatchWorkItem?
     private let core = HostServices.core
@@ -43,6 +44,7 @@ final class AppSurface: UIView, WKNavigationDelegate {
     }
 
     private func loadApp() {
+        toolbar.clear()
         loadStarted = ProcessInfo.processInfo.systemUptime
         trace("requested")
         timeout?.cancel()
@@ -121,6 +123,7 @@ final class AppSurface: UIView, WKNavigationDelegate {
     }
 
     private func preparePresentation() throws {
+        toolbar.clear()
         guard let web, let lastSnapshot else { return }
         presentationId = UUID().uuidString
         let controller = web.configuration.userContentController
@@ -161,6 +164,13 @@ final class AppSurface: UIView, WKNavigationDelegate {
                 case .failure(let error): self.emit(["requestId": id, "error": String(describing: error)])
                 }
             }
+        }
+        if kind == "view.toolbar" {
+            do {
+                try toolbar.publish(body, appId: appId, document: presentationId)
+                reply(.success([:]))
+            } catch { reply(.failure(error)) }
+            return
         }
         if kind == "view.ready" {
             guard body["presentationId"] as? String == presentationId else { return }
@@ -240,6 +250,7 @@ final class AppSurface: UIView, WKNavigationDelegate {
         showFailure("界面载入失败，可以重新载入。")
     }
     private func showFailure(_ message: String) {
+        toolbar.clear()
         timeout?.cancel()
         cover?.removeFromSuperview()
         cover = nil

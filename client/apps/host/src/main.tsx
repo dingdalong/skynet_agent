@@ -6,7 +6,7 @@ import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { createHostStore } from "../../../packages/host-bridge/src";
 import { Workspace } from "../../../packages/workspace/src/Workspace";
-import type { HostSnapshot } from "@skynet/contracts";
+import type { HostSnapshot, PaneToolbar } from "@skynet/contracts";
 import { tokens, hostTheme } from "@skynet/tokens";
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
@@ -51,17 +51,42 @@ function report(error: unknown) {
 function Shell() {
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [toolbars, setToolbars] = useState<Record<string, PaneToolbar>>({});
     const [error, setError] = useState("");
     useLayoutEffect(() => {
         const fail = (event: Event) =>
             setError((event as CustomEvent<string>).detail);
         const surfaces = (event: Event) =>
             setErrors((event as CustomEvent<Record<string, string>>).detail);
+        const controls = (event: Event) =>
+            setToolbars(
+                (event as CustomEvent<Record<string, PaneToolbar>>).detail,
+            );
+        const windowControls = (event: Event) => {
+            const { end, height } = (
+                event as CustomEvent<{ end: number; height: number }>
+            ).detail;
+            document.documentElement.style.setProperty(
+                "--window-controls-end",
+                `${end}px`,
+            );
+            document.documentElement.style.setProperty(
+                "--window-controls-height",
+                `${height}px`,
+            );
+        };
         window.addEventListener("workspace:error", fail);
         window.addEventListener("workspace:errors", surfaces);
+        window.addEventListener("workspace:toolbars", controls);
+        window.addEventListener("workspace:windowControls", windowControls);
         return () => {
             window.removeEventListener("workspace:error", fail);
             window.removeEventListener("workspace:errors", surfaces);
+            window.removeEventListener("workspace:toolbars", controls);
+            window.removeEventListener(
+                "workspace:windowControls",
+                windowControls,
+            );
         };
     }, []);
     useLayoutEffect(() => {
@@ -85,6 +110,12 @@ function Shell() {
             const mode = dark ? "dark" : "light";
             const desktop = snapshot.workspace.mode !== "apps";
             const background = hostTheme[mode].background;
+            const rects = (selector: string) =>
+                Array.from(document.querySelectorAll(selector), (element) =>
+                    element.getBoundingClientRect(),
+                )
+                    .filter((rect) => rect.width > 0 && rect.height > 0)
+                    .map((rect) => rect.toJSON());
             void post({
                 kind: "layout",
                 frames,
@@ -94,6 +125,9 @@ function Shell() {
                     ? tokens.wallpapers[preferences.wallpaper][mode]
                     : [background],
                 lightStatus: dark,
+                menus: rects('[role="menu"]'),
+                titlebars: rects('[role="toolbar"]:not([aria-label="Dock"])'),
+                buttons: rects('[role="toolbar"] button'),
             }).catch(report);
         };
         const observer = new ResizeObserver(sync);
@@ -107,11 +141,11 @@ function Shell() {
             sync();
         };
         const mutation = new MutationObserver(observe);
-        mutation.observe(root, {
+        mutation.observe(document.body, {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ["data-app-slot", "style"],
+            attributeFilter: ["data-app-slot", "style", "aria-expanded"],
         });
         observe();
         media.addEventListener("change", sync);
@@ -141,6 +175,16 @@ function Shell() {
                     <Workspace
                         snapshot={snapshot}
                         errors={errors}
+                        toolbars={toolbars}
+                        activate={(appId, presentationId, action) => {
+                            setError("");
+                            void post({
+                                kind: "toolbarAction",
+                                appId,
+                                presentationId,
+                                action,
+                            }).catch(report);
+                        }}
                         retry={(id) => {
                             void post({ kind: "retry", id }).catch(report);
                         }}

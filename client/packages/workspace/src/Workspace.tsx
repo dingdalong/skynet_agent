@@ -1,4 +1,10 @@
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import {
+    Fragment,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from "react";
 import {
     Banner,
     Button,
@@ -8,6 +14,9 @@ import {
     HStack,
     Icon,
     IconButton,
+    DropdownMenu,
+    MoreMenu,
+    OverflowList,
     ResizeHandle,
     StatusDot,
     Text,
@@ -25,6 +34,8 @@ import type {
     AppSummary,
     HostSnapshot,
     Json,
+    PaneToolbar,
+    PaneToolbarItem,
     WorkspaceCommandName,
 } from "@skynet/contracts";
 import { tokens } from "@skynet/tokens";
@@ -46,6 +57,8 @@ type ShellProps = {
     execute: Execute;
     errors: Record<string, string>;
     retry: (id: string) => void;
+    toolbars: Record<string, PaneToolbar>;
+    activate: (appId: string, document: string, action: string) => void;
 };
 const appGlyph = (id: string) => (
     <Icon
@@ -256,7 +269,136 @@ function PlacementControl({
     );
 }
 
-export function Workspace({ snapshot, execute, errors, retry }: ShellProps) {
+function PanelToolbar({
+    app,
+    toolbar,
+    activate,
+    execute,
+    wide,
+    index,
+    width,
+}: Pick<ShellProps, "activate" | "execute"> & {
+    app: AppSummary;
+    toolbar?: PaneToolbar;
+    wide: boolean;
+    index: number;
+    width: number;
+}) {
+    const invoke = (id: string) =>
+        toolbar && activate(app.id, toolbar.presentationId, id);
+    const menuItem = (choice: PaneToolbarItem) => ({
+        id: choice.id,
+        label: choice.label,
+        icon: choice.selected ? ("check" as const) : undefined,
+        onClick: () => invoke(choice.id),
+    });
+    const actions: {
+        id: string;
+        control: ReactNode;
+        menu: Parameters<typeof MoreMenu>[0]["items"][number];
+    }[] = (toolbar?.items ?? []).map((item) => {
+        const choices = item.choices?.map(menuItem);
+        return {
+            id: item.id,
+            control: choices ? (
+                <DropdownMenu
+                    button={{
+                        label: item.label,
+                        variant: "ghost",
+                        isDisabled: !choices.length,
+                    }}
+                    items={choices}
+                />
+            ) : (
+                <Button
+                    label={item.label}
+                    variant={item.selected ? "secondary" : "ghost"}
+                    aria-pressed={item.selected}
+                    onClick={() => invoke(item.id)}
+                />
+            ),
+            menu: choices
+                ? {
+                      type: "section" as const,
+                      title: item.label,
+                      items: choices,
+                  }
+                : menuItem(item),
+        };
+    });
+    const overview = () => execute("overview");
+    const close = () => execute("close", { appId: app.id });
+    actions.push(
+        {
+            id: "overview",
+            control: control("后台应用", "copy", overview),
+            menu: { label: "后台应用", onClick: overview },
+        },
+        {
+            id: "close",
+            control: control(`关闭${app.name}`, "close", close),
+            menu: { label: `关闭${app.name}`, onClick: close },
+        },
+    );
+    return (
+        <Toolbar
+            label={`${app.name}工具栏`}
+            style={{ containerType: "inline-size" }}
+            dividers={["bottom"]}
+            startContent={
+                <HStack
+                    width="100cqw"
+                    align="center"
+                    gap={1}
+                    style={{
+                        paddingInlineStart:
+                            index === 0
+                                ? "var(--window-controls-end, 0px)"
+                                : undefined,
+                    }}
+                >
+                    {control("返回桌面", "chevronLeft", () => execute("home"))}
+                    <Text maxLines={1}>{app.name}</Text>
+                    {wide && (
+                        <PlacementControl
+                            app={app}
+                            width={width}
+                            side={index}
+                            execute={execute}
+                        />
+                    )}
+                    <VStack style={{ flex: 1, minWidth: 0 }}>
+                        <OverflowList
+                            gap={1}
+                            overflowRenderer={(hidden) => (
+                                <MoreMenu
+                                    label="更多"
+                                    alignment="end"
+                                    items={hidden.map(
+                                        ({ index }) => actions[index].menu,
+                                    )}
+                                />
+                            )}
+                        >
+                            {actions.map((action) => (
+                                <HStack
+                                    key={action.id}
+                                    width="max-content"
+                                    style={{ flexShrink: 0 }}
+                                >
+                                    {action.control}
+                                </HStack>
+                            ))}
+                        </OverflowList>
+                    </VStack>
+                </HStack>
+            }
+        />
+    );
+}
+
+export function Workspace(props: ShellProps) {
+    const { snapshot, execute } = props;
     const container = useRef<HTMLElement>(null);
     const [width, setWidth] = useState(window.innerWidth);
     useLayoutEffect(() => {
@@ -285,9 +427,18 @@ export function Workspace({ snapshot, execute, errors, retry }: ShellProps) {
                 <VStack height="100%" gap={4} padding={4} isScrollable>
                     <Toolbar
                         label="后台应用"
-                        startContent={control("返回桌面", "chevronLeft", () =>
-                            execute("home"),
-                        )}
+                        startContent={
+                            <HStack
+                                style={{
+                                    paddingInlineStart:
+                                        "var(--window-controls-end, 0px)",
+                                }}
+                            >
+                                {control("返回桌面", "chevronLeft", () =>
+                                    execute("home"),
+                                )}
+                            </HStack>
+                        }
                         centerContent={<Text>后台应用</Text>}
                     />
                     <Grid columns={{ minWidth: 180, max: 5 }} gap={3}>
@@ -310,12 +461,9 @@ export function Workspace({ snapshot, execute, errors, retry }: ShellProps) {
                 </VStack>
             ) : (
                 <Panes
-                    key={`${panes.join("|")}:${width}`}
+                    key={panes.join("|")}
                     {...{
-                        snapshot,
-                        execute,
-                        errors,
-                        retry,
+                        ...props,
                         width,
                         wide,
                         panes,
@@ -344,6 +492,8 @@ function Panes({
     execute,
     errors,
     retry,
+    toolbars,
+    activate,
     width,
     wide,
     panes,
@@ -440,46 +590,16 @@ function Panes({
                         >
                             {app ? (
                                 <>
-                                    <Toolbar
-                                        label={`${app.name}工具栏`}
-                                        dividers={["bottom"]}
-                                        startContent={
-                                            <>
-                                                {control(
-                                                    "返回桌面",
-                                                    "chevronLeft",
-                                                    () => execute("home"),
-                                                )}
-                                                <Text>{app.name}</Text>
-                                            </>
-                                        }
-                                        centerContent={
-                                            wide && (
-                                                <PlacementControl
-                                                    app={app}
-                                                    width={width}
-                                                    side={index}
-                                                    execute={execute}
-                                                />
-                                            )
-                                        }
-                                        endContent={
-                                            <>
-                                                {control(
-                                                    "后台应用",
-                                                    "copy",
-                                                    () => execute("overview"),
-                                                )}
-                                                {control(
-                                                    `关闭${app.name}`,
-                                                    "close",
-                                                    () =>
-                                                        execute("close", {
-                                                            appId: app.id,
-                                                        }),
-                                                )}
-                                            </>
-                                        }
+                                    <PanelToolbar
+                                        {...{
+                                            app,
+                                            index,
+                                            wide,
+                                            width,
+                                            execute,
+                                            activate,
+                                        }}
+                                        toolbar={toolbars[app.id]}
                                     />
                                     <VStack
                                         data-app-slot={app.id}
@@ -502,11 +622,21 @@ function Panes({
                                     </VStack>
                                 </>
                             ) : (
-                                <Launchers
-                                    snapshot={snapshot}
-                                    execute={execute}
-                                    embedded
-                                />
+                                <VStack
+                                    height="100%"
+                                    style={{
+                                        paddingTop:
+                                            index === 0
+                                                ? "var(--window-controls-height, 0px)"
+                                                : undefined,
+                                    }}
+                                >
+                                    <Launchers
+                                        snapshot={snapshot}
+                                        execute={execute}
+                                        embedded
+                                    />
+                                </VStack>
                             )}
                         </VStack>
                     </Fragment>

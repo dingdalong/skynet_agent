@@ -36,6 +36,18 @@ export interface HostSnapshot {
     capabilities: HostCapabilities;
 }
 
+export type PaneToolbarItem = {
+    id: string;
+    label: string;
+    selected?: boolean;
+    choices?: { id: string; label: string; selected?: boolean }[];
+};
+
+export type PaneToolbar = {
+    presentationId: string;
+    items: PaneToolbarItem[];
+};
+
 export interface HostCapabilities {
     platform: "macos" | "ios" | "android" | "windows" | "linux" | "web";
     splitView: boolean;

@@ -37,6 +37,16 @@ final class MobileHostTests: XCTestCase {
         )
         try await eventually("分隔线的键盘操作未调整原生面板") { agent.frame.width > original.width * 0.6 }
         let adjustedWidth = agent.frame.width
+        shell.frame.size.width = 750
+        let settingsBar = "document.querySelector('[role=toolbar][aria-label=\"设置工具栏\"]')"
+        let more = "\(settingsBar)?.querySelector('button[aria-label=\"更多\"]')"
+        try await waitForWeb(shell, "\(more)?.getBoundingClientRect().width > 0")
+        _ = try await shell.evaluateJavaScript("\(more).click()")
+        let management =
+            "Array.from(document.querySelectorAll('[role=menuitem]')).find(item => item.textContent.trim() === '应用管理')"
+        try await waitForWeb(shell, "!!(\(management))")
+        _ = try await shell.evaluateJavaScript("\(management).click()")
+        try await waitForWeb(retainedSettings, "document.querySelector('h1')?.textContent === '应用管理'")
         shell.frame.size.width = 390
         try await eventually("窄窗口未显示最近使用的应用") {
             agent.isHidden && !settings.isHidden && abs(settings.frame.width - 390) < 2
@@ -47,6 +57,15 @@ final class MobileHostTests: XCTestCase {
         }
         XCTAssertTrue(retainedAgent === descendant(agent) { $0 as? WKWebView })
         XCTAssertTrue(retainedSettings === descendant(settings) { $0 as? WKWebView })
+    }
+
+    private func waitForWeb(_ web: WKWebView, _ condition: String) async throws {
+        for _ in 0..<100 {
+            if (try? await web.evaluateJavaScript(condition)) as? Bool == true { return }
+            try await Task.sleep(for: .milliseconds(80))
+        }
+        XCTFail("WebKit did not reach \(condition)")
+        throw NSError(domain: "WorkspaceToolbar", code: 1)
     }
 
     func testRetainedApplicationStaysHiddenAfterReturningHome() async throws {
@@ -281,7 +300,7 @@ final class MobileHostTests: XCTestCase {
                 XCTAssertEqual(overflow, false)
                 let height =
                     try await web.evaluateJavaScript(
-                        "document.querySelector('nav button').getBoundingClientRect().height")
+                        "document.querySelector('button[role=radio]').getBoundingClientRect().height")
                     as? Double
                 XCTAssertGreaterThanOrEqual(try XCTUnwrap(height), 44)
                 web.stopLoading()
@@ -432,7 +451,7 @@ final class MobileHostTests: XCTestCase {
                     if handler.readyCount > 0 {
                         let section =
                             try await web.evaluateJavaScript(
-                                "document.querySelector('[aria-current=true]').getAttribute('aria-label')")
+                                "document.querySelector('h1').textContent")
                             as? String
                         let dark =
                             try await web.evaluateJavaScript(
@@ -497,7 +516,7 @@ private final class ReadyHandler: NSObject, WKScriptMessageHandler {
     ) {
         guard let body = message.body as? [String: Any], let kind = body["kind"] as? String,
             let requestId = body["requestId"] as? String,
-            kind == "view.ready" || (kind == "snapshot" && snapshot != nil),
+            kind == "view.ready" || kind == "view.toolbar" || (kind == "snapshot" && snapshot != nil),
             let data = try? JSONSerialization.data(
                 withJSONObject: ["requestId": requestId, "value": kind == "snapshot" ? snapshot! : [:]]),
             let json = String(data: data, encoding: .utf8)
