@@ -241,7 +241,7 @@ final class MobileHostTests: XCTestCase {
                 XCTAssertEqual(overflow, false)
                 let height =
                     try await web.evaluateJavaScript(
-                        "document.querySelector('[data-slot=button]').getBoundingClientRect().height")
+                        "document.querySelector('nav button').getBoundingClientRect().height")
                     as? Double
                 XCTAssertGreaterThanOrEqual(try XCTUnwrap(height), 44)
                 web.stopLoading()
@@ -304,10 +304,10 @@ final class MobileHostTests: XCTestCase {
                         try await web.evaluateJavaScript(
                             """
                             (() => {
-                                const input = document.querySelector('#agent-message');
+                                const input = document.querySelector('#agent-message [contenteditable]');
                                 const form = input.closest('form');
-                                const pane = form.parentElement;
-                                const content = document.querySelector('[data-slot=empty]').parentElement;
+                                const pane = document.querySelector('.agent-chat');
+                                const empty = Array.from(pane.querySelectorAll('h1,h2,h3,h4')).find(heading => heading.textContent.includes('Agent'));
                                 const event = new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true});
                                 input.dispatchEvent(event);
                                 pane.scrollTop = pane.scrollHeight;
@@ -315,8 +315,8 @@ final class MobileHostTests: XCTestCase {
                                 return {
                                     coarse: matchMedia('(pointer:coarse)').matches,
                                     enterPrevented: event.defaultPrevented,
-                                    separate: content.getBoundingClientRect().bottom <= formRect.top + 1,
-                                    scrollable: getComputedStyle(content).overflowY === 'auto',
+                                    separate: empty.getBoundingClientRect().bottom <= formRect.top + 1,
+                                    scrollable: getComputedStyle(pane).overflowY === 'auto',
                                     overflow: document.documentElement.scrollWidth > innerWidth,
                                     inputReachable: formRect.bottom <= innerHeight + 1
                                 };
@@ -395,7 +395,7 @@ final class MobileHostTests: XCTestCase {
                                 "document.querySelector('[aria-current=page]').textContent.trim()") as? String
                         let dark =
                             try await web.evaluateJavaScript(
-                                "document.documentElement.classList.contains('dark')") as? Bool
+                                "document.documentElement.dataset.theme==='dark'") as? Bool
                         XCTAssertEqual(section, "壁纸")
                         XCTAssertEqual(dark, true)
                         XCTAssertEqual(handler.readyCount, 1)

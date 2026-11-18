@@ -129,43 +129,85 @@ server.on("connection", (socket) => {
             model_id: "fixture",
         };
         snapshot.chat_sessions = [session];
+        const accepted = structuredClone(session);
         send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
+        const webkit = snapshot.username === "webkit-agent";
+        const reasoning = {
+            id: "plan",
+            run_id: "run",
+            status: "streaming",
+            text: "",
+        };
+        const permission = { ...reasoning, id: "check-directory" };
+        const tool = {
+            id: "background",
+            name: "exec_command",
+            arguments: JSON.stringify({ cmd: "pwd" }),
+            status: "judging",
+            run_id: "run",
+            output: "",
+            working_directory: "/workspace",
+            reasoning: [],
+        };
+        function updateTool() {
+            message.tool_calls = [tool];
+            send(socket, "ToolUpdatedNtf", 0, {
+                session_id: "session",
+                message_id: "assistant",
+                revision: ++session.session.revision,
+                tool,
+            });
+        }
+        function reasoningDelta(block, text, toolId) {
+            block.text += text;
+            send(socket, "ReasoningDeltaNtf", 0, {
+                session_id: "session",
+                message_id: "assistant",
+                tool_call_id: toolId,
+                block: { ...block, text },
+                revision: ++session.session.revision,
+            });
+        }
+        if (webkit) {
+            message.reasoning.push(reasoning);
+            reasoningDelta(reasoning, "先检查");
+            reasoningDelta(reasoning, "会话目录。");
+            updateTool();
+            tool.reasoning.push(permission);
+            reasoningDelta(permission, "确认当前工作目录。", tool.id);
+        }
         send(socket, "MessageDeltaNtf", 0, {
             session_id: "session",
             message_id: "assistant",
             run_id: "run",
             delta: "binary✓",
-            revision: 2,
+            revision: ++session.session.revision,
         });
-        send(socket, "ChatRes", requestId, { ret: 1, chat_session: session });
+        send(socket, "ChatRes", requestId, { ret: 1, chat_session: accepted });
         message.content =
             snapshot.username === "webkit-agent"
                 ? "binary✓\n\n" +
                   "历史内容，用于验证模型切换时保留阅读位置。\n\n".repeat(70)
                 : "binary✓";
-        session.session.revision = 2;
-        setTimeout(() => {
-            if (socket.readyState !== socket.OPEN) return;
-            message.status = 2;
-            session.session.run_id = "";
-            session.session.revision = 3;
-            send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
-            const tool = {
-                id: "background",
-                name: "exec_command",
-                status: "completed",
-                run_id: "run",
-                output: "background✓",
-            };
-            message.tool_calls = [tool];
-            session.session.revision = 4;
-            send(socket, "ToolUpdatedNtf", 0, {
-                session_id: "session",
-                message_id: "assistant",
-                revision: 4,
-                tool,
-            });
-        }, 600);
+        setTimeout(
+            () => {
+                if (socket.readyState !== socket.OPEN) return;
+                if (webkit) {
+                    reasoning.status = "completed";
+                    reasoningDelta(reasoning, "");
+                    permission.status = "completed";
+                    reasoningDelta(permission, "", tool.id);
+                }
+                message.status = 2;
+                session.session.run_id = "";
+                session.session.revision++;
+                send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
+                tool.status = "completed";
+                tool.output = "background✓";
+                updateTool();
+            },
+            webkit ? 1600 : 600,
+        );
     });
 });
 const address = server.address();

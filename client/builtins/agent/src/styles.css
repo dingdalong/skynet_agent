@@ -1,104 +1,13 @@
-.agent-markdown {
-    line-height: 1.75;
-    overflow-wrap: anywhere;
+.agent-chat {
+    height: 100%;
+    min-height: 0;
 }
-.agent-markdown > * + * {
-    margin-top: 0.75em;
+.user-message {
+    white-space: pre-wrap;
 }
-.agent-markdown :is(h1, h2, h3, h4) {
-    font-weight: 600;
-    margin-top: 1em;
-}
-.agent-markdown h1 {
-    font-size: 1.4em;
-}
-.agent-markdown h2 {
-    font-size: 1.2em;
-}
-.agent-markdown h3 {
-    font-size: 1.1em;
-}
-.agent-markdown :is(ul, ol) {
-    padding-inline-start: 1.5em;
-}
-.agent-markdown ul {
-    list-style: disc;
-}
-.agent-markdown ol {
-    list-style: decimal;
-}
-.agent-markdown blockquote {
-    border-inline-start: 2px solid var(--border);
-    padding-inline-start: 1em;
-    color: var(--muted-foreground);
-}
-.agent-markdown table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
-    border-collapse: collapse;
-}
-.agent-markdown :is(td, th) {
-    border: 1px solid var(--border);
-    padding: 0.5em 0.75em;
-}
-
-.agent-touch-hint {
-    display: none;
-}
-@media (pointer: coarse) {
-    .agent-keyboard-hint {
-        display: none;
-    }
-    .agent-touch-hint {
-        display: inline;
-    }
-}
-
-@media (max-height: 420px) {
-    .agent-pane > header {
-        padding-block: 4px;
-        gap: 8px;
-    }
-    .agent-composer {
-        padding-block: 8px;
-    }
-    .agent-composer > p {
-        display: none;
-    }
-    .agent-composer textarea {
-        min-height: var(--touch-minimum-target);
-        max-height: 96px;
-    }
-}
-
-/* A short editing viewport needs space for the focused control before metadata.
-   This also applies to a resized desktop pane, without device-specific branches. */
 @media (max-height: 320px) {
-    .agent-app:has(#agent-message:focus) .agent-pane > header,
-    .agent-app:has(#agent-message:focus) .agent-composer > p,
-    .agent-app:has(#agent-message:focus)
-        .agent-composer
-        [data-slot="select-trigger"] {
+    .session-toolbar,
+    form:has(#agent-message :focus) .composer-options {
         display: none;
-    }
-    .agent-app:has(#agent-message:focus) .agent-composer {
-        padding: 4px;
-    }
-    .agent-app:has(#agent-message:focus)
-        .agent-composer
-        [data-slot="input-group"] {
-        flex-direction: row;
-    }
-    .agent-app:has(#agent-message:focus) .agent-composer textarea {
-        min-height: var(--touch-minimum-target);
-        max-height: var(--touch-minimum-target);
-    }
-    .agent-app:has(#agent-message:focus)
-        .agent-composer
-        [data-slot="input-group-addon"] {
-        width: auto;
-        padding: 0 4px;
-        flex-wrap: nowrap;
     }
 }

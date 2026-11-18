@@ -6,13 +6,14 @@ import {
     type ErrorInfo,
     type ReactNode,
 } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from "@skynet/ui/components/ui/alert";
-import { Button } from "@skynet/ui/components/ui/button";
+import { Banner, Button, Theme, VStack } from "@astryxdesign/core";
+import { InternationalizationProvider } from "@astryxdesign/core/i18n";
+import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
+import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import "@astryxdesign/core/reset.css";
+import "@astryxdesign/core/astryx.css";
+import "@astryxdesign/theme-neutral/theme.css";
+import "./viewport.css";
 import type { AppSnapshot, Json } from "@skynet/contracts";
 import { getSnapshot, refreshSnapshot, request, subscribe } from "./bridge";
 
@@ -47,7 +48,28 @@ function revealPresentation() {
     return cleanup;
 }
 
-export class AppBoundary extends Component<
+const messages = { "zh-CN": chinese };
+
+export function AppBoundary({ children }: { children: ReactNode }) {
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+    useLayoutEffect(() => {
+        document.documentElement.dataset.reduceMotion = String(
+            snapshot?.preferences.reduceMotion ?? false,
+        );
+    }, [snapshot?.preferences.reduceMotion]);
+    return (
+        <Theme
+            theme={neutralTheme}
+            mode={snapshot?.preferences.appearance ?? "system"}
+        >
+            <InternationalizationProvider locale="zh-CN" messages={messages}>
+                <ViewBoundary>{children}</ViewBoundary>
+            </InternationalizationProvider>
+        </Theme>
+    );
+}
+
+class ViewBoundary extends Component<
     { children: ReactNode },
     { error?: string }
 > {
@@ -67,19 +89,17 @@ export class AppBoundary extends Component<
     render() {
         if (!this.state.error) return this.props.children;
         return (
-            <main className="flex h-dvh items-center justify-center p-8">
-                <div className="flex w-full max-w-lg flex-col gap-5">
-                    <Alert variant="destructive">
-                        <AlertCircle />
-                        <AlertTitle>应用界面遇到问题</AlertTitle>
-                        <AlertDescription>{this.state.error}</AlertDescription>
-                    </Alert>
-                    <Button variant="outline" onClick={() => location.reload()}>
-                        <RotateCcw data-icon="inline-start" />
-                        重新载入界面
-                    </Button>
-                </div>
-            </main>
+            <VStack as="main" padding={6} gap={4}>
+                <Banner
+                    status="error"
+                    title="应用界面遇到问题"
+                    description={this.state.error}
+                />
+                <Button
+                    label="重新载入界面"
+                    onClick={() => location.reload()}
+                />
+            </VStack>
         );
     }
 }
@@ -89,23 +109,6 @@ export function useAppSnapshot<State = Json>(): AppSnapshot<State> | undefined {
         void refreshSnapshot().catch(console.error);
     }, []);
     const snapshot = useSyncExternalStore(subscribe, getSnapshot);
-    useLayoutEffect(() => {
-        const preference = snapshot?.preferences.appearance ?? "system";
-        const media = matchMedia("(prefers-color-scheme: dark)");
-        const update = () => {
-            document.documentElement.classList.toggle(
-                "dark",
-                preference === "dark" ||
-                    (preference === "system" && media.matches),
-            );
-        };
-        update();
-        document.documentElement.dataset.reduceMotion = String(
-            snapshot?.preferences.reduceMotion ?? false,
-        );
-        media.addEventListener("change", update);
-        return () => media.removeEventListener("change", update);
-    }, [snapshot?.preferences.appearance, snapshot?.preferences.reduceMotion]);
     const initialized =
         !!snapshot &&
         snapshot.apps.find((app) => app.id === snapshot.appId)?.status !==

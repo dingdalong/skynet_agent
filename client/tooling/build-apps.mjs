@@ -1,8 +1,8 @@
 import { build as buildWeb } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { readdir, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -20,9 +20,7 @@ const aliases = {
     "@skynet/agent-client": `${root}packages/agent-client/src/index.ts`,
     "@skynet/app-sdk/react": `${root}packages/app-sdk/src/react.tsx`,
     "@skynet/app-sdk": `${root}packages/app-sdk/src/bridge.ts`,
-    "@skynet/ui": `${root}packages/ui/src`,
     "@skynet/tokens": `${root}packages/tokens/theme.ts`,
-    "@": `${root}packages/ui/src`,
 };
 
 export async function packageApp(source, output) {
@@ -35,12 +33,26 @@ export async function packageApp(source, output) {
         configFile: false,
         root: source,
         base: "./",
-        plugins: [react(), tailwindcss()],
-        resolve: { alias: aliases },
+        plugins: [react()],
+        resolve: {
+            alias: [
+                {
+                    find: /^@astryxdesign\/core$/,
+                    replacement: createRequire(import.meta.url).resolve(
+                        "@astryxdesign/core",
+                    ),
+                },
+                ...Object.entries(aliases).map(([find, replacement]) => ({
+                    find,
+                    replacement,
+                })),
+            ],
+        },
         build: {
             outDir: path.join(output, "ui"),
             emptyOutDir: true,
             modulePreload: false,
+            cssCodeSplit: false,
             rolldownOptions: { output: { format: "iife" } },
         },
     });

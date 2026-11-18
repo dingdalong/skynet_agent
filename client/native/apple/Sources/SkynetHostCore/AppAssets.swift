@@ -21,8 +21,8 @@ public enum AppPresentation {
                 (() => {
                     const preferences = window.__skynetInitialSnapshot.preferences;
                     const root = document.documentElement;
-                    root.classList.toggle("dark", preferences.appearance === "dark" ||
-                        (preferences.appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches));
+                    root.dataset.astryxTheme = "neutral";
+                    if (preferences.appearance !== "system") root.dataset.theme = preferences.appearance;
                     root.dataset.reduceMotion = String(preferences.reduceMotion);
                 })();
                 """,

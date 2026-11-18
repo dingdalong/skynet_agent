@@ -5,7 +5,7 @@ import XCTest
 
 @testable import SkynetHostCore
 
-/// Runs the packaged shadcn UI in the real WebKit engine. Pointer/keyboard
+/// Runs the packaged Astryx UI in the real WebKit engine. Pointer/keyboard
 /// acceptance is separate; this catches scheme, CSP and bridge failures.
 @MainActor
 final class WebViewTests: XCTestCase {
@@ -48,24 +48,53 @@ final class WebViewTests: XCTestCase {
         let address = String(data: try jsonData("\(url)/agent"), encoding: .utf8)!
         _ = try await harness.web.evaluateJavaScript(
             """
-            document.getElementById('agent-url').value = \(address);
-            document.getElementById('agent-username').value = 'webkit-agent';
+            for (const [id, value] of [['agent-url', \(address)], ['agent-username', 'webkit-agent']]) {
+                const input = document.getElementById(id);
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+            }
             """)
         try await harness.click("连接")
         try await harness.until("document.body.innerText.includes('已连接')")
         _ = try await harness.web.evaluateJavaScript(
             """
-            (()=>{ const e=document.getElementById('agent-message');
-            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'WebKit chat');
+            (()=>{ const e=document.querySelector('#agent-message [contenteditable]');
+            e.textContent='WebKit chat';
             e.dispatchEvent(new Event('input',{bubbles:true})); })()
             """)
-        try await harness.until("!document.querySelector('[aria-label=\"发送消息\"]').disabled")
-        try await harness.click("发送消息")
+        try await harness.until("!document.querySelector('button[aria-label=\"发送\"]').disabled")
+        try await harness.click("发送")
+        let thoughtButton =
+            "label => Array.from(document.querySelectorAll('button[aria-expanded]')).find(button => button.textContent.trim() === label)"
+        try await harness.until(
+            "(\(thoughtButton))('正在思考')?.getAttribute('aria-expanded') === 'true' && document.body.innerText.includes('先检查会话目录。')"
+        )
+        try await harness.until(
+            "(\(thoughtButton))('exec_command · 正在思考')?.getAttribute('aria-expanded') === 'true' && document.body.innerText.includes('确认当前工作目录。')"
+        )
+        try await harness.click("exec_command · 正在思考")
+        try await harness.click("exec_command · 正在思考")
         try await harness.until("document.body.textContent.includes('binary✓')")
         try await harness.until("!document.body.textContent.includes('正在生成')")
+        try await harness.until("(\(thoughtButton))('思考记录')?.getAttribute('aria-expanded') === 'false'")
+        try await harness.click("思考记录")
+        try await harness.until("document.body.innerText.includes('先检查会话目录。')")
+        try await harness.until(
+            "document.querySelector('[aria-current=\"page\"]')?.textContent.includes('Native Agent')")
+        let callRow =
+            "Array.from(document.querySelectorAll('[role=button]')).find(row=>row.textContent.includes('exec_command') && row.textContent.includes('pwd'))"
+        try await harness.until("\(callRow)?.getAttribute('aria-expanded') === 'false'")
+        try await harness.until(
+            "(\(thoughtButton))('exec_command · 思考记录')?.getAttribute('aria-expanded') === 'true'")
+        try await harness.until("document.body.innerText.includes('确认当前工作目录。')")
+        _ = try await harness.web.evaluateJavaScript("\(callRow).click()")
+        try await harness.until(
+            "document.body.innerText.includes('background✓') && document.body.innerText.includes('/workspace')"
+        )
+        _ = try await harness.web.evaluateJavaScript("\(callRow).click()")
         _ = try await harness.web.evaluateJavaScript(
             """
-            (()=>{const e=document.querySelector('[data-slot=message-scroller-viewport]');
+            (()=>{const e=document.querySelector('.agent-chat');
             e.dispatchEvent(new WheelEvent('wheel',{deltaY:-300,bubbles:true}));
             e.scrollTop=230;e.dispatchEvent(new Event('scroll'));})()
             """)
@@ -73,8 +102,9 @@ final class WebViewTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(250))
         let before =
             try await harness.web.evaluateJavaScript(
-                "document.querySelector('[data-slot=message-scroller-viewport]').scrollTop") as! Double
-        try await harness.click("选择模型")
+                "document.querySelector('.agent-chat').scrollTop") as! Double
+        XCTAssertGreaterThan(before, 0)
+        _ = try await harness.web.evaluateJavaScript("document.getElementById('agent-model').click()")
         try await harness.until(
             "Array.from(document.querySelectorAll('[role=option]')).some(e=>e.textContent.trim()==='Fixture 2')"
         )
@@ -82,22 +112,23 @@ final class WebViewTests: XCTestCase {
             "Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.trim()==='Fixture 2').click()"
         )
         try await harness.until(
-            "document.querySelector('[aria-label=\"选择模型\"]').textContent.includes('Fixture 2')")
+            "document.getElementById('agent-model').textContent.includes('Fixture 2')")
         try await Task.sleep(for: .milliseconds(250))
         let after =
             try await harness.web.evaluateJavaScript(
-                "document.querySelector('[data-slot=message-scroller-viewport]').scrollTop") as! Double
+                "document.querySelector('.agent-chat').scrollTop") as! Double
         XCTAssertEqual(
             after, before, accuracy: 2, "model-only updates must preserve the transcript reading position")
         try await harness.until("!document.body.textContent.includes('模型切换正在进行')")
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-webkit.png"))
         _ = try await harness.web.evaluateJavaScript(
             """
-            (()=>{const e=document.getElementById('agent-message');
-            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'保留这份草稿');
+            (()=>{const e=document.querySelector('#agent-message [contenteditable]');
+            e.textContent='保留这份草稿';
             e.dispatchEvent(new Event('input',{bubbles:true})); })()
             """)
-        try await harness.until("document.getElementById('agent-message').value==='保留这份草稿'")
+        try await harness.until(
+            "document.querySelector('#agent-message [contenteditable]').textContent==='保留这份草稿'")
         let persisted = expectation(description: "Agent draft durably committed")
         var once = false
         let observer = core.attach(appId: "agent") { snapshot in
@@ -109,10 +140,11 @@ final class WebViewTests: XCTestCase {
         await fulfillment(of: [persisted], timeout: 4)
         core.detach(observer)
         harness.web.reload()
-        try await harness.until("document.getElementById('agent-message')?.value==='保留这份草稿'")
+        try await harness.until(
+            "document.querySelector('#agent-message [contenteditable]')?.textContent==='保留这份草稿'")
         try await harness.until("document.body.textContent.includes('binary✓')")
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
-        try await harness.until("getComputedStyle(document.querySelector('aside')).display==='none'")
+        try await harness.until("document.getElementById('agent-session')?.getBoundingClientRect().width > 0")
         try await harness.until("document.documentElement.scrollWidth<=420")
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
     }
@@ -141,17 +173,17 @@ final class WebViewTests: XCTestCase {
         try await harness.waitForPresentation(1)
         XCTAssertEqual(harness.presentations[0]["section"] as? String, "外观")
         try await harness.until(
-            "getComputedStyle(document.querySelector('[data-slot=button]')).display==='flex' && getComputedStyle(document.querySelector('[data-slot=button]')).alignItems==='center'"
+            "getComputedStyle(document.querySelector('nav button')).alignItems==='center' && document.documentElement.dataset.astryxTheme==='neutral'"
         )
         try await harness.until(
-            "parseFloat(getComputedStyle(document.querySelector('[data-slot=card]')).borderRadius)>0")
+            "parseFloat(getComputedStyle(document.querySelector('.astryx-card')).borderRadius)>0")
         try await harness.click("深色")
-        try await harness.until("document.documentElement.classList.contains('dark')")
+        try await harness.until("document.documentElement.dataset.theme==='dark'")
         try await harness.click("壁纸")
         try await harness.until("document.body.innerText.includes('选择壁纸')")
         try await harness.click("暮色")
         try await harness.until(
-            "Array.from(document.querySelectorAll('button')).some(b => b.getAttribute('aria-label')==='暮色' && b.getAttribute('aria-pressed')==='true')"
+            "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim()==='暮色' && b.getAttribute('aria-pressed')==='true')"
         )
         try await harness.capture(client.appendingPathComponent("test-artifacts/settings-webkit.png"))
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
@@ -164,7 +196,7 @@ final class WebViewTests: XCTestCase {
         try await harness.capture(client.appendingPathComponent("test-artifacts/settings-narrow-webkit.png"))
         harness.web.reload()
         try await harness.until(
-            "document.body.innerText.includes('选择壁纸') && document.documentElement.classList.contains('dark')")
+            "document.body.innerText.includes('选择壁纸') && document.documentElement.dataset.theme==='dark'")
         try await harness.waitForPresentation(2)
         XCTAssertEqual(harness.presentations[1]["section"] as? String, "壁纸")
         XCTAssertEqual(harness.presentations[1]["dark"] as? Bool, true)
@@ -180,10 +212,11 @@ final class WebViewTests: XCTestCase {
         )
         try await harness.click("动态效果")
         try await harness.until("document.body.innerText.includes('减少动态效果')")
-        try await harness.until("document.querySelector('[role=switch]').getBoundingClientRect().width>=28")
+        try await harness.until(
+            "document.querySelector('input[role=switch]').parentElement.getBoundingClientRect().width>=28")
         let agent = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
         defer { agent.close() }
-        try await agent.until("document.querySelector('main[aria-label=Agent]')!==null")
+        try await agent.until("document.querySelector('[role=toolbar][aria-label=\"会话操作\"]')!==null")
         try await agent.waitForPresentation(1)
         XCTAssertEqual(agent.presentations[0]["dark"] as? Bool, true)
     }
@@ -230,7 +263,7 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
             guard body["presentationId"] as? String == presentationId else { return }
             web.evaluateJavaScript(
                 """
-                ({dark: document.documentElement.classList.contains('dark'),
+                ({dark: document.documentElement.dataset.theme==='dark',
                   section: document.querySelector('[aria-current=page]')?.textContent.trim()})
                 """
             ) { [weak self] value, error in

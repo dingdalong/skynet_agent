@@ -11,10 +11,9 @@ native/apple/      苹果平台资源、Actor 与生命周期
 native/core/       平台无关工作区状态规则
 builtins/          设置与 Agent 对话，分别包含 manifest、runtime 与 view
 packages/contracts 消息、清单和状态契约
-packages/app-sdk   Web 表现桥接与可失效订阅
+packages/app-sdk   Web 表现桥接、快照订阅、Astryx 主题与错误界面
 packages/app-runtime 同步 Actor 定义
 packages/agent-client 二进制协议、会话、流式任务和恢复规则
-packages/ui        Web 子应用共享组件与样式
 packages/tokens    单一令牌源与生成主题
 tooling/           构建、打包、架构检查、原生验收与应用模板
 ```
