@@ -9,17 +9,57 @@ import XCTest
 /// mouse/keyboard events; actual Simulator acceptance is a separate step.
 @MainActor
 final class MobileHostTests: XCTestCase {
+    func testWebWorkspaceRestoresSplitWithoutRecreatingEitherApplication() async throws {
+        let core = HostServices.core
+        let shell = try await view("workspace-shell") as! WKWebView
+        let original = shell.frame
+        guard original.width >= 728 else { throw XCTSkip("需要宽工作区") }
+        defer {
+            shell.frame = original
+            core.workspace("home")
+        }
+        _ = try await workspace(core, "open", ["appId": "agent"])
+        _ = try await workspace(core, "split", ["appId": "agent", "edge": "left"])
+        _ = try await workspace(core, "open", ["appId": "settings"])
+        _ = try await workspace(core, "resize", ["ratio": 0.5])
+        let agent = try await view("app-scene-agent")
+        let settings = try await view("app-scene-settings")
+        try await eventually("两个子应用未并排放置") {
+            !agent.isHidden && !settings.isHidden && agent.frame.maxX < settings.frame.minX
+                && abs(agent.frame.width - settings.frame.width) < 2
+                && self.descendant(agent) { $0 as? WKWebView } != nil
+                && self.descendant(settings) { $0 as? WKWebView } != nil
+        }
+        let retainedAgent = try XCTUnwrap(descendant(agent) { $0 as? WKWebView })
+        let retainedSettings = try XCTUnwrap(descendant(settings) { $0 as? WKWebView })
+        _ = try await shell.evaluateJavaScript(
+            "document.querySelector('[role=separator]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))"
+        )
+        try await eventually("分隔线的键盘操作未调整原生面板") { agent.frame.width > original.width * 0.6 }
+        let adjustedWidth = agent.frame.width
+        shell.frame.size.width = 390
+        try await eventually("窄窗口未显示最近使用的应用") {
+            agent.isHidden && !settings.isHidden && abs(settings.frame.width - 390) < 2
+        }
+        shell.frame = original
+        try await eventually("恢复窗口后未恢复之前的分屏比例") {
+            !agent.isHidden && !settings.isHidden && abs(agent.frame.width - adjustedWidth) < 2
+        }
+        XCTAssertTrue(retainedAgent === descendant(agent) { $0 as? WKWebView })
+        XCTAssertTrue(retainedSettings === descendant(settings) { $0 as? WKWebView })
+    }
+
     func testRetainedApplicationStaysHiddenAfterReturningHome() async throws {
         let core = HostServices.core
         for delay: UInt64 in [350_000_000, 10_000_000, 0] {
             _ = try await workspace(core, "open", ["appId": "agent"])
             let scene = try await view("app-scene-agent")
             try await eventually("Agent scene did not become visible") {
-                self.opacity(scene) > 0.01 && self.findView("workspace-desktop") == nil
+                self.opacity(scene) > 0.01
             }
             try await Task.sleep(nanoseconds: delay)
             _ = try await workspace(core, "home")
-            _ = try await view("workspace-desktop")
+            try await eventually("Agent is still visible on the desktop") { scene.isHidden }
             for _ in 0..<35 {
                 await displayFrame()
                 XCTAssertEqual(
@@ -33,15 +73,15 @@ final class MobileHostTests: XCTestCase {
         let core = HostServices.core
         _ = try await workspace(core, "open", ["appId": "agent"])
         let scene = try await view("app-scene-agent")
-        let transition = try await view("app-transition-agent")
         try await eventually("Agent scene did not become visible") {
-            self.opacity(scene) > 0.01 && self.findView("workspace-desktop") == nil
+            self.opacity(scene) > 0.01
         }
         var retainedWeb: WKWebView?
         try await eventually("Agent WebView did not mount") {
             retainedWeb = self.descendant(scene) { $0 as? WKWebView }
             return retainedWeb != nil
         }
+        let transition = try XCTUnwrap(retainedWeb)
         for mode in ["home", "overview"] {
             _ = try await workspace(core, mode)
             try await eventually("Retained scene did not hide") { self.opacity(scene) == 0 }
@@ -392,7 +432,8 @@ final class MobileHostTests: XCTestCase {
                     if handler.readyCount > 0 {
                         let section =
                             try await web.evaluateJavaScript(
-                                "document.querySelector('[aria-current=page]').textContent.trim()") as? String
+                                "document.querySelector('[aria-current=true]').getAttribute('aria-label')")
+                            as? String
                         let dark =
                             try await web.evaluateJavaScript(
                                 "document.documentElement.dataset.theme==='dark'") as? Bool

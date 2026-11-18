@@ -8,8 +8,7 @@
 | 依赖 | 用途 |
 | --- | --- |
 | Git 与 GitHub SSH | 仓库及子模块 |
-| Node.js 与 pnpm | 客户端 TypeScript、React Native 与 Web 子应用构建测试，版本见 `client/package.json` |
-| Ruby 与 Bundler | CocoaPods；`make install` 将 gem 安装到项目 `.tools/gems` |
+| Node.js 与 pnpm | 客户端 TypeScript、React 和 Astryx 工作区构建测试，版本见 `client/package.json` |
 | 完整 Xcode、macOS/iOS SDK 与模拟器 | 苹果平台宿主、Swift Package Manager 与签名构建 |
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
 | Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
@@ -29,15 +28,14 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 | `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 iOS Scene |
 | `client/native` | 公共 C++ 状态规则、苹果平台宿主资源与原生集成测试 |
 | `client/builtins` | 设置与 Agent 对话，各自包含清单、同步业务与 Web 表现 |
-| `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、组件与令牌 |
+| `client/packages` | 共享 Web 工作区、宿主桥、契约、SDK 与令牌 |
 | `client/tooling` | 构建、应用包模板、边界检查和原生验收 |
 | `server` | Skynet 服务端及 Lua 单元、网络集成与真实模型测试 |
 | `common` | 公共协议、测试向量及 C 工具核心 |
 
-运行 `make install` 安装工作区依赖与 CocoaPods。服务端测试复用现有 Skynet 与 Lua 库。
+运行 `make install` 安装工作区依赖。服务端测试复用现有 Skynet 与 Lua 库。
 `make dev` 构建并启动 macOS 客户端，修改源码后重新执行；菜单“工作空间 / 重新载入界面”
-重建当前包内的 React 表现，保留原生宿主资源。需要 Metro 开发时，在 `client/apps/host` 启动
-`pnpm exec react-native start`，再以 `SKYNET_METRO=1` 启动 App 的可执行文件。
+重新载入包内工作区页面，保留子应用、连接和原生宿主资源。
 客户端的工作区与设置可独立运行；Agent 对话需要启动服务端并配置连接。
 业务接入边界和并发模型见[客户端运行时](architecture/CLIENT_RUNTIME.md)。
 
@@ -49,7 +47,6 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 `make client-platforms` 查询可构建状态，`make client-doctor` 查询锁定版本与构建主机。
 未接入的平台会在产生构建副作用前明确失败，不会回退到 macOS。
 `make client-core-test` 在具备 CMake、Node 和 C++17 编译器的主机上独立验证公共内核。
-`pnpm --dir client run probe:platforms` 验证共享 RN 的 iOS/Android 依赖图；不替代原生构建和体验验收。
 支持矩阵及后续接入门槛见[客户端平台接入](architecture/CLIENT_PLATFORMS.md)。
 产物位于 `client/dist/macos/Skynet Agent.app`。
 本机构建使用 ad-hoc 签名，不启用要求 Team ID 的 Hardened Runtime 库校验。

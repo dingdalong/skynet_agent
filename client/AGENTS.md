@@ -8,10 +8,10 @@
 
 ## 架构与体验
 
-- 客户端使用 React Native 宿主与独立 Web 子应用，macOS 与 iOS 入口均在 `apps/host`。
+- 客户端使用 React DOM 和 Astryx 官方组件构建宿主工作区与独立 Web 子应用。macOS 与 iOS 入口均在 `apps/host`。
 - 客户端开发遵循[客户端运行时规范](../docs/architecture/CLIENT_RUNTIME.md)，UI 开发前同时阅读
   [客户端设计规范](../docs/design/CLIENT_DESIGN.md)；资源所有权、调用与恢复规则见本目录隐式约定。
-- 宿主与子应用的界面设计使用项目内的官方 `astryx` 技能。工作区支持分屏，并按可用宽度和输入方式适配。
+- 宿主、子应用与模板共用官方 `astryx` 技能和同一套官方组件。工作区按可用宽度支持分屏。组件缺口按客户端设计规范单独记录。
 - macOS、iPhone/iPad 模拟器已接入，iOS 真机与 App Store 发行尚未验收。
   其他平台接入前必须实现对应的宿主、资源与隔离适配器。
 - 当前内置设置与 Agent 对话；支持服务器与已授权 macOS 本地工作目录、流式消息、模型选择、取消和重试。

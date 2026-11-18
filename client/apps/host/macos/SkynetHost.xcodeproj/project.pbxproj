@@ -7,29 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		13074FD9364BB12A6D9B17B9 /* WorkspaceHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 696153EAF62D87134E407B95 /* WorkspaceHost.swift */; };
 		35D2350EEA35496EA0CDB6F6 /* AppSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A976B687968F64DC3F5259 /* AppSurface.swift */; };
 		514201522437B4B40078DB4F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 514201512437B4B40078DB4F /* Assets.xcassets */; };
-		583254010231A97C4F63B238 /* HostBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9A8CEDFAADC2B06912EBB5 /* HostBridge.swift */; };
-		5D4E5CA1466601EF65196467 /* libPods-SkynetHost-macOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */; };
-		7BD7361BB4908E4B614B5DF3 /* WorkspaceScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0771FE44B9C49E64382AC4DF /* WorkspaceScene.swift */; };
-		82528B3C8E8E0B64C252B5FE /* Exports.m in Sources */ = {isa = PBXBuildFile; fileRef = 1DC700400FEF9106C22E7936 /* Exports.m */; };
 		BA5AD4AC31B7A9BA3E486D3C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3C284659A2C462490B7C0179 /* PrivacyInfo.xcprivacy */; };
 		C524B4C17C92B1AAEF0DC38F /* HostApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F921CA5256F05561EEEE5196 /* HostApplication.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0771FE44B9C49E64382AC4DF /* WorkspaceScene.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceScene.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* SkynetHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SkynetHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1DC700400FEF9106C22E7936 /* Exports.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = Exports.m; sourceTree = "<group>"; };
-		21265F747B81B223A5A0E72B /* Pods-SkynetHost-macOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHost-macOS.release.xcconfig"; path = "Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS.release.xcconfig"; sourceTree = "<group>"; };
 		3C284659A2C462490B7C0179 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		42A976B687968F64DC3F5259 /* AppSurface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSurface.swift; sourceTree = "<group>"; };
 		514201492437B4B30078DB4F /* SkynetHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SkynetHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		514201512437B4B40078DB4F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		514201562437B4B40078DB4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SkynetHost-macOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		CA9A8CEDFAADC2B06912EBB5 /* HostBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostBridge.swift; sourceTree = "<group>"; };
-		E87AF2C8B6E378C7EB500651 /* Pods-SkynetHost-macOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHost-macOS.debug.xcconfig"; path = "Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS.debug.xcconfig"; sourceTree = "<group>"; };
+		696153EAF62D87134E407B95 /* WorkspaceHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceHost.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F921CA5256F05561EEEE5196 /* HostApplication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostApplication.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -39,7 +31,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5D4E5CA1466601EF65196467 /* libPods-SkynetHost-macOS.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,7 +41,6 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -61,12 +51,18 @@
 				514201512437B4B40078DB4F /* Assets.xcassets */,
 				514201562437B4B40078DB4F /* Info.plist */,
 				F921CA5256F05561EEEE5196 /* HostApplication.swift */,
-				CA9A8CEDFAADC2B06912EBB5 /* HostBridge.swift */,
 				42A976B687968F64DC3F5259 /* AppSurface.swift */,
-				1DC700400FEF9106C22E7936 /* Exports.m */,
-				0771FE44B9C49E64382AC4DF /* WorkspaceScene.swift */,
 			);
 			path = "SkynetHost-macOS";
+			sourceTree = "<group>";
+		};
+		6A6E99872DD163059C9E3C6B /* Workspace */ = {
+			isa = PBXGroup;
+			children = (
+				696153EAF62D87134E407B95 /* WorkspaceHost.swift */,
+			);
+			name = Workspace;
+			path = ../apple;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -84,7 +80,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				3C284659A2C462490B7C0179 /* PrivacyInfo.xcprivacy */,
-				A0AEFE25DB2969F8FB45A673 /* Pods */,
+				6A6E99872DD163059C9E3C6B /* Workspace */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -100,16 +96,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A0AEFE25DB2969F8FB45A673 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				E87AF2C8B6E378C7EB500651 /* Pods-SkynetHost-macOS.debug.xcconfig */,
-				21265F747B81B223A5A0E72B /* Pods-SkynetHost-macOS.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -117,13 +103,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5142015A2437B4B40078DB4F /* Build configuration list for PBXNativeTarget "SkynetHost-macOS" */;
 			buildPhases = (
-				1A938104A937498D81B3BD3B /* [CP] Check Pods Manifest.lock */,
 				514201452437B4B30078DB4F /* Sources */,
 				514201462437B4B30078DB4F /* Frameworks */,
 				514201472437B4B30078DB4F /* Resources */,
-				381D8A6E24576A4E00465D17 /* Bundle React Native code and images */,
-				AE0F6EC0113065C84E29DB4D /* [CP] Embed Pods Frameworks */,
-				53D0C4D76E8122898DBA6DED /* [CP] Copy Pods Resources */,
 				0C1BAA1A2717F13D7E4D77CD /* Copy Skynet applications */,
 			);
 			buildRules = (
@@ -200,90 +182,6 @@
 			shellPath = /bin/sh;
 			shellScript = "node \"$SRCROOT/../../../tooling/copy-resources.mjs\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH\"\n";
 		};
-		1A938104A937498D81B3BD3B /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-SkynetHost-macOS-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		381D8A6E24576A4E00465D17 /* Bundle React Native code and images */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Bundle React Native code and images";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "export NODE_BINARY=node\nexport FORCE_BUNDLING=1\n\"$SRCROOT/../../../node_modules/react-native-macos/scripts/react-native-xcode.sh\"\n";
-		};
-		53D0C4D76E8122898DBA6DED /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS-resources.sh",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/boost/boost_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/glog/glog_privacy.bundle",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/boost_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/glog_privacy.bundle",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		AE0F6EC0113065C84E29DB4D /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS-frameworks.sh",
-				"${PODS_ROOT}/hermes-engine/destroot/Library/Frameworks/macosx/hermesvm.framework",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermesvm.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -292,10 +190,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C524B4C17C92B1AAEF0DC38F /* HostApplication.swift in Sources */,
-				583254010231A97C4F63B238 /* HostBridge.swift in Sources */,
 				35D2350EEA35496EA0CDB6F6 /* AppSurface.swift in Sources */,
-				82528B3C8E8E0B64C252B5FE /* Exports.m in Sources */,
-				7BD7361BB4908E4B614B5DF3 /* WorkspaceScene.swift in Sources */,
+				13074FD9364BB12A6D9B17B9 /* WorkspaceHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,7 +200,6 @@
 /* Begin XCBuildConfiguration section */
 		5142015B2437B4B40078DB4F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E87AF2C8B6E378C7EB500651 /* Pods-SkynetHost-macOS.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -343,7 +238,6 @@
 		};
 		5142015C2437B4B40078DB4F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 21265F747B81B223A5A0E72B /* Pods-SkynetHost-macOS.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -436,10 +330,8 @@
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native-macos";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
-				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -493,9 +385,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native-macos";
 				SDKROOT = iphoneos;
-				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

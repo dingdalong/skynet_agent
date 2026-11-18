@@ -1,13 +1,6 @@
 import AppKit
-import React
 import SkynetHostCore
 import WebKit
-
-@objc(SkynetSurfaceManager)
-final class SurfaceManager: RCTViewManager {
-    override static func requiresMainQueueSetup() -> Bool { true }
-    override func view() -> NSView! { AppSurface() }
-}
 
 private final class WeakHandler: NSObject, WKScriptMessageHandler {
     weak var target: AppSurface?
@@ -46,7 +39,8 @@ final class AppSurface: NSView, WKNavigationDelegate {
     private var session = UUID()
     private var presentationId = UUID().uuidString
     private var lastSnapshot: [String: Any]?
-    private var failureView: NSView?
+    var onFailure: ((String) -> Void)?
+    private var failed = false
     private let core = HostServices.core
     private var loadStarted = ProcessInfo.processInfo.systemUptime
 
@@ -67,8 +61,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
         web?.removeFromSuperview()
         cover?.removeFromSuperview()
         cover = nil
-        failureView?.removeFromSuperview()
-        failureView = nil
+        failed = false
         web = nil
         lastSnapshot = nil
         session = UUID()
@@ -176,7 +169,7 @@ final class AppSurface: NSView, WKNavigationDelegate {
         if kind == "view.ready" {
             guard body["presentationId"] as? String == presentationId else { return }
             readinessTimeout?.cancel()
-            if cover != nil, failureView == nil {
+            if cover != nil, !failed {
                 trace("visible")
                 cover?.removeFromSuperview()
                 cover = nil
@@ -310,22 +303,10 @@ final class AppSurface: NSView, WKNavigationDelegate {
         cover?.removeFromSuperview()
         cover = nil
         web?.isHidden = true
-        failureView?.removeFromSuperview()
-        let label = NSTextField(wrappingLabelWithString: message)
-        let reload = NSButton(title: "重新载入界面", target: self, action: #selector(reloadView))
-        let stack = NSStackView(views: [label, reload])
-        stack.orientation = .vertical
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
-        ])
-        failureView = stack
+        failed = true
+        onFailure?(message)
     }
-    @objc private func reloadView() { loadApp() }
+    func reloadView() { loadApp() }
     deinit {
         readinessTimeout?.cancel()
         if let lease { core.detach(lease) }

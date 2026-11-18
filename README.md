@@ -1,6 +1,6 @@
 # Skynet Agent
 
-基于 Skynet 与 Lua 的 Agent 服务端，搭配 React Native 宿主与独立 Web 子应用。
+基于 Skynet 与 Lua 的 Agent 服务端，搭配 Astryx 工作区与独立 Web 子应用。
 客户端提供桌面、Dock、设置、Agent 对话、后台与双应用分屏。
 Agent 支持会话恢复、流式消息、模型选择、取消、失败重试及服务器工具记录。
 服务端保留多会话、流式对话、模型选择、工具执行与权限管理能力。

@@ -1,6 +1,6 @@
 # 客户端运行时
 
-客户端由 React Native 工作区、受限 WebView 表现和 JavaScriptCore 业务运行时组成。
+客户端由 Astryx Web 工作区、受限子应用 WebView 和 JavaScriptCore 业务运行时组成。
 macOS 每应用独立进程，iOS/iPadOS 每个可信内置应用独立 VM 与串行队列，属于进程内隔离。
 当前内置设置与 Agent。Agent 已接入服务器会话、流式任务、模型选择、取消与失败重试；
 已接入 macOS 本地项目执行器；移动端发送远程指令。Agent 生成并安装应用和远程分发尚未接入。
@@ -15,13 +15,13 @@ UI 规格见[客户端设计规范](../design/CLIENT_DESIGN.md)。
 
 ## 所有权与数据流
 
-原生 AppDelegate 创建并持有 HostCore。React Native 只订阅工作区，WebView 只订阅所属应用；
+原生 AppDelegate 创建并持有 HostCore。受信任的宿主页面订阅工作区，每个子应用页面只订阅所属应用。
 界面持有租约，不能释放业务进程、存储或连接。纯 TypeScript runtime 接受状态与消息，
 同步返回新状态、结果和效果请求。状态与资源不保存在 React 组件中。
 
 ```mermaid
 flowchart LR
-    Shell[React Native 工作区] -->|工作区命令| Host[原生 HostCore]
+    Shell[Astryx 工作区] -->|工作区命令| Host[原生 HostCore]
     View[子应用 WebView] -->|身份绑定租约| Host
     Host -->|有序消息和状态| Actor[每应用 JSC Actor]
     Actor -->|新状态及效果请求| Host
@@ -46,7 +46,7 @@ HostCore 的可变状态全部归属于单一串行队列。每个应用有自�
 | --- | --- | --- |
 | 返回桌面、后台、分屏 | 保留进程、任务与连接 | 保留已打开应用的表现缓存，改变可见性与容器矩形 |
 | 内存压力 | 保留业务与资源 | 丢弃隐藏表现；再次进入重新订阅和载入 |
-| 重载 React Native 或子应用界面 | 原生宿主、业务进程与连接保留 | 旧租约失效，重新订阅快照 |
+| 重载工作区或子应用界面 | 原生宿主、业务进程与连接保留 | 重载的页面重新订阅快照 |
 | 关闭内部应用 | 结束进程，关闭资源，保留已提交数据 | 释放内容 |
 | 运行时崩溃或超限 | 终止所属进程和连接，拒绝在途命令 | 显示所属应用故障与重启入口 |
 | 安装更新 | 先验证和探测，再替换包；关闭旧代次 | 按版本重新创建界面 |

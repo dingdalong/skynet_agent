@@ -16,28 +16,20 @@
     "dev": "node tooling/build.mjs dev",
     "test:core": "node tooling/test-core.mjs",
     "platforms": "node tooling/build.mjs list",
-    "doctor": "node tooling/build.mjs doctor",
-    "probe:platforms": "node tooling/probe-platforms.mjs"
+    "doctor": "node tooling/build.mjs doctor"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.16",
     "@astryxdesign/theme-neutral": "0.7.16",
+    "@heroicons/react": "2.2.0",
     "@kayahr/text-encoding": "2.2.0",
     "@stylexjs/stylex": "^0.19.2",
     "protobufjs": "8.8.1",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-native": "0.83.10",
-    "react-native-macos": "0.83.0"
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
     "@astryxdesign/cli": "0.7.16",
-    "@babel/runtime": "7.29.14",
-    "@react-native-community/cli": "20.2.0",
-    "@react-native-community/cli-platform-ios": "20.2.0",
-    "@react-native/babel-preset": "0.83.10",
-    "@react-native/community-cli-plugin": "0.83.10",
-    "@react-native/metro-config": "0.83.10",
     "@types/node": "26.0.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

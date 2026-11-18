@@ -31,8 +31,6 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>连接你授权的局域网 Agent 服务器，远程查看和控制开发任务。</string>
-	<key>RCTNewArchEnabled</key>
-	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIApplicationSceneManifest</key>

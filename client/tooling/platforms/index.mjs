@@ -6,35 +6,35 @@ export const platforms = {
     macos: {
         status: "supported",
         host: "darwin",
-        renderer: "react-native-macos",
+        renderer: "WebKit",
         detail: "本机 ad-hoc App；正式签名与公证未接入",
     },
     ios: {
         status: "supported",
         host: "darwin",
-        renderer: "react-native",
+        renderer: "WebKit",
         detail: "iPhone/iPad 模拟器；真机、签名与 App Store 审核未验收",
     },
     android: {
         status: "planned",
-        renderer: "react-native",
-        detail: "共享 RN 界面可独立打包验证；Android 宿主与运行时未接入",
+        renderer: null,
+        detail: "Android 宿主与运行时待接入",
     },
     windows: {
         status: "planned",
         host: "win32",
-        renderer: "react-native-windows",
+        renderer: null,
         detail: "需选择受支持版本并验证原生桥；没有 Windows 原生构建证据",
     },
     linux: {
         status: "blocked",
         host: "linux",
         renderer: null,
-        detail: "公共 C++ 核心可验证；尚无已选定且兼容当前 RN 的生产级宿主",
+        detail: "公共 C++ 核心可验证，Linux 宿主待接入",
     },
     web: {
         status: "planned",
-        renderer: "react-native-web",
+        renderer: "React DOM",
         detail: "浏览器宿主、传输与资源适配未接入",
     },
 };
@@ -59,7 +59,7 @@ export async function installedVersions() {
         await readFile(`${clientRoot}package.json`, "utf8"),
     );
     return Object.fromEntries(
-        ["react", "react-native", "react-native-macos"].map((name) => [
+        ["react", "react-dom", "@astryxdesign/core"].map((name) => [
             name,
             manifest.dependencies[name],
         ]),

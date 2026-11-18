@@ -6,6 +6,13 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const contents = process.argv[2];
 if (!contents) throw new Error("App Contents path required");
 await mkdir(path.join(contents, "Helpers"), { recursive: true });
+await rm(path.join(contents, "Resources/workspace"), {
+    recursive: true,
+    force: true,
+});
+await cp(`${root}dist/workspace`, path.join(contents, "Resources/workspace"), {
+    recursive: true,
+});
 await rm(path.join(contents, "Resources/builtins"), {
     recursive: true,
     force: true,

@@ -31,13 +31,27 @@ public enum AppPresentation {
 }
 
 public final class AppAssets: NSObject, WKURLSchemeHandler {
-    let entry: AppCatalog.Entry
+    private let root: URL
+    private let host: String
+    private let files: Set<String>
     private var active = Set<ObjectIdentifier>()
-    public init(entry: AppCatalog.Entry) { self.entry = entry }
+    public init(entry: AppCatalog.Entry) {
+        root = entry.root
+        host = entry.manifest.id
+        files = Set(entry.manifest.files.keys)
+    }
+    public init(bundledWorkspace: URL) {
+        root = bundledWorkspace
+        host = "workspace"
+        let assets =
+            (try? FileManager.default.contentsOfDirectory(
+                atPath: bundledWorkspace.appendingPathComponent("assets").path)) ?? []
+        files = Set(["index.html"] + assets.map { "assets/\($0)" })
+    }
     public func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
-        guard let url = urlSchemeTask.request.url, url.host == entry.manifest.id,
+        guard let url = urlSchemeTask.request.url, url.host == host,
             let decoded = url.path.removingPercentEncoding, !decoded.contains(".."),
-            entry.manifest.files[String(decoded.dropFirst())] != nil
+            files.contains(String(decoded.dropFirst()))
         else {
             urlSchemeTask.didFailWithError(HostError("path", "Asset path denied"))
             return
@@ -47,7 +61,7 @@ public final class AppAssets: NSObject, WKURLSchemeHandler {
         let path = String(decoded.dropFirst())
         DispatchQueue.global(qos: .userInitiated).async {
             let result: Result<Data, Error> = Result {
-                var data = try Data(contentsOf: self.entry.root.appendingPathComponent(path))
+                var data = try Data(contentsOf: self.root.appendingPathComponent(path))
                 if path.hasSuffix(".html") {
                     let policy =
                         "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'"

@@ -15,7 +15,7 @@ help:
 	@printf '%s\n' \
 		"Skynet Agent" \
 		"" \
-		"  make install        安装项目客户端依赖与 CocoaPods" \
+		"  make install        安装项目客户端依赖" \
 		"  make dev            按 PLATFORM 构建并启动客户端（服务端单独启动）" \
 		"  make build          构建服务端和所选平台 Release 客户端" \
 		"  make check          服务端与客户端基础回归" \

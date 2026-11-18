@@ -23,12 +23,7 @@ const aliases = {
     "@skynet/tokens": `${root}packages/tokens/theme.ts`,
 };
 
-export async function packageApp(source, output) {
-    const manifest = JSON.parse(
-        await readFile(path.join(source, "manifest.json"), "utf8"),
-    );
-    await rm(output, { force: true, recursive: true });
-    await mkdir(output, { recursive: true });
+async function buildPresentation(source, output) {
     await buildWeb({
         configFile: false,
         root: source,
@@ -49,19 +44,28 @@ export async function packageApp(source, output) {
             ],
         },
         build: {
-            outDir: path.join(output, "ui"),
+            outDir: output,
             emptyOutDir: true,
             modulePreload: false,
             cssCodeSplit: false,
             rolldownOptions: { output: { format: "iife" } },
         },
     });
-    const html = path.join(output, "ui/index.html");
+    const html = path.join(output, "index.html");
     // Static IIFE bundles work on WebKit's private custom URL scheme.
     await writeFile(
         html,
         (await readFile(html, "utf8")).replaceAll('type="module"', "defer"),
     );
+}
+
+export async function packageApp(source, output) {
+    const manifest = JSON.parse(
+        await readFile(path.join(source, "manifest.json"), "utf8"),
+    );
+    await rm(output, { force: true, recursive: true });
+    await mkdir(output, { recursive: true });
+    await buildPresentation(source, path.join(output, "ui"));
     await build({
         entryPoints: [path.join(source, "src/runtime.ts")],
         outfile: path.join(output, "runtime.js"),
@@ -106,6 +110,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             ),
         );
     } else {
+        await buildPresentation(`${root}apps/host`, `${root}dist/workspace`);
         for (const name of ["settings", "agent"]) {
             await packageApp(
                 `${root}builtins/${name}`,

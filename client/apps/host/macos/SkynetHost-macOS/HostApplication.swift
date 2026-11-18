@@ -1,10 +1,6 @@
-import React
-import ReactAppDependencyProvider
-import React_RCTAppDelegate
 import SkynetHostCore
 import SwiftUI
 
-/// The application delegate owns core lifetime. React modules only borrow it.
 enum HostServices {
     static weak var delegate: AppDelegate?
     static var core: HostCore { delegate!.core }
@@ -15,7 +11,7 @@ struct SkynetApplication: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
         Window("Skynet Agent", id: "main") {
-            ReactNativeView(factory: appDelegate.factory)
+            WorkspaceWindow(delegate: appDelegate)
                 .frame(minWidth: 360, minHeight: 480)
                 .preferredColorScheme(appDelegate.colorScheme)
         }
@@ -30,7 +26,7 @@ struct SkynetApplication: App {
             }
             CommandGroup(replacing: .newItem) {}
             CommandMenu("工作空间") {
-                Button("重新载入界面") { RCTTriggerReloadCommandListeners("workspace menu") }
+                Button("重新载入界面") { appDelegate.workspace?.reload() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
@@ -39,9 +35,8 @@ struct SkynetApplication: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let core: HostCore
-    let factory: RCTReactNativeFactory
+    weak var workspace: WorkspaceHost?
     @Published private(set) var colorScheme: ColorScheme?
-    private let reactDelegate: ReactNativeDelegate
     private var appearanceObservation: UUID?
     override init() {
         let resources = Bundle.main.resourceURL!
@@ -55,9 +50,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 executable: resources.deletingLastPathComponent().appendingPathComponent(
                     "Helpers/SkynetAppRuntime"))
         } catch { fatalError("HostCore initialization failed: \(error)") }
-        reactDelegate = ReactNativeDelegate()
-        reactDelegate.dependencyProvider = RCTAppDependencyProvider()
-        factory = RCTReactNativeFactory(delegate: reactDelegate)
         super.init()
         HostServices.delegate = self
         appearanceObservation = core.observe { [weak self] snapshot in
@@ -79,20 +71,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 }
 
-final class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
-    override func sourceURL(for bridge: RCTBridge) -> URL? { bundleURL() }
-    override func bundleURL() -> URL? {
-        if ProcessInfo.processInfo.environment["SKYNET_METRO"] == "1" {
-            return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
-        }
-        return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
-    }
-}
-
-struct ReactNativeView: NSViewRepresentable {
-    let factory: RCTReactNativeFactory
+private struct WorkspaceWindow: NSViewRepresentable {
+    let delegate: AppDelegate
     func makeNSView(context: Context) -> NSView {
-        factory.rootViewFactory.view(withModuleName: "SkynetHost")
+        let workspace = WorkspaceHost(frame: .zero)
+        delegate.workspace = workspace
+        return workspace
     }
     func updateNSView(_ nsView: NSView, context: Context) {}
 }

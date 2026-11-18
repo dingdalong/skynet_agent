@@ -1,13 +1,7 @@
-import React
 import SkynetHostCore
 import UIKit
 import WebKit
 
-@objc(SkynetSurfaceManager)
-final class SurfaceManager: RCTViewManager {
-    override static func requiresMainQueueSetup() -> Bool { true }
-    override func view() -> UIView! { AppSurface() }
-}
 private final class WeakHandler: NSObject, WKScriptMessageHandler {
     weak var target: AppSurface?
     init(_ target: AppSurface) { self.target = target }
@@ -32,7 +26,8 @@ final class AppSurface: UIView, WKNavigationDelegate {
     @objc var revealDurationMs: Double = 140
     private var web: WKWebView?
     private var cover: UIView?
-    private var failureView: UIView?
+    var onFailure: ((String) -> Void)?
+    private var failed = false
     private var lease: UUID?
     private var session = UUID()
     private var presentationId = UUID().uuidString
@@ -59,8 +54,7 @@ final class AppSurface: UIView, WKNavigationDelegate {
         web = nil
         cover?.removeFromSuperview()
         cover = nil
-        failureView?.removeFromSuperview()
-        failureView = nil
+        failed = false
         lastSnapshot = nil
         session = UUID()
         let current = session
@@ -171,7 +165,7 @@ final class AppSurface: UIView, WKNavigationDelegate {
         if kind == "view.ready" {
             guard body["presentationId"] as? String == presentationId else { return }
             timeout?.cancel()
-            if failureView == nil, cover != nil {
+            if !failed, cover != nil {
                 trace("visible")
                 cover?.removeFromSuperview()
                 cover = nil
@@ -250,29 +244,10 @@ final class AppSurface: UIView, WKNavigationDelegate {
         cover?.removeFromSuperview()
         cover = nil
         web?.isHidden = true
-        failureView?.removeFromSuperview()
-        let label = UILabel()
-        label.text = message
-        label.numberOfLines = 0
-        label.font = .preferredFont(forTextStyle: .body)
-        label.adjustsFontForContentSizeCategory = true
-        let reload = UIButton(type: .system)
-        reload.setTitle("重新载入界面", for: .normal)
-        reload.addTarget(self, action: #selector(reloadView), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [label, reload])
-        stack.axis = .vertical
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -24),
-        ])
-        failureView = stack
+        failed = true
+        onFailure?(message)
     }
-    @objc private func reloadView() { loadApp() }
+    func reloadView() { loadApp() }
     deinit {
         timeout?.cancel()
         if let lease { core.detach(lease) }

@@ -1,6 +1,6 @@
 # Skynet 客户端
 
-React Native 宿主负责工作区，独立 WebView 呈现子应用。
+Astryx 工作区在宿主 WebView 中运行，每个子应用由独立 WebView 呈现。
 macOS 每应用独立 JavaScriptCore 进程；iOS 内置应用使用各自的 VM 与串行队列。
 两端均通过原生 HostCore 使用存储、连接和动作，界面重载不释放原生资源。
 Node.js 只用于开发构建，不随 App 分发。

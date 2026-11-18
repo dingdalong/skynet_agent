@@ -11,6 +11,7 @@ import {
     LayoutFooter,
     Switch,
     TextInput,
+    VStack,
 } from "@astryxdesign/core";
 import { app, request } from "@skynet/app-sdk";
 import type { AgentState } from "@skynet/agent-client/types";
@@ -71,7 +72,8 @@ export function Connection({
                 }
                 content={
                     <LayoutContent>
-                        <form
+                        <VStack
+                            as="form"
                             id="agent-connection"
                             aria-label="服务器连接"
                             onSubmit={submit}
@@ -127,7 +129,7 @@ export function Connection({
                                     />
                                 )}
                             </FormLayout>
-                        </form>
+                        </VStack>
                     </LayoutContent>
                 }
                 footer={

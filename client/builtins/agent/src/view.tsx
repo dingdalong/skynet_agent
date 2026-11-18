@@ -10,6 +10,7 @@ import {
     EmptyState,
     Heading,
     Icon,
+    IconButton,
     Layout,
     LayoutHeader,
     Selector,
@@ -175,10 +176,9 @@ function Agent() {
                                         }
                                     />
                                     {!wide && newSession}
-                                    <Button
+                                    <IconButton
                                         label="连接设置"
                                         icon={<Icon icon="wrench" />}
-                                        isIconOnly
                                         tooltip="连接设置"
                                         variant="ghost"
                                         onClick={openConnection}

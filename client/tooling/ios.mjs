@@ -1,23 +1,15 @@
 import { spawn } from "node:child_process";
-import { access, cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { clientRoot } from "./platforms/index.mjs";
 
-const repository = path.dirname(clientRoot.replace(/\/$/, ""));
 const host = `${clientRoot}apps/host`;
 const ios = `${host}/ios`;
-const gems = `${repository}/.tools/gems`;
 const environment = {
     ...process.env,
     DEVELOPER_DIR:
         process.env.DEVELOPER_DIR ??
         "/Applications/Xcode.app/Contents/Developer",
-    GEM_HOME: gems,
-    GEM_PATH: gems,
-    BUNDLE_PATH: gems,
-    BUNDLE_GEMFILE: `${clientRoot}Gemfile`,
-    SKYNET_PLATFORM: "ios",
-    RCT_NEW_ARCH_ENABLED: "1",
 };
 const action = process.argv[2] ?? "build";
 async function run(executable, args, cwd = clientRoot, capture = false) {
@@ -36,32 +28,6 @@ async function run(executable, args, cwd = clientRoot, capture = false) {
                 : reject(Error(`${executable} exited ${code}`)),
         );
     });
-}
-const ruby = (args) => run(`${gems}/bin/bundle`, ["exec", "ruby", ...args]);
-async function install() {
-    const bundler = `${gems}/bin/bundle`;
-    try {
-        await access(bundler);
-    } catch {
-        await run("gem", [
-            "install",
-            "bundler",
-            "--version",
-            "2.4.22",
-            "--install-dir",
-            gems,
-            "--no-document",
-        ]);
-    }
-    await run(bundler, ["install"]);
-    await ruby([`${clientRoot}tooling/configure-ios.rb`]);
-    await ruby([
-        "-e",
-        'require "logger"; load Gem.bin_path("cocoapods", "pod")',
-        "--",
-        "install",
-        `--project-directory=${ios}`,
-    ]);
 }
 async function device() {
     const list = JSON.parse(
@@ -98,15 +64,7 @@ async function device() {
 try {
     if (!["install", "build", "dev", "test", "archive"].includes(action))
         throw Error(`未知 iOS 操作 ${action}`);
-    if (action === "install") {
-        await install();
-    } else {
-        try {
-            await access(`${ios}/Pods/Manifest.lock`);
-        } catch {
-            await install();
-        }
-        await ruby([`${clientRoot}tooling/configure-ios.rb`]);
+    if (action !== "install") {
         await run(process.execPath, [`${clientRoot}tooling/build-apps.mjs`]);
         const archive = action === "archive";
         const configuration = action === "test" ? "Debug" : "Release";
@@ -115,8 +73,8 @@ try {
         await run(
             "xcodebuild",
             [
-                "-workspace",
-                "SkynetHost.xcworkspace",
+                "-project",
+                "SkynetHost.xcodeproj",
                 "-scheme",
                 "SkynetHost-iOS",
                 "-configuration",
@@ -130,7 +88,7 @@ try {
                       ? "generic/platform=iOS"
                       : "generic/platform=iOS Simulator",
                 "-derivedDataPath",
-                "DerivedData",
+                "DerivedData/Workspace",
                 "-jobs",
                 "4",
                 ...(archive && process.env.SKYNET_APPLE_TEAM
@@ -146,7 +104,7 @@ try {
             ],
             ios,
         );
-        const app = `${ios}/DerivedData/Build/Products/${configuration}-iphonesimulator/Skynet Agent.app`;
+        const app = `${ios}/DerivedData/Workspace/Build/Products/${configuration}-iphonesimulator/Skynet Agent.app`;
         if (archive) {
             console.log(
                 process.env.SKYNET_APPLE_TEAM

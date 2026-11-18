@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access, cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -7,7 +7,6 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const repository = path.dirname(root.replace(/\/$/, ""));
 const host = `${root}apps/host`;
 const native = `${root}native`;
-const gems = `${repository}/.tools/gems`;
 const command = process.argv[2] ?? "build";
 const configuration = command === "test" ? "Debug" : "Release";
 const environment = {
@@ -16,11 +15,6 @@ const environment = {
         process.env.DEVELOPER_DIR ??
         "/Applications/Xcode.app/Contents/Developer",
     MACOSX_DEPLOYMENT_TARGET: "14.0",
-    GEM_HOME: gems,
-    GEM_PATH: gems,
-    BUNDLE_PATH: gems,
-    BUNDLE_GEMFILE: `${root}Gemfile`,
-    RCT_NEW_ARCH_ENABLED: "1",
 };
 async function run(executable, args, cwd = root, env = environment) {
     await new Promise((resolve, reject) => {
@@ -33,33 +27,7 @@ async function run(executable, args, cwd = root, env = environment) {
         );
     });
 }
-const bundler = `${gems}/bin/bundle`;
-const ruby = (args) => run(bundler, ["exec", "ruby", ...args]);
-
-if (command === "install") {
-    try {
-        await access(bundler);
-    } catch {
-        await run("gem", [
-            "install",
-            "bundler",
-            "--version",
-            "2.4.22",
-            "--install-dir",
-            gems,
-            "--no-document",
-        ]);
-    }
-    await run(bundler, ["install"]);
-    await ruby([
-        "-e",
-        'require "logger"; load Gem.bin_path("cocoapods", "pod")',
-        "--",
-        "install",
-        `--project-directory=${host}/macos`,
-    ]);
-    await ruby([`${root}tooling/configure-xcode.rb`]);
-} else {
+if (command !== "install") {
     const cBuild = `${native}/.build/c-core`;
     await run("make", [
         "-C",
@@ -79,18 +47,17 @@ if (command === "install") {
             configuration.toLowerCase(),
             ...swiftArgs,
         ]);
-        await ruby([`${root}tooling/configure-xcode.rb`]);
         await run(
             "xcodebuild",
             [
-                "-workspace",
-                "macos/SkynetHost.xcworkspace",
+                "-project",
+                "macos/SkynetHost.xcodeproj",
                 "-scheme",
                 "SkynetHost-macOS",
                 "-configuration",
                 configuration,
                 "-derivedDataPath",
-                "DerivedData",
+                "DerivedData/Workspace",
                 `ARCHS=${process.arch === "arm64" ? "arm64" : "x86_64"}`,
                 "ONLY_ACTIVE_ARCH=YES",
                 "CODE_SIGNING_ALLOWED=NO",
@@ -98,7 +65,7 @@ if (command === "install") {
             ],
             host,
         );
-        const app = `${host}/DerivedData/Build/Products/${configuration}/Skynet Agent.app`;
+        const app = `${host}/DerivedData/Workspace/Build/Products/${configuration}/Skynet Agent.app`;
         // Sign nested executables first; the source build is local and ad hoc.
         await run("codesign", [
             "--force",

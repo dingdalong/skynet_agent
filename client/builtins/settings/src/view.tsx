@@ -8,6 +8,10 @@ import {
     Card,
     Heading,
     HStack,
+    Grid,
+    Tab,
+    TabList,
+    AspectRatio,
     SegmentedControl,
     SegmentedControlItem,
     Switch,
@@ -19,7 +23,6 @@ import { AppBoundary, useAppSnapshot } from "@skynet/app-sdk/react";
 import type { AppSummary } from "@skynet/contracts";
 import type { State } from "./runtime";
 import "../../../packages/tokens/theme.css";
-import "./view.css";
 
 const sections = [
     ["appearance", "外观"],
@@ -63,23 +66,27 @@ function Settings() {
         }
     };
     return (
-        <div className="settings-layout">
-            <nav className="settings-navigation" aria-label="设置分类">
+        <VStack as="main" gap={0} minHeight="100dvh">
+            <TabList
+                aria-label="设置分类"
+                hasDivider
+                value={section}
+                onChange={(id) =>
+                    void run(() => app.command("navigate", { section: id }))
+                }
+            >
                 {sections.map(([id, label]) => (
-                    <Button
-                        key={id}
-                        label={label}
-                        variant={section === id ? "secondary" : "ghost"}
-                        aria-current={section === id ? "page" : undefined}
-                        onClick={() =>
-                            void run(() =>
-                                app.command("navigate", { section: id }),
-                            )
-                        }
-                    />
+                    <Tab key={id} value={id} label={label} aria-label={label} />
                 ))}
-            </nav>
-            <VStack as="main" className="settings-main" padding={4} gap={4}>
+            </TabList>
+            <VStack
+                as="section"
+                data-settings-content
+                width="100%"
+                maxWidth="56rem"
+                padding={4}
+                gap={4}
+            >
                 <Heading level={1}>
                     {sections.find(([id]) => id === section)?.[1]}
                 </Heading>
@@ -127,11 +134,17 @@ function Settings() {
                         {section === "wallpaper" && (
                             <VStack gap={3}>
                                 <Heading level={2}>选择壁纸</Heading>
-                                <div className="wallpaper-choices">
+                                <Grid
+                                    data-wallpaper-choices
+                                    columns={{ minWidth: 144, max: 3 }}
+                                    gap={3}
+                                >
                                     {wallpapers.map(([value, label]) => (
                                         <VStack gap={2} key={value}>
-                                            <div
-                                                className="wallpaper-preview"
+                                            <AspectRatio
+                                                ratio={2}
+                                                children={null}
+                                                data-wallpaper-preview
                                                 aria-hidden="true"
                                                 style={{
                                                     background: `var(--wallpaper-${value})`,
@@ -160,7 +173,7 @@ function Settings() {
                                             />
                                         </VStack>
                                     ))}
-                                </div>
+                                </Grid>
                             </VStack>
                         )}
                         {section === "motion" && (
@@ -284,7 +297,7 @@ function Settings() {
                     />
                 )}
             </VStack>
-        </div>
+        </VStack>
     );
 }
 

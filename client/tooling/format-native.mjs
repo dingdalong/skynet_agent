@@ -17,6 +17,7 @@ const child = spawn(
         `${root}native/apple/Sources`,
         `${root}native/apple/Tests`,
         `${root}apps/host/macos/SkynetHost-macOS`,
+        `${root}apps/host/apple`,
         `${root}apps/host/ios/SkynetHost`,
         `${root}apps/host/ios/SkynetHostTests`,
     ],

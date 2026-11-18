@@ -1,0 +1,159 @@
+import { useLayoutEffect, useState, useSyncExternalStore } from "react";
+import { createRoot } from "react-dom/client";
+import { Banner, Spinner, Theme } from "@astryxdesign/core";
+import { InternationalizationProvider } from "@astryxdesign/core/i18n";
+import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
+import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { createHostStore } from "../../../packages/host-bridge/src";
+import { Workspace } from "../../../packages/workspace/src/Workspace";
+import type { HostSnapshot } from "@skynet/contracts";
+import { tokens, hostTheme } from "@skynet/tokens";
+import "@astryxdesign/core/reset.css";
+import "@astryxdesign/core/astryx.css";
+import "@astryxdesign/theme-neutral/theme.css";
+import "../../../packages/tokens/theme.css";
+import "../../../packages/app-sdk/src/viewport.css";
+
+declare global {
+    interface Window {
+        webkit: {
+            messageHandlers: {
+                workspace: {
+                    postMessage(value: unknown): Promise<HostSnapshot | null>;
+                };
+            };
+        };
+    }
+}
+const post = (value: unknown) =>
+    window.webkit.messageHandlers.workspace.postMessage(value);
+const store = createHostStore({
+    async command(name, input) {
+        const next = await post({ kind: "command", name, input });
+        if (!next) throw Error("工作区未响应");
+        return next;
+    },
+    subscribe(accept) {
+        const listener = (event: Event) =>
+            accept((event as CustomEvent<HostSnapshot>).detail);
+        window.addEventListener("workspace:snapshot", listener);
+        void post({ kind: "initial" })
+            .then((next) => next && accept(next))
+            .catch(report);
+        return () => window.removeEventListener("workspace:snapshot", listener);
+    },
+});
+function report(error: unknown) {
+    window.dispatchEvent(
+        new CustomEvent("workspace:error", { detail: String(error) }),
+    );
+}
+function Shell() {
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [error, setError] = useState("");
+    useLayoutEffect(() => {
+        const fail = (event: Event) =>
+            setError((event as CustomEvent<string>).detail);
+        const surfaces = (event: Event) =>
+            setErrors((event as CustomEvent<Record<string, string>>).detail);
+        window.addEventListener("workspace:error", fail);
+        window.addEventListener("workspace:errors", surfaces);
+        return () => {
+            window.removeEventListener("workspace:error", fail);
+            window.removeEventListener("workspace:errors", surfaces);
+        };
+    }, []);
+    useLayoutEffect(() => {
+        if (!snapshot) return;
+        const preferences = snapshot.preferences;
+        document.documentElement.dataset.reduceMotion = String(
+            preferences.reduceMotion,
+        );
+        const media = matchMedia("(prefers-color-scheme: dark)");
+        const sync = () => {
+            const frames: Record<string, DOMRect> = {};
+            for (const slot of document.querySelectorAll<HTMLElement>(
+                "[data-app-slot]",
+            ))
+                frames[slot.dataset.appSlot!] = slot
+                    .getBoundingClientRect()
+                    .toJSON();
+            const dark =
+                preferences.appearance === "dark" ||
+                (preferences.appearance === "system" && media.matches);
+            const mode = dark ? "dark" : "light";
+            const desktop = snapshot.workspace.mode !== "apps";
+            const background = hostTheme[mode].background;
+            void post({
+                kind: "layout",
+                frames,
+                revision: snapshot.revision,
+                background,
+                chrome: desktop
+                    ? tokens.wallpapers[preferences.wallpaper][mode]
+                    : [background],
+                lightStatus: dark,
+            }).catch(report);
+        };
+        const observer = new ResizeObserver(sync);
+        const root = document.querySelector("#root")!;
+        const observe = () => {
+            observer.disconnect();
+            observer.observe(root);
+            root.querySelectorAll("[data-app-slot]").forEach((slot) =>
+                observer.observe(slot),
+            );
+            sync();
+        };
+        const mutation = new MutationObserver(observe);
+        mutation.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["data-app-slot", "style"],
+        });
+        observe();
+        media.addEventListener("change", sync);
+        return () => {
+            observer.disconnect();
+            mutation.disconnect();
+            media.removeEventListener("change", sync);
+        };
+    }, [snapshot]);
+    return (
+        <Theme
+            theme={neutralTheme}
+            mode={snapshot?.preferences.appearance ?? "system"}
+        >
+            <InternationalizationProvider
+                locale="zh-CN"
+                messages={{ "zh-CN": chinese }}
+            >
+                {error && (
+                    <Banner
+                        status="error"
+                        title="工作区操作失败"
+                        description={error}
+                    />
+                )}
+                {snapshot ? (
+                    <Workspace
+                        snapshot={snapshot}
+                        errors={errors}
+                        retry={(id) => {
+                            void post({ kind: "retry", id }).catch(report);
+                        }}
+                        execute={(name, input) => {
+                            setError("");
+                            void store.command(name, input).catch(report);
+                        }}
+                    />
+                ) : (
+                    <Spinner label="正在载入工作区" />
+                )}
+            </InternationalizationProvider>
+        </Theme>
+    );
+}
+createRoot(document.getElementById("root")!).render(<Shell />);

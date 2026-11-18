@@ -20,7 +20,6 @@
       "@skynet/app-sdk/react": ["./packages/app-sdk/src/react.tsx"],
       "@skynet/tokens": ["./packages/tokens/theme.ts"],
       "@skynet/workspace": ["./packages/workspace/src/Workspace.tsx"],
-      "@skynet/workspace/platform": ["./packages/workspace/src/platform.tsx"],
       "@skynet/host-bridge": ["./packages/host-bridge/src/index.ts"]
     }
   },

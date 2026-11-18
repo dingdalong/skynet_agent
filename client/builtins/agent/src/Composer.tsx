@@ -147,8 +147,8 @@ export function Composer({ state, send }: Props) {
         void send("draft.set", { target: state.selectedId, text });
     }
     return (
-        <form
-            className="agent-composer"
+        <VStack
+            as="form"
             onSubmit={(event) => {
                 event.preventDefault();
                 submit();
@@ -246,6 +246,6 @@ export function Composer({ state, send }: Props) {
                     />
                 }
             />
-        </form>
+        </VStack>
     );
 }

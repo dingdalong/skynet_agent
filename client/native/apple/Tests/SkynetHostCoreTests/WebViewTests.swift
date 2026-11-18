@@ -188,7 +188,7 @@ final class WebViewTests: XCTestCase {
         try await harness.capture(client.appendingPathComponent("test-artifacts/settings-webkit.png"))
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
         try await harness.until(
-            "getComputedStyle(document.querySelector('.settings-layout')).gridTemplateColumns.split(' ').length===1"
+            "document.querySelector('[data-settings-content]').clientWidth <= innerWidth"
         )
         let overflowing =
             try await harness.web.evaluateJavaScript("document.documentElement.scrollWidth > 420") as? Bool
@@ -201,14 +201,14 @@ final class WebViewTests: XCTestCase {
         XCTAssertEqual(harness.presentations[1]["section"] as? String, "壁纸")
         XCTAssertEqual(harness.presentations[1]["dark"] as? Bool, true)
         try await harness.until(
-            "window.__skynetInitialSnapshot.state.section==='wallpaper' && document.querySelector('.wallpaper-preview').style.background.includes('--wallpaper-')"
+            "window.__skynetInitialSnapshot.state.section==='wallpaper' && document.querySelector('[data-wallpaper-preview]').style.background.includes('--wallpaper-')"
         )
         harness.web.setFrameSize(NSSize(width: 240, height: 700))
         try await harness.until(
-            "getComputedStyle(document.querySelector('.wallpaper-choices')).gridTemplateColumns.split(' ').length===1"
+            "getComputedStyle(document.querySelector('[data-wallpaper-choices]')).gridTemplateColumns.split(' ').length===1"
         )
         try await harness.until(
-            "document.querySelector('.settings-main').scrollWidth <= document.querySelector('.settings-main').clientWidth"
+            "document.querySelector('[data-settings-content]').scrollWidth <= document.querySelector('[data-settings-content]').clientWidth"
         )
         try await harness.click("动态效果")
         try await harness.until("document.body.innerText.includes('减少动态效果')")
@@ -264,7 +264,7 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
             web.evaluateJavaScript(
                 """
                 ({dark: document.documentElement.dataset.theme==='dark',
-                  section: document.querySelector('[aria-current=page]')?.textContent.trim()})
+                  section: document.querySelector('[aria-current=true]')?.getAttribute('aria-label')})
                 """
             ) { [weak self] value, error in
                 XCTAssertNil(error)

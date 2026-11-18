@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { transform } from "esbuild";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const failures = [];
@@ -25,6 +26,20 @@ async function inspect(folder) {
         const isAgentClient = relative.startsWith("packages/agent-client/");
         const isWorkspace = relative.startsWith("packages/workspace/");
         const isBridge = relative.startsWith("packages/host-bridge/");
+        if (entry.name.endsWith(".tsx")) {
+            const { code } = await transform(source, {
+                loader: "tsx",
+                jsx: "transform",
+                jsxFactory: "auditElement",
+            });
+            const nativeTags = [
+                ...code.matchAll(/\bauditElement\(\s*"([^"]+)"/g),
+            ].map((match) => match[1]);
+            if (nativeTags.length)
+                failures.push(
+                    `${relative}: 使用 Astryx 官方组件替代直接绘制的 ${[...new Set(nativeTags)].join(", ")}`,
+                );
+        }
         const imports = [
             ...source.matchAll(
                 /(?:from\s*|import\s*|require\s*\(\s*)["']([^"']+)["']/g,
@@ -33,7 +48,7 @@ async function inspect(folder) {
         for (const name of imports) {
             if (
                 isBuiltin &&
-                (/^(node:|react-native|@skynet\/host)/.test(name) ||
+                (/^(node:|@skynet\/host)/.test(name) ||
                     name.includes("/builtins/"))
             )
                 failures.push(`${relative}: forbidden subapp import ${name}`);
@@ -66,14 +81,12 @@ async function inspect(folder) {
                 );
             if (
                 (isWorkspace || isBridge) &&
-                /^(react-native-macos|react-native-windows|@skynet\/app-sdk|node:)|apps\/host|builtins\//.test(
-                    name,
-                )
+                /^(@skynet\/app-sdk|node:)|apps\/host|builtins\//.test(name)
             )
                 failures.push(
                     `${relative}: shared layer imports platform or subapp code ${name}`,
                 );
-            if (isBridge && /^(react|react-native)(\/|$)/.test(name))
+            if (isBridge && /^react(-dom)?(\/|$)/.test(name))
                 failures.push(
                     `${relative}: transport store must not depend on a UI runtime`,
                 );

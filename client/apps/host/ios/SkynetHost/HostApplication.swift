@@ -1,6 +1,3 @@
-import React
-import ReactAppDependencyProvider
-import React_RCTAppDelegate
 import SkynetHostCore
 import UIKit
 
@@ -12,8 +9,6 @@ enum HostServices {
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     private(set) var core: HostCore!
-    private var factory: RCTReactNativeFactory?
-    private var reactDelegate: ReactNativeDelegate?
     private weak var workspaceController: WorkspaceController?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
@@ -28,18 +23,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                 dataRoot: root, builtins: Bundle.main.resourceURL!.appendingPathComponent("builtins"))
         } catch { fatalError("HostCore initialization failed: \(error)") }
         HostServices.delegate = self
-        let delegate = ReactNativeDelegate()
-        delegate.dependencyProvider = NativeDependencies()
-        let factory = RCTReactNativeFactory(delegate: delegate)
-        reactDelegate = delegate
-        self.factory = factory
         return true
     }
 
     func connect(_ windowScene: UIWindowScene) -> UIWindow {
         let controller = WorkspaceController()
         workspaceController = controller
-        controller.content = factory!.rootViewFactory.view(withModuleName: "SkynetHost")
+        controller.content = WorkspaceHost(frame: .zero)
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = controller
         window.makeKeyAndVisible()
@@ -149,23 +139,5 @@ private final class WorkspaceController: UIViewController {
         chrome.endPoint = CGPoint(x: 1, y: 1)
         lightStatus = lightContent
         setNeedsStatusBarAppearanceUpdate()
-    }
-}
-
-private final class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
-    override func sourceURL(for bridge: RCTBridge) -> URL? { bundleURL() }
-    override func bundleURL() -> URL? {
-        #if DEBUG
-            if ProcessInfo.processInfo.environment["SKYNET_METRO"] == "1" {
-                return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
-            }
-        #endif
-        return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
-    }
-}
-
-private final class NativeDependencies: RCTAppDependencyProvider {
-    override func imageURLLoaderClassNames() -> [String] {
-        super.imageURLLoaderClassNames() + ["SkynetSymbolLoader"]
     }
 }

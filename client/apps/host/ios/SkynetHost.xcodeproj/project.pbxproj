@@ -10,17 +10,13 @@
 		2AEE5E8D73440E2DE2031371 /* EmbeddedRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B7AA3F66C3EC732EDA4ED9 /* EmbeddedRuntimeTests.swift */; };
 		3F9D01C0E5C9810761A0D931 /* HostApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18241E2725CF1B4870A71F41 /* HostApplication.swift */; };
 		5B777C8A6E62FBC85AE0802F /* AppSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75751119864FBF025218EE5 /* AppSurface.swift */; };
-		6550102F448E235FED8DFBA5 /* HostBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDE271BFB5AF284C5E5BA616 /* HostBridge.swift */; };
-		6BE44AB644790087F107C1B5 /* libPods-SkynetHost-iOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FD7930DA26174758C71DB50E /* libPods-SkynetHost-iOS.a */; };
 		7814248F0818E37404BFF87C /* MobileHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507C74B5778D071CD30964F9 /* MobileHostTests.swift */; };
-		79431C468FEB9D32604A4AE3 /* SymbolLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = F7301C4DD63DD5AEC44C246C /* SymbolLoader.m */; };
+		831E002D53A91633037C768C /* WorkspaceHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D1834638B0A1E42EC176E2 /* WorkspaceHost.swift */; };
 		9BDB199854F2FFB804FD02D3 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 669612F76AF6F1F5059CA15D /* Foundation.framework */; };
 		B3E8DA4F04A8119AC978A7E0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 157AB2E3690DC0A941627272 /* Assets.xcassets */; };
 		C462ABD0E25F95EA2A6BB809 /* SkynetHostCore in Frameworks */ = {isa = PBXBuildFile; productRef = D4B53CD6BB6743AB0EF6A4CD /* SkynetHostCore */; };
 		CBAECF02703E0174AEF6FE9B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DA531631E127C5AEADF4FE4B /* PrivacyInfo.xcprivacy */; };
 		DF5F47F71B21377444498EA7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 669612F76AF6F1F5059CA15D /* Foundation.framework */; };
-		F496115049ACBD7D7BEC3703 /* Exports.m in Sources */ = {isa = PBXBuildFile; fileRef = 6E4CF0807553CFE51C986ACF /* Exports.m */; };
-		FABCABB5C583870AFC2C38F5 /* libPods-SkynetHostTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BA7A27E5C4A76B7D984029EC /* libPods-SkynetHostTests.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,21 +33,13 @@
 		157AB2E3690DC0A941627272 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		18241E2725CF1B4870A71F41 /* HostApplication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostApplication.swift; sourceTree = "<group>"; };
 		18B7AA3F66C3EC732EDA4ED9 /* EmbeddedRuntimeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmbeddedRuntimeTests.swift; path = ../../../../native/apple/Tests/SkynetHostCoreTests/EmbeddedRuntimeTests.swift; sourceTree = "<group>"; };
-		48186AD27FF9185154F6AF3F /* Pods-SkynetHostTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHostTests.debug.xcconfig"; path = "Target Support Files/Pods-SkynetHostTests/Pods-SkynetHostTests.debug.xcconfig"; sourceTree = "<group>"; };
+		40D1834638B0A1E42EC176E2 /* WorkspaceHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceHost.swift; sourceTree = "<group>"; };
 		507C74B5778D071CD30964F9 /* MobileHostTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileHostTests.swift; sourceTree = "<group>"; };
 		5D5BAF29A459520D4FA4B391 /* Skynet Agent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Skynet Agent.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		669612F76AF6F1F5059CA15D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		66BC904F6EAEEEE5EF0FDF3E /* Pods-SkynetHost-iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHost-iOS.debug.xcconfig"; path = "Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS.debug.xcconfig"; sourceTree = "<group>"; };
-		6E4CF0807553CFE51C986ACF /* Exports.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = Exports.m; sourceTree = "<group>"; };
-		BA7A27E5C4A76B7D984029EC /* libPods-SkynetHostTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SkynetHostTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		CDE271BFB5AF284C5E5BA616 /* HostBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostBridge.swift; sourceTree = "<group>"; };
 		DA531631E127C5AEADF4FE4B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		E2B660E6DCBB055207CF85C1 /* Pods-SkynetHostTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHostTests.release.xcconfig"; path = "Target Support Files/Pods-SkynetHostTests/Pods-SkynetHostTests.release.xcconfig"; sourceTree = "<group>"; };
 		E8B9043CAFCD9D69B564A1C3 /* SkynetHostTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SkynetHostTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		F5E76AE2A79E5964372E2A5B /* Pods-SkynetHost-iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHost-iOS.release.xcconfig"; path = "Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS.release.xcconfig"; sourceTree = "<group>"; };
-		F7301C4DD63DD5AEC44C246C /* SymbolLoader.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SymbolLoader.m; sourceTree = "<group>"; };
 		F75751119864FBF025218EE5 /* AppSurface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSurface.swift; sourceTree = "<group>"; };
-		FD7930DA26174758C71DB50E /* libPods-SkynetHost-iOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SkynetHost-iOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,7 +48,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				9BDB199854F2FFB804FD02D3 /* Foundation.framework in Frameworks */,
-				FABCABB5C583870AFC2C38F5 /* libPods-SkynetHostTests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,7 +57,6 @@
 			files = (
 				DF5F47F71B21377444498EA7 /* Foundation.framework in Frameworks */,
 				C462ABD0E25F95EA2A6BB809 /* SkynetHostCore in Frameworks */,
-				6BE44AB644790087F107C1B5 /* libPods-SkynetHost-iOS.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,15 +72,13 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		32C206E88488B2C855D39360 /* Pods */ = {
+		A8826E300B4E28CC5B5C6B1E /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
-				F5E76AE2A79E5964372E2A5B /* Pods-SkynetHost-iOS.release.xcconfig */,
-				66BC904F6EAEEEE5EF0FDF3E /* Pods-SkynetHost-iOS.debug.xcconfig */,
-				E2B660E6DCBB055207CF85C1 /* Pods-SkynetHostTests.release.xcconfig */,
-				48186AD27FF9185154F6AF3F /* Pods-SkynetHostTests.debug.xcconfig */,
+				40D1834638B0A1E42EC176E2 /* WorkspaceHost.swift */,
 			);
-			path = Pods;
+			name = Workspace;
+			path = ../apple;
 			sourceTree = "<group>";
 		};
 		B1B80D8539B8B28077A64013 /* iOS */ = {
@@ -109,11 +93,8 @@
 			isa = PBXGroup;
 			children = (
 				18241E2725CF1B4870A71F41 /* HostApplication.swift */,
-				CDE271BFB5AF284C5E5BA616 /* HostBridge.swift */,
 				F75751119864FBF025218EE5 /* AppSurface.swift */,
-				6E4CF0807553CFE51C986ACF /* Exports.m */,
 				DA531631E127C5AEADF4FE4B /* PrivacyInfo.xcprivacy */,
-				F7301C4DD63DD5AEC44C246C /* SymbolLoader.m */,
 				157AB2E3690DC0A941627272 /* Assets.xcassets */,
 			);
 			path = SkynetHost;
@@ -132,8 +113,6 @@
 			isa = PBXGroup;
 			children = (
 				B1B80D8539B8B28077A64013 /* iOS */,
-				FD7930DA26174758C71DB50E /* libPods-SkynetHost-iOS.a */,
-				BA7A27E5C4A76B7D984029EC /* libPods-SkynetHostTests.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -144,8 +123,8 @@
 				03927D763339870095399FE1 /* Products */,
 				D9BA151D9FE5CF1BC051BF3F /* Frameworks */,
 				C41571312801BC895BF39A85 /* SkynetHost */,
-				32C206E88488B2C855D39360 /* Pods */,
 				C5743A783A47A945DBE1FC96 /* SkynetHostTests */,
+				A8826E300B4E28CC5B5C6B1E /* Workspace */,
 			);
 			sourceTree = "<group>";
 		};
@@ -156,14 +135,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 57253664939DE71BC4EC0654 /* Build configuration list for PBXNativeTarget "SkynetHost-iOS" */;
 			buildPhases = (
-				6852DE7EAAD6EDCD7F98D713 /* [CP] Check Pods Manifest.lock */,
 				878A0ED7EE02DB615F93F3CB /* Sources */,
 				F431B5F5E3E5C82630440FD2 /* Frameworks */,
 				AE0E6B6A6E96AEC2B05CB10E /* Resources */,
-				9C259A90B401090A4141445F /* Bundle React Native code and images */,
 				2A6C5912F072AF6A7E13A900 /* Copy Skynet applications */,
-				AD47010AC1F9264C968CF984 /* [CP] Embed Pods Frameworks */,
-				61D4E18BBF70EFE00DAB4704 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -181,7 +156,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = B69A4F316590C467AF569C41 /* Build configuration list for PBXNativeTarget "SkynetHostTests" */;
 			buildPhases = (
-				7F101223085743C54911F3B1 /* [CP] Check Pods Manifest.lock */,
 				6CFA7A79F73B205267E23D4B /* Sources */,
 				C7CDAF0BFFA86064384B3F74 /* Frameworks */,
 				2583049BE91E85899E6002AE /* Resources */,
@@ -265,114 +239,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/builtins\"\nrsync -a --delete \"$SRCROOT/../../../dist/builtins/\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/builtins/\"\n";
-		};
-		61D4E18BBF70EFE00DAB4704 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS-resources.sh",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/boost/boost_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/glog/glog_privacy.bundle",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/boost_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/glog_privacy.bundle",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		6852DE7EAAD6EDCD7F98D713 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-SkynetHost-iOS-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		7F101223085743C54911F3B1 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-SkynetHostTests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		9C259A90B401090A4141445F /* Bundle React Native code and images */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Bundle React Native code and images";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "export NODE_BINARY=node\nexport FORCE_BUNDLING=1\nexport SKYNET_PLATFORM=ios\nexport RCT_METRO_PORT=8081\n\"$SRCROOT/../../../node_modules/react-native/scripts/react-native-xcode.sh\"\n";
-		};
-		AD47010AC1F9264C968CF984 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermesvm.framework/hermesvm",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermesvm.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SkynetHost-iOS/Pods-SkynetHost-iOS-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
+			shellScript = "set -eu\nfor folder in builtins workspace; do\n  mkdir -p \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$folder\"\n  rsync -a --delete \"$SRCROOT/../../../dist/$folder/\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$folder/\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -391,10 +258,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				3F9D01C0E5C9810761A0D931 /* HostApplication.swift in Sources */,
-				6550102F448E235FED8DFBA5 /* HostBridge.swift in Sources */,
 				5B777C8A6E62FBC85AE0802F /* AppSurface.swift in Sources */,
-				F496115049ACBD7D7BEC3703 /* Exports.m in Sources */,
-				79431C468FEB9D32604A4AE3 /* SymbolLoader.m in Sources */,
+				831E002D53A91633037C768C /* WorkspaceHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -412,7 +277,6 @@
 /* Begin XCBuildConfiguration section */
 		3658689AED463936B142DFD6 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 48186AD27FF9185154F6AF3F /* Pods-SkynetHostTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -431,7 +295,6 @@
 		};
 		551117FBAE0739915872E5D4 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F5E76AE2A79E5964372E2A5B /* Pods-SkynetHost-iOS.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -516,18 +379,15 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
-				USE_HERMES = true;
 			};
 			name = Release;
 		};
 		B2EBCCF30A63CFB3A6743784 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E2B660E6DCBB055207CF85C1 /* Pods-SkynetHostTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -547,7 +407,6 @@
 		};
 		C3BA2C9FA4933099C8688A6B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 66BC904F6EAEEEE5EF0FDF3E /* Pods-SkynetHost-iOS.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -638,12 +497,10 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				USE_HERMES = true;
 			};
 			name = Debug;
 		};

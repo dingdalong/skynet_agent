@@ -22,7 +22,7 @@ Verified · Seen: 2× (2026-11-06, 2026-11-10)
 
 ### L-046 验证签名时检查整个 macOS App bundle
 
-可执行文件的签名不覆盖所有资源。对实际产物执行 `codesign --verify --deep --strict`，随后使用 L-095 的启动检查。 [configure-xcode.rb](../../client/tooling/configure-xcode.rb)、[macos.mjs](../../client/tooling/macos.mjs)
+可执行文件的签名不覆盖所有资源。对实际产物执行 `codesign --verify --deep --strict`，随后使用 L-095 的启动检查。 [macos.mjs](../../client/tooling/macos.mjs)
 
 Verified · Seen: 1× (2026-11-07)
 
@@ -54,7 +54,7 @@ Verified · Seen: 1× (2026-11-13)
 
 ### L-094 用完整的新目录替换带摘要的内置资源
 
-叠加复制会留下旧哈希文件，导致清单与实际内容不符。从已有旧资源的产物更新，再启动并校验包。 [copy-resources.mjs](../../client/tooling/copy-resources.mjs)、[configure-ios.rb](../../client/tooling/configure-ios.rb)
+叠加复制会留下旧哈希文件，导致清单与实际内容不符。从已有旧资源的产物更新，再启动并校验包。 [copy-resources.mjs](../../client/tooling/copy-resources.mjs)
 
 Verified · Seen: 1× (2026-11-13)
 
@@ -62,7 +62,7 @@ Verified · Seen: 1× (2026-11-13)
 
 ### L-095 直接启动新构建且已完成本地签名的 App
 
-dyld 对嵌入框架的校验发生在启动时。本地构建需从产物验证启动和界面，发行签名、Hardened Runtime 与公证按发行流程另验。 [configure-xcode.rb](../../client/tooling/configure-xcode.rb)、[编码与协作规范.md](../../client/编码与协作规范.md)
+dyld 对嵌入框架的校验发生在启动时。本地构建需从产物验证启动和界面，发行签名、Hardened Runtime 与公证按发行流程另验。 [编码与协作规范.md](../../client/编码与协作规范.md)
 
 Verified · Seen: 1× (2026-11-13)
 
@@ -86,7 +86,7 @@ Verified · Seen: 1× (2026-11-13)
 
 ### L-099 先隔离平台依赖，再开放平台构建入口
 
-共享工作区只依赖标准 RN 能力，由平台注入视图与桥接。逐平台核对宿主、运行时与隔离能力，再启用对应构建。 [CLIENT_PLATFORMS.md](../../docs/architecture/CLIENT_PLATFORMS.md)、[platforms.test.ts](../../client/tooling/platforms.test.ts)
+逐平台核对宿主、运行时与隔离能力，再启用对应构建。 [CLIENT_PLATFORMS.md](../../docs/architecture/CLIENT_PLATFORMS.md)、[platforms.test.ts](../../client/tooling/platforms.test.ts)
 
 Verified · Seen: 1× (2026-11-13)
 
@@ -94,7 +94,7 @@ Verified · Seen: 1× (2026-11-13)
 
 ### L-100 Swift 包增加 C/C++ 依赖时验证最终 Xcode 工程
 
-Swift 模块的外部消费者也需要头文件和 module map。用实际 App 工程编译导入路径。 [module.modulemap](../../client/native/core/include/module.modulemap)、[configure-xcode.rb](../../client/tooling/configure-xcode.rb)
+Swift 模块的外部消费者也需要头文件和 module map。用实际 App 工程编译导入路径。 [module.modulemap](../../client/native/core/include/module.modulemap)
 
 Verified · Seen: 1× (2026-11-13)
 
@@ -106,19 +106,11 @@ Verified · Seen: 1× (2026-11-13)
 
 Verified · Seen: 1× (2026-11-13)
 
-<a id="l-110"></a>
-
-### L-110 Fabric 自定义图像加载器要在 iOS 宿主注册
-
-通过依赖提供者注册原生 loader，在实际宿主用标准 Image 验证符号加载。 [SymbolLoader.m](../../client/apps/host/ios/SkynetHost/SymbolLoader.m)、[HostApplication.swift](../../client/apps/host/ios/SkynetHost/HostApplication.swift)
-
-Verified · Seen: 1× (2026-11-14)
-
 <a id="l-111"></a>
 
 ### L-111 Hosted 测试复用 App 已链接的静态核心
 
-同一静态核心被装入两次会产生类型或运行时身份冲突。设置 `TEST_HOST`、`BUNDLE_LOADER` 和模块搜索路径，再从测试 bundle 使用宿主实现。 [configure-ios.rb](../../client/tooling/configure-ios.rb)、[MobileHostTests.swift](../../client/apps/host/ios/SkynetHostTests/MobileHostTests.swift)
+同一静态核心被装入两次会产生类型或运行时身份冲突。设置 `TEST_HOST`、`BUNDLE_LOADER` 和模块搜索路径，再从测试 bundle 使用宿主实现。 [MobileHostTests.swift](../../client/apps/host/ios/SkynetHostTests/MobileHostTests.swift)
 
 Verified · Seen: 1× (2026-11-14)
 
@@ -126,6 +118,6 @@ Verified · Seen: 1× (2026-11-14)
 
 ### L-112 最低平台版本同时满足原生框架和系统 WebKit
 
-检查 RN、Swift 包、WebView 及共享 CSS 的能力边界，再同步工程生成配置和平台支持文档。 [CLIENT_PLATFORMS.md](../../docs/architecture/CLIENT_PLATFORMS.md)、[Package.swift](../../client/native/Package.swift)、[Podfile](../../client/apps/host/ios/Podfile)
+检查 Swift 包、WebView 及官方组件的最低系统要求，再同步 Xcode 工程和平台支持文档。 [CLIENT_PLATFORMS.md](../../docs/architecture/CLIENT_PLATFORMS.md)、[Package.swift](../../client/native/Package.swift)
 
 Verified · Seen: 1× (2026-11-14)
