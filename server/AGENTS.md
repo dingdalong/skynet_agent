@@ -8,7 +8,7 @@
 
 ## 技术与架构
 
-- 服务端基于 Skynet 框架，使用 Lua 5.5 开发，使用 Sumneko 风格注释代码。
+- 服务端基于 Skynet 框架，使用 Lua 5.5 开发，使用 Sumneko 风格为字段、函数、关键步骤补充中文注释。
 - Lua 模块是否支持热更新，按[热更新编码规范](编码与协作规范.md#热更新编码规范)确认。
 - 服务生命周期、连接、会话与工具执行的架构见[网关架构](../docs/architecture/AGENT_GATEWAY.md)，
   环境与配置入口见[配置说明](../docs/CONFIGURATION.md)。
