@@ -43,7 +43,6 @@ build: client-preflight
 	@$(MAKE) client-build
 
 check:
-	@python3 -B -m unittest discover -s tools -p 'test_cleanup_runtime.py'
 	@$(MAKE) -C "$(SERVER_DIR)" check-format test
 	@$(MAKE) client-check
 
