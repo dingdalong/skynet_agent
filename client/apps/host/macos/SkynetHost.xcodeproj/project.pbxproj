@@ -9,25 +9,13 @@
 /* Begin PBXBuildFile section */
 		35D2350EEA35496EA0CDB6F6 /* AppSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A976B687968F64DC3F5259 /* AppSurface.swift */; };
 		514201522437B4B40078DB4F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 514201512437B4B40078DB4F /* Assets.xcassets */; };
-		535CFFE50F0518838D4F1792 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF9A42EF9EF02F3C233A1452 /* Cocoa.framework */; };
 		583254010231A97C4F63B238 /* HostBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9A8CEDFAADC2B06912EBB5 /* HostBridge.swift */; };
 		5D4E5CA1466601EF65196467 /* libPods-SkynetHost-macOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */; };
 		7BD7361BB4908E4B614B5DF3 /* WorkspaceScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0771FE44B9C49E64382AC4DF /* WorkspaceScene.swift */; };
 		82528B3C8E8E0B64C252B5FE /* Exports.m in Sources */ = {isa = PBXBuildFile; fileRef = 1DC700400FEF9106C22E7936 /* Exports.m */; };
-		8EA7CEA27B42F77BA47595FD /* WorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69710469EE7D0B934F59B626 /* WorkspaceTests.swift */; };
 		BA5AD4AC31B7A9BA3E486D3C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3C284659A2C462490B7C0179 /* PrivacyInfo.xcprivacy */; };
 		C524B4C17C92B1AAEF0DC38F /* HostApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F921CA5256F05561EEEE5196 /* HostApplication.swift */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		A2DE4A4302E6F17577AE6F0A /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 514201482437B4B30078DB4F;
-			remoteInfo = "SkynetHost-macOS";
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0771FE44B9C49E64382AC4DF /* WorkspaceScene.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceScene.swift; sourceTree = "<group>"; };
@@ -39,11 +27,8 @@
 		514201492437B4B30078DB4F /* SkynetHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SkynetHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		514201512437B4B40078DB4F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		514201562437B4B40078DB4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		69710469EE7D0B934F59B626 /* WorkspaceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceTests.swift; sourceTree = "<group>"; };
-		9A2B6CF4C7DBD705C4FAC871 /* SkynetHostUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SkynetHostUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SkynetHost-macOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA9A8CEDFAADC2B06912EBB5 /* HostBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostBridge.swift; sourceTree = "<group>"; };
-		CF9A42EF9EF02F3C233A1452 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		E87AF2C8B6E378C7EB500651 /* Pods-SkynetHost-macOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SkynetHost-macOS.debug.xcconfig"; path = "Target Support Files/Pods-SkynetHost-macOS/Pods-SkynetHost-macOS.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F921CA5256F05561EEEE5196 /* HostApplication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostApplication.swift; sourceTree = "<group>"; };
@@ -58,14 +43,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6E69B5FCAC7F143F623D33DC /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				535CFFE50F0518838D4F1792 /* Cocoa.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -74,7 +51,6 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				9DFB4F6713A3436A29240A32 /* libPods-SkynetHost-macOS.a */,
-				6F8D7050D3DE577D9615AD98 /* OS X */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -93,14 +69,6 @@
 			path = "SkynetHost-macOS";
 			sourceTree = "<group>";
 		};
-		6F8D7050D3DE577D9615AD98 /* OS X */ = {
-			isa = PBXGroup;
-			children = (
-				CF9A42EF9EF02F3C233A1452 /* Cocoa.framework */,
-			);
-			name = "OS X";
-			sourceTree = "<group>";
-		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
@@ -117,7 +85,6 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				3C284659A2C462490B7C0179 /* PrivacyInfo.xcprivacy */,
 				A0AEFE25DB2969F8FB45A673 /* Pods */,
-				C9E88CBE7888E3318EFCA580 /* SkynetHostUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -129,7 +96,6 @@
 			children = (
 				13B07F961A680F5B00A75B9A /* SkynetHost.app */,
 				514201492437B4B30078DB4F /* SkynetHost.app */,
-				9A2B6CF4C7DBD705C4FAC871 /* SkynetHostUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -142,15 +108,6 @@
 			);
 			name = Pods;
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		C9E88CBE7888E3318EFCA580 /* SkynetHostUITests */ = {
-			isa = PBXGroup;
-			children = (
-				69710469EE7D0B934F59B626 /* WorkspaceTests.swift */,
-			);
-			name = SkynetHostUITests;
-			path = SkynetHostUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -177,24 +134,6 @@
 			productName = SkynetHost;
 			productReference = 514201492437B4B30078DB4F /* SkynetHost.app */;
 			productType = "com.apple.product-type.application";
-		};
-		C021603056A0556494A9FD03 /* SkynetHostUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 375F0C39678FC631A04D2176 /* Build configuration list for PBXNativeTarget "SkynetHostUITests" */;
-			buildPhases = (
-				B298DBC92FB4D10E42F808D2 /* Sources */,
-				6E69B5FCAC7F143F623D33DC /* Frameworks */,
-				02E50305EC17E0ABE24BF349 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				784E11C73BD2C97E4D18703F /* PBXTargetDependency */,
-			);
-			name = SkynetHostUITests;
-			productName = SkynetHostUITests;
-			productReference = 9A2B6CF4C7DBD705C4FAC871 /* SkynetHostUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -226,19 +165,11 @@
 			projectRoot = "";
 			targets = (
 				514201482437B4B30078DB4F /* SkynetHost-macOS */,
-				C021603056A0556494A9FD03 /* SkynetHostUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		02E50305EC17E0ABE24BF349 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		514201472437B4B30078DB4F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -368,24 +299,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B298DBC92FB4D10E42F808D2 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				8EA7CEA27B42F77BA47595FD /* WorkspaceTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		784E11C73BD2C97E4D18703F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = "SkynetHost-macOS";
-			target = 514201482437B4B30078DB4F /* SkynetHost-macOS */;
-			targetProxy = A2DE4A4302E6F17577AE6F0A /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5142015B2437B4B40078DB4F /* Debug */ = {
@@ -586,50 +500,9 @@
 			};
 			name = Release;
 		};
-		83F7C123A846F7915C073021 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.skynet.agent.uitests;
-				PRODUCT_MODULE_NAME = SkynetHostUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "SkynetHost-macOS";
-			};
-			name = Debug;
-		};
-		D3B4E6416D6BE1488FF2BB96 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.skynet.agent.uitests;
-				PRODUCT_MODULE_NAME = SkynetHostUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "SkynetHost-macOS";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		375F0C39678FC631A04D2176 /* Build configuration list for PBXNativeTarget "SkynetHostUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D3B4E6416D6BE1488FF2BB96 /* Release */,
-				83F7C123A846F7915C073021 /* Debug */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		5142015A2437B4B40078DB4F /* Build configuration list for PBXNativeTarget "SkynetHost-macOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

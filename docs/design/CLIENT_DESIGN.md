@@ -123,5 +123,5 @@ Enter 发送、Shift + Enter 换行，输入法组合期间不发送。生成中
 分别检查普通窗口、窄窗口和双应用分屏；验证屏幕阅读器标签、键盘等效入口与减少动态效果。
 打开卡顿使用实际 Release App 的性能采样定位，并在相同操作下复测；
 CPU 采样和静态截图不能作为帧率测量结果。
-`make client-check` 验证类型、令牌、导入边界和逻辑；`make client-e2e` 验证原生流程。
+`make client-check` 验证类型、令牌、导入边界和逻辑。原生交互使用 Computer Use 在最新本地 App 上验收。
 截图只用于人工查看与排查，写入 `client/test-artifacts/`，不维护像素基线。

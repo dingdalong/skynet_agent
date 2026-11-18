@@ -1331,13 +1331,10 @@
 
 - 类型：Pitfall
 - 状态：Verified
-- 范围：Computer Use、macOS XCUITest、自动验收入口
-- 触发：Computer Use 失败后静默切换 XCUITest，用户无法同时使用鼠标。
-- 根因：两种工具的前台输入影响不同，不能只根据都能操作 UI 就互相替代。
-- 解法：XCUITest 入口默认拒绝，需先说明影响并安排用户确认的测试时段；
-  显式开关及 preflight 在构建和 UI 启动前检查。
-- 证据：默认脚本和 Make 入口退出 2，显式启用的 preflight 退出 0，均未启动 UI。
-- Done right：工具不可用时保留未验收项；不得自行启用前台输入开关。
+- 范围：macOS 界面验收
+- 触发：后台操作失败后切换到前台输入，占用了用户的鼠标。
+- 根因：应用访问权限与桌面输入权限是两种授权。
+- 解法：使用 Computer Use 操作本地 App，工具不可用时记录未验收的界面流程。
 - Seen: 1× (2026-11-13; task: 20261113T120000-native-subapp-host.md)
 
 ### L-097: 插件启用后的服务配置需要由新 MCP 进程加载
@@ -1426,7 +1423,7 @@
 - 根因：防休眠不授予锁屏 GUI 操作能力；此前 cgWindowNotFound 的唯一原因未复现确认。
 - 解法：按官方文档在 ChatGPT 设置的 Computer Use 中单独启用 Locked use，
   由用户完成系统插件授权；锁屏后从连接设备发起实际 Computer Use 任务验证。
-  未开启或无法使用时保留 GUI 验收缺口，不自动改用前台 XCUITest。
+  未开启或无法使用时记录待验收的界面流程。
 - 证据：2026-11-13 官方 learn.chatgpt.com/docs/computer-use 的 Locked use 说明；
   用户回来后正常 API 直接恢复最终 App 窗口读取与后台操作，无需重装或重新配置。
 - Done right：区分已观察的恢复、未确认的原因与尚未运行的锁屏测试；不关闭用户锁屏保护来代替功能授权。

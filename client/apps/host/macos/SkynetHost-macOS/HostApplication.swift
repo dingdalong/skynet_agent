@@ -45,13 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var appearanceObservation: UUID?
     override init() {
         let resources = Bundle.main.resourceURL!
-        let dataRoot: URL
-        if let path = ProcessInfo.processInfo.environment["SKYNET_DATA_ROOT"] {
-            dataRoot = URL(fileURLWithPath: path)
-        } else {
-            dataRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Skynet Agent")
-        }
+        let dataRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Skynet Agent")
         do {
             core = try HostCore(
                 dataRoot: dataRoot, builtins: resources.appendingPathComponent("builtins"),

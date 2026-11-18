@@ -20,8 +20,7 @@ tooling/           构建、打包、架构检查、原生验收与应用模板
 ```
 
 在项目根目录运行 `make install`、`make dev` 和 `make client-check`。
-原生 UI 测试会占用当前桌面的鼠标、键盘，安排空闲时段后使用
-`SKYNET_FOREGROUND_UI_TESTS=1 make client-e2e`。
+界面验收使用 Computer Use 操作最新本地 App；`make check-full` 运行自动化回归。
 `make client-build` 的产物位于 `client/dist/macos/Skynet Agent.app`，当前为本机架构和本地签名；
 公证、发布签名另行接入。
 

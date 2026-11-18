@@ -143,8 +143,7 @@ Web worker 或错误边界不能描述成与 macOS 进程及沙盒相同的隔�
 `make client-check` 检查格式、类型、令牌、依赖边界、几何规则及原生集成。
 `make client-test` 使用实际 JSC helper 和回环 WebSocket 检查串行状态、界面重订阅、
 连接身份、超时、崩溃、内存、权限、更新、存储失败和取消后迟到结果。
-安排前台测试时段后，`SKYNET_FOREGROUND_UI_TESTS=1 make client-e2e` 构建最新 macOS App，
-执行 XCUITest 验证原生工作区和 WebView 交互。该测试会占用鼠标、键盘，不能作为后台 Computer Use。
+使用 Computer Use 在最新本地 macOS App 上验收原生工作区和 WebView 交互。
 这些检查不等于真实聊天和其他平台已验收。
 
 原生错误写入统一日志并带应用身份；业务异常保留 JSC 错误，监督器报告超时、退出或内存原因。

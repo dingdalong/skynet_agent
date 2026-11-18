@@ -76,8 +76,8 @@ CI 的 `client-core.yml` 提供 macOS、Linux、Windows 编译测试矩阵；未
 `make install PLATFORM=ios` 安装锁定的依赖并生成 iOS 工程。
 `make client-dev PLATFORM=ios` 构建并启动模拟器；`SKYNET_IOS_DEVICE` 可指定设备名称或 UDID。
 `make client-build PLATFORM=ios` 生成 `client/dist/ios-simulator/Skynet Agent.app`，
-同一包支持 iPhone 与 iPad。`make client-test PLATFORM=ios` 运行当前模拟器的非 UI 原生集成测试，
-不会运行接管桌面输入的 XCUITest。实际交互另用后台 Computer Use 验收。
+同一包支持 iPhone 与 iPad。`make client-test PLATFORM=ios` 运行当前模拟器的原生集成测试。
+实际交互使用 Computer Use 验收。
 
 `make client-archive PLATFORM=ios` 生成 `client/dist/ios/Skynet Agent.xcarchive`；
 默认未签名。配置 `SKYNET_APPLE_TEAM` 后使用本机已有开发团队与签名配置，

@@ -35,33 +35,8 @@ target.build_configurations.each do |config|
     config.build_settings["OTHER_LDFLAGS"] = ["$(inherited)", "-lSkynetHostCore", "-lagent_runtime", "-lc++", "-framework", "WebKit", "-framework", "JavaScriptCore"]
     config.build_settings["SWIFT_VERSION"] = "5.0"
 end
-tests = project.targets.find { |item| item.name == "SkynetHostUITests" } ||
-    project.new_target(:ui_test_bundle, "SkynetHostUITests", :osx, "14.0")
-tests.add_dependency(target) unless tests.dependencies.any? { |dependency| dependency.target == target }
-test_group = project.main_group.groups.find { |item| item.path == "SkynetHostUITests" } ||
-    project.main_group.new_group("SkynetHostUITests", "SkynetHostUITests")
-test_file = test_group.files.find { |item| item.path == "WorkspaceTests.swift" } || test_group.new_file("WorkspaceTests.swift")
-tests.source_build_phase.add_file_reference(test_file, true)
-tests.build_configurations.each do |config|
-    config.build_settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
-    config.build_settings["PRODUCT_MODULE_NAME"] = "SkynetHostUITests"
-    config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "app.skynet.agent.uitests"
-    config.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
-    config.build_settings["TEST_TARGET_NAME"] = target.name
-    config.build_settings["SWIFT_VERSION"] = "5.0"
-    config.build_settings["CODE_SIGN_IDENTITY"] = "-"
-    config.build_settings["CODE_SIGN_STYLE"] = "Manual"
-end
 project.save
 scheme = Xcodeproj::XCScheme.new
 scheme.add_build_target(target)
 scheme.set_launch_target(target)
-scheme.add_test_target(tests)
-scheme.test_action.build_configuration = "Release"
-# UI acceptance runs the signed release application without attaching LLDB.
-# This also avoids requiring a machine-wide debugger authorization change.
-[scheme.test_action, scheme.launch_action].each do |action|
-    action.xml_element.attributes["selectedDebuggerIdentifier"] = ""
-    action.xml_element.attributes["selectedLauncherIdentifier"] = "Xcode.IDEFoundation.Launcher.PosixSpawn"
-end
 scheme.save_as(project_path, "SkynetHost-macOS", true)

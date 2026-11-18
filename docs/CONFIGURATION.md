@@ -95,8 +95,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。三类工作池的实�
 外观可选跟随系统、浅色和深色；壁纸可选海岸、暮色和森林；减少动态效果为开关。
 这些设置由原生宿主原子保存，保存成功后统一发布到工作区与各应用。
 存储不可用时拒绝变更并显示反馈。系统主题与减少动态效果参与界面适配。
-默认数据目录为 macOS Application Support 下的 `Skynet Agent`；`SKYNET_DATA_ROOT`
-可指定隔离目录供原生测试使用。每个应用只能通过宿主访问自己的状态。
+macOS 宿主将数据保存在 Application Support 下的 `Skynet Agent` 目录。每个应用只能通过宿主访问自己的状态。
 
 客户端不读取旧前端环境文件；网关地址、用户名和自动恢复状态由 Agent 业务状态保存。
 普通应用网络来源须列入 manifest 的 `networkOrigins`。内置 Agent 可在连接设置中经原生确认

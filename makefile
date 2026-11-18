@@ -9,7 +9,7 @@ XCODE_DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 PLATFORM ?= $(shell node -p '({darwin:"macos",win32:"windows",linux:"linux"})[process.platform] || "unknown"')
 
 .NOTPARALLEL:
-.PHONY: help install dev build check check-full client-check client-e2e client-build client-archive client-test client-dev client-core-test client-platforms client-doctor client-preflight
+.PHONY: help install dev build check check-full client-check client-build client-archive client-test client-dev client-core-test client-platforms client-doctor client-preflight
 
 help:
 	@printf '%s\n' \
@@ -19,10 +19,9 @@ help:
 		"  make dev            按 PLATFORM 构建并启动客户端（服务端单独启动）" \
 		"  make build          构建服务端和所选平台 Release 客户端" \
 		"  make check          服务端与客户端基础回归" \
-		"  make check-full     基础回归、服务端集成及客户端原生 E2E" \
+		"  make check-full     基础回归、服务端集成及客户端原生集成（界面另用 Computer Use 验收）" \
 		"  make client-check   格式、类型、令牌、边界、逻辑和原生集成测试" \
 		"  make client-test    所选平台的原生运行时和生命周期集成测试" \
-		"  make client-e2e     macOS 原生 E2E（需显式启用前台输入）" \
 		"  make client-build   构建客户端；PLATFORM=ios 生成通用模拟器 App" \
 		"  make client-archive PLATFORM=ios 生成 iPhone/iPad 真机归档" \
 		"  make client-dev     按 PLATFORM 构建并启动客户端" \
@@ -30,7 +29,8 @@ help:
 		"  make client-doctor  查看平台状态与锁定依赖版本" \
 		"  make client-core-test 独立验证共享 C++ 核心" \
 		"" \
-		"服务管理：./server/start.sh；./server/control.sh status|stop|force-stop [端口]"
+		"服务管理：./server/start.sh；./server/control.sh status|stop|force-stop [端口]" \
+		"扩展管理：./server/control.sh extensions-status|extensions-reload [端口]"
 
 install: client-preflight
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" install --frozen-lockfile
@@ -43,12 +43,12 @@ build: client-preflight
 	@$(MAKE) client-build
 
 check:
+	@python3 -B -m unittest discover -s tools -p 'test_cleanup_runtime.py'
 	@$(MAKE) -C "$(SERVER_DIR)" check-format test
 	@$(MAKE) client-check
 
 check-full: check
 	@$(MAKE) -C "$(SERVER_DIR)" test-integration
-	@$(MAKE) client-e2e
 
 client-check:
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" run format:check
@@ -62,13 +62,6 @@ client-check:
 
 client-test:
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs test --platform "$(PLATFORM)"
-
-client-e2e:
-	@test "$(PLATFORM)" = macos || { printf '%s\n' '此自动化入口仅适用于 macOS；iOS 使用模拟器实际验收与 client-test PLATFORM=ios'; exit 2; }
-	@$(MAKE) client-preflight
-	@node client/tooling/e2e.mjs --preflight
-	@$(MAKE) client-build
-	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/e2e.mjs
 
 client-build:
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs build --platform "$(PLATFORM)"

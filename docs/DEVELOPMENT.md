@@ -118,8 +118,7 @@ dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base
 | `make client-check` | 格式、TypeScript、令牌、导入边界、几何逻辑与原生进程集成 |
 | `make client-test` | 实际 JSC 子进程、权限、更新、故障、任务与本地 WebSocket 生命周期 |
 | `make client-test PLATFORM=ios` | 模拟器内独立 JSC VM、移动权限、前后台恢复与真实 WebKit 触控布局 |
-| `make client-e2e` | 最新 macOS App 的 XCUITest 工作区交互与偏好持久化 |
-| `make check-full` | 基础回归、服务端集成与客户端原生 E2E |
+| `make check-full` | 基础回归、服务端集成与客户端原生集成 |
 | `make -C server test-live` | 服务端真实模型网关探针 |
 | `make build` | 服务端与最新 macOS Release 构建 |
 
@@ -136,10 +135,6 @@ Shell 包装负责启动、日志与进程回收；自动热修测试只修改�
 Agent 业务按规范从页面连接真实网关、模型并检查结果页面。
 其他平台首次支持时分别验收；共享界面的日常体验以 macOS App 为主。
 
-同一客户端工作区的依赖安装、原生构建和 UI 测试串行执行。
-原生测试结束后再执行外部辅助功能检查，避免干扰测试语义生命周期。
-XCUITest 会在当前 macOS 登录桌面显示自动化提示并占用鼠标、键盘，不属于后台 Computer Use。
-先安排前台测试时段，再执行 `SKYNET_FOREGROUND_UI_TESTS=1 make client-e2e`；
-`make check-full` 包含同样的前台阶段，也需要该开关。未启用时明确失败，不跳过 UI 测试后宣称全部通过。
-`make check`、`make client-test` 和构建不发送全局鼠标或键盘事件，可以在后台运行。
+同一客户端工作区的依赖安装和原生构建串行执行。
+在最新本地 macOS App 上使用 Computer Use 验收工作区交互、WebView 和偏好持久化。
 截图、性能报告与脱敏证据统一写入被忽略的 `client/test-artifacts/`，不维护像素基线。
