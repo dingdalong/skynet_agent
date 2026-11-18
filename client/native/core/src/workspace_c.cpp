@@ -55,12 +55,23 @@ int sk_workspace_allow_app(sk_workspace* workspace, const char* app_id) {
     return mutate(workspace, [app_id](auto& value) { value.knownApps.emplace(app_id); });
 }
 
+int sk_workspace_add_docked(sk_workspace* workspace, const char* app_id) {
+    if (!app_id) return unavailable;
+    return mutate(workspace, [app_id](auto& value) { value.state.dock.emplace_back(app_id); });
+}
+
+int sk_workspace_add_desktop(sk_workspace* workspace, const char* app_id) {
+    if (!app_id) return unavailable;
+    return mutate(workspace, [app_id](auto& value) { value.state.desktop.emplace_back(app_id); });
+}
+
 int sk_workspace_apply(sk_workspace* workspace, const char* command,
-                       const char* app_id, const char* edge, int has_ratio, double ratio) {
-    if (!workspace || !command || !app_id || !edge) return unavailable;
+                       const char* app_id, const char* edge, int has_ratio, double ratio,
+                       const char* before_app_id) {
+    if (!workspace || !command || !app_id || !edge || !before_app_id) return unavailable;
     try {
         const skynet::WorkspaceCommand input{
-            command, app_id, edge, has_ratio ? std::optional<double>(ratio) : std::nullopt};
+            command, app_id, edge, has_ratio ? std::optional<double>(ratio) : std::nullopt, before_app_id};
         return static_cast<int>(
             skynet::applyWorkspace(workspace->state, input, workspace->knownApps));
     } catch (...) {
@@ -74,6 +85,7 @@ const char* sk_workspace_error(int code) {
         case skynet::WorkspaceError::unknownApp: return "Unknown app";
         case skynet::WorkspaceError::invalidEdge: return "Split edge required";
         case skynet::WorkspaceError::invalidRatio: return "Invalid split ratio";
+        case skynet::WorkspaceError::invalidLauncherPosition: return "App position no longer exists";
         case skynet::WorkspaceError::invalidCollapse:
             return "Collapse requires a split workspace and a valid edge";
         case skynet::WorkspaceError::unknownCommand: return "Unknown workspace command";
@@ -110,6 +122,20 @@ size_t sk_workspace_recent_count(const sk_workspace* workspace) {
 const char* sk_workspace_recent(const sk_workspace* workspace, size_t index) {
     if (!workspace || index >= workspace->state.recent.size()) return nullptr;
     return workspace->state.recent[index].c_str();
+}
+size_t sk_workspace_dock_count(const sk_workspace* workspace) {
+    return workspace ? workspace->state.dock.size() : 0;
+}
+const char* sk_workspace_docked(const sk_workspace* workspace, size_t index) {
+    if (!workspace || index >= workspace->state.dock.size()) return nullptr;
+    return workspace->state.dock[index].c_str();
+}
+size_t sk_workspace_desktop_count(const sk_workspace* workspace) {
+    return workspace ? workspace->state.desktop.size() : 0;
+}
+const char* sk_workspace_desktop(const sk_workspace* workspace, size_t index) {
+    if (!workspace || index >= workspace->state.desktop.size()) return nullptr;
+    return workspace->state.desktop[index].c_str();
 }
 
 }

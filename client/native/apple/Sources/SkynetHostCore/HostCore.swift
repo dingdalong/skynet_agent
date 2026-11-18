@@ -77,6 +77,7 @@ public final class HostCore {
             document = HostDocument()
         }
         document.workspace.recent.removeAll { catalog.entries[$0] == nil }
+        document.workspace.reconcileLaunchers(knownApps: Set(catalog.entries.keys))
         document.workspace.panes = document.workspace.panes.map { id in
             id.flatMap { catalog.entries[$0] == nil ? nil : $0 }
         }
@@ -594,6 +595,8 @@ public final class HostCore {
         var candidate = document
         candidate.grants[id] = nil
         candidate.workspace.recent.removeAll { $0 == id }
+        candidate.workspace.dock.removeAll { $0 == id }
+        candidate.workspace.desktop.removeAll { $0 == id }
         candidate.workspace.panes = candidate.workspace.panes.map { $0 == id ? nil : $0 }
         try catalog.remove(id) { try persist(candidate) }
         stopApp(id)
@@ -633,6 +636,8 @@ public final class HostCore {
                         let previous = self.document
                         var candidate = previous
                         candidate.grants[manifest.id] = approvedPermissions
+                        candidate.workspace.reconcileLaunchers(
+                            knownApps: Set(self.catalog.entries.keys).union([manifest.id]))
                         try self.persist(candidate)
                         do { _ = try self.catalog.activate(manifest, staging: staging) } catch {
                             try self.persist(previous)

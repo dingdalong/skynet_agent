@@ -190,7 +190,13 @@ function Shell() {
                         }}
                         execute={(name, input) => {
                             setError("");
-                            void store.command(name, input).catch(report);
+                            return store.command(name, input).then(
+                                () => true,
+                                (error) => {
+                                    report(error);
+                                    return false;
+                                },
+                            );
                         }}
                     />
                 ) : (

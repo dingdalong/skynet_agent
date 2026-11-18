@@ -9,7 +9,6 @@ import {
     Banner,
     Button,
     Card,
-    ClickableCard,
     Grid,
     HStack,
     Icon,
@@ -18,17 +17,11 @@ import {
     MoreMenu,
     OverflowList,
     ResizeHandle,
-    StatusDot,
     Text,
     Toolbar,
     VStack,
 } from "@astryxdesign/core";
-import {
-    Cog6ToothIcon,
-    SparklesIcon,
-    Squares2X2Icon,
-    HomeIcon,
-} from "@heroicons/react/24/outline";
+import { HomeIcon } from "@heroicons/react/24/outline";
 import { usePanGesture } from "@astryxdesign/core/hooks";
 import type {
     AppSummary,
@@ -39,6 +32,7 @@ import type {
     WorkspaceCommandName,
 } from "@skynet/contracts";
 import { tokens } from "@skynet/tokens";
+import { AppArtwork, Launchers } from "./Launchers";
 import {
     beginDividerDrag,
     gripPlacement,
@@ -51,7 +45,7 @@ import {
 type Execute = (
     name: WorkspaceCommandName,
     input?: Record<string, Json>,
-) => void;
+) => Promise<boolean>;
 type ShellProps = {
     snapshot: HostSnapshot;
     execute: Execute;
@@ -60,18 +54,6 @@ type ShellProps = {
     toolbars: Record<string, PaneToolbar>;
     activate: (appId: string, document: string, action: string) => void;
 };
-const appGlyph = (id: string) => (
-    <Icon
-        size="lg"
-        icon={
-            id === "settings"
-                ? Cog6ToothIcon
-                : id === "agent"
-                  ? SparklesIcon
-                  : Squares2X2Icon
-        }
-    />
-);
 const control = (
     label: string,
     icon: "chevronLeft" | "close" | "copy",
@@ -85,93 +67,6 @@ const control = (
         onClick={click}
     />
 );
-
-function Launchers({
-    snapshot,
-    execute,
-    embedded = false,
-}: {
-    snapshot: HostSnapshot;
-    execute: Execute;
-    embedded?: boolean;
-}) {
-    const open = (app: AppSummary) => execute("open", { appId: app.id });
-    return (
-        <VStack
-            height="100%"
-            justify="between"
-            padding={4}
-            gap={4}
-            style={{
-                minHeight: 0,
-                background: `var(--wallpaper-${snapshot.preferences.wallpaper})`,
-            }}
-        >
-            <VStack gap={4} isScrollable>
-                {!embedded && (
-                    <Toolbar
-                        label="桌面"
-                        endContent={control("后台应用", "copy", () =>
-                            execute("overview"),
-                        )}
-                    />
-                )}
-                <Grid
-                    columns={{ minWidth: 104, max: 7, repeat: "fill" }}
-                    gap={3}
-                >
-                    {snapshot.apps.map((app) => (
-                        <ClickableCard
-                            key={app.id}
-                            width={96}
-                            padding={3}
-                            label={app.name}
-                            isDisabled={
-                                embedded &&
-                                snapshot.workspace.panes.includes(app.id)
-                            }
-                            onClick={() => open(app)}
-                        >
-                            <VStack align="center" gap={2}>
-                                {appGlyph(app.id)}
-                                <Text>{app.name}</Text>
-                            </VStack>
-                        </ClickableCard>
-                    ))}
-                </Grid>
-            </VStack>
-            {!embedded && (
-                <HStack justify="center">
-                    <Card padding={1}>
-                        <Toolbar
-                            label="Dock"
-                            size="lg"
-                            centerContent={snapshot.apps.map((app) => (
-                                <VStack key={app.id} align="center" gap={1}>
-                                    <IconButton
-                                        label={app.name}
-                                        tooltip={app.name}
-                                        icon={appGlyph(app.id)}
-                                        variant="ghost"
-                                        onClick={() => open(app)}
-                                    />
-                                    {snapshot.workspace.recent.includes(
-                                        app.id,
-                                    ) && (
-                                        <StatusDot
-                                            label="已打开"
-                                            variant="accent"
-                                        />
-                                    )}
-                                </VStack>
-                            ))}
-                        />
-                    </Card>
-                </HStack>
-            )}
-        </VStack>
-    );
-}
 
 function RecentApp({ app, execute }: { app: AppSummary; execute: Execute }) {
     const ref = useRef<HTMLDivElement>(null);
@@ -187,10 +82,14 @@ function RecentApp({ app, execute }: { app: AppSummary; execute: Execute }) {
             <HStack align="center" justify="between">
                 <Button
                     label={app.name}
-                    icon={appGlyph(app.id)}
                     variant="ghost"
                     onClick={() => execute("restore", { appId: app.id })}
-                />
+                >
+                    <HStack as="span" align="center" gap={2}>
+                        <AppArtwork app={app} size={24} />
+                        <Text maxLines={1}>{app.name}</Text>
+                    </HStack>
+                </Button>
                 {control(`关闭${app.name}`, "close", () =>
                     execute("close", { appId: app.id }),
                 )}

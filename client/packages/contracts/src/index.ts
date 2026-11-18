@@ -26,6 +26,8 @@ export interface Workspace {
     panes: (string | null)[];
     ratio: number;
     recent: string[];
+    dock: string[];
+    desktop: string[];
 }
 
 export interface HostSnapshot {
@@ -64,6 +66,8 @@ export type WorkspaceCommandName =
     | "close"
     | "split"
     | "resize"
+    | "dock"
+    | "undock"
     | "collapse"
     | "restart";
 

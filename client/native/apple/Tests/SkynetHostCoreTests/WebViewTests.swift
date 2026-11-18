@@ -9,6 +9,123 @@ import XCTest
 /// acceptance is separate; this catches scheme, CSP and bridge failures.
 @MainActor
 final class WebViewTests: XCTestCase {
+    func testWorkspaceAppIconGeometry() async throws {
+        _ = NSApplication.shared
+        let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let workspace = tests.appendingPathComponent("../../../../dist/workspace").standardizedFileURL
+        for width in [390, 1024] {
+            let config = WKWebViewConfiguration()
+            config.websiteDataStore = .nonPersistent()
+            config.setURLSchemeHandler(AppAssets(bundledWorkspace: workspace), forURLScheme: "skynet-host")
+            config.userContentController.addUserScript(
+                WKUserScript(
+                    source: """
+                        const apps = [{id:'agent', name:'Agent', builtin:true}, {id:'settings', name:'设置', builtin:true}];
+                        const placement = innerWidth < 600 ? apps : [...apps].reverse();
+                        const extras = \(width) > 600 ? [{id:'notes', name:'笔记', builtin:false}] : [];
+                        const snapshot = {
+                            revision:1, apps:[...apps, ...extras], capabilities:{splitView:true},
+                            preferences:{appearance:'light', wallpaper:'coast', reduceMotion:true},
+                            workspace:{mode:'desktop', panes:[], recent:apps.map(app=>app.id), ratio:0.5,
+                                desktop:[placement[0].id], dock:[placement[1].id, ...extras.map(app=>app.id)]}
+                        };
+                        window.webkit = {messageHandlers:{workspace:{postMessage:async ({kind}) =>
+                            kind === 'initial' ? snapshot : null}}};
+                        """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            let web = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: 780), configuration: config)
+            defer { web.stopLoading() }
+            web.load(URLRequest(url: URL(string: "skynet-host://workspace/index.html")!))
+            for (area, size) in [("desktop", 60.0), ("dock", 60.0), ("overview", 24.0)] {
+                let selector: String
+                if area == "overview" {
+                    _ = try await web.evaluateJavaScript(
+                        """
+                        window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail:{
+                            ...snapshot, revision:2, workspace:{...snapshot.workspace, mode:'overview'}
+                        }}))
+                        """)
+                    selector = ".astryx-card button:first-child svg"
+                } else {
+                    selector = "[data-drop-area='\(area)'] [data-launcher-button] svg"
+                }
+                let condition = "document.querySelector(\"\(selector)\") !== null"
+                for _ in 0..<60 {
+                    if (try? await web.evaluateJavaScript(condition)) as? Bool == true { break }
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                let result = try await web.callAsyncJavaScript(
+                    """
+                    return Array.from(document.querySelectorAll(selector), glyph => {
+                        const tile = glyph.parentElement.getBoundingClientRect();
+                        const icon = glyph.getBoundingClientRect();
+                        const button = glyph.closest('button').getBoundingClientRect();
+                        return [tile.width, tile.height, icon.width, icon.height,
+                            icon.x - tile.x + (icon.width - tile.width) / 2,
+                            icon.y - tile.y + (icon.height - tile.height) / 2,
+                            tile.x - button.x, tile.y - button.y, button.width, button.height];
+                    });
+                    """, arguments: ["selector": selector], in: nil, contentWorld: .page)
+                let measurements = try XCTUnwrap(result as? [[Double]])
+                let expectedCount = area == "overview" || (area == "dock" && width > 600) ? 2 : 1
+                XCTAssertEqual(measurements.count, expectedCount, "\(area) at \(width)")
+                for actual in measurements {
+                    var expected = [size, size, size * 0.56, size * 0.56, 0, 0]
+                    if area != "overview" { expected += [0, 0, size, size] }
+                    for (value, target) in zip(actual, expected) {
+                        XCTAssertEqual(value, target, accuracy: 0.1, "\(area) at \(width): \(actual)")
+                    }
+                }
+                if area == "dock" {
+                    let iconInsets =
+                        try await web.evaluateJavaScript(
+                            """
+                            (() => {
+                                const dock = document.querySelector('[data-drop-area=dock]');
+                                const bounds = dock.getBoundingClientRect();
+                                const buttons = dock.querySelectorAll('[data-launcher-button]');
+                                const first = buttons[0].getBoundingClientRect();
+                                const last = buttons[buttons.length - 1].getBoundingClientRect();
+                                return [first.top - bounds.top, bounds.bottom - last.bottom,
+                                    first.left - bounds.left, bounds.right - last.right];
+                            })()
+                            """) as? [Double]
+                    let insets = try XCTUnwrap(iconInsets)
+                    for inset in insets.dropFirst() {
+                        XCTAssertEqual(
+                            inset, insets[0], accuracy: 0.1, "Dock icon insets at \(width): \(insets)")
+                    }
+                    let surface = "getComputedStyle(document.querySelector('[data-drop-area=dock]'))"
+                    let light = try await web.evaluateJavaScript("\(surface).backgroundColor") as? String
+                    _ = try await web.evaluateJavaScript(
+                        """
+                        snapshot.preferences = {...snapshot.preferences, appearance:'dark'};
+                        window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail:{...snapshot}}))
+                        """)
+                    let lightColor = try XCTUnwrap(light)
+                    let isDark = "document.documentElement.dataset.theme === 'dark'"
+                    let changed = "\(isDark) && \(surface).backgroundColor !== '\(lightColor)'"
+                    for _ in 0..<60 {
+                        if (try? await web.evaluateJavaScript(changed)) as? Bool == true { break }
+                        try await Task.sleep(for: .milliseconds(100))
+                    }
+                    let adapted = try await web.evaluateJavaScript(changed) as? Bool
+                    XCTAssertEqual(adapted, true, "Dock surface follows the workspace appearance")
+                    let aligned =
+                        try await web.evaluateJavaScript(
+                            """
+                            Array.from(document.querySelectorAll('[data-launcher-button]')).every(button => {
+                                const tile = getComputedStyle(button.querySelector('[data-app-artwork]'));
+                                return tile.borderRadius === getComputedStyle(button).borderRadius &&
+                                    tile.backgroundImage.includes('gradient');
+                            })
+                            """) as? Bool
+                    XCTAssertEqual(
+                        aligned, true, "The illuminated tile and its hover surface share one contour")
+                }
+            }
+        }
+    }
+
     func testPackagedAgentChatDraftReloadAndNarrowLayout() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

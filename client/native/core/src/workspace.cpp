@@ -11,13 +11,24 @@ WorkspaceError applyWorkspace(
     const std::unordered_set<std::string>& knownApps) {
     const auto& name = command.name;
     const auto& id = command.appId;
-    if ((name == "open" || name == "close" || name == "split" || name == "restore") &&
+    if ((name == "open" || name == "close" || name == "split" || name == "restore" ||
+         name == "dock" || name == "undock") &&
         knownApps.count(id) == 0) {
         return WorkspaceError::unknownApp;
     }
 
     auto next = state;
-    if (name == "home") {
+    if (name == "dock" || name == "undock") {
+        for (auto* list : {&next.desktop, &next.dock}) {
+            list->erase(std::remove(list->begin(), list->end(), id), list->end());
+        }
+        auto& list = name == "dock" ? next.dock : next.desktop;
+        const auto position = std::find(list.begin(), list.end(), command.beforeAppId);
+        if (!command.beforeAppId.empty() && position == list.end()) {
+            return WorkspaceError::invalidLauncherPosition;
+        }
+        list.insert(position, id);
+    } else if (name == "home") {
         next.mode = "desktop";
     } else if (name == "overview") {
         next.mode = "overview";

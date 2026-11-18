@@ -16,9 +16,12 @@ sk_workspace* sk_workspace_create(const char* mode, double ratio);
 void sk_workspace_destroy(sk_workspace* workspace);
 int sk_workspace_add_pane(sk_workspace* workspace, const char* app_id);
 int sk_workspace_add_recent(sk_workspace* workspace, const char* app_id);
+int sk_workspace_add_docked(sk_workspace* workspace, const char* app_id);
+int sk_workspace_add_desktop(sk_workspace* workspace, const char* app_id);
 int sk_workspace_allow_app(sk_workspace* workspace, const char* app_id);
 int sk_workspace_apply(sk_workspace* workspace, const char* command,
-                       const char* app_id, const char* edge, int has_ratio, double ratio);
+                       const char* app_id, const char* edge, int has_ratio, double ratio,
+                       const char* before_app_id);
 const char* sk_workspace_error(int code);
 const char* sk_workspace_error_kind(int code);
 const char* sk_workspace_mode(const sk_workspace* workspace);
@@ -27,6 +30,10 @@ size_t sk_workspace_pane_count(const sk_workspace* workspace);
 const char* sk_workspace_pane(const sk_workspace* workspace, size_t index);
 size_t sk_workspace_recent_count(const sk_workspace* workspace);
 const char* sk_workspace_recent(const sk_workspace* workspace, size_t index);
+size_t sk_workspace_dock_count(const sk_workspace* workspace);
+const char* sk_workspace_docked(const sk_workspace* workspace, size_t index);
+size_t sk_workspace_desktop_count(const sk_workspace* workspace);
+const char* sk_workspace_desktop(const sk_workspace* workspace, size_t index);
 
 #ifdef __cplusplus
 }

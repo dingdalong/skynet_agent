@@ -12,6 +12,8 @@ struct Workspace {
     std::vector<std::optional<std::string>> panes;
     double ratio = 0.5;
     std::vector<std::string> recent;
+    std::vector<std::string> dock;
+    std::vector<std::string> desktop;
 };
 
 struct WorkspaceCommand {
@@ -19,6 +21,7 @@ struct WorkspaceCommand {
     std::string appId;
     std::string edge;
     std::optional<double> ratio;
+    std::string beforeAppId{};
 };
 
 enum class WorkspaceError {
@@ -27,6 +30,7 @@ enum class WorkspaceError {
     invalidEdge,
     invalidRatio,
     invalidCollapse,
+    invalidLauncherPosition,
     unknownCommand,
     unavailable
 };

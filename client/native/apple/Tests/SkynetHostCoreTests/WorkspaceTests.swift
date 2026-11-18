@@ -3,6 +3,36 @@ import XCTest
 @testable import SkynetHostCore
 
 final class WorkspaceTests: XCTestCase {
+    func testDesktopInsertionRecoveryAndCatalogChanges() throws {
+        var workspace = Workspace()
+        let apps: Set<String> = ["agent", "settings", "notes"]
+        workspace.reconcileLaunchers(knownApps: apps)
+        XCTAssertEqual(workspace.desktop, ["notes", "settings"])
+        try workspace.apply("undock", ["appId": "settings", "beforeAppId": "notes"], knownApps: apps)
+        try workspace.apply("undock", ["appId": "agent", "beforeAppId": "notes"], knownApps: apps)
+        XCTAssertThrowsError(
+            try workspace.apply("dock", ["appId": "settings", "beforeAppId": "notes"], knownApps: apps))
+        workspace = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+        XCTAssertEqual(workspace.desktop, ["settings", "agent", "notes"])
+        XCTAssertEqual(workspace.dock, [])
+        workspace.reconcileLaunchers(knownApps: ["agent", "settings", "calendar"])
+        XCTAssertEqual(workspace.desktop, ["settings", "agent", "calendar"])
+    }
+
+    func testDockOrderSurvivesRelaunchIncludingEmptyDock() throws {
+        let apps: Set<String> = ["settings", "agent"]
+        var workspace = Workspace()
+        XCTAssertEqual(workspace.dock, ["agent"])
+        try workspace.apply("dock", ["appId": "settings", "beforeAppId": "agent"], knownApps: apps)
+        workspace = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+        XCTAssertEqual(workspace.dock, ["settings", "agent"])
+        for id in workspace.dock { try workspace.apply("undock", ["appId": id], knownApps: apps) }
+        workspace = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+        XCTAssertEqual(workspace.dock, [])
+        XCTAssertEqual(workspace.mode, "desktop")
+        XCTAssertTrue(workspace.recent.isEmpty)
+    }
+
     func testSplitDesktopLaunchAndRestore() throws {
         var workspace = Workspace()
         let apps: Set<String> = ["settings", "agent"]

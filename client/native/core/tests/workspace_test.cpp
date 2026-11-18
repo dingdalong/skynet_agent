@@ -63,13 +63,25 @@ int main() {
     check(sk_workspace_add_pane(handle, nullptr) == 0, "null desktop");
     check(sk_workspace_add_pane(handle, unicodeId) == 0, "append app");
     check(sk_workspace_add_recent(handle, unicodeId) == 0, "append recent");
-    check(sk_workspace_apply(handle, "split", unicodeId, "left", 0, 0) == 0, "C transition");
+    check(sk_workspace_apply(handle, "split", unicodeId, "left", 0, 0, "") == 0, "C transition");
+    check(sk_workspace_add_docked(handle, "agent") == 0 &&
+          sk_workspace_apply(handle, "dock", unicodeId, "", 0, 0, "agent") == 0 &&
+          sk_workspace_dock_count(handle) == 2 &&
+          std::string(sk_workspace_docked(handle, 0)) == unicodeId, "insert before a dock item");
+    check(sk_workspace_apply(handle, "dock", unicodeId, "", 0, 0, "") == 0 &&
+          sk_workspace_dock_count(handle) == 2 &&
+          std::string(sk_workspace_docked(handle, 1)) == unicodeId, "reorder without duplication");
+    check(sk_workspace_apply(handle, "dock", unicodeId, "", 0, 0, "missing") != 0 &&
+          sk_workspace_apply(handle, "dock", "missing", "", 0, 0, "") != 0 &&
+          sk_workspace_dock_count(handle) == 2, "reject invalid drops atomically");
+    check(sk_workspace_apply(handle, "undock", unicodeId, "", 0, 0, "") == 0 &&
+          sk_workspace_dock_count(handle) == 1, "return to desktop without closing");
     check(std::string(sk_workspace_pane(handle, 0)) == unicodeId &&
           sk_workspace_pane(handle, 1) == nullptr, "C snapshot");
     check(sk_workspace_recent_count(handle) == 1 &&
           std::string(sk_workspace_recent(handle, 0)) == unicodeId, "C recent");
     check(sk_workspace_pane(handle, 99) == nullptr, "C bounds");
     sk_workspace_destroy(handle);
-    check(sk_workspace_apply(nullptr, "home", "", "", 0, 0) != 0, "null handle");
+    check(sk_workspace_apply(nullptr, "home", "", "", 0, 0, "") != 0, "null handle");
     std::cout << "Workspace transitions and C ABI passed\n";
 }

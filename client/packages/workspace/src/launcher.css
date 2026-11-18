@@ -1,0 +1,104 @@
+[data-app-artwork],
+.astryx-button[data-launcher-button] {
+    border-radius: 23%;
+}
+
+[data-app-artwork] {
+    flex-shrink: 0;
+    background: linear-gradient(155deg, var(--tile-light), var(--tile-shade));
+    box-shadow:
+        inset 0 1px 1px
+            color-mix(in oklab, var(--color-on-dark) 34%, transparent),
+        inset 0 -1px 1px
+            color-mix(in oklab, var(--color-on-light) 18%, transparent);
+}
+
+[data-app-artwork="graphite"] {
+    --tile-light: color-mix(
+        in oklab,
+        var(--color-on-light) 75%,
+        var(--color-on-dark)
+    );
+    --tile-shade: var(--color-on-light);
+    color: var(--color-on-dark);
+}
+
+[data-app-artwork="silver"] {
+    --tile-light: var(--color-on-dark);
+    --tile-shade: color-mix(
+        in oklab,
+        var(--color-on-dark) 78%,
+        var(--color-on-light)
+    );
+    color: var(--color-on-light);
+}
+
+[data-app-artwork] svg {
+    filter: drop-shadow(
+        0 1px 1px color-mix(in oklab, var(--color-on-light) 28%, transparent)
+    );
+}
+
+.astryx-card[data-drop-area="dock"] {
+    --dock-inset: var(--spacing-4);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    padding-inline: var(--dock-inset);
+    background-color: var(--color-background-surface);
+    border-radius: var(--radius-page);
+}
+
+@supports (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+    .astryx-card[data-drop-area="dock"] {
+        background-color: color-mix(
+            in oklab,
+            var(--color-background-surface) 68%,
+            transparent
+        );
+        background-image: linear-gradient(
+            to bottom,
+            color-mix(in oklab, var(--color-on-dark) 9%, transparent),
+            transparent 45%
+        );
+        -webkit-backdrop-filter: blur(16px) saturate(1.15);
+        backdrop-filter: blur(16px) saturate(1.15);
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .astryx-card[data-drop-area="dock"] {
+        background-color: var(--color-background-surface);
+        background-image: none;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+[data-launcher-button] {
+    position: relative;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    :root:not([data-reduce-motion="true"]) [data-drop-area="dock"] {
+        transition: width var(--duration-fast) var(--ease-standard);
+    }
+}
+
+@media (hover: hover) {
+    [data-launcher-button]:enabled:hover [data-app-artwork] {
+        filter: brightness(1.08);
+    }
+}
+
+:root[data-reduce-motion="true"] [data-launcher-button] {
+    transform: none;
+}
+
+:root[data-reduce-motion="true"] [data-drop-area="dock"] {
+    transition-property: none;
+}

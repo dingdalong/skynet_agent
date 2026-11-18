@@ -4,7 +4,14 @@ import { createHostStore, type HostTransport } from "@skynet/host-bridge";
 
 const snapshot = (revision: number): HostSnapshot => ({
     revision,
-    workspace: { mode: "desktop", panes: [], ratio: 0.5, recent: [] },
+    workspace: {
+        mode: "desktop",
+        panes: [],
+        ratio: 0.5,
+        recent: [],
+        dock: ["agent"],
+        desktop: ["settings"],
+    },
     preferences: {
         appearance: "system",
         wallpaper: "coast",

@@ -6,6 +6,23 @@ public struct Workspace: Codable {
     public var panes: [String?] = []
     public var ratio = 0.5
     public var recent: [String] = []
+    private var dockOrder: [String]?
+    public var dock: [String] {
+        get { dockOrder ?? ["agent"] }
+        set { dockOrder = newValue }
+    }
+    private var desktopOrder: [String]?
+    public var desktop: [String] {
+        get { desktopOrder ?? [] }
+        set { desktopOrder = newValue }
+    }
+
+    mutating func reconcileLaunchers(knownApps: Set<String>) {
+        var remaining = knownApps
+        dock = dock.filter { remaining.remove($0) != nil }
+        let placed = desktop.filter { remaining.remove($0) != nil }
+        desktop = placed + remaining.sorted()
+    }
 
     public mutating func apply(_ command: String, _ input: [String: Any], knownApps: Set<String>) throws {
         guard let native = mode.withCString({ sk_workspace_create($0, ratio) }) else {
@@ -24,6 +41,8 @@ public struct Workspace: Codable {
                     ?? sk_workspace_add_pane(native, nil))
         }
         for id in recent { try check(id.withCString { sk_workspace_add_recent(native, $0) }) }
+        for id in dock { try check(sk_workspace_add_docked(native, id)) }
+        for id in desktop { try check(sk_workspace_add_desktop(native, id)) }
         for id in knownApps { try check(id.withCString { sk_workspace_allow_app(native, $0) }) }
         let id = input["appId"] as? String ?? ""
         let edge = input["edge"] as? String ?? ""
@@ -33,7 +52,8 @@ public struct Workspace: Codable {
                 edge.withCString { edge in
                     sk_workspace_apply(
                         native, command, id, edge,
-                        requestedRatio == nil ? 0 : 1, requestedRatio ?? 0)
+                        requestedRatio == nil ? 0 : 1, requestedRatio ?? 0,
+                        input["beforeAppId"] as? String ?? "")
                 }
             }
         }
@@ -48,10 +68,17 @@ public struct Workspace: Codable {
         recent = (0..<sk_workspace_recent_count(native)).map { index in
             String(cString: sk_workspace_recent(native, index))
         }
+        dock = (0..<sk_workspace_dock_count(native)).map { String(cString: sk_workspace_docked(native, $0)) }
+        desktop = (0..<sk_workspace_desktop_count(native)).map {
+            String(cString: sk_workspace_desktop(native, $0))
+        }
     }
 
     public var snapshot: [String: Any] {
-        ["mode": mode, "panes": panes.map { $0 as Any? ?? NSNull() }, "ratio": ratio, "recent": recent]
+        [
+            "mode": mode, "panes": panes.map { $0 as Any? ?? NSNull() }, "ratio": ratio, "recent": recent,
+            "dock": dock, "desktop": desktop,
+        ]
     }
 }
 
