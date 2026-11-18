@@ -22,7 +22,7 @@ UI 规格见[客户端设计规范](../design/CLIENT_DESIGN.md)。
 ```mermaid
 flowchart LR
     Shell[React Native 工作区] -->|工作区命令| Host[原生 HostCore]
-    View[shadcn WebView] -->|身份绑定租约| Host
+    View[子应用 WebView] -->|身份绑定租约| Host
     Host -->|有序消息和状态| Actor[每应用 JSC Actor]
     Actor -->|新状态及效果请求| Host
     Host --> Store[原子状态存储]
@@ -88,7 +88,7 @@ WebKit 与业务初始化并行，SDK 等待初始化状态提交后发送 `view
 
 - `manifest.json`：稳定 ID、版本、最低宿主版本、状态版本、权限、精确网络来源和导出动作。
 - `src/runtime.ts`：纯同步状态转换，可导出带输入、输出 schema 的动作。
-- `src/view.tsx`：shadcn 表现，通过 SDK 订阅状态和请求命令。
+- `src/view.tsx`：Web 界面，通过 SDK 订阅状态和请求命令。
 
 当前支持 `socket.open`、`socket.send`、`socket.close`、`timer.wait` 和 `apps.call` 效果。
 内置 Agent 独占 `agent.context`、`agent.execute` 及原生目录、服务器授权入口；

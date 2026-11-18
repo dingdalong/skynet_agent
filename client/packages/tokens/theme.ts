@@ -203,3 +203,68 @@ export const tokens = {
         }
     }
 } as const;
+
+export const hostTheme = {
+    "light": {
+        "background": "#f1f1f1",
+        "card": "#ffffff",
+        "foreground": "#000000",
+        "mutedForeground": "#474747",
+        "primary": "#1b1b1b",
+        "primaryForeground": "#ffffff",
+        "border": "#00000014",
+        "divider": "#d4d4d4",
+        "hover": "#0000000D",
+        "pressed": "#0000001A",
+        "selected": "#d4d4d4",
+        "ring": "#1b1b1b",
+        "destructive": "#c0262c",
+        "shadow": "#0000001A",
+        "onWallpaper": "#111111"
+    },
+    "dark": {
+        "background": "#1b1b1b",
+        "card": "#262626",
+        "foreground": "#ffffff",
+        "mutedForeground": "#9e9e9e",
+        "primary": "#f1f1f1",
+        "primaryForeground": "#111111",
+        "border": "#ffffff1A",
+        "divider": "#525252",
+        "hover": "#ffffff0D",
+        "pressed": "#ffffff1A",
+        "selected": "#474747",
+        "ring": "#f1f1f1",
+        "destructive": "#ffaea7",
+        "shadow": "#0000004D",
+        "onWallpaper": "#ffffff"
+    },
+    "spacing": {
+        "1": 4,
+        "2": 8,
+        "3": 12,
+        "4": 16,
+        "5": 20,
+        "6": 24,
+        "8": 32,
+        "12": 48
+    },
+    "radius": {
+        "inner": 6,
+        "control": 10,
+        "card": 12,
+        "dock": 28
+    },
+    "type": {
+        "label": 14,
+        "supporting": 12,
+        "heading": 17
+    },
+    "button": 36,
+    "compactButton": 32,
+    "focusWidth": 2,
+    "motion": {
+        "quick": 125,
+        "standard": 300
+    }
+} as const;

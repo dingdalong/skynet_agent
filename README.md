@@ -1,6 +1,6 @@
 # Skynet Agent
 
-基于 Skynet 与 Lua 的 Agent 服务端，搭配 React Native 宿主与 shadcn/ui 子应用。
+基于 Skynet 与 Lua 的 Agent 服务端，搭配 React Native 宿主与独立 Web 子应用。
 客户端提供桌面、Dock、设置、Agent 对话、后台与双应用分屏。
 Agent 支持会话恢复、流式消息、模型选择、取消、失败重试及服务器工具记录。
 服务端保留多会话、流式对话、模型选择、工具执行与权限管理能力。
@@ -41,7 +41,7 @@ make -C server build
 - [配置说明](docs/CONFIGURATION.md)：渠道、模型、工具权限与偏好。
 - [客户端运行时](docs/architecture/CLIENT_RUNTIME.md)：表现分离、Actor、生命周期与并发规则。
 - [网关架构](docs/architecture/AGENT_GATEWAY.md)：服务、会话、协议与工具执行。
-- [客户端设计规范](docs/design/CLIENT_DESIGN.md)：共享令牌、官方 shadcn 组件和工作区交互。
+- [客户端设计规范](docs/design/CLIENT_DESIGN.md)：Astryx 主题、工作区分屏与多平台交互。
 - [客户端开发](client/README.md)：宿主、独立应用包与构建入口。
 - [仓库公共规范](AGENTS.md)：公共约束与分层阅读入口。
 - [编码与协作规范](编码与协作规范.md)：公共开发约定与验收要求。

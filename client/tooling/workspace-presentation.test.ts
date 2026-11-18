@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HostSnapshot } from "@skynet/contracts";
 import { Workspace } from "../packages/workspace/src/Workspace";
+import { tokens } from "@skynet/tokens";
 import { splitFrames } from "../packages/workspace/src/geometry";
 import type {
     SceneProps,
@@ -186,6 +187,25 @@ describe("shared workspace presentation ownership", () => {
         });
         frame("agent", true);
         frame("settings", false);
+    });
+    it("restores both iPad panes and their ratio when the workspace grows past the split threshold", () => {
+        const workspace: HostSnapshot["workspace"] = {
+            mode: "apps",
+            panes: ["settings", "agent"],
+            ratio: 2 / 3,
+            recent: ["agent", "settings"],
+        };
+        const minimum = tokens.shell.comfortablePane * 2 + tokens.shell.divider;
+        for (const width of [1024, minimum - 1, minimum]) {
+            captured.width = width;
+            render(workspace);
+            const frames = splitFrames(width, workspace.ratio).panes;
+            expect(frame("agent", true)).toMatchObject(
+                width < minimum ? { left: 0, width } : frames[1],
+            );
+            const other = frame("settings", width >= minimum);
+            if (width >= minimum) expect(other).toMatchObject(frames[0]);
+        }
     });
     it.each([false, true])(
         "keeps hidden presentations inert through theme and motion preferences (reduced motion %s)",

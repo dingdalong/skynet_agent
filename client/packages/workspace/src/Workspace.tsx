@@ -17,7 +17,7 @@ import type {
     HostSnapshot,
     WorkspaceCommandName,
 } from "@skynet/contracts";
-import { tokens } from "@skynet/tokens";
+import { hostTheme, tokens } from "@skynet/tokens";
 import {
     PlatformContext,
     useWorkspacePlatform,
@@ -36,7 +36,7 @@ import {
     type Placement,
 } from "./geometry";
 
-type Palette = typeof tokens.light | typeof tokens.dark;
+type Palette = typeof hostTheme.light | typeof hostTheme.dark;
 type Layout = { panes: (string | null)[]; ratio: number };
 const iconFor = (id: string): HostIcon =>
     id === "settings" ? "settings" : id === "agent" ? "agent" : "application";
@@ -100,7 +100,7 @@ function WorkspaceContent() {
     const dark =
         preferences?.appearance === "dark" ||
         (preferences?.appearance !== "light" && systemTheme === "dark");
-    const palette = dark ? tokens.dark : tokens.light;
+    const palette = dark ? hostTheme.dark : hostTheme.light;
     const reducedMotion = preferences?.reduceMotion || systemReduceMotion;
     const mode = snapshot?.workspace.mode;
     useEffect(() => {
@@ -180,8 +180,7 @@ function WorkspaceContent() {
     const previewDesktop =
         !!divider?.collapse &&
         actual.panes[divider.collapse === "left" ? 1 : 0] === null;
-    const desktopChrome = showDesktop;
-    const showWorkspaceToolbar = desktopChrome || mode === "overview";
+    const showWorkspaceToolbar = showDesktop || mode === "overview";
     const setPlacement = (appId: string, placement?: Placement) => {
         prepareLayoutTransition?.(!!reducedMotion);
         if (!placement) {
@@ -208,46 +207,36 @@ function WorkspaceContent() {
                 style={StyleSheet.absoluteFill}
             />
             {showWorkspaceToolbar && (
-                <View style={styles.topbar}>
-                    {desktopChrome ? (
-                        <Text
-                            style={[
-                                styles.wordmark,
-                                { color: palette.desktopForeground },
-                            ]}
-                        >
-                            Skynet
-                        </Text>
-                    ) : (
+                <View
+                    style={[styles.topbar, showDesktop && styles.desktopTopbar]}
+                >
+                    {showDesktop ? (
                         <IconButton
-                            label="返回桌面"
-                            icon="home"
-                            onPress={() => execute("home")}
+                            label="后台应用"
+                            icon="overview"
+                            onPress={() => execute("overview")}
                             palette={palette}
+                            raised
                         />
+                    ) : (
+                        <>
+                            <IconButton
+                                label="返回桌面"
+                                icon="home"
+                                onPress={() => execute("home")}
+                                palette={palette}
+                                raised
+                            />
+                            <Text
+                                style={[
+                                    styles.topTitle,
+                                    { color: palette.onWallpaper },
+                                ]}
+                            >
+                                后台应用
+                            </Text>
+                        </>
                     )}
-                    <Text
-                        style={[
-                            styles.topTitle,
-                            {
-                                color: desktopChrome
-                                    ? palette.desktopForeground
-                                    : palette.foreground,
-                            },
-                        ]}
-                    >
-                        {desktopChrome
-                            ? "WORKSPACE"
-                            : mode === "overview"
-                              ? "后台应用"
-                              : "Skynet"}
-                    </Text>
-                    <IconButton
-                        label="后台应用"
-                        icon="overview"
-                        onPress={() => execute("overview")}
-                        palette={palette}
-                    />
                 </View>
             )}
             {error && (
@@ -316,7 +305,7 @@ function WorkspaceContent() {
                                     }
                                     animateLayout={!divider?.active}
                                     reducedMotion={!!reducedMotion}
-                                    durationMs={tokens.motion.standard}
+                                    durationMs={hostTheme.motion.standard}
                                     entrance={tokens.transitions.app}
                                     style={styles.appFrame}
                                 >
@@ -327,6 +316,7 @@ function WorkspaceContent() {
                                         paneWidth={frame.width}
                                         paneLeft={frame.left}
                                         active={visible}
+                                        canSplit={wide}
                                         reducedMotion={!!reducedMotion}
                                         execute={execute}
                                         begin={() => {
@@ -426,16 +416,19 @@ function IconButton({
     onPress,
     palette,
     compact = false,
+    raised = false,
 }: {
     label: string;
     icon: HostIcon;
     onPress(): void;
     palette: Palette;
     compact?: boolean;
+    raised?: boolean;
 }) {
     const { Icon: Symbol, focusProps, inputMode } = useWorkspacePlatform();
     const [hover, setHover] = useState(false);
     const [focused, setFocused] = useState(false);
+    const [pressed, setPressed] = useState(false);
     return (
         <Pressable
             accessibilityRole="button"
@@ -444,6 +437,8 @@ function IconButton({
             {...focusProps}
             onHoverIn={() => setHover(true)}
             onHoverOut={() => setHover(false)}
+            onPressIn={() => setPressed(true)}
+            onPressOut={() => setPressed(false)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             style={[
@@ -454,7 +449,15 @@ function IconButton({
                     minHeight: tokens.touch.minimumTarget,
                 },
                 {
-                    backgroundColor: hover ? palette.muted : "transparent",
+                    backgroundColor: pressed
+                        ? palette.selected
+                        : hover
+                          ? raised
+                              ? palette.background
+                              : palette.hover
+                          : raised
+                            ? palette.card
+                            : "transparent",
                     borderColor: focused ? palette.ring : "transparent",
                 },
             ]}
@@ -485,15 +488,9 @@ function AppIcon({
                 {
                     width: size,
                     height: size,
-                    borderRadius: size * 0.26,
+                    borderRadius: Math.min(hostTheme.radius.dock, size * 0.25),
                     backgroundColor:
                         app.id === "agent" ? palette.primary : palette.card,
-                    borderColor: palette.border,
-                    boxShadow: [
-                        ...tokens.elevation[
-                            palette === tokens.dark ? "dark" : "light"
-                        ].appIcon,
-                    ],
                 },
             ]}
         >
@@ -550,12 +547,14 @@ function Desktop({
                     style={[
                         styles.dock,
                         {
-                            backgroundColor: `${palette.card}cc`,
-                            borderColor: `${palette.border}aa`,
+                            backgroundColor: palette.card,
                             boxShadow: [
-                                ...tokens.elevation[
-                                    palette === tokens.dark ? "dark" : "light"
-                                ].dock,
+                                {
+                                    offsetX: 0,
+                                    offsetY: 2,
+                                    blurRadius: hostTheme.spacing[3],
+                                    color: palette.shadow,
+                                },
                             ],
                         },
                     ]}
@@ -594,7 +593,7 @@ function Launcher({
     dock?: boolean;
     disabled?: boolean;
 }) {
-    const { focusProps, Feedback } = useWorkspacePlatform();
+    const { focusProps, Feedback, Icon: Symbol } = useWorkspacePlatform();
     const [hover, setHover] = useState(false);
     const [pressed, setPressed] = useState(false);
     const [focused, setFocused] = useState(false);
@@ -625,22 +624,36 @@ function Launcher({
                 dock ? styles.dockItem : styles.desktopItem,
                 {
                     opacity: disabled ? 0.45 : 1,
+                    backgroundColor:
+                        dock && (hover || pressed)
+                            ? pressed
+                                ? palette.pressed
+                                : palette.hover
+                            : "transparent",
                     borderColor: focused
                         ? dock
                             ? palette.ring
-                            : palette.desktopFocus
+                            : palette.onWallpaper
                         : "transparent",
                 },
             ]}
         >
             <Feedback
                 target={target}
-                durationMs={tokens.motion.quick}
+                durationMs={hostTheme.motion.quick}
                 reducedMotion={reducedMotion}
                 pointerEvents="none"
-                style={{ width: size, height: size }}
+                style={dock ? styles.dockGlyph : { width: size, height: size }}
             >
-                <AppIcon app={app} palette={palette} size={size} />
+                {dock ? (
+                    <Symbol
+                        name={iconFor(app.id)}
+                        tint={palette.foreground}
+                        style={styles.dockGlyph}
+                    />
+                ) : (
+                    <AppIcon app={app} palette={palette} size={size} />
+                )}
             </Feedback>
             {dock ? (
                 <View
@@ -657,7 +670,7 @@ function Launcher({
                 <Text
                     style={[
                         styles.desktopLabel,
-                        { color: palette.desktopForeground },
+                        { color: palette.onWallpaper },
                     ]}
                 >
                     {app.name}
@@ -675,6 +688,7 @@ function AppPane({
     paneWidth,
     paneLeft,
     active,
+    canSplit,
     reducedMotion,
     begin,
     place,
@@ -687,17 +701,14 @@ function AppPane({
     paneWidth: number;
     paneLeft: number;
     active: boolean;
+    canSplit: boolean;
     reducedMotion: boolean;
     begin(): void;
     place(value?: Placement): void;
     finish(value?: Placement): void;
     execute: Execute;
 }) {
-    const { Surface, focusProps, dragProps, store } = useWorkspacePlatform();
-    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-    const canSplit =
-        !!snapshot?.capabilities.splitView &&
-        width >= tokens.shell.comfortablePane * 2 + tokens.shell.divider;
+    const { Surface, focusProps, dragProps } = useWorkspacePlatform();
     const compact = paneWidth < tokens.shell.comfortablePane;
     const latest = useRef({ width, paneWidth, paneLeft, begin, place, finish });
     latest.current = { width, paneWidth, paneLeft, begin, place, finish };
@@ -860,7 +871,7 @@ function AppPane({
                     active={active}
                     backgroundHex={palette.background}
                     reducedMotion={reducedMotion}
-                    revealDurationMs={tokens.motion.quick}
+                    revealDurationMs={hostTheme.motion.quick}
                     style={styles.surface}
                 />
             )}
@@ -987,7 +998,7 @@ function Divider({
                     pointerEvents="none"
                     style={[
                         styles.dividerLine,
-                        { backgroundColor: `${palette.ring}44` },
+                        { backgroundColor: palette.divider },
                     ]}
                 >
                     <View
@@ -1030,7 +1041,7 @@ function Overview({
                 transitionKey=""
                 animateLayout={false}
                 reducedMotion={reducedMotion}
-                durationMs={tokens.motion.standard}
+                durationMs={hostTheme.motion.standard}
                 entrance={tokens.transitions.overview}
                 style={styles.overviewContent}
                 pointerEvents="box-none"
@@ -1038,7 +1049,7 @@ function Overview({
                 <Text
                     style={[
                         styles.overviewHint,
-                        { color: palette.desktopHint },
+                        { color: palette.onWallpaper },
                     ]}
                 >
                     {recent.length
@@ -1129,7 +1140,7 @@ function OverviewCard({
                 <Text
                     style={{
                         color: palette.mutedForeground,
-                        fontSize: tokens.type.supporting,
+                        fontSize: hostTheme.type.label,
                     }}
                 >
                     继续使用{app.name}
@@ -1145,93 +1156,96 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        gap: 16,
-        padding: 32,
+        gap: hostTheme.spacing[4],
+        padding: hostTheme.spacing[8],
     },
     topbar: {
         height: 52,
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 24,
+        paddingHorizontal: hostTheme.spacing[4],
+        gap: hostTheme.spacing[3],
     },
-    wordmark: {
-        fontSize: 20,
-        fontWeight: "600",
-        letterSpacing: -0.8,
-    },
+    desktopTopbar: { justifyContent: "flex-end" },
     topTitle: {
-        position: "absolute",
-        left: 100,
-        right: 100,
-        textAlign: "center",
-        fontSize: tokens.type.caption,
-        letterSpacing: 1.5,
+        fontSize: hostTheme.type.heading,
+        fontWeight: "600",
     },
     scene: { flex: 1 },
     iconButton: {
-        width: tokens.shell.button,
-        height: tokens.shell.button,
-        borderRadius: tokens.radius.control,
+        width: hostTheme.button,
+        height: hostTheme.button,
+        borderRadius: hostTheme.radius.control,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 2,
+        borderWidth: hostTheme.focusWidth,
     },
-    symbol: { width: 19, height: 19 },
+    symbol: { width: hostTheme.spacing[5], height: hostTheme.spacing[5] },
     compactIconButton: {
-        width: tokens.shell.compactButton,
-        height: tokens.shell.compactButton,
+        width: hostTheme.compactButton,
+        height: hostTheme.compactButton,
     },
-    error: { padding: 12, margin: 12, borderRadius: tokens.radius.control },
-    desktop: { flex: 1, paddingHorizontal: 28, paddingBottom: 24 },
+    error: {
+        padding: hostTheme.spacing[3],
+        margin: hostTheme.spacing[3],
+        borderRadius: hostTheme.radius.control,
+    },
+    desktop: {
+        flex: 1,
+        paddingHorizontal: hostTheme.spacing[6],
+        paddingBottom: hostTheme.spacing[4],
+    },
     desktopGrid: {
-        paddingTop: 52,
-        paddingBottom: 30,
+        paddingTop: hostTheme.spacing[6],
+        paddingBottom: hostTheme.spacing[8],
         flexDirection: "row",
-        gap: 26,
+        gap: hostTheme.spacing[4],
         flexWrap: "wrap",
     },
     desktopItem: {
         width: 104,
         alignItems: "center",
-        gap: 14,
-        padding: 8,
-        borderRadius: 18,
-        borderWidth: 2,
+        gap: hostTheme.spacing[2],
+        padding: hostTheme.spacing[2],
+        borderRadius: hostTheme.radius.card,
+        borderWidth: hostTheme.focusWidth,
     },
     desktopLabel: {
-        fontSize: tokens.type.label,
-        textShadowColor: "#00000044",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 5,
+        fontSize: hostTheme.type.label,
+        fontWeight: "500",
     },
     appIcon: {
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 0.5,
-        overflow: "visible",
+        borderCurve: "continuous",
     },
     dock: {
         alignSelf: "center",
         flexDirection: "row",
         flexWrap: "wrap",
         justifyContent: "center",
-        paddingHorizontal: 12,
-        paddingTop: 10,
-        paddingBottom: 6,
-        gap: 16,
-        borderRadius: tokens.radius.dock,
-        borderWidth: 0.5,
-        overflow: "visible",
+        paddingHorizontal: hostTheme.spacing[2],
+        paddingVertical: hostTheme.spacing[1],
+        gap: hostTheme.spacing[1],
+        borderRadius: hostTheme.radius.dock,
+        borderCurve: "continuous",
     },
     dockItem: {
         alignItems: "center",
-        gap: 5,
-        borderWidth: 2,
-        borderRadius: 16,
-        padding: 3,
+        justifyContent: "center",
+        width: tokens.shell.dockIcon,
+        height: tokens.touch.minimumTarget,
+        borderWidth: hostTheme.focusWidth,
+        borderRadius: hostTheme.radius.dock,
     },
-    runningDot: { width: 3, height: 3, borderRadius: 2 },
+    dockGlyph: { width: hostTheme.spacing[6], height: hostTheme.spacing[6] },
+    runningDot: {
+        position: "absolute",
+        bottom: 1,
+        width: hostTheme.spacing[1],
+        height: hostTheme.spacing[1],
+        borderRadius: hostTheme.spacing[1],
+    },
     pane: {
         position: "absolute",
         top: 0,
@@ -1267,7 +1281,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     paneTitle: {
-        fontSize: tokens.type.label,
+        fontSize: hostTheme.type.label,
         fontWeight: "500",
         flexShrink: 1,
     },
@@ -1297,10 +1311,10 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     dividerGrip: { height: 34, width: 3, borderRadius: 2 },
-    failureTitle: { fontSize: 19, fontWeight: "600" },
+    failureTitle: { fontSize: hostTheme.type.heading, fontWeight: "600" },
     overview: { flex: 1, paddingTop: 48, alignItems: "center" },
     overviewContent: { alignItems: "center", gap: 48, width: "100%" },
-    overviewHint: { fontSize: tokens.type.supporting },
+    overviewHint: { fontSize: hostTheme.type.label },
     overviewCards: {
         flexDirection: "row",
         flexWrap: "wrap",
@@ -1311,13 +1325,9 @@ const styles = StyleSheet.create({
     overviewCard: {
         width: 300,
         height: 244,
-        borderRadius: tokens.radius.window,
+        borderRadius: hostTheme.radius.card,
         borderWidth: 0.5,
         overflow: "hidden",
-        shadowColor: "#000000",
-        shadowRadius: 24,
-        shadowOpacity: 0.2,
-        shadowOffset: { width: 0, height: 12 },
     },
     overviewCardHeader: {
         height: 52,
@@ -1326,7 +1336,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         gap: 10,
     },
-    cardTitle: { flex: 1, fontSize: tokens.type.label, fontWeight: "500" },
+    cardTitle: { flex: 1, fontSize: hostTheme.type.label, fontWeight: "500" },
     cardPreview: {
         flex: 1,
         justifyContent: "center",

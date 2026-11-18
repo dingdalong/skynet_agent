@@ -6,6 +6,8 @@ nodeLinker: hoisted
 storeDir: ../.tools/pnpm-store
 confirmModulesPurge: false
 allowBuilds:
+  '@astryxdesign/cli': false
+  '@astryxdesign/core': false
   esbuild: true
 minimumReleaseAgeExclude:
   - prettier@3.10.1

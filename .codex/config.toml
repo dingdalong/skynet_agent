@@ -5,14 +5,8 @@ enabled = true
 [plugins."chrome@openai-bundled"]
 enabled = true
 
-# 官方 shadcn 注册表查询；仅在本项目启用并固定 CLI 版本。
-[mcp_servers.shadcn]
-command = "/opt/homebrew/bin/pnpm"
-args = ["exec", "shadcn", "mcp", "--cwd", "/Users/dingdalong/github/skynet_agent/client/packages/ui"]
-cwd = "/Users/dingdalong/github/skynet_agent/client"
-enabled = true
-startup_timeout_sec = 120
-tool_timeout_sec = 120
+[mcp_servers.astryx]
+url = "https://astryx.atmeta.com/mcp"
 
 # Android/iOS 设备操作；仅在本项目启用并固定服务版本。
 [mcp_servers.mobile-mcp]

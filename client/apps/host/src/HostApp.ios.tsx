@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useEffect, useRef } from "react";
 import { Workspace } from "@skynet/workspace";
-import { tokens } from "@skynet/tokens";
+import { hostTheme } from "@skynet/tokens";
 import { createHostStore, type HostTransport } from "@skynet/host-bridge";
 import type {
     FeedbackProps,
@@ -173,7 +173,7 @@ const platform: WorkspacePlatform = {
     prepareLayoutTransition(reducedMotion) {
         if (!reducedMotion)
             LayoutAnimation.configureNext({
-                duration: tokens.motion.standard,
+                duration: hostTheme.motion.standard,
                 update: { type: "easeInEaseOut" },
             });
     },

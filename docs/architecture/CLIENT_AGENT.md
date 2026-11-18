@@ -8,7 +8,7 @@ Agent 子应用接入现有二进制 protobuf 网关，提供多会话、模型�
 
 ```mermaid
 flowchart LR
-    UI[shadcn 对话界面] -->|命令与订阅| Host[HostCore]
+    UI[对话界面] -->|命令与订阅| Host[HostCore]
     Host --> Actor[独立 Agent 业务进程]
     Actor --> Protocol[共享 agent-client 协议与状态转换]
     Protocol -->|效果请求| Host

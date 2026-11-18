@@ -21,7 +21,10 @@
     "shadcn": "shadcn"
   },
   "dependencies": {
+    "@astryxdesign/core": "0.7.16",
+    "@astryxdesign/theme-neutral": "0.7.16",
     "@kayahr/text-encoding": "2.2.0",
+    "@stylexjs/stylex": "^0.19.2",
     "protobufjs": "8.8.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -31,6 +34,7 @@
     "remark-gfm": "4.0.1"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "0.7.16",
     "@babel/runtime": "7.29.14",
     "@react-native-community/cli": "20.2.0",
     "@react-native-community/cli-platform-ios": "20.2.0",

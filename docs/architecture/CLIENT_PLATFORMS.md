@@ -1,6 +1,6 @@
 # 客户端平台接入
 
-客户端保留 RN 宿主，遵循统一的 shadcn 视觉规范。普通业务复用共享代码，系统能力通过平台适配接入。
+客户端使用 RN 宿主，界面设计遵循[客户端 Astryx 设计规范](../design/CLIENT_DESIGN.md)。普通业务复用共享代码，系统能力通过平台适配接入。
 平台支持以实际原生构建和体验验收为准；依赖图打包、公共内核测试不等于完整客户端支持。
 
 ## 共享边界
@@ -13,7 +13,7 @@
 | `client/native/core` | 不依赖 RN、Swift 或系统 API 的 C++ 状态规则，提供 C ABI |
 | `client/native/apple` | 苹果平台资源所有者与 Actor，macOS 进程及 iOS 内置 VM 适配 |
 | `client/apps/host` | 平台启动、RN 接线、原生视图绑定和系统窗口 |
-| `client/builtins` | React/shadcn 表现与同步 TypeScript 子应用业务 |
+| `client/builtins` | React 界面与同步 TypeScript 子应用业务 |
 
 公共工作区不得直接使用 NativeModules、原生组件注册名、SF Symbols 名称或平台私有 View 属性。
 宿主入口注入应用容器、语义图标、壁纸、场景动画、图标反馈和通信适配。
@@ -82,9 +82,7 @@ CI 的 `client-core.yml` 提供 macOS、Linux、Windows 编译测试矩阵；未
 `make client-archive PLATFORM=ios` 生成 `client/dist/ios/Skynet Agent.xcarchive`；
 默认未签名。配置 `SKYNET_APPLE_TEAM` 后使用本机已有开发团队与签名配置，
 不自动创建证书、下载描述文件或上传。真机安装、TestFlight 和 App Store 分发需团队签名及单独验收。
-最低系统版本为 iOS/iPadOS 16.4，与共享 Tailwind 4 的 Safari 基线一致；
-不能仅使用 RN 本身的最低系统要求。当前实测运行时见任务验收记录，最低版本兼容性未单独验收。
-样式依据：[Tailwind 浏览器兼容性](https://tailwindcss.com/docs/compatibility)。
+最低系统版本为 iOS/iPadOS 16.4。新增 Web 特性须核对系统 WebKit 的支持情况。当前实测运行时见任务验收记录，最低版本兼容性未单独验收。
 
 UIKit Scene 持有 HostCore；安全区和键盘剩余高度由原生根容器提供。
 iPhone 窄屏显示单应用，iPad 宽屏支持内部双应用分屏，按实际内容宽度决定布局。

@@ -8,7 +8,7 @@
 | 依赖 | 用途 |
 | --- | --- |
 | Git 与 GitHub SSH | 仓库及子模块 |
-| Node.js 与 pnpm | 客户端 TypeScript、React Native、shadcn 构建与测试；版本见 `client/package.json` |
+| Node.js 与 pnpm | 客户端 TypeScript、React Native 与 Web 子应用构建测试，版本见 `client/package.json` |
 | Ruby 与 Bundler | CocoaPods；`make install` 将 gem 安装到项目 `.tools/gems` |
 | 完整 Xcode、macOS/iOS SDK 与模拟器 | 苹果平台宿主、Swift Package Manager 与签名构建 |
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
@@ -29,7 +29,7 @@ Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 name
 | `client/apps/host` | 平台启动、原生视图接线、macOS 窗口与 iOS Scene |
 | `client/native` | 公共 C++ 状态规则、苹果平台宿主资源与原生集成测试 |
 | `client/builtins` | 设置与 Agent 对话，各自包含清单、同步业务与 Web 表现 |
-| `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、shadcn 组件与令牌 |
+| `client/packages` | 共享 RN 工作区、宿主桥、契约、SDK、组件与令牌 |
 | `client/tooling` | 构建、应用包模板、边界检查和原生验收 |
 | `server` | Skynet 服务端及 Lua 单元、网络集成与真实模型测试 |
 | `common` | 公共协议、测试向量及 C 工具核心 |
@@ -65,8 +65,8 @@ iPhone/iPad 使用 `make install PLATFORM=ios`、`make client-dev PLATFORM=ios`�
 Lua 静态诊断配置见 `.luarc.json`。
 
 Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立运行。
-项目使用 shadcn MCP 和项目内技能查询组件规范；配置位于 `.codex/config.toml`，
-新会话读取配置后生效。完整 Xcode 的路径由 `XCODE_DEVELOPER_DIR` 覆盖，无需更改全局工具链。
+客户端使用项目内的 Astryx 官方技能，项目 MCP 可查官方组件、布局与主题。分屏和多平台交互见[客户端设计规范](design/CLIENT_DESIGN.md)。
+完整 Xcode 的路径由 `XCODE_DEVELOPER_DIR` 覆盖。
 
 ## 服务管理
 

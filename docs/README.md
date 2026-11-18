@@ -20,5 +20,5 @@
 
 ## 客户端设计
 
-- [客户端设计规范](design/CLIENT_DESIGN.md)：shadcn 组件、统一令牌、工作区交互和原生验收。
+- [客户端设计规范](design/CLIENT_DESIGN.md)：Astryx 主题、工作区交互和原生验收。
 - [客户端开发](../client/README.md)：React Native 宿主、独立应用包与开发入口。

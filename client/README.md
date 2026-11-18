@@ -1,6 +1,6 @@
 # Skynet 客户端
 
-React Native 宿主负责工作区；独立 WebView 呈现官方 shadcn/ui 子应用。
+React Native 宿主负责工作区，独立 WebView 呈现子应用。
 macOS 每应用独立 JavaScriptCore 进程；iOS 内置应用使用各自的 VM 与串行队列。
 两端均通过原生 HostCore 使用存储、连接和动作，界面重载不释放原生资源。
 Node.js 只用于开发构建，不随 App 分发。
@@ -14,7 +14,7 @@ packages/contracts 消息、清单和状态契约
 packages/app-sdk   Web 表现桥接与可失效订阅
 packages/app-runtime 同步 Actor 定义
 packages/agent-client 二进制协议、会话、流式任务和恢复规则
-packages/ui        官方 shadcn 组件源码与共享样式
+packages/ui        Web 子应用共享组件与样式
 packages/tokens    单一令牌源与生成主题
 tooling/           构建、打包、架构检查、原生验收与应用模板
 ```

@@ -34,14 +34,6 @@ Verified · Seen: 2× (2026-11-12, 2026-11-13)
 
 Verified · Seen: 1× (2026-11-13)
 
-<a id="l-092"></a>
-
-### L-092 共享 shadcn 组件目录要纳入 Tailwind 扫描
-
-组件存在而样式缺失时，先检查共享 CSS 的 `@source`。用随包 WebView 核对按钮的实际布局和样式。 [styles.css](../../client/packages/ui/src/styles.css)、[WebViewTests.swift](../../client/native/apple/Tests/SkynetHostCoreTests/WebViewTests.swift)
-
-Verified · Seen: 1× (2026-11-13)
-
 <a id="l-109"></a>
 
 ### L-109 宽度重排和高度不足分别验收
