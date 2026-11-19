@@ -1,6 +1,6 @@
 local Scope = require("tests.support.modules")
 local codes = require("enum.error_code")
-local status = require("enum.message_status")
+local status = require("agent.message_status")
 
 describe("用户与客户端服务", function()
     local scope, service, tasks, events, model, next_id, random_id, templates, template_loads, workspaces

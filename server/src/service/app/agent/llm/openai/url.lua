@@ -1,4 +1,4 @@
----@class openai.url.ParsedUrl
+---@class agent.llm.openai.url.ParsedUrl
 ---@field scheme string
 ---@field host string
 ---@field port integer
@@ -14,7 +14,7 @@ local default_ports = {
 local url = {}
 
 ---@param value string
----@return openai.url.ParsedUrl|nil
+---@return agent.llm.openai.url.ParsedUrl|nil
 ---@return string|nil
 function url.parse(value)
     if type(value) ~= "string" then

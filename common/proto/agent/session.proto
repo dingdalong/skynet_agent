@@ -3,6 +3,7 @@ syntax = "proto3";
 package skynet.agent.v1;
 
 import "common.proto";
+import "agent/types.proto";
 
 message AgentSnapshotReq {}
 

@@ -245,6 +245,7 @@ cleanall:
 
 # Both hosts build the same native sources in independent output directories.
 NATIVE_DIR := $(PROJECT_ROOT)/../common/native/agent_runtime
+AGENT_BINDINGS := $(PROJECT_ROOT)/src/service/app/agent/native
 NATIVE_BUILD := $(PROJECT_ROOT)/build/native
 .PHONY: native test-native
 native:
@@ -258,12 +259,12 @@ test-native: native
 process: native
 	@mkdir -p "$(LUACLIB_DIR)"
 	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" -I"$(NATIVE_DIR)" \
-		"$(PROJECT_ROOT)/src/lualib-src/process.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_process.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
+		"$(AGENT_BINDINGS)/process.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_process.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
 
 filesystem: native
 	@mkdir -p "$(LUACLIB_DIR)"
 	@$(CC) -O2 -Wall -Wextra $(LFS_CFLAGS) -I"$(LUA_DIR)" -I"$(NATIVE_DIR)" \
-		"$(PROJECT_ROOT)/src/lualib-src/filesystem.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_filesystem.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
+		"$(AGENT_BINDINGS)/filesystem.c" "$(NATIVE_BUILD)/libagent_runtime.a" -o "$(LUACLIB_DIR)/agent_filesystem.so" $(LFS_LDFLAGS) $(if $(filter Linux,$(UNAME_S)),-lutil,)
 
 test-tool-process:
 	@cd "$(PROJECT_ROOT)" && "$(SKYNET_DIR)/skynet" tests/integration/tool_process.config

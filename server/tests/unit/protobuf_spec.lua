@@ -2,7 +2,7 @@ local hash = require("helper.hash")
 local cjson = require("cjson")
 local error_code = require("enum.error_code")
 local lfs = require("lfs")
-local message_status = require("enum.message_status")
+local message_status = require("agent.message_status")
 local pb = require("pb")
 local pb_io = require("pb.io")
 local protobuf = require("helper.protobuf")
@@ -63,25 +63,12 @@ local function write_proto(directory, filename, content)
 end
 
 ---@param directory string
----@param package_name string
----@return string
-local function compile_test_schema(directory, package_name)
-    local proto_path = directory .. "/cached.proto"
-    write_proto(
-        directory,
-        "cached.proto",
-        string.format(
-            'syntax = "proto3"; package %s; message Cached { string value = 1; }',
-            package_name
-        )
-    )
+local function compile_shared_schema(directory)
     local compiler = protoc.new()
     compiler.include_imports = true
-    compiler:addpath(directory)
-    local descriptor = compiler:compilefile("cached.proto")
+    compiler.paths = { AGENT_PROTO_DIR }
+    local descriptor = compiler:compilefile("schema.proto")
     assert(pb_io.dump(directory .. "/pb.bytes", descriptor))
-    os.remove(proto_path)
-    return package_name .. ".Cached"
 end
 
 ---@param data table
@@ -93,7 +80,7 @@ local function assert_round_trip(type_name, data, expected)
 end
 
 describe("protobuf", function()
-    it("加载目录中的全部共享 proto 并自动注册消息名与哈希", function()
+    it("从统一入口加载共享协议并注册消息名与哈希", function()
         assert.is_true(protobuf.load(AGENT_PROTO_DIR))
         protocol:init()
 
@@ -223,34 +210,59 @@ describe("protobuf", function()
         assert.is_false(ok)
     end)
 
-    it("优先加载 pb.bytes 并忽略同目录损坏的 proto", function()
+    it("源码和预编译入口都能收发登录、聊天和设备执行消息", function()
         local directory = temporary_directory()
-        local type_name = compile_test_schema(directory, "protobuf_cache_test")
-        write_proto(directory, "broken.proto", 'syntax = "proto3"; this is invalid')
-        write_proto(directory, "ignored.txt", 'syntax = "proto3";')
-
-        assert.is_true(protobuf.load(directory))
-        assert_round_trip(type_name, { value = "cached" }, { value = "cached" })
+        compile_shared_schema(directory)
+        write_proto(directory, "schema.proto", "invalid source")
+        local vectors = load_protocol_vectors().frames
+        local requests = {
+            DesktopRegisterReq = { device_id = "desktop", name = "Desktop", authorization_id = "auth" },
+            ExecutionActionNtf = { request_id = "call", operation = "project", workspace_id = "workspace" },
+            ExecutionResultReq = { request_id = "call", result = "{}" },
+        }
+        for _, source in ipairs({ AGENT_PROTO_DIR, directory }) do
+            pb.clear()
+            protoc.reload()
+            assert.is_true(protobuf.load(source))
+            protocol:init()
+            for _, sample in ipairs({
+                { vectors.login_request, 1, "LoginReq", { username = "alice" } },
+                { vectors.chat_request, 2, "ChatReq", { session_id = "session-1", text = "你好" } },
+            }) do
+                local frame = decode_hex(sample[1])
+                local id, decoded, args = protocol:decode_msg(frame)
+                assert.are.equal(sample[2], id)
+                assert.are.equal(sample[3], decoded)
+                for field, value in pairs(sample[4]) do assert.are.equal(value, args[field]) end
+                local encoded = protocol:encode_msg(id, decoded, sample[4])
+                assert.are.equal(frame:sub(1, 9), encoded:sub(1, 9))
+                local _, _, round_trip = protocol:decode_msg(encoded)
+                assert.same(args, round_trip)
+            end
+            for name, fields in pairs(requests) do
+                local id = name:match("Ntf$") and 0 or 1
+                local decoded_id, decoded, args = protocol:decode_msg(protocol:encode_msg(id, name, fields))
+                assert.are.equal(id, decoded_id)
+                assert.are.equal(name, decoded)
+                for field, value in pairs(fields) do assert.are.equal(value, args[field]) end
+            end
+        end
         remove_directory(directory)
     end)
 
-    it("只扫描第一层普通 proto 文件", function()
+    it("只加载入口声明的协议", function()
         local directory = temporary_directory()
         write_proto(
             directory,
-            "root.proto",
+            "schema.proto",
             'syntax = "proto3"; package protobuf_nested_test; message Root { string value = 1; }'
         )
-        assert(lfs.mkdir(directory .. "/nested"))
-        write_proto(directory .. "/nested", "broken.proto", "not protobuf")
+        write_proto(directory, "unused.proto", "not protobuf")
 
         assert.is_true(protobuf.load(directory))
         assert_round_trip("protobuf_nested_test.Root", { value = "root" }, { value = "root" })
 
-        os.remove(directory .. "/nested/broken.proto")
-        assert(lfs.rmdir(directory .. "/nested"))
-        os.remove(directory .. "/root.proto")
-        assert(lfs.rmdir(directory))
+        remove_directory(directory)
     end)
 
     it("拒绝缺失目录、文件路径和空目录", function()
@@ -267,7 +279,7 @@ describe("protobuf", function()
         local directory = temporary_directory()
         ok, err = pcall(protobuf.load, directory)
         assert.is_false(ok)
-        assert.matches("没有 .proto 文件", tostring(err))
+        assert.matches("schema%.proto", tostring(err))
         assert(lfs.rmdir(directory))
     end)
 
@@ -276,7 +288,7 @@ describe("protobuf", function()
         write_file(directory .. "/pb.bytes", "invalid descriptor")
         write_proto(
             directory,
-            "fallback.proto",
+            "schema.proto",
             'syntax = "proto3"; package protobuf_fallback_test; message Value { string text = 1; }'
         )
 

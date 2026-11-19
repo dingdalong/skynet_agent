@@ -65,7 +65,8 @@ WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `service/client/user.lua`、`service/client/applications.lua` | 用户身份与连接、应用请求路由登记 |
+| `service/client/user.lua`、`service/client/applications.lua` | 用户身份与连接、装配已启用应用的路由 |
+| `service/app/agent/routes.lua`                  | Agent 对外开放的请求清单 |
 | `service/app/agent/init.lua`                    | Agent 服务的用户分配、请求分发和关服清理 |
 | `service/app/agent/app.lua`、`service/app/agent/handler.lua` | 单个用户的 Agent 上下文、快照及请求处理 |
 | `service/app/agent/session.lua`、`service/app/agent/agent.lua` | 单会话生命周期、模型对话与历史提交 |
@@ -74,7 +75,7 @@ WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循
 独立脚本和 Skynet 内置服务优先于公共入口。基础服务位于 `src/service/<name>/<name>.lua`，
 应用入口统一放在 `src/service/app/<name>/init.lua`。两者均以服务名加载稳定类表，例如 `require("agent")`。
 每个服务的私有模块和资源与入口同目录，按模块名加载，例如 `client.user`、`agent.session` 和 `agent.agent`。
-`src/lualib` 保存公共框架、协议与 SDK 适配。各节点的 main 通过 `node.init(callback)` 定制业务启动，
+`src/lualib` 保存公共框架与协议编解码。各节点的 main 通过 `node.init(callback)` 定制业务启动，
 回调接收节点实例；`node` 先完成公共初始化，再执行回调，最后进入就绪状态。
 `node` 复用服务基础层的初始化与命令分发，统一管理进程生命周期，业务服务清单由 main 决定。
 节点实例的 `launch(name, count, params, registered_name)` 默认按服务名和编号注册；
@@ -189,7 +190,8 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
 WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-`client.applications` 登记每个应用可接收的协议请求名。client 校验 WebSocket 来源，按请求查目标，
+`agent.routes` 声明 Agent 可接收的协议请求名。`client.applications` 装配应用的路由声明。
+client 校验 WebSocket 来源，按请求查目标，
 始终传递连接绑定的用户身份。main 先启动 N 个 Agent 实例，再将有序地址列表交给所有 client。
 路由使用 `FNV-1a32(用户名) % N + 1` 选择实例。多端登录、断线重连和后续请求均使用同一规则。
 N 独立于 client 池的大小，调整后重启生效，部分用户名会映射到新的实例编号。
@@ -214,9 +216,9 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 
 ### Protobuf 编解码
 
-`helper.protobuf.load(schema_directory)` 加载目录第一层的全部 `.proto`，文件按名称排序，
-通过标准 import 关系一次加载。存在 `pb.bytes` 时只加载该预编译 FileDescriptorSet，
-不再扫描或校验 proto；预编译需带 `--include_imports`，多个 proto 仍生成一个文件。
+`helper.protobuf.load(schema_directory)` 从 `schema.proto` 加载登录和应用协议，
+所有 import 路径相对于 schema 目录。目录中存在 `pb.bytes` 时优先读取该 FileDescriptorSet。
+需要预编译时，在 `common/proto/` 执行 `protoc -I . --include_imports --descriptor_set_out=pb.bytes schema.proto`。
 
 业务服务在初始化阶段调用 `attach()`，随后按完整消息类型名编解码，例如：
 
@@ -238,7 +240,8 @@ schema、helper 公开接口或 `pb.so` 变化后必须重启；共享 schema �
 
 ## 外部消息格式
 
-共享协议位于 `common/proto`，服务端与独立 Lua 网络探针直接加载同一 schema。
+共享协议位于 `common/proto`。Agent 的会话、执行和业务类型集中在 `agent/`，
+服务端、独立 Lua 网络探针和客户端生成器使用同一入口。
 固定二进制向量和真实网络检查入口见[开发指南](../DEVELOPMENT.md#测试与验收)。
 
 每帧是 `压缩标志 uint8 | 消息 ID uint32 | 类型哈希 uint32 | Protobuf args`，固定头为 9 字节，
@@ -311,7 +314,7 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 `exec_command` 启动 bash，`write_stdin` 继续访问所属会话的执行进程，`apply_patch` 处理文本补丁。
 `common/native/agent_runtime/` 是服务端使用的公共 C 核心，统一补丁、文件访问、沙盒、进程与 PTY。
-服务端 `lualib-src/process.c`、`filesystem.c` 只做 Lua 绑定，描述符接入 Skynet 调度。
+服务端的两个 Lua 绑定位于 `src/service/app/agent/native/`，将文件和进程操作接入 Skynet。
 macOS 客户端通过 Swift 绑定同一 C ABI，在原生宿主授权的本机目录内执行工具。
 `agent_worker` 在沙盒子进程执行补丁，私有临时输入随任务回收；
 `process_launcher` 监督进程组，在控制连接关闭时终止子进程。C 变更需重新构建和重启。
@@ -341,6 +344,7 @@ Web 与原生核心均检查版本连续性，出现缺口获取完整快照，�
 模型清单由 config 提供。Agent 快照只包含公开模型描述。`SessionModelSetReq/Res` 按会话设置模型，
 `ChatSession` 包装同时返回当前模型和实际权限模型 ID。切换不取消正在进行的模型请求，后续请求获取最新配置快照。
 `agent.llm.base` 统一管理模型配置、客户端生命周期、流式响应、思考通知与用量日志。
+Agent 在自己的 Lua VM 内安装 `service/app/agent/llm/openai/` 中的传输和流解析适配，再加载第三方 `lua-openai` SDK。
 主模型与权限模型各持有独立实例；SDK 适配和单次 HTTP 请求的取消状态由同模块的
 `Base.Client`、`Base.Request` 管理，类表从模块导出以支持原位热修。`agent.Run` 管理整轮任务。
 

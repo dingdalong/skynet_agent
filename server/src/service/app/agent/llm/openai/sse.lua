@@ -1,17 +1,15 @@
 local cjson = require("cjson")
 local class = require("class")
 
-local MODULE_NAME = "openai.sse"
-
----@class openai.sse.Event
+---@class agent.llm.openai.sse.Event
 ---@field type? string
 ---@field delta? string
 ---@field response? table
 ---@field error? string|table
 ---@field message? string
 
----@class openai.sse.Parser
----@field on_event fun(event: openai.sse.Event)
+---@class agent.llm.openai.sse.Parser
+---@field on_event fun(event: agent.llm.openai.sse.Event)
 ---@field buffer string
 ---@field data_lines string[]
 ---@field event_name string?
@@ -21,7 +19,7 @@ local sse = {
     Parser = class(),
 }
 
----@param parser openai.sse.Parser
+---@param parser agent.llm.openai.sse.Parser
 local function dispatch(parser)
     if #parser.data_lines == 0 then
         parser.event_name = nil
@@ -48,7 +46,7 @@ local function dispatch(parser)
     parser.event_name = nil
 end
 
----@param parser openai.sse.Parser
+---@param parser agent.llm.openai.sse.Parser
 ---@param line string
 local function process_line(parser, line)
     if line == "" then
@@ -76,7 +74,7 @@ local function process_line(parser, line)
     end
 end
 
----@param parser openai.sse.Parser
+---@param parser agent.llm.openai.sse.Parser
 local function consume_lines(parser)
     -- CR 和 LF 可能分处两个网络 chunk，行尾不完整时留到下一次 feed 再处理。
     while #parser.buffer > 0 do
@@ -126,7 +124,7 @@ function sse.Parser:feed(chunk, err)
     return chunk
 end
 
----@param on_event fun(event: openai.sse.Event)
+---@param on_event fun(event: agent.llm.openai.sse.Event)
 function sse.Parser:ctor(on_event)
     assert(type(on_event) == "function", "on_event 必须是函数")
     self.on_event = on_event
@@ -136,12 +134,10 @@ function sse.Parser:ctor(on_event)
     self.finished = false
 end
 
----@param on_event fun(event: openai.sse.Event)
----@return openai.ltn12.Filter
+---@param on_event fun(event: agent.llm.openai.sse.Event)
+---@return agent.llm.openai.ltn12.Filter
 function sse.create_stream_filter(on_event)
-    local loaded = package.loaded[MODULE_NAME]
-    assert(type(loaded) == "table", "openai.sse 尚未加载")
-    local parser = loaded.Parser:new(on_event)
+    local parser = require("agent.llm.openai.sse").Parser:new(on_event)
     return function(chunk, err)
         return parser:feed(chunk, err)
     end

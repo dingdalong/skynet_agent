@@ -5,9 +5,10 @@ local FakeHttp = require("tests.support.fake_http")
 ---@diagnostic disable-next-line: assign-type-mismatch
 local luassert = assert
 
-local ltn12 = require("openai.ltn12")
-local sse = require("openai.sse")
-local url = require("openai.url")
+local ltn12 = require("agent.llm.openai.ltn12")
+local sse = require("agent.llm.openai.sse")
+local url = require("agent.llm.openai.url")
+local provider = "agent.llm.openai.skynet_compat"
 
 local original_compat
 local original_httpc
@@ -15,15 +16,15 @@ local original_skynet
 local timers
 
 local function load_compat()
-    package.loaded["openai.skynet_compat"] = nil
-    compat = require("openai.skynet_compat")
+    package.loaded[provider] = nil
+    compat = require(provider)
 end
 
 before_each(function()
     original_skynet = package.loaded.skynet
     timers = {}
     package.loaded.skynet = { now = function() return 0 end, timeout = function(_, f) timers[#timers + 1] = f end }
-    original_compat = package.loaded["openai.skynet_compat"]
+    original_compat = package.loaded[provider]
     original_httpc = package.loaded["http.httpc"]
     package.loaded["http.httpc"] = {
         request_stream = function()
@@ -35,12 +36,12 @@ end)
 
 after_each(function()
     package.loaded.skynet = original_skynet
-    package.loaded["openai.skynet_compat"] = original_compat
+    package.loaded[provider] = original_compat
     package.loaded["http.httpc"] = original_httpc
 end)
 
----@param sink openai.ltn12.Sink
----@return openai.skynet_compat.RequestOptions
+---@param sink agent.llm.openai.ltn12.Sink
+---@return agent.llm.openai.skynet_compat.RequestOptions
 local function request_options(sink)
     return {
         method = "POST",
@@ -61,12 +62,12 @@ local function install_httpc(fake_http)
     load_compat()
 end
 
-describe("openai.skynet_compat", function()
+describe(provider, function()
     it("显式安装 lua-openai 兼容依赖", function()
         compat.install()
         luassert.are.equal(ltn12, package.loaded.ltn12)
         luassert.are.equal(url, package.loaded["socket.url"])
-        luassert.are.equal(sse, package.loaded["openai.sse"])
+        luassert.are.equal(sse, require("openai.sse"))
         luassert.is_nil(package.loaded["socket.core"])
         luassert.is_nil(package.loaded["socket.http"])
 
@@ -404,8 +405,9 @@ describe("openai.skynet_compat", function()
             },
         })
         install_httpc(fake)
+        compat.install()
         local client = require("openai").new("secret")
-        client.config.http_provider = "openai.skynet_compat"
+        client.config.http_provider = provider
         client.api_base = "https://api.example.com/v1"
         client.default_model = "example-model"
         luassert.are.equal(compat, client:get_http())

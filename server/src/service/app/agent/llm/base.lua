@@ -86,9 +86,9 @@ function Base.Client:ctor(config)
     assert(type(base_url) == "string" and base_url ~= "", "LLM base_url 不能为空")
     assert(type(model) == "string" and model ~= "", "LLM model 不能为空")
 
-    require("openai.skynet_compat").install()
+    require("agent.llm.openai.skynet_compat").install()
     require("openai").OpenAI.__init(self, config.api_key)
-    self.config.http_provider = "openai.skynet_compat"
+    self.config.http_provider = "agent.llm.openai.skynet_compat"
     self.api_base = config.base_url:gsub("/+$", "")
     self.default_model = config.model
     self.request_timeout_ticks = config.request_timeout_ticks or 12000
@@ -98,12 +98,12 @@ end
 ---@return table
 function Base.Client:get_http()
     local request = self.current_request
-    local compat = require("openai.skynet_compat")
+    local compat = require("agent.llm.openai.skynet_compat")
     local http_client = compat.new_http_client(self.request_timeout_ticks)
     -- provider 仅在本次请求中使用，不安装共享的协程上下文或长期方法闭包。
     return {
         request = function(options)
-            return require("openai.skynet_compat").request(options, request, http_client)
+            return require("agent.llm.openai.skynet_compat").request(options, request, http_client)
         end,
     }
 end
@@ -111,7 +111,7 @@ end
 ---@class llm.Request
 ---@field new fun(self: llm.Request): llm.Request
 ---@field cancelled boolean
----@field stream openai.skynet_compat.ResponseStream?
+---@field stream agent.llm.openai.skynet_compat.ResponseStream?
 ---@field close_error string?
 Base.Request = class()
 
@@ -156,7 +156,7 @@ local function http_error_message(status, body)
     return string.format("LLM HTTP %s: %s", tostring(status), detail or "未知错误")
 end
 
----@param event openai.sse.Event
+---@param event agent.llm.openai.sse.Event
 ---@return string
 local function terminal_error(event)
     local response = event.response or {}
@@ -216,7 +216,7 @@ local function stream_responses(client, input, on_text_delta, request, options, 
         if delta ~= "" and on_reasoning then on_reasoning(delta, key) end
     end
 
-    ---@param event openai.sse.Event
+    ---@param event agent.llm.openai.sse.Event
     local function on_event(event)
         if event.type == "response.reasoning_text.delta" or event.type == "response.reasoning_summary_text.delta"
             or event.type == "response.reasoning_text.done" or event.type == "response.reasoning_summary_text.done" then

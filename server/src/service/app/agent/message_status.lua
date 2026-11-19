@@ -1,4 +1,4 @@
----@enum message_status
+---@enum agent.MessageStatus
 local message_status = {
     unspecified = 0,
     streaming = 1,

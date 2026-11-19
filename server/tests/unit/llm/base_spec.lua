@@ -5,7 +5,8 @@ local FakeHttp = require("tests.support.fake_http")
 local luassert = assert
 
 local current_httpc
-local original_compat = package.loaded["openai.skynet_compat"]
+local provider = "agent.llm.openai.skynet_compat"
+local original_compat = package.loaded[provider]
 local original_httpc = package.loaded["http.httpc"]
 local httpc_proxy = {
     request_stream = function(...)
@@ -19,13 +20,13 @@ package.loaded.log = { info = function() end, failure = function() end }
 local original_skynet = package.loaded.skynet
 package.loaded.skynet = { now = function() return 0 end, timeout = function() end }
 package.loaded["http.httpc"] = httpc_proxy
-package.loaded["openai.skynet_compat"] = nil
+package.loaded[provider] = nil
 local llm = require("agent.llm.base")
-local compat = require("openai.skynet_compat")
+local compat = require(provider)
 package.loaded.log = original_log
 package.loaded.skynet = original_skynet
 package.loaded["http.httpc"] = original_httpc
-package.loaded["openai.skynet_compat"] = original_compat
+package.loaded[provider] = original_compat
 
 local previous_compat
 local previous_httpc
@@ -35,10 +36,10 @@ local previous_log
 before_each(function()
     previous_log = package.loaded.log
     package.loaded.log = { info = function() end, failure = function() end }
-    previous_compat = package.loaded["openai.skynet_compat"]
+    previous_compat = package.loaded[provider]
     previous_httpc = package.loaded["http.httpc"]
     current_httpc = nil
-    package.loaded["openai.skynet_compat"] = compat
+    package.loaded[provider] = compat
     previous_new_http_client = compat.new_http_client
     compat.new_http_client = function(timeout)
         return { timeout = timeout, request_stream = function(...) return current_httpc.request_stream(...) end }
@@ -49,7 +50,7 @@ after_each(function()
     package.loaded.log = previous_log
     compat.new_http_client = previous_new_http_client
     current_httpc = nil
-    package.loaded["openai.skynet_compat"] = previous_compat
+    package.loaded[provider] = previous_compat
     package.loaded["http.httpc"] = previous_httpc
 end)
 
@@ -223,7 +224,7 @@ describe("agent.llm.base", function()
         end)
 
         luassert.is_nil(err)
-        luassert.are.equal("openai.skynet_compat", model.client.config.http_provider)
+        luassert.are.equal(provider, model.client.config.http_provider)
         luassert.are.equal("https://api.deepseek.com", model.client.api_base)
         luassert.are.equal("deepseek-flash", model.client.default_model)
         luassert.are.equal("你好", text)

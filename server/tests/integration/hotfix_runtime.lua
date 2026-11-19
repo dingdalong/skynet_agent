@@ -40,6 +40,16 @@ skynet.start(function()
         local config = { api_key = "hotfix-probe", base_url = "https://llm.example.com", model = "probe" }
         local model = Base:new(config, "main")
         local client = Client:new(config)
+        local sse = require("openai.sse")
+        assert(sse == require("agent.llm.openai.sse"))
+        local streamed
+        local filter = sse.create_stream_filter(function(event) streamed = event.delta end)
+        filter('data: {"delta":"')
+        reloaded, reload_error = hotfix.reload({ "agent.llm.openai.sse" })
+        assert(reloaded, reload_error)
+        assert(require("openai.sse") == sse)
+        filter('continued"}\n\n')
+        assert(streamed == "continued")
         local request = Request:new()
         model.client, client.current_request = client, request
         model.sequence = 7

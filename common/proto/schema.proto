@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+import public "login.proto";
+import public "agent/session.proto";
+import public "agent/execution.proto";

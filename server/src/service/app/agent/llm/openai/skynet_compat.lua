@@ -1,21 +1,22 @@
-local ltn12 = require("openai.ltn12")
-local url = require("openai.url")
+local ltn12 = require("agent.llm.openai.ltn12")
+local sse = require("agent.llm.openai.sse")
+local url = require("agent.llm.openai.url")
 local httpc = require("http.httpc")
 local skynet = require("skynet")
 
----@alias openai.skynet_compat.Headers table<string, string|number>
+---@alias agent.llm.openai.skynet_compat.Headers table<string, string|number>
 
----@class openai.skynet_compat.RequestOptions
+---@class agent.llm.openai.skynet_compat.RequestOptions
 ---@field url string
 ---@field method string
----@field headers? openai.skynet_compat.Headers
----@field source? openai.ltn12.Source
----@field sink? openai.ltn12.Sink
+---@field headers? agent.llm.openai.skynet_compat.Headers
+---@field source? agent.llm.openai.ltn12.Source
+---@field sink? agent.llm.openai.ltn12.Sink
 
----@class openai.skynet_compat.ResponseStream
+---@class agent.llm.openai.skynet_compat.ResponseStream
 ---@field status integer
 ---@field header? table<string, string>
----@field close fun(self: openai.skynet_compat.ResponseStream)
+---@field close fun(self: agent.llm.openai.skynet_compat.ResponseStream)
 
 local module = {}
 
@@ -24,6 +25,7 @@ function module.install(timeout_ticks)
     httpc.timeout = timeout_ticks or 12000
     package.loaded["ltn12"] = ltn12
     package.loaded["socket.url"] = url
+    package.loaded["openai.sse"] = sse
 end
 
 ---@param timeout_ticks integer?
@@ -37,7 +39,7 @@ function module.new_http_client(timeout_ticks)
     return client
 end
 
----@param source openai.ltn12.Source?
+---@param source agent.llm.openai.ltn12.Source?
 ---@return string|nil
 ---@return string|nil
 local function read_source(source)
@@ -59,8 +61,8 @@ local function read_source(source)
     return table.concat(chunks)
 end
 
----@param headers openai.skynet_compat.Headers?
----@return openai.skynet_compat.Headers
+---@param headers agent.llm.openai.skynet_compat.Headers?
+---@return agent.llm.openai.skynet_compat.Headers
 local function request_headers(headers)
     local result = {}
     for name, value in pairs(headers or {}) do
@@ -73,7 +75,7 @@ local function request_headers(headers)
     return result
 end
 
----@param options openai.skynet_compat.RequestOptions
+---@param options agent.llm.openai.skynet_compat.RequestOptions
 ---@param request llm.Request?
 ---@return integer|nil
 ---@return any

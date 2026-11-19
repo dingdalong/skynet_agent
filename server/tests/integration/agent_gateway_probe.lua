@@ -1,6 +1,6 @@
 local gateway = require("integration.gateway_socket")
 local support = require("integration.support")
-local status = require("enum.message_status")
+local status = require("agent.message_status")
 local crypt = require("skynet.crypt")
 
 local M = {}

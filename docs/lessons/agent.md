@@ -38,7 +38,7 @@ Verified · Seen: 1× (2026-11-05)
 
 ### L-021 流式模型请求从发送到读完共用一个截止时间
 
-收到响应头后仍可能长时间收不到流数据。用剩余预算约束读取和关闭，验证超时后请求能够退出。 [skynet_compat.lua](../../server/src/lualib/openai/skynet_compat.lua)、[skynet_compat_spec.lua](../../server/tests/unit/openai/skynet_compat_spec.lua)
+收到响应头后仍可能长时间收不到流数据。用剩余预算约束读取和关闭，验证超时后请求能够退出。 [skynet_compat.lua](../../server/src/service/app/agent/llm/openai/skynet_compat.lua)、[skynet_compat_spec.lua](../../server/tests/unit/llm/openai/skynet_compat_spec.lua)
 
 Verified · Seen: 1× (2026-11-05)
 
@@ -70,7 +70,7 @@ Verified · Seen: 1× (2026-11-07)
 
 ### L-049 主模型与权限模型使用各自的 HTTP 超时配置
 
-HTTP 模块的可变超时会污染并行请求。隔离各客户端的请求配置，交错发起两个期限不同的请求验证。 [skynet_compat.lua](../../server/src/lualib/openai/skynet_compat.lua)、[skynet_compat_spec.lua](../../server/tests/unit/openai/skynet_compat_spec.lua)
+HTTP 模块的可变超时会污染并行请求。隔离各客户端的请求配置，交错发起两个期限不同的请求验证。 [skynet_compat.lua](../../server/src/service/app/agent/llm/openai/skynet_compat.lua)、[skynet_compat_spec.lua](../../server/tests/unit/llm/openai/skynet_compat_spec.lua)
 
 Verified · Seen: 1× (2026-11-08)
 
@@ -78,7 +78,7 @@ Verified · Seen: 1× (2026-11-08)
 
 ### L-056 用稳定历史前缀维护模型缓存
 
-公共消息、历史与已编码工具结果按顺序追加。传输层原样转发 SDK 请求体，避免解码再编码改变空数组。缓存效果查供应商实际返回的用量。 [PROMPTS.md](../../docs/architecture/PROMPTS.md)、[skynet_compat_spec.lua](../../server/tests/unit/openai/skynet_compat_spec.lua)
+公共消息、历史与已编码工具结果按顺序追加。传输层原样转发 SDK 请求体，避免解码再编码改变空数组。缓存效果查供应商实际返回的用量。 [PROMPTS.md](../../docs/architecture/PROMPTS.md)、[skynet_compat_spec.lua](../../server/tests/unit/llm/openai/skynet_compat_spec.lua)
 
 Verified · Seen: 1× (2026-11-08)
 

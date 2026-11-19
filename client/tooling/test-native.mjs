@@ -5,16 +5,10 @@ import { build } from "esbuild";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import protobuf from "protobufjs";
+import { loadProtocol } from "./load-protocol.mjs";
 
 const clientRoot = fileURLToPath(new URL("../", import.meta.url));
-const schema = new protobuf.Root();
-await schema.load(
-    ["login.proto", "agent_session.proto"].map(
-        (file) => `${clientRoot}../common/proto/${file}`,
-    ),
-    { keepCase: true },
-);
+const schema = await loadProtocol();
 const messageHash = (name) => {
     let hash = 0x811c9dc5;
     for (const value of `skynet.agent.v1.${name}`)
