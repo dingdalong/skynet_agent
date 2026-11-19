@@ -9,8 +9,14 @@ import XCTest
 /// mouse/keyboard events; actual Simulator acceptance is a separate step.
 @MainActor
 final class MobileHostTests: XCTestCase {
+    private func login(_ core: HostCore) async throws {
+        let endpoint = try XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"])
+        _ = try? await workspace(core, "logout")
+        _ = try await workspace(core, "login", ["url": "\(endpoint)/agent", "username": "mobile-test"])
+    }
     func testWebWorkspaceRestoresSplitWithoutRecreatingEitherApplication() async throws {
         let core = HostServices.core
+        try await login(core)
         let shell = try await view("workspace-shell") as! WKWebView
         let original = shell.frame
         guard original.width >= 728 else { throw XCTSkip("需要宽工作区") }
@@ -70,6 +76,7 @@ final class MobileHostTests: XCTestCase {
 
     func testRetainedApplicationStaysHiddenAfterReturningHome() async throws {
         let core = HostServices.core
+        try await login(core)
         for delay: UInt64 in [350_000_000, 10_000_000, 0] {
             _ = try await workspace(core, "open", ["appId": "agent"])
             let scene = try await view("app-scene-agent")
@@ -90,6 +97,7 @@ final class MobileHostTests: XCTestCase {
 
     func testNativeAnimationOutputCannotRevealRetainedApplication() async throws {
         let core = HostServices.core
+        try await login(core)
         _ = try await workspace(core, "open", ["appId": "agent"])
         let scene = try await view("app-scene-agent")
         try await eventually("Agent scene did not become visible") {
@@ -207,6 +215,7 @@ final class MobileHostTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let builtins = Bundle.main.resourceURL!.appendingPathComponent("builtins")
         let core = try HostCore(dataRoot: root, builtins: builtins)
+        try await login(core)
         defer {
             core.shutdown()
             try? FileManager.default.removeItem(at: root)
@@ -240,6 +249,7 @@ final class MobileHostTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let builtins = Bundle.main.resourceURL!.appendingPathComponent("builtins")
         let core = try HostCore(dataRoot: root, builtins: builtins)
+        try await login(core)
         defer {
             core.shutdown()
             try? FileManager.default.removeItem(at: root)
@@ -270,6 +280,7 @@ final class MobileHostTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let core = try HostCore(
             dataRoot: root, builtins: Bundle.main.resourceURL!.appendingPathComponent("builtins"))
+        try await login(core)
         let lease = core.attach(appId: "settings") { _ in }
         defer {
             core.detach(lease)
@@ -316,6 +327,7 @@ final class MobileHostTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let core = try HostCore(
             dataRoot: root, builtins: Bundle.main.resourceURL!.appendingPathComponent("builtins"))
+        try await login(core)
         let lease = core.attach(appId: "agent") { _ in }
         defer {
             core.detach(lease)
@@ -400,6 +412,7 @@ final class MobileHostTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let core = try HostCore(
             dataRoot: root, builtins: Bundle.main.resourceURL!.appendingPathComponent("builtins"))
+        try await login(core)
         let lease = core.attach(appId: "settings") { _ in }
         defer {
             core.detach(lease)

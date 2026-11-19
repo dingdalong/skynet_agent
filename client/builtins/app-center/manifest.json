@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "minimumHostVersion": 1,
+  "stateVersion": 1,
+  "id": "app-center",
+  "name": "应用中心",
+  "version": "1.0.0",
+  "permissions": ["user.identity"],
+  "networkOrigins": [],
+  "actions": {}
+}

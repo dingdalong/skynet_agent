@@ -71,8 +71,11 @@ try {
         const target =
             action === "test" || action === "dev" ? await device() : null;
         await run(
-            "xcodebuild",
+            action === "test" ? process.execPath : "xcodebuild",
             [
+                ...(action === "test"
+                    ? [`${clientRoot}tooling/test-native.mjs`, "--xcodebuild"]
+                    : []),
                 "-project",
                 "SkynetHost.xcodeproj",
                 "-scheme",

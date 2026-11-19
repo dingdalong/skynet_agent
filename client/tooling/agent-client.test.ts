@@ -65,7 +65,7 @@ class Client {
     state = initialAgentState();
     last: Transition<AgentState> = { state: this.state };
     command(type: string, payload: Json = {}) {
-        this.last = reduceAgent(this.state, { type, payload }, [origin]);
+        this.last = reduceAgent(this.state, { type, payload });
         this.state = this.last.state;
         return this.last;
     }
@@ -96,9 +96,10 @@ class Client {
         };
     }
     connect() {
-        let result = this.command("connection.configure", {
+        let result = this.command("$user", {
             url: `${origin}/agent`,
             username: "alice",
+            userId: "u1",
         });
         const context = result.effects?.find(
             (effect) => effect.kind === "agent.context",
@@ -133,7 +134,6 @@ const nativeContext = {
     name: "Mac",
     authorizationId: "grant-1",
     remoteEnabled: false,
-    origins: ["wss://agent.example.com"],
     workspaces: [
         {
             device_id: "mac-1",
@@ -145,7 +145,70 @@ const nativeContext = {
 };
 
 describe("native Agent development", () => {
-    it("uses mobile native origins without registering a desktop executor", () => {
+    it("keeps the connection through service retirement and registers the desktop with the new pool", () => {
+        const client = new Client();
+        client.state = startAgent(client.state, true).state;
+        client.login([session()]);
+        client.resource(
+            "DesktopRegisterRes",
+            { ret: 1 },
+            client.pending("DesktopRegisterReq"),
+        );
+        client.command("session.select", { id: "s1" });
+        const change = (enabled: boolean) =>
+            client.resource("AppCenterChangedNtf", {
+                app_id: "agent",
+                enabled,
+            });
+        change(false);
+        expect(client.state.connection.status).toBe("unavailable");
+        expect(client.state.connection.id).toBe("physical1");
+        const cleanup = client.resource("ExecutionActionNtf", {
+            request_id: "cleanup",
+            operation: "cancel",
+        });
+        client.effect(cleanup.effects![0].id, { ok: true });
+        expect(client.pending("ExecutionResultReq")).toBeGreaterThan(0);
+        client.resource("SessionUpdatedNtf", { chat_session: session() });
+        expect(client.state.sessions).toEqual({});
+        change(true);
+        expect(client.state.selectedId).toBe("");
+        client.resource(
+            "AgentSnapshotRes",
+            { ret: 1, snapshot: client.snapshot() },
+            client.pending("AgentSnapshotReq"),
+        );
+        client.resource(
+            "DesktopRegisterRes",
+            { ret: 1 },
+            client.pending("DesktopRegisterReq"),
+        );
+        expect(client.state.connection.status).toBe("online");
+        expect(client.state.connection.id).toBe("physical1");
+        expect(client.pending("ChatReq")).toBeNaN();
+    });
+    it("waits on the logged-in connection when Agent is offline at first open", () => {
+        const client = new Client();
+        client.connect();
+        client.resource(
+            "LoginRes",
+            { ret: 1, identity: { username: "alice", user_id: "u1" } },
+            client.pending("LoginReq"),
+        );
+        client.resource(
+            "AgentSnapshotRes",
+            { ret: 4 },
+            client.pending("AgentSnapshotReq"),
+        );
+        expect(client.state.connection.status).toBe("unavailable");
+        client.resource("AppCenterChangedNtf", {
+            app_id: "agent",
+            enabled: true,
+        });
+        expect(client.pending("AgentSnapshotReq")).toBeGreaterThan(0);
+        expect(client.pending("LoginReq")).toBeNaN();
+    });
+    it("uses the host identity on mobile without registering a desktop executor", () => {
         const client = new Client();
         client.state = startAgent(client.state, true).state;
         client.command("$agent.context", {
@@ -228,12 +291,10 @@ describe("native Agent development", () => {
     });
     it("starts native context once per business process and ignores results after disconnect", () => {
         const initial = startAgent(initialAgentState(), true);
-        expect(initial.effects?.map((effect) => effect.kind)).toEqual([
-            "agent.context",
-        ]);
+        expect(initial.effects).toEqual([]);
         const client = new Client();
         client.state = initial.state;
-        client.effect(initial.effects![0].id, nativeContext);
+        client.command("$agent.context", nativeContext);
         expect(client.state.local?.deviceId).toBe("mac-1");
         client.state.supportsLocal = false;
         client.login();
@@ -283,21 +344,15 @@ describe("native Agent development", () => {
         ).toBe(true);
         expect(client.pending("ChatReq")).toBeGreaterThan(0);
     });
-    it("accepts only native-authorized server origins without changing the manifest", () => {
+    it("binds the Agent transport to the identity confirmed by the host", () => {
         const client = new Client();
-        client.command("$agent.context", nativeContext);
-        client.command("connection.configure", {
-            url: "wss://agent.example.com/agent",
-            username: "alice",
-        });
-        expect(client.state.configuration.url).toBe(
-            "wss://agent.example.com/agent",
+        client.connect();
+        client.resource(
+            "LoginRes",
+            { ret: 1, identity: { username: "alice", user_id: "other" } },
+            client.pending("LoginReq"),
         );
-        client.command("connection.configure", {
-            url: "wss://agent.example.com.evil/agent",
-            username: "alice",
-        });
-        expect(client.state.error).toContain("尚未授权");
+        expect(client.state.error).toContain("身份不匹配");
     });
 });
 
@@ -503,10 +558,7 @@ describe("Agent actor", () => {
         const resumed = startAgent(client.state);
         expect(resumed.state.notice).toContain("未确认");
         expect(resumed.state.drafts[""]).toBe("不能重放");
-        expect(resumed.effects?.map((effect) => effect.kind)).toEqual([
-            "socket.open",
-            "timer.wait",
-        ]);
+        expect(resumed.effects).toEqual([]);
         expect(resumed.state.connection.pending).toEqual({});
     });
     it("binds cancel and retry to the displayed run and preserves prepared input", () => {
@@ -564,14 +616,14 @@ describe("Agent actor", () => {
             result.effects?.some((effect) => effect.kind === "socket.send"),
         ).toBe(false);
     });
-    it("rejects unauthorized origins, stale send targets and invalid retry requests", () => {
+    it("rejects incomplete identities, stale send targets and invalid retry requests", () => {
         const client = new Client();
-        const denied = client.command("connection.configure", {
-            url: `${origin}.evil/agent`,
+        const denied = client.command("$user", {
+            url: `${origin}/agent`,
             username: "alice",
         });
         expect(denied.effects).toEqual([]);
-        expect(client.state.error).toContain("授权");
+        expect(client.state.error).toContain("登录信息");
         client.login([session(1, 2)]);
         client.command("chat.send", { target: "s1", text: "stale" });
         expect(client.state.error).toContain("切换");

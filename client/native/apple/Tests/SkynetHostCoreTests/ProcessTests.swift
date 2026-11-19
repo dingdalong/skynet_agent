@@ -16,10 +16,20 @@ final class ProcessTests: XCTestCase {
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let runtime = native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime")
+        try FileManager.default.copyItem(
+            at: native.deletingLastPathComponent().appendingPathComponent("dist/builtins/gateway.js"),
+            to: builtins.appendingPathComponent("gateway.js"))
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: runtime.path))
         host = try HostCore(
             dataRoot: directory.appendingPathComponent("data"), builtins: builtins,
             launcher: native.appendingPathComponent(".build/c-core/process_launcher"), executable: runtime)
+        let online = expectation(description: "宿主已登录")
+        let url = try XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"])
+        host.workspace("login", input: ["url": "\(url)/agent", "username": "native-agent"]) { result in
+            if case .failure(let error) = result { XCTFail(String(describing: error)) }
+            online.fulfill()
+        }
+        wait(for: [online], timeout: 5)
     }
 
     override func tearDownWithError() throws {
@@ -481,8 +491,8 @@ final class ProcessTests: XCTestCase {
         let code = try String(
             contentsOfFile: XCTUnwrap(environment["SKYNET_TEST_AGENT_RUNTIME"]), encoding: .utf8)
         install(
-            try package("test.agent", code: code, permissions: ["network"], origins: [url]),
-            permissions: ["network"])
+            try package("test.agent", code: code, permissions: ["network", "user.identity"], origins: [url]),
+            permissions: ["network", "user.identity"])
         let ready = expectation(description: "Agent receives initial data in actual JavaScriptCore")
         var once = false
         let first = host.attach(appId: "test.agent") { snapshot in
@@ -492,13 +502,6 @@ final class ProcessTests: XCTestCase {
             }
         }
         wait(for: [ready], timeout: 5)
-        host.request(
-            lease: first, kind: "command",
-            input: [
-                "name": "connection.configure",
-                "payload": ["url": "\(url)/agent", "username": "native-agent"],
-            ]
-        ) { _ in }
         let online = expectation(description: "Agent logs in over binary socket")
         var onlineOnce = false
         var connectionId = ""
@@ -554,12 +557,15 @@ final class ProcessTests: XCTestCase {
         host.detach(reloaded)
     }
 
-    func testInstalledAppCannotAcquireBuiltinAgentDirectoryOrServerAccess() throws {
+    func testInstalledAppCannotAccessBuiltinToolsOrRegistry() throws {
         install(try package("test.untrusted", code: counter))
         let lease = host.attach(appId: "test.untrusted") { _ in }
         let denied = expectation(description: "native Agent capabilities remain builtin-only")
-        denied.expectedFulfillmentCount = 3
-        for kind in ["agent.directory.choose", "agent.server.authorize", "agent.remote.set"] {
+        let operations = [
+            "agent.directory.choose", "agent.remote.set", "catalog.list", "catalog.unlock", "catalog.set",
+        ]
+        denied.expectedFulfillmentCount = operations.count
+        for kind in operations {
             host.request(lease: lease, kind: kind, input: ["url": "wss://example.com", "enabled": true]) {
                 result in
                 switch result {
@@ -571,6 +577,43 @@ final class ProcessTests: XCTestCase {
         }
         wait(for: [denied], timeout: 4)
         host.detach(lease)
+    }
+
+    func testLogoutRevokesAppAccessAndRequiresNewGatewayIdentity() throws {
+        install(
+            try package("test.account", code: counter, permissions: ["user.identity"]),
+            permissions: ["user.identity"])
+        let first = expectation(description: "first user")
+        var received = false
+        let oldLease = host.attach(appId: "test.account") { value in
+            if !received, dictionary(value["user"])["username"] as? String == "native-agent" {
+                received = true
+                first.fulfill()
+            }
+        }
+        wait(for: [first], timeout: 5)
+        let logout = expectation(description: "revoked")
+        host.workspace("logout") { response in
+            XCTAssertTrue((try? response.get()["user"]) is NSNull)
+            logout.fulfill()
+        }
+        wait(for: [logout], timeout: 5)
+        let denied = expectation(description: "login gate")
+        denied.expectedFulfillmentCount = 2
+        let reject: HostCore.Reply = { response in
+            if case .success = response { XCTFail("access remained after logout") }
+            denied.fulfill()
+        }
+        host.workspace("open", input: ["appId": "test.account"], completion: reject)
+        host.request(lease: oldLease, kind: "snapshot", input: [:], completion: reject)
+        wait(for: [denied], timeout: 5)
+        let login = expectation(description: "second user")
+        let url = try XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"])
+        host.workspace("login", input: ["url": "\(url)/agent", "username": "another-user"]) { response in
+            XCTAssertEqual(dictionary(try? response.get()["user"])["username"] as? String, "another-user")
+            login.fulfill()
+        }
+        wait(for: [login], timeout: 5)
     }
 
     func testProcessCrashAndRestartPreserveCommittedState() throws {

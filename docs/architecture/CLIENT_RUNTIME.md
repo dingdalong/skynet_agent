@@ -2,7 +2,10 @@
 
 客户端由 Astryx Web 工作区、受限子应用 WebView 和 JavaScriptCore 业务运行时组成。
 macOS 每应用独立进程，iOS/iPadOS 每个可信内置应用独立 VM 与串行队列，属于进程内隔离。
-当前内置设置与 Agent。Agent 已接入服务器会话、流式任务、模型选择、取消与失败重试；
+当前内置设置、应用中心与 Agent。启动宿主时先向网关登录，成功后开放工作区。
+声明并获得 `user.identity` 权限的应用在启动时收到 `$user`，其快照中的 `user` 包含用户名、用户 ID 和网关地址。
+应用中心通过宿主登录连接请求目录；管理员详情只在该连接解锁后返回。退出登录时释放应用进程和连接。
+Agent 已接入服务器会话、流式任务、模型选择、取消与失败重试；
 已接入 macOS 本地项目执行器；移动端发送远程指令。Agent 生成并安装应用和远程分发尚未接入。
 业务协议和恢复规则见 [Agent 客户端](CLIENT_AGENT.md)。
 UI 规格见[客户端设计规范](../design/CLIENT_DESIGN.md)。
@@ -92,14 +95,14 @@ WebKit 与业务初始化并行，SDK 等待初始化状态提交后发送 `view
 - `src/view.tsx`：Web 界面，通过 SDK 订阅状态和请求命令。
 
 当前支持 `socket.open`、`socket.send`、`socket.close`、`timer.wait` 和 `apps.call` 效果。
-内置 Agent 独占 `agent.context`、`agent.execute` 及原生目录、服务器授权入口；
+内置 Agent 独占 `agent.context`、`agent.execute` 及原生目录授权入口；
 即使普通包声明相似权限，也不能获得这些能力。目录、设备与工具进程由原生宿主管理。
 `socket.send` 在 `text` 与 base64 `data` 之间二选一，收包使用相同字段区分帧类型；
 可以绑定 `connectionId` 拒绝旧连接发送。消息上限为 256 KiB。
 `timer.wait` 由宿主执行，按应用和 key 管理，替换同 key 时旧任务收到失败；退出应用时清理。
 计时范围和并发数量有硬限制，不能在 reducer 或 Web 页面持有业务重连计时器。
 网络权限需要 manifest 声明并得到安装授权；仅允许精确 `wss` 来源及显式回环 `ws`。
-内置 Agent 还可由用户在原生确认框中授权新服务器；额外来源仅对该内置应用生效。
+宿主登录新的远程网关时弹出原生确认框。内置 Agent 的业务连接仅能打开当前登录的网关。
 连接由 ResourceBroker 持有，不因 WebView 卸载而关闭。
 应用可定义同步 `start(state)`，在业务进程加载并处理上次中断后执行一次；
 安装探测和界面订阅不会执行它。恢复连接等启动效果仍遵循先持久提交、后执行的规则。

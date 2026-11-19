@@ -9,7 +9,7 @@ Node.js 只用于开发构建，不随 App 分发。
 apps/host/          macOS/iOS 入口、原生视图与平台接线
 native/apple/      苹果平台资源、Actor 与生命周期
 native/core/       平台无关工作区状态规则
-builtins/          设置与 Agent 对话，分别包含 manifest、runtime 与 view
+builtins/          设置、应用中心与 Agent 对话，各自包含 manifest、runtime 与 view
 packages/contracts 消息、清单和状态契约
 packages/app-sdk   Web 表现桥接、快照订阅、Astryx 主题与错误界面
 packages/app-runtime 同步 Actor 定义

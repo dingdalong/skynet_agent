@@ -281,6 +281,7 @@ end
 
 function AgentSession:close()
     self.agent:close()
+    self.agent.executor = nil
 end
 
 return AgentSession

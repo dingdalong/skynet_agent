@@ -31,12 +31,9 @@
         private func value() -> [String: Any] {
             [
                 "deviceId": access.deviceId, "name": "iOS", "authorizationId": "",
-                "remoteEnabled": false, "canExecute": false, "origins": access.origins,
+                "remoteEnabled": false, "canExecute": false,
                 "workspaces": [],
             ]
-        }
-        func origins(_ completion: @escaping ([String]) -> Void) {
-            queue.async { completion(self.access.origins) }
         }
         func context(reset: Bool, completion: @escaping HostCore.Reply) {
             queue.async { completion(.success(self.value())) }

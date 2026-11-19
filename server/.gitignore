@@ -7,4 +7,5 @@ logs/
 luaclib/
 bin/
 work_dir/
+app_center_state.json*
 build/

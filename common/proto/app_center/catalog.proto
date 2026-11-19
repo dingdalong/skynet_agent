@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package skynet.agent.v1;
+
+import "common.proto";
+
+message AppCenterListReq {}
+message AppCenterService {
+  string app_id = 1;
+  string name = 2;
+  string service = 3;
+  uint32 instances = 4;
+  bool enabled = 5;
+  string transition = 6;
+}
+message AppCenterListRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+  repeated string names = 3;
+  repeated AppCenterService services = 4;
+  bool administrator = 5;
+}
+message AppCenterUnlockReq { string token = 1; }
+message AppCenterUnlockRes { int32 ret = 1; ErrorInfo error = 2; }
+message AppCenterSetReq { string app_id = 1; bool enabled = 2; }
+message AppCenterSetRes { int32 ret = 1; ErrorInfo error = 2; }
+message AppCenterChangedNtf { string app_id = 1; bool enabled = 2; }

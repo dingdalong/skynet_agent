@@ -72,13 +72,15 @@ function Service:invoke(context, command, ...)
         if context.source ~= self.owner then
             return error_code.invalid_command
         end
-        if self.close_started then
+        local retry = ...
+        if self.close_started and (not self.close_done or self.close_succeeded or retry ~= true) then
             while not self.close_done do
                 skynet.sleep(1)
             end
             return self.close_succeeded and error_code.succ or error_code.call_fail, self.close_succeeded
         end
         self.close_started = true
+        self.close_done = false
         self.state = "closing"
         local ok, result = true, true
         if self.instance.close then

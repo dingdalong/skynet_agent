@@ -89,7 +89,6 @@ export interface LocalContext {
     name: string;
     authorizationId: string;
     remoteEnabled: boolean;
-    origins: string[];
     workspaces: ExecutionTarget[];
 }
 export interface PendingRequest {
@@ -102,10 +101,16 @@ export interface PendingRequest {
 export interface AgentState {
     version: 1;
     sequence: number;
-    configuration: { url: string; username: string; enabled: boolean };
+    configuration: {
+        url: string;
+        username: string;
+        userId: string;
+        enabled: boolean;
+    };
     connection: {
         status:
             | "offline"
+            | "unavailable"
             | "connecting"
             | "restoring"
             | "online"

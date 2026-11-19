@@ -37,6 +37,57 @@
                     "snapshot": { "id": 4, "type": "AgentSnapshot" }
                   }
                 },
+                "AppCenterChangedNtf": {
+                  "fields": {
+                    "app_id": { "id": 1, "type": "string" },
+                    "enabled": { "id": 2, "type": "bool" }
+                  }
+                },
+                "AppCenterListReq": { "fields": {} },
+                "AppCenterListRes": {
+                  "fields": {
+                    "administrator": { "id": 5, "type": "bool" },
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "names": { "id": 3, "rule": "repeated", "type": "string" },
+                    "ret": { "id": 1, "type": "int32" },
+                    "services": {
+                      "id": 4,
+                      "rule": "repeated",
+                      "type": "AppCenterService"
+                    }
+                  }
+                },
+                "AppCenterService": {
+                  "fields": {
+                    "app_id": { "id": 1, "type": "string" },
+                    "enabled": { "id": 5, "type": "bool" },
+                    "instances": { "id": 4, "type": "uint32" },
+                    "name": { "id": 2, "type": "string" },
+                    "service": { "id": 3, "type": "string" },
+                    "transition": { "id": 6, "type": "string" }
+                  }
+                },
+                "AppCenterSetReq": {
+                  "fields": {
+                    "app_id": { "id": 1, "type": "string" },
+                    "enabled": { "id": 2, "type": "bool" }
+                  }
+                },
+                "AppCenterSetRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AppCenterUnlockReq": {
+                  "fields": { "token": { "id": 1, "type": "string" } }
+                },
+                "AppCenterUnlockRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
                 "ChatMessage": {
                   "fields": {
                     "content": { "id": 3, "type": "string" },

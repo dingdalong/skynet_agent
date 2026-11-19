@@ -5,7 +5,7 @@
   "id": "agent",
   "name": "Agent",
   "version": "1.0.0",
-  "permissions": ["network"],
+  "permissions": ["network", "user.identity"],
   "networkOrigins": ["ws://127.0.0.1:18787", "ws://localhost:18787"],
   "actions": {}
 }

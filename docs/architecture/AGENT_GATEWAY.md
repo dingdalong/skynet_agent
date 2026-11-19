@@ -27,7 +27,8 @@
 
 ```mermaid
 flowchart LR
-    C["client 服务"] -->|"1:N"| U["user"]
+    Registry["App Center"] -->|"订阅与目录变更"| C["client 服务"]
+    C -->|"1:N"| U["user"]
     C -->|"1:N"| N["connection 订阅"]
     C -->|"按用户名固定路由"| P["agent 服务池中的一个实例"]
     P -->|"1:N"| B["用户的 Agent 上下文"]
@@ -48,8 +49,8 @@ flowchart LR
 
 `main` 是进程的生命周期所有者，持有共享 Protobuf schema 和服务地址列表。它按依赖顺序创建、
 命名和初始化服务，最后开放网关监听；启动失败则回收已创建服务。本机控制台在业务服务启动前开放，
-启动卡住时也可显式强制关闭。关闭时先停止热修监听并等待当前批次结束，再停止接入、依次回收
-WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循环和后台生成退出后统一结束进程。
+启动卡住时也可显式强制关闭。关服时先冻结应用上下线、等候进行中的变更和热修结束，再停止接入，
+依次关闭 WebSocket、logind、client、应用实例和应用中心，等待在途命令、连接读循环和后台生成退出后结束进程。
 启动和关闭均无超时，正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
 显式强制关闭跳过清理并退出 1。进程重启由外部管理器负责。
 
@@ -65,7 +66,7 @@ WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `service/client/user.lua`、`service/client/applications.lua` | 用户身份与连接、装配已启用应用的路由 |
+| `service/client/user.lua`、`service/app/app_center/` | 用户身份与连接、应用服务注册及目录同步 |
 | `service/app/agent/routes.lua`                  | Agent 对外开放的请求清单 |
 | `service/app/agent/init.lua`                    | Agent 服务的用户分配、请求分发和关服清理 |
 | `service/app/agent/app.lua`、`service/app/agent/handler.lua` | 单个用户的 Agent 上下文、快照及请求处理 |
@@ -88,7 +89,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 返回格式为 `状态码, 业务结果...`；Lua 异常会被记录并转换为 `call_fail`。
 
 初始化只能执行一次。服务就绪前拒绝业务命令；初始化期间仅放行 `initializing_commands` 显式登记的
-命令，main 只登记 `force_shutdown`。关闭由初始化所有者发起并保持幂等。
+命令。main 在启动时接受显式强制关服和应用中心的实例创建请求。关闭由初始化所有者发起并保持幂等。
 `close` 成功表示清理完成，重复调用等待同一次结果。关闭期间拒绝新业务，仅允许
 `closing_commands` 显式登记的收尾命令，例如回收迟到的接入 fd 和断线清理。
 在途命令异常也会释放计数。每个 Agent 服务继续跟踪分配到本实例的所有用户的离线生成任务。
@@ -190,12 +191,14 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
 WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-`agent.routes` 声明 Agent 可接收的协议请求名。`client.applications` 装配应用的路由声明。
-client 校验 WebSocket 来源，按请求查目标，
-始终传递连接绑定的用户身份。main 先启动 N 个 Agent 实例，再将有序地址列表交给所有 client。
+`agent.routes` 声明 Agent 可接收的请求。节点启动后 App Center 登记有序的服务池，每个 client
+在开放网关之前订阅完整目录，此后接收变更快照。client 校验 WebSocket 来源，在本地查表并转发连接绑定的身份。
 路由使用 `FNV-1a32(用户名) % N + 1` 选择实例。多端登录、断线重连和后续请求均使用同一规则。
 N 独立于 client 池的大小，调整后重启生效，部分用户名会映射到新的实例编号。
-公共服务可在登记项中指定已由节点启动的本地注册名 `address`，各用户的请求都发往同一地址。
+公共服务使用单实例池。应用中心管理员可在线注册或撤销整组服务，启用状态保存在节点本地。
+下线时先让全部 client 停止分配新请求，保留在途工具的清理回执。节点取消任务、关闭工具后销毁整组 Actor，释放旧地址。
+上线时按配置创建全新的实例，全部就绪后一次性登记。用户登录和工作目录文件保留，聊天会话从空快照开始。
+节点启动时先读取应用中心保存的启用状态，已下线的应用显示零个实例。
 每次路由都携带用户身份与连接 ID，公共服务可据此决定数据的可见范围。
 
 Agent 服务校验路由来源和用户 ID，再从 `agent.handler.REQUEST` 动态查找方法。

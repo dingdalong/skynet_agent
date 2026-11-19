@@ -74,10 +74,7 @@ export function request(
                 pending.delete(requestId);
                 reject(new Error(`请求超时：${kind}`));
             },
-            kind === "agent.directory.choose" ||
-                kind === "agent.server.authorize"
-                ? 300_000
-                : 15_000,
+            kind === "agent.directory.choose" ? 300_000 : 15_000,
         );
         pending.set(requestId, { resolve, reject, timer });
         try {

@@ -15,6 +15,10 @@ return {
     protocol = {
         agent_gateway_schema_dir = "../common/proto",
     },
+    app_center = {
+        admin_token = os.getenv("APP_CENTER_ADMIN_TOKEN"),
+        state_path = os.getenv("APP_CENTER_STATE_PATH") or "./app_center_state.json",
+    },
     agent_gateway = {
         socket = {
             host = "127.0.0.1",

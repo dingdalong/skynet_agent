@@ -309,6 +309,13 @@ export function Launchers({
                                     "var(--window-controls-end, 0px)",
                             }}
                         >
+                            {snapshot.user && (
+                                <Button
+                                    label={`${snapshot.user.username} · 退出登录`}
+                                    variant="ghost"
+                                    onClick={() => void execute("logout")}
+                                />
+                            )}
                             <IconButton
                                 icon={<Icon icon="copy" />}
                                 label="后台应用"

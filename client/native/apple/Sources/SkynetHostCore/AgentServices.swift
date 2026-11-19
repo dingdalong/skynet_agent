@@ -111,7 +111,6 @@
             [
                 "deviceId": access.deviceId, "name": Host.current().localizedName ?? "Mac",
                 "authorizationId": authorization, "remoteEnabled": access.remoteEnabled,
-                "origins": access.origins,
                 "workspaces": access.directories.map {
                     [
                         "device_id": access.deviceId, "workspace_id": $0.id,
@@ -119,9 +118,6 @@
                     ]
                 },
             ]
-        }
-        func origins(_ completion: @escaping ([String]) -> Void) {
-            queue.async { completion(self.access.origins) }
         }
         func context(reset: Bool, completion: @escaping HostCore.Reply) {
             queue.async {
@@ -152,7 +148,7 @@
                     }
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "允许 Agent 连接此服务器？"
+                        alert.messageText = "允许工作区连接此服务器？"
                         alert.informativeText = "\(origin)\n\n对话和所选项目的任务信息会发送到该服务器。仅授权你信任的服务器。"
                         alert.addButton(withTitle: "允许连接")
                         alert.addButton(withTitle: "取消")

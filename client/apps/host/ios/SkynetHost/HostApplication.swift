@@ -41,7 +41,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                 return
             }
             let alert = UIAlertController(
-                title: "允许 Agent 连接此服务器？",
+                title: "允许工作区连接此服务器？",
                 message: "\(origin)\n\n对话和任务信息会发送到该服务器。仅授权你信任的服务器。",
                 preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completion(false) })

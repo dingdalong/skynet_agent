@@ -31,11 +31,18 @@ export interface Workspace {
 }
 
 export interface HostSnapshot {
+    user?: HostUser | null;
     revision: number;
     workspace: Workspace;
     preferences: Preferences;
     apps: AppSummary[];
     capabilities: HostCapabilities;
+}
+
+export interface HostUser {
+    userId: string;
+    username: string;
+    url: string;
 }
 
 export type PaneToolbarItem = {
@@ -59,6 +66,8 @@ export interface HostCapabilities {
 }
 
 export type WorkspaceCommandName =
+    | "login"
+    | "logout"
     | "home"
     | "overview"
     | "open"
@@ -72,6 +81,7 @@ export type WorkspaceCommandName =
     | "restart";
 
 export interface AppSnapshot<State = Json> {
+    user?: HostUser | null;
     appId: string;
     generation: number;
     revision: number;

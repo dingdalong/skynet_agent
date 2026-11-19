@@ -6,6 +6,7 @@ import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { createHostStore } from "../../../packages/host-bridge/src";
 import { Workspace } from "../../../packages/workspace/src/Workspace";
+import { Login } from "./Login";
 import type { HostSnapshot, PaneToolbar } from "@skynet/contracts";
 import { tokens, hostTheme } from "@skynet/tokens";
 import "@astryxdesign/core/reset.css";
@@ -171,7 +172,13 @@ function Shell() {
                         description={error}
                     />
                 )}
-                {snapshot ? (
+                {snapshot && !snapshot.user ? (
+                    <Login
+                        login={(url, username) =>
+                            store.command("login", { url, username })
+                        }
+                    />
+                ) : snapshot ? (
                     <Workspace
                         snapshot={snapshot}
                         errors={errors}

@@ -16,8 +16,9 @@ export function initialAgentState(): AgentState {
         version: 1,
         sequence: 0,
         configuration: {
-            url: "ws://127.0.0.1:18787/agent",
+            url: "",
             username: "",
+            userId: "",
             enabled: false,
         },
         connection: {
@@ -242,7 +243,43 @@ class Turn {
             authorization_id: local.authorizationId,
         });
     }
+    unavailable() {
+        this.state.connection.status = "unavailable";
+        this.state.connection.pending = {};
+        this.state.sessions = {};
+        this.state.selectedId = "";
+        this.state.desktops = [];
+        this.state.buffered = [];
+        this.state.syncing = false;
+        this.state.error = "";
+    }
     notification(packet: Packet) {
+        const connection = this.state.connection;
+        if (packet.name === "AppCenterChangedNtf") {
+            if (
+                packet.body.app_id !== "agent" ||
+                Object.values(connection.pending).some(
+                    (request) => request.name === "LoginReq",
+                )
+            )
+                return;
+            if (!packet.body.enabled) this.unavailable();
+            else if (connection.status === "unavailable") {
+                connection.status = "restoring";
+                this.state.localEffects = {};
+                this.request(
+                    "AgentSnapshotReq",
+                    {},
+                    this.state.configuration.userId,
+                );
+            }
+            return;
+        }
+        if (
+            connection.status === "unavailable" &&
+            packet.name !== "ExecutionActionNtf"
+        )
+            return;
         if (this.state.connection.status === "restoring") {
             if (this.state.buffered.length >= 128)
                 this.lost("登录期间更新过多，正在重连");
@@ -357,6 +394,11 @@ class Turn {
                 pending.name === "DesktopRegisterReq"
             )
                 this.lost(message, false);
+            else if (
+                pending.name === "AgentSnapshotReq" &&
+                packet.body.ret === 4
+            )
+                this.unavailable();
             else if (pending.name === "AgentSnapshotReq") this.lost(message);
             else this.state.error = message;
             return;
@@ -369,6 +411,7 @@ class Turn {
                 };
                 if (
                     !identity?.user_id ||
+                    identity.user_id !== this.state.configuration.userId ||
                     identity.username !== this.state.configuration.username
                 )
                     throw Error("服务器登录身份不匹配");
@@ -440,7 +483,8 @@ class Turn {
             delete this.state.localEffects[id];
             if (
                 execution.epoch === connection.epoch &&
-                connection.status === "online"
+                (connection.status === "online" ||
+                    connection.status === "unavailable")
             ) {
                 this.request("ExecutionResultReq", {
                     request_id: execution.requestId,
@@ -534,16 +578,12 @@ export function startAgent(
     turn.state.local = null;
     turn.state.localEffects = {};
     turn.state.localRequest = "";
-    if (turn.state.configuration.enabled) turn.connect();
-    else if (localExecution)
-        turn.state.localRequest = turn.emit("agent.context", {});
     return turn.finish();
 }
 
 export function reduceAgent(
     previous: AgentState,
     command: Command,
-    origins: readonly string[],
 ): Transition<AgentState> {
     const turn = new Turn(previous);
     const state = turn.state;
@@ -573,27 +613,16 @@ export function reduceAgent(
                     else turn.response(packet);
                 } else throw Error("服务器应发送二进制 protobuf 消息");
                 break;
-            case "connection.configure": {
+            case "$user": {
                 const url = String(body.url ?? "").trim();
                 const username = String(body.username ?? "").trim();
-                // JavaScriptCore has no browser URL API. The native broker independently checks the parsed authority.
-                if (
-                    ![...origins, ...(state.local?.origins ?? [])].some(
-                        (origin) =>
-                            url === origin ||
-                            url.startsWith(`${origin.replace(/\/$/, "")}/`),
-                    )
-                )
-                    throw Error(
-                        "此服务器来源尚未授权，请在连接设置中允许连接此服务器",
-                    );
-                if (/[#?@\\\s]/.test(url)) throw Error("服务器地址格式无效");
-                if (!username || username.length > 64)
-                    throw Error("请输入 1–64 个字符的用户名");
+                const userId = String(body.userId ?? "");
+                if (!url || !username || !userId)
+                    throw Error("宿主登录信息无效");
                 const changedUser =
                     username !== state.configuration.username ||
                     url !== state.configuration.url;
-                state.configuration = { url, username, enabled: true };
+                state.configuration = { url, username, userId, enabled: true };
                 if (changedUser) {
                     state.sessions = {};
                     state.models = [];

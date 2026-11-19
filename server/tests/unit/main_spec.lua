@@ -30,11 +30,12 @@ describe("main", function()
 
     it("在节点启动回调中加载业务 schema 并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema" }, { "launch", "agent" }, { "launch", "client" }, { "launch", "logind" },
+        assert.same({ { "schema", "schema" }, { "launch", "app_center" },
+            { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
-            { name = "agent", count = 1 },
-            { name = "client", count = 2, params = { app_services = { agent = { 11 } } } },
+            { name = "app_center", count = 1, params = { agent_count = 1 }, registered_name = ".app_center" },
+            { name = "client", count = 2 },
             { name = "logind", count = 1, params = { client_services = { 12, 13 } } },
             { name = "websocket", count = 3 },
             { name = "gateway", count = 1, params = { loginds = { 14 }, websockets = { 15, 16, 17 } },
@@ -45,11 +46,11 @@ describe("main", function()
         config.agent_gateway.instance = { agent = 0, client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
-            { name = "agent", count = 0 },
-            { name = "client", count = 0, params = { app_services = { agent = {} } } },
+            { name = "app_center", count = 1, params = { agent_count = 0 }, registered_name = ".app_center" },
+            { name = "client", count = 0 },
             { name = "logind", count = 2, params = { client_services = {} } },
             { name = "websocket", count = 0 },
-            { name = "gateway", count = 1, params = { loginds = { 11, 12 }, websockets = {} },
+            { name = "gateway", count = 1, params = { loginds = { 12, 13 }, websockets = {} },
                 registered_name = ".gateway" },
         }, calls)
     end)

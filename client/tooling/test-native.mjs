@@ -15,7 +15,13 @@ const messageHash = (name) => {
         hash = Math.imul(hash ^ value.charCodeAt(0), 0x1000193) >>> 0;
     return hash;
 };
-const names = ["LoginReq", "AgentSnapshotReq", "ChatReq", "SessionModelSetReq"];
+const names = [
+    "LoginReq",
+    "AppCenterListReq",
+    "AgentSnapshotReq",
+    "ChatReq",
+    "SessionModelSetReq",
+];
 const send = (socket, name, id, body) => {
     const type = schema.lookupType(`skynet.agent.v1.${name}`);
     const payload = type.encode(type.create(body)).finish();
@@ -67,6 +73,13 @@ server.on("connection", (socket) => {
                     username: request.username,
                     user_id: snapshot.user_id,
                 },
+            });
+            return;
+        }
+        if (name === "AppCenterListReq") {
+            send(socket, "AppCenterListRes", requestId, {
+                ret: 1,
+                names: ["Agent", "应用中心", "日历"],
             });
             return;
         }
@@ -223,7 +236,7 @@ await build({
             import {initialAgentState, startAgent, reduceAgent} from ${JSON.stringify(`${clientRoot}packages/agent-client/src/index.ts`)};
             export default {
                 initialState: initialAgentState, start: startAgent,
-                reduce(state, command) { return reduceAgent(state, command, ["ws://127.0.0.1:${address.port}"]); }
+                reduce: reduceAgent
             };
         `,
         resolveDir: clientRoot,
@@ -237,14 +250,20 @@ await build({
     inject: [`${clientRoot}packages/app-runtime/src/text-codec.ts`],
     footer: { js: "globalThis.SkynetApp = SkynetRuntime.default;" },
 });
-const child = spawn("swift", ["test", ...process.argv.slice(2)], {
-    env: {
-        ...process.env,
-        SKYNET_TEST_SOCKET: `ws://127.0.0.1:${address.port}`,
-        SKYNET_TEST_AGENT_RUNTIME: agentRuntime,
+const simulator = process.argv[2] === "--xcodebuild";
+const child = spawn(
+    simulator ? "xcodebuild" : "swift",
+    simulator ? process.argv.slice(3) : ["test", ...process.argv.slice(2)],
+    {
+        env: {
+            ...process.env,
+            SKYNET_TEST_SOCKET: `ws://127.0.0.1:${address.port}`,
+            TEST_RUNNER_SKYNET_TEST_SOCKET: `ws://127.0.0.1:${address.port}`,
+            SKYNET_TEST_AGENT_RUNTIME: agentRuntime,
+        },
+        stdio: "inherit",
     },
-    stdio: "inherit",
-});
+);
 const code = await new Promise((resolve, reject) => {
     child.once("exit", resolve);
     child.once("error", reject);

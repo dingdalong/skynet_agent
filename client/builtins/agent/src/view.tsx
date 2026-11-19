@@ -28,6 +28,7 @@ import "./styles.css";
 
 const statusLabels = {
     offline: "未连接",
+    unavailable: "服务已下线",
     connecting: "连接中",
     restoring: "恢复会话",
     online: "已连接",
@@ -105,7 +106,6 @@ function Agent() {
     const canConnect =
         state.connection.status === "offline" ||
         state.connection.status === "error";
-    const openConnection = () => setConnectionOpen(true);
     return (
         <AppShell variant="wash" mobileNav={{ breakpoint: "none" }}>
             <Layout
@@ -174,12 +174,26 @@ function Agent() {
                     emptyState={
                         <EmptyState
                             isCompact={!wide}
-                            title={online ? "开始一个新任务" : "连接你的 Agent"}
+                            role="status"
+                            title={
+                                state.connection.status === "unavailable"
+                                    ? "Agent 服务已下线"
+                                    : online
+                                      ? "开始一个新任务"
+                                      : "正在连接 Agent"
+                            }
+                            description={
+                                state.connection.status === "unavailable"
+                                    ? "服务上线后，此窗口会自动恢复。"
+                                    : undefined
+                            }
                             actions={
                                 canConnect && (
                                     <Button
-                                        label="连接服务器"
-                                        onClick={openConnection}
+                                        label="重新连接"
+                                        onClick={() =>
+                                            void send("connection.reconnect")
+                                        }
                                     />
                                 )
                             }

@@ -87,6 +87,8 @@ cat >"$env_file" <<EOF
 SKYNET_CFG_CHANNEL=$channel
 DEEPSEEK_API_KEY=e2e-test-key
 AGENT_WORKSPACE_ROOT="$temp_dir/work_dir"
+APP_CENTER_STATE_PATH="$temp_dir/app_center.json"
+APP_CENTER_ADMIN_TOKEN=fixture-registry-token
 EOF
 
 if [ "$probe" = hotfix_watch_probe ]; then
@@ -102,27 +104,20 @@ else
 fi
 server_pid=$!
 
-attempt=1
-gateway_ready=
-while [ "$attempt" -le 40 ]; do
-    if AGENT_WS_URL="$gateway_url" \
-        "$project_root/tests/integration/run_probe.sh" agent_gateway_probe ready >/dev/null 2>&1; then
-        gateway_ready=1
-        break
-    fi
-    if ! kill -0 "$server_pid" 2>/dev/null; then
-        printf '%s\n' "Agent 网关进程提前退出" >&2
-        cat "$server_log" >&2
-        exit 1
-    fi
-    attempt=$((attempt + 1))
-    sleep 0.25
-done
-if [ -z "$gateway_ready" ]; then
+wait_for_gateway() {
+    attempt=1
+    while [ "$attempt" -le 40 ] && kill -0 "$server_pid" 2>/dev/null; do
+        if AGENT_WS_URL="$gateway_url" \
+            "$project_root/tests/integration/run_probe.sh" agent_gateway_probe ready >/dev/null 2>&1; then
+            return
+        fi
+        attempt=$((attempt + 1))
+        sleep 0.25
+    done
     printf '%s\n' "Agent 网关未在预期时间内启动" >&2
-    cat "$server_log" >&2
-    exit 1
-fi
+    return 1
+}
+wait_for_gateway
 
 set +e
 AGENT_WS_URL="$gateway_url" AGENT_FAKE_LLM_URL="$fake_llm_url" \
@@ -134,7 +129,7 @@ command_status=$?
 probe_pid=
 set -e
 case "$probe" in
-    hotfix_watch_probe|service_control_probe)
+    hotfix_watch_probe|service_control_probe|agent_gateway_probe)
         attempt=0
         while [ "$command_status" -eq 0 ] && kill -0 "$server_pid" 2>/dev/null; do
             if [ "$attempt" -ge 150 ]; then
@@ -157,6 +152,14 @@ if ! kill -0 "$server_pid" 2>/dev/null; then
         printf 'Skynet 进程异常退出 status=%s\n' "$server_status" >&2
         command_status=1
     fi
+fi
+if [ "$command_status" -eq 0 ] && [ "$probe" = agent_gateway_probe ]; then
+    server_log="$temp_dir/restart.log"
+    SKYNET_ENV_FILE="$env_file" "$project_root/start.sh" >"$server_log" 2>&1 &
+    server_pid=$!
+    wait_for_gateway
+    AGENT_WS_URL="$gateway_url" AGENT_TEST_SERVER_LOG="$server_log" \
+        "$project_root/tests/integration/run_probe.sh" "$probe" offline_restart
 fi
 if [ "$command_status" -ne 0 ]; then
     printf '%s\n' "假模型全链路命令执行失败" >&2

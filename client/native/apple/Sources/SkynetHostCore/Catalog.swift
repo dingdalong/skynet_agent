@@ -166,7 +166,8 @@ public final class AppCatalog {
             guard permission.count <= 160,
                 !permission.hasPrefix("host.") || (builtin && reserved.contains(permission)),
                 permission == "storage" || reserved.contains(permission)
-                    || permission == "network" || permission.hasPrefix("apps.call:")
+                    || permission == "network" || permission == "user.identity"
+                    || permission.hasPrefix("apps.call:")
             else {
                 throw failure("permission", "Unsupported app permission: \(permission)")
             }

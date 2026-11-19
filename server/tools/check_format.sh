@@ -68,6 +68,7 @@ $(find "$project_root" \
 	\( -path "$project_root/.git" \
 		-o -path "$project_root/3rd" -o -path "$project_root/luaclib" \
 		-o -path "$project_root/cservice" -o -path "$project_root/logs" \
+		-o -path "$project_root/app_center_state.json" -o -path "$project_root/work_dir" \
 		-o -name build -o -name coverage \) -prune -o \
 	-type f \( -name '*.lua' -o -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.json' \
 		-o -name '*.md' -o -name '*.config' -o -name 'makefile' \

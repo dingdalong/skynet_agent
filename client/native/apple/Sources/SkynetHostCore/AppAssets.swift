@@ -79,7 +79,8 @@ public final class AppAssets: NSObject, WKURLSchemeHandler {
                     let mime =
                         [
                             "html": "text/html", "js": "application/javascript", "css": "text/css",
-                            "svg": "image/svg+xml", "png": "image/png", "woff2": "font/woff2",
+                            "svg": "image/svg+xml", "png": "image/png", "webp": "image/webp",
+                            "woff2": "font/woff2",
                         ][url.pathExtension] ?? "application/octet-stream"
                     let response = HTTPURLResponse(
                         url: url, statusCode: 200, httpVersion: "HTTP/1.1",

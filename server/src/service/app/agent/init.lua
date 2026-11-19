@@ -5,18 +5,22 @@ local Prompts = require("agent.prompts")
 local App = require("agent.app")
 local config = require("etc.cfg")
 local log = require("log")
+local codes = require("enum.error_code")
 
 ---@class agent.Service
 ---@field users table<string, agent.App>
 ---@field templates agent.PromptTemplates?
 local AgentService = class()
 
-AgentService.commands = { handle_request = "handle_request", disconnect = "disconnect" }
-AgentService.closing_commands = { disconnect = true }
+AgentService.commands = {
+    handle_request = "handle_request", disconnect = "disconnect",
+}
+AgentService.closing_commands = { disconnect = true, handle_request = true }
 
 function AgentService:ctor()
     self.users = {}
     self.templates = nil
+    self.available = true
 end
 
 function AgentService:init()
@@ -37,6 +41,9 @@ end
 
 function AgentService:handle_request(context, identity, id, name, args)
     local app = self:_user(identity, context.source)
+    if not self.available and (name ~= "ExecutionResultReq" or not app or not app.connections[id]) then
+        return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
+    end
     if not app then
         app = App:new(identity, context.source, self.templates)
         self.users[identity.username] = app
@@ -50,6 +57,7 @@ function AgentService:disconnect(context, identity, id)
 end
 
 function AgentService:close()
+    self.available = false
     local runs = {}
     for _, app in pairs(self.users) do
         for run in pairs(app.pending_runs) do runs[#runs + 1] = run end

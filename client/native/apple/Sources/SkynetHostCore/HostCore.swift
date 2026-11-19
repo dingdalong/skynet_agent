@@ -1,4 +1,5 @@
 import CoreFoundation
+import CryptoKit
 import Foundation
 import OSLog
 
@@ -15,6 +16,7 @@ public final class HostCore {
     private let agentServices: AgentServices
     private var suspended = false
     private var suspendedApps: [String] = []
+    private var suspendedUser: [String: Any]?
     private var document: HostDocument
     private var revision = 0
     private var observers: [UUID: Observer] = [:]
@@ -24,6 +26,18 @@ public final class HostCore {
     private var quarantined: [String: String] = [:]
     private let logger = Logger(subsystem: "app.skynet.agent", category: "HostCore")
     private var stopped = false
+    private let builtins: URL
+    private var loggingIn = false
+    private lazy var gateway = GatewaySession(builtins: builtins, queue: queue) { [weak self] event in
+        guard let self else { return }
+        if event == "logout" {
+            for id in Array(self.apps.keys) { self.stopApp(id) }
+            if !self.suspended { self.leases.removeAll() }
+        } else if event == "AppCenterChangedNtf", self.apps["app-center"] != nil {
+            self.enqueue("app-center", type: "command", name: "$catalog", payload: [:]) { _ in }
+        }
+        self.publish()
+    }
     private lazy var resources = ResourceBroker(queue: queue) { [weak self] appId, event in
         if appId == "agent", event["error"] != nil { self?.agentServices.close() }
         self?.enqueue(appId, type: "command", name: "$resource", payload: event) { _ in }
@@ -48,6 +62,7 @@ public final class HostCore {
     }
 
     public init(dataRoot: URL, builtins: URL, launcher: URL? = nil, executable: URL? = nil) throws {
+        self.builtins = builtins
         try FileManager.default.createDirectory(at: dataRoot, withIntermediateDirectories: true)
         #if os(macOS)
             guard let launcher, let executable else {
@@ -121,9 +136,9 @@ public final class HostCore {
     public func attach(appId: String, observer: @escaping Observer) -> UUID {
         let lease = UUID()
         queue.async {
-            self.leases[lease] = (appId, observer)
             do {
                 _ = try self.ensureApp(appId)
+                self.leases[lease] = (appId, observer)
                 observer(self.appSnapshot(appId))
             } catch { observer(["error": String(describing: error)]) }
         }
@@ -137,7 +152,7 @@ public final class HostCore {
 
     public func mayManageApps(lease: UUID, completion: @escaping (Bool) -> Void) {
         queue.async {
-            guard let (appId, _) = self.leases[lease] else {
+            guard self.gateway.user != nil, let (appId, _) = self.leases[lease] else {
                 completion(false)
                 return
             }
@@ -151,7 +166,7 @@ public final class HostCore {
     /// Identity comes from the native-created lease, not an appId in JSON.
     public func request(lease: UUID, kind: String, input: [String: Any], completion: @escaping Reply) {
         queue.async {
-            guard let (appId, _) = self.leases[lease] else {
+            guard self.gateway.user != nil, let (appId, _) = self.leases[lease] else {
                 completion(.failure(failure("lease", "View lease expired")))
                 return
             }
@@ -165,10 +180,20 @@ public final class HostCore {
                 }
                 switch kind {
                 case "snapshot": reply(.success(self.appSnapshot(appId)))
-                case "agent.directory.choose", "agent.server.authorize", "agent.remote.set":
+                case "catalog.list", "catalog.unlock", "catalog.set":
+                    guard appId == "app-center", self.catalog.entries[appId]?.builtin == true,
+                        self.gateway.user != nil
+                    else { throw failure("permission", "需要登录应用中心") }
+                    let messages = [
+                        "catalog.list": "AppCenterListReq", "catalog.unlock": "AppCenterUnlockReq",
+                        "catalog.set": "AppCenterSetReq",
+                    ]
+                    self.gateway.request(messages[kind]!, input: input, completion: reply)
+                case "agent.directory.choose", "agent.remote.set":
                     try self.requireBuiltinAgent(appId)
                     let completed: Reply = { result in
                         self.queue.async {
+                            guard self.leases[lease]?.0 == appId else { return }
                             if case .success(let value) = result, value["cancelled"] as? Bool != true {
                                 self.enqueue(
                                     appId, type: "command", name: "$agent.context",
@@ -180,9 +205,6 @@ public final class HostCore {
                     }
                     if kind == "agent.directory.choose" {
                         self.agentServices.chooseDirectory(completion: completed)
-                    } else if kind == "agent.server.authorize" {
-                        guard let url = input["url"] as? String else { throw failure("network", "服务器地址必填") }
-                        self.agentServices.authorize(url, completion: completed)
                     } else {
                         guard let value = input["enabled"] as? NSNumber,
                             CFGetTypeID(value) == CFBooleanGetTypeID()
@@ -247,6 +269,43 @@ public final class HostCore {
     public func workspace(_ command: String, input: [String: Any] = [:], completion: Reply? = nil) {
         queue.async {
             do {
+                if command == "login" {
+                    guard !self.loggingIn, self.gateway.user == nil, !self.suspended, !self.stopped,
+                        let url = input["url"] as? String, let raw = input["username"] as? String
+                    else { throw failure("login", "无法开始登录") }
+                    let username = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard (1...32).contains(username.unicodeScalars.count) else {
+                        throw failure("login", "用户名须为 1–32 个字符")
+                    }
+                    let origin = try ServerOrigin.parse(url)
+                    self.loggingIn = true
+                    let connect: Reply = { approval in
+                        self.queue.async {
+                            let finished: Reply = { result in
+                                self.loggingIn = false
+                                self.publish()
+                                completion?(result.map { _ in self.snapshot() })
+                            }
+                            do {
+                                _ = try approval.get()
+                                guard !self.suspended, !self.stopped else { throw failure("login", "登录已中断") }
+                                try self.gateway.login(url: url, username: username, completion: finished)
+                            } catch { finished(.failure(error)) }
+                        }
+                    }
+                    if origin.hasPrefix("wss://") {
+                        self.agentServices.authorize(url, completion: connect)
+                    } else {
+                        connect(.success([:]))
+                    }
+                    return
+                }
+                guard self.gateway.user != nil else { throw failure("login", "请先登录宿主应用") }
+                if command == "logout" {
+                    self.gateway.close()
+                    completion?(.success(self.snapshot()))
+                    return
+                }
                 if command == "restart" {
                     guard let id = input["appId"] as? String else { throw failure("app", "App required") }
                     try self.restart(id)
@@ -272,6 +331,7 @@ public final class HostCore {
     }
 
     private func ensureApp(_ id: String) throws -> AppActor {
+        guard let user = gateway.user else { throw failure("login", "请先登录宿主应用") }
         if let error = quarantined[id] { throw failure("runtime", error) }
         if let actor = apps[id] { return actor }
         guard apps.count < 16 else { throw failure("limit", "At most 16 apps may run at once") }
@@ -281,7 +341,7 @@ public final class HostCore {
         let generation = (generations[id] ?? 0) + 1
         generations[id] = generation
         let actor = AppActor(entry: entry, generation: generation)
-        if let saved = try store.read(id) {
+        if let saved = try store.read(stateKey(id)) {
             actor.state = saved["state"] ?? NSNull()
             actor.revision = saved["revision"] as? Int ?? 0
             actor.interrupted = saved["pendingTasks"] as? [String] ?? []
@@ -328,6 +388,9 @@ public final class HostCore {
                         ))
                 }
                 startup.append((["type": "start", "name": "$start", "payload": NSNull()], { _ in }))
+                if (try? self.require(id, "user.identity")) != nil {
+                    startup.append((["type": "command", "name": "$user", "payload": user], { _ in }))
+                }
                 actor.mailbox.insert(contentsOf: startup, at: 0)
                 actor.ready = true
                 self.pump(actor)
@@ -406,7 +469,8 @@ public final class HostCore {
         let next = actor.revision + 1
         let pending = tasks ?? actor.tasks
         try store.write(
-            actor.entry.manifest.id, ["state": state, "revision": next, "pendingTasks": Array(pending.keys)])
+            stateKey(actor.entry.manifest.id),
+            ["state": state, "revision": next, "pendingTasks": Array(pending.keys)])
         actor.state = state
         actor.revision = next
         actor.tasks = pending
@@ -443,18 +507,12 @@ public final class HostCore {
                 try require(appId, "network")
                 if appId == "agent", kind == "socket.close" { agentServices.close() }
                 if appId == "agent", actor.entry.builtin, kind == "socket.open" {
-                    agentServices.origins { origins in
-                        self.queue.async {
-                            guard self.apps[appId] === actor, actor.tasks[id] == token else { return }
-                            do {
-                                try self.resources.request(
-                                    appId: appId, generation: actor.generation,
-                                    kind: kind, input: input,
-                                    origins: actor.entry.manifest.networkOrigins + origins,
-                                    completion: complete)
-                            } catch { complete(.failure(error)) }
-                        }
-                    }
+                    guard let url = gateway.user?["url"] as? String, input["url"] as? String == url
+                    else { throw failure("network", "Agent 必须使用宿主登录的服务器") }
+                    try resources.request(
+                        appId: appId, generation: actor.generation,
+                        kind: kind, input: input, origins: [try ServerOrigin.parse(url)], completion: complete
+                    )
                 } else {
                     try resources.request(
                         appId: appId, generation: actor.generation, kind: kind, input: input,
@@ -557,13 +615,17 @@ public final class HostCore {
             "state": apps[id]?.state ?? NSNull(), "preferences": preferences(),
             "apps": catalog.entries.values.sorted { $0.manifest.id < $1.manifest.id }.map(summary),
             "capabilities": capabilities,
+            "user": (try? require(id, "user.identity")) != nil ? gateway.user as Any? ?? NSNull() : NSNull(),
             "error": apps[id]?.error as Any? ?? NSNull(),
         ]
     }
     private func snapshot() -> [String: Any] {
         [
-            "revision": revision, "workspace": document.workspace.snapshot, "preferences": preferences(),
+            "revision": revision,
+            "workspace": gateway.user == nil ? Workspace().snapshot : document.workspace.snapshot,
+            "preferences": preferences(),
             "capabilities": capabilities,
+            "user": gateway.user as Any? ?? NSNull(),
             "apps": catalog.entries.values.sorted { $0.manifest.id < $1.manifest.id }.map(summary),
         ]
     }
@@ -572,6 +634,14 @@ public final class HostCore {
         let value = snapshot()
         for observer in Array(observers.values) { observer(value) }
         for (appId, observer) in Array(leases.values) { observer(appSnapshot(appId)) }
+    }
+
+    private func stateKey(_ id: String) -> String {
+        guard (try? require(id, "user.identity")) != nil, let user = gateway.user,
+            let username = user["username"] as? String, let url = user["url"] as? String
+        else { return id }
+        let hash = SHA256.hash(data: Data((url + "\u{0}" + username).utf8))
+        return id + "-" + hash.map { String(format: "%02x", $0) }.joined()
     }
     private func report(_ error: Error, appId: String = "host") {
         logger.error(
@@ -620,7 +690,7 @@ public final class HostCore {
                     throw failure("permission", "App permissions were not approved")
                 }
                 let generation = (self.generations[manifest.id] ?? 0) + 1
-                let saved = try self.store.read(manifest.id)?["state"] ?? NSNull()
+                let saved = try self.store.read(self.stateKey(manifest.id))?["state"] ?? NSNull()
                 let code = try String(
                     contentsOf: staging.appendingPathComponent("runtime.js"), encoding: .utf8)
                 let probe = try self.makeRuntime(self.queue, generation)
@@ -662,6 +732,7 @@ public final class HostCore {
     public func shutdown(completion: (() -> Void)? = nil) {
         queue.async {
             self.stopped = true
+            self.gateway.close()
             for id in Array(self.apps.keys) { self.stopApp(id) }
             self.observers.removeAll()
             self.leases.removeAll()
@@ -693,16 +764,33 @@ public final class HostCore {
             }
             self.suspended = backgrounded
             if backgrounded {
+                self.suspendedUser = self.gateway.user
                 self.suspendedApps = Array(self.apps.keys)
-                // In-flight effects become interrupted, never replayed.
+                self.gateway.close()
                 for id in Array(self.apps.keys) { self.stopApp(id) }
-            } else {
+            } else if let user = self.suspendedUser, let url = user["url"] as? String,
+                let username = user["username"] as? String
+            {
+                self.suspendedUser = nil
                 let apps = self.suspendedApps
                 self.suspendedApps = []
-                for id in apps {
-                    do { _ = try self.ensureApp(id) } catch { self.report(error, appId: id) }
+                self.loggingIn = true
+                let restored: Reply = { result in
+                    self.loggingIn = false
+                    if case .success = result {
+                        for id in apps {
+                            do { _ = try self.ensureApp(id) } catch { self.report(error, appId: id) }
+                        }
+                    } else {
+                        self.leases.removeAll()
+                    }
+                    self.publish()
+                    completion?()
                 }
-                self.publish()
+                do { try self.gateway.login(url: url, username: username, completion: restored) } catch {
+                    restored(.failure(error))
+                }
+                return
             }
             completion?()
         }

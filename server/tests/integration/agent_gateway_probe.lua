@@ -69,6 +69,75 @@ local function multi_user_flow(login)
     other:close()
 end
 
+local function catalog_flow(login, config)
+    local admin = login("catalog-owner")
+    local reader = login("catalog-reader")
+    local peer = login("catalog-owner")
+    local observer = login("catalog-observer")
+    local function agent_addresses()
+        local result = {}
+        for index, address in support.control(config, "status"):gmatch("%.agent_(%d+) (:%x+) ready") do
+            result[tonumber(index)] = address
+        end
+        return result
+    end
+    local previous = agent_addresses()
+    support.equal(#previous, 2)
+    local public = reader:request("AppCenterListReq")
+    support.same(public.names, { "Agent", "应用中心" })
+    support.equal(#(public.services or {}), 0)
+    local change = { app_id = "agent", enabled = false }
+    assert(reader:request("AppCenterSetReq", change).ret ~= 1)
+    assert(admin:request("AppCenterUnlockReq", { token = "wrong" }).ret ~= 1)
+    support.equal(admin:request("AppCenterUnlockReq", { token = "fixture-registry-token" }).ret, 1)
+    support.equal(#admin:request("AppCenterListReq").services, 2)
+    assert(peer:request("AppCenterSetReq", change).ret ~= 1)
+    local active = reader:request("ChatReq", { text = "[e2e:header-stall]" }).chat_session.session
+    support.equal(observer:request("DesktopRegisterReq", {
+        device_id = "desktop", name = "Desktop", authorization_id = "catalog-auth",
+    }).ret, 1)
+    local target = { device_id = "desktop", workspace_id = "workspace", directory = "/project", platform = "macos" }
+    support.equal(observer:request("ChatReq", { execution_target = target, text = "[e2e:success]" }).ret, 1)
+    local action = observer:wait_for(function(event) return event.name == "ExecutionActionNtf" end).payload
+    local stopping = admin:allocate_message_id()
+    admin:send_request(stopping, "AppCenterSetReq", change)
+    observer:wait_for(function(event)
+        return event.name == "AppCenterChangedNtf" and event.payload.app_id == "agent" and not event.payload.enabled
+    end)
+    local repeated = admin:allocate_message_id()
+    admin:send_request(repeated, "AppCenterSetReq", change)
+    assert(observer:request("AgentSnapshotReq").ret ~= 1)
+    local receipt = { request_id = action.request_id, result = '{"ok":true,"project":{"workspace":"/project"}}' }
+    support.equal(observer:request("ExecutionResultReq", receipt).ret, 1)
+    for _, id in ipairs({ stopping, repeated }) do
+        support.equal(admin:wait_for(function(event) return event.message_id == id end).payload.ret, 1)
+    end
+    assert(observer:request("ExecutionResultReq", receipt).ret ~= 1)
+    support.equal(last(reader:wait_run(active.run_id)).status, status.cancelled)
+    support.same(reader:request("AppCenterListReq").names, { "应用中心" })
+    assert(peer:request("AgentSnapshotReq").ret ~= 1)
+    assert(reader:request("ChatReq", { text = "已下线" }).ret ~= 1)
+    support.equal(admin:request("AppCenterSetReq", change).ret, 1)
+    support.equal(#agent_addresses(), 0)
+    local live = support.console(config.control_port, "list")
+    for _, address in ipairs(previous) do assert(not live:find(address, 1, true), live) end
+    support.equal(admin:request("AppCenterListReq").services[1].instances, 0)
+    change.enabled = true
+    support.equal(admin:request("AppCenterSetReq", change).ret, 1)
+    local current = agent_addresses()
+    support.equal(#current, 2)
+    for _, address in ipairs(current) do
+        assert(address ~= previous[1] and address ~= previous[2])
+    end
+    support.equal(admin:request("AppCenterSetReq", change).ret, 1)
+    support.same(agent_addresses(), current)
+    support.equal(#reader:request("AgentSnapshotReq").snapshot.chat_sessions, 0)
+    support.equal(last(reader:send_message(nil, "[e2e:success]")).status, status.completed)
+    change.enabled = false
+    support.equal(admin:request("AppCenterSetReq", change).ret, 1)
+    support.control(config, "stop")
+end
+
 local function protocol_flow(connect)
     local function rejected(payload, code, format)
         local client = connect()
@@ -143,6 +212,21 @@ function M.run(config)
             support.equal(ready:request("LoginReq", { username = "readiness" }).ret, 1)
             return
         end
+        if config.mode == "offline_restart" then
+            local admin = connect()
+            support.equal(admin:request("LoginReq", { username = "catalog-owner" }).ret, 1)
+            support.same(admin:request("AppCenterListReq").names, { "应用中心" })
+            assert(admin:request("AgentSnapshotReq").ret ~= 1)
+            local file <close> = assert(io.open(config.server_log))
+            assert(not file:read("a"):find("LAUNCH snlua agent", 1, true), "已下线的 Agent 在重启时被创建")
+            support.equal(admin:request("AppCenterUnlockReq", { token = "fixture-registry-token" }).ret, 1)
+            support.equal(admin:request("AppCenterListReq").services[1].instances, 0)
+            support.equal(admin:request("AppCenterSetReq", { app_id = "agent", enabled = true }).ret, 1)
+            support.equal(admin:request("AppCenterListReq").services[1].instances, 2)
+            support.equal(#admin:request("AgentSnapshotReq").snapshot.chat_sessions, 0)
+            print("真实节点重启后保持零实例，重新上线按配置注册成功")
+            return
+        end
         if config.mode == "live" then
             local client, snapshot, username = login()
             local session = client:send_message(nil, config.live_prompt, 12000)
@@ -165,6 +249,7 @@ function M.run(config)
         chat_flow(login)
         multi_user_flow(login)
         desktop_flow(login)
+        catalog_flow(login, config)
         print("网关测试通过：用户路由、离线恢复、多端同步、并发、" ..
             "上下文、取消、重试与协议边界")
     end, debug.traceback)

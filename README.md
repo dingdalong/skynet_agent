@@ -16,20 +16,21 @@ Agent 支持会话恢复、流式消息、模型选择、取消、失败重试�
 git clone --recurse-submodules git@github.com:dingdalong/skynet_agent.git
 cd skynet_agent
 make install
-make dev
 ```
 
-客户端界面可独立运行。需要开发或测试服务端时，准备模型凭据并单独启动：
+使用本机网关时，先准备配置并启动服务端。首次配置可从示例文件开始：
 
 ```bash
 cp server/.env.example server/.env
-# 在 server/.env 中填写模型 API Key
+# 填写模型 API Key，如需管理应用，再设置 APP_CENTER_ADMIN_TOKEN
 make -C server build
 ./server/start.sh
 ```
 
+在另一终端运行 `make dev` 启动客户端。连接已有网关时，可以直接从这一步开始。
+打开宿主后填写服务器地址和用户名。登录成功后进入工作区，Agent 自动使用这份身份。
+打开「应用中心」可查看已注册的应用名。管理员解锁后可以查看服务详情、注册或撤销服务池。
 服务管理使用 `./server/control.sh status|stop|force-stop`。客户端通过系统菜单或 `⌘Q` 退出。
-打开 Agent 后，在“连接设置”中填写服务器地址和用户名；可使用服务器工作目录或授权本机项目运行任务。
 连接配置、权限范围与恢复规则见 [Agent 客户端](docs/architecture/CLIENT_AGENT.md)。
 `make build` 构建服务端及正式 macOS 客户端，更多入口见 `make help`。
 运行 iOS 使用 `make install PLATFORM=ios`、`make client-dev PLATFORM=ios`；

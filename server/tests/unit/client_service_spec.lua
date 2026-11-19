@@ -4,10 +4,10 @@ local status = require("agent.message_status")
 
 describe("用户与客户端服务", function()
     local scope, service, tasks, events, model, next_id, random_id, templates, template_loads, workspaces
-    local apps, instances, params
+    local apps, instances, agent_addresses
     before_each(function()
         tasks, events, next_id, random_id, workspaces = {}, {}, 0, 0, {}
-        instances, params = {}, { app_services = { agent = { 1 } } }
+        instances, agent_addresses = {}, { 1 }
         templates, template_loads = { base = "测试基础提示", permission_judge = "测试权限提示" }, 0
         model = { text = "回答" }
         local Agent = require("class")()
@@ -34,7 +34,7 @@ describe("用户与客户端服务", function()
             return model.text
         end
         scope = Scope.new({
-            client = false, ["client.user"] = false, ["client.applications"] = false, ["agent.session"] = false,
+            client = false, ["client.user"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)
                 workspaces[#workspaces + 1] = { username = username, id = id }
@@ -58,20 +58,25 @@ describe("用户与客户端服务", function()
                 },
                 max_message_length = 100, session_title_length = 24 } },
             skynet = { localname = function(name)
-                return ({ [".logind_1"] = 20, [".websocket_1"] = 100, [".websocket_2"] = 200,
+                return ({ [".app_center"] = 80, [".logind_1"] = 20, [".websocket_1"] = 100, [".websocket_2"] = 200,
                     [".websocket_3"] = 300, [".client_1"] = 10, [".client_2"] = 11, [".shared"] = 77 })[name]
             end, genid = function() next_id = next_id + 1; return next_id end,
                 fork = function(callback) tasks[#tasks + 1] = coroutine.create(callback) end,
                 error = function() end, sleep = function() coroutine.yield("sleep") end },
             ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
             log = { info = function() end, failure = function() end },
-            rpc = { call_no_timeout = function(address, command, ...)
+            rpc = { call = function(address, command)
+                assert.are.equal(80, address)
+                assert.are.equal("subscribe", command)
+                return codes.succ, { revision = 1, apps = { { app_id = "agent", addresses = agent_addresses,
+                    enabled = true, requests = require("agent.routes").requests } } }
+            end, call_no_timeout = function(address, command, ...)
                 return codes.succ, instances[address][command](instances[address], { source = 10 }, ...)
             end, send = function(address, command, ...)
                 if command == "publish" then
                     local username = ...
                     assert.are.equal(10, address)
-                    for _, agent in ipairs(params.app_services.agent) do
+                    for _, agent in ipairs(agent_addresses) do
                         if instances[agent].users[username] then
                             service:publish({ source = agent }, ...)
                             return codes.succ
@@ -91,7 +96,7 @@ describe("用户与客户端服务", function()
         instances[1]:init()
         apps = instances[1].users
         service = require("client"):new()
-        service:init(params)
+        service:init()
     end)
     after_each(function()
         scope:restore()
@@ -122,9 +127,9 @@ describe("用户与客户端服务", function()
     it("登录只绑定身份；同名连接与重连按用户名选择同一常驻实例", function()
         instances[2] = require("agent"):new()
         instances[2]:init()
-        params.app_services.agent[2] = 2
+        agent_addresses[2] = 2
         service = require("client"):new()
-        service:init(params)
+        service:init()
         assert.is_nil(service:open({ source = 10 }, "bad", 100, "alice"))
         assert.is_nil(service:open({ source = 20 }, "bad", 10, "alice"))
         local identity = service:open({ source = 20 }, "a", 100, "alice")
@@ -182,10 +187,11 @@ describe("用户与客户端服务", function()
     end)
 
     it("公共服务跨用户共用地址，每个请求和推送仍绑定身份", function()
-        local registry = require("client.applications")
-        registry.shared = { address = ".shared", requests = { "CommonReq" } }
         service = require("client"):new()
-        service:init(params)
+        service:init()
+        service:sync_routes({ source = 80 }, { revision = 2, apps = {
+            { app_id = "common", enabled = true, addresses = { 77 }, requests = { "CommonReq" } },
+        } })
         local requests = {}
         instances[77] = { handle_request = function(_, _, identity)
             requests[#requests + 1] = identity.username
@@ -233,6 +239,41 @@ describe("用户与客户端服务", function()
         assert.are.equal(2, #events[1].args[4].chat_session.session.messages)
     end)
 
+    it("服务变更整表替换，拒绝过期快照和未授权更新", function()
+        open("a", 100, "alice")
+        local snapshot = { revision = 3, apps = { { app_id = "agent", addresses = { 1 },
+            requests = require("agent.routes").requests, enabled = false } } }
+        assert.has_error(function() service:sync_routes({ source = 100 }, snapshot) end, "应用目录来源无效")
+        assert.is_true(service:sync_routes({ source = 80 }, snapshot))
+        snapshot.revision = 2
+        snapshot.apps[1].enabled = true
+        assert.is_true(service:sync_routes({ source = 80 }, snapshot))
+        assert.are.equal(codes.server_busy, request(2, "AgentSnapshotReq", {}).ret)
+        snapshot.revision = 4
+        assert.is_true(service:sync_routes({ source = 80 }, snapshot))
+        assert.are.equal(codes.succ, request(3, "AgentSnapshotReq", {}).ret)
+    end)
+
+    it("应用中心重推未确认的最新路由，取代旧版本的重试", function()
+        local timers, delivered = {}, {}
+        require("skynet").timeout = function(_, callback) timers[#timers + 1] = callback end
+        require("rpc").call = function(address, command, snapshot)
+            assert.are.equal(10, address)
+            assert.are.equal("sync_routes", command)
+            delivered[#delivered + 1] = snapshot.revision
+            if #delivered < 3 then return codes.call_fail end
+            return codes.succ, true
+        end
+        local center = require("app_center"):new()
+        center:subscribe({ source = 10 })
+        assert.is_false(center:_sync())
+        assert.is_false(center:_sync())
+        timers[1]()
+        timers[2]()
+        assert.same({ 1, 2, 2 }, delivered)
+        assert.are.equal(2, #timers)
+    end)
+
     it("服务初始化加载一次模板，各会话共享启动快照与项目规则上限", function()
         assert.are.equal(1, template_loads)
         open("a", 100, "alice")
@@ -244,6 +285,22 @@ describe("用户与客户端服务", function()
             assert.are.equal(templates, session.agent.templates)
             assert.are.equal(32768, session.agent.options.project_instructions_max_bytes)
         end
+    end)
+
+    it("应用下线等待路由重推成功后才允许回收实例", function()
+        local retry, attempts = nil, 0
+        require("skynet").timeout = function(_, callback) retry = callback end
+        require("rpc").call = function()
+            attempts = attempts + 1
+            if attempts == 1 then return codes.call_fail end
+            return codes.succ, true
+        end
+        local center = require("app_center"):new()
+        center:subscribe({ source = 10 })
+        local synced = coroutine.create(function() return center:_sync(true) end)
+        assert.same({ true, "sleep" }, { coroutine.resume(synced) })
+        retry()
+        assert.same({ true, true }, { coroutine.resume(synced) })
     end)
 
     it("首发拒绝无效文本、模型与重试组合，不生成会话工作区或任务", function()

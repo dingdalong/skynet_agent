@@ -9,6 +9,13 @@ import XCTest
 /// acceptance is separate; this catches scheme, CSP and bridge failures.
 @MainActor
 final class WebViewTests: XCTestCase {
+    private func login(_ core: HostCore, url: String, username: String) async throws -> [String: Any] {
+        try await withCheckedThrowingContinuation { continuation in
+            core.workspace("login", input: ["url": "\(url)/agent", "username": username]) {
+                continuation.resume(with: $0)
+            }
+        }
+    }
     func testWorkspaceAppIconGeometry() async throws {
         _ = NSApplication.shared
         let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -24,7 +31,7 @@ final class WebViewTests: XCTestCase {
                         const placement = innerWidth < 600 ? apps : [...apps].reverse();
                         const extras = \(width) > 600 ? [{id:'notes', name:'笔记', builtin:false}] : [];
                         const snapshot = {
-                            revision:1, apps:[...apps, ...extras], capabilities:{splitView:true},
+                            revision:1, user:{userId:'test', username:'测试', url:'ws://localhost'}, apps:[...apps, ...extras], capabilities:{splitView:true},
                             preferences:{appearance:'light', wallpaper:'coast', reduceMotion:true},
                             workspace:{mode:'desktop', panes:[], recent:apps.map(app=>app.id), ratio:0.5,
                                 desktop:[placement[0].id], dock:[placement[1].id, ...extras.map(app=>app.id)]}
@@ -153,25 +160,13 @@ final class WebViewTests: XCTestCase {
             dataRoot: data.appendingPathComponent("data"), builtins: builtins,
             launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
             executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
+        _ = try await login(core, url: url, username: "webkit-agent")
         let harness = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
         defer {
             harness.close()
             core.shutdown()
             try? FileManager.default.removeItem(at: data)
         }
-        try await harness.until("document.body.innerText.includes('连接你的 Agent')")
-        try await harness.activateToolbar("connection")
-        try await harness.until("document.getElementById('agent-url')!==null")
-        let address = String(data: try jsonData("\(url)/agent"), encoding: .utf8)!
-        _ = try await harness.web.evaluateJavaScript(
-            """
-            for (const [id, value] of [['agent-url', \(address)], ['agent-username', 'webkit-agent']]) {
-                const input = document.getElementById(id);
-                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
-                input.dispatchEvent(new Event('input', {bubbles: true}));
-            }
-            """)
-        try await harness.click("连接")
         try await harness.untilToolbar("connection", labelContaining: "已连接")
         _ = try await harness.web.evaluateJavaScript(
             """
@@ -268,6 +263,45 @@ final class WebViewTests: XCTestCase {
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
     }
 
+    func testAppCenterCoversAndResponsiveCatalog() async throws {
+        _ = NSApplication.shared
+        let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "catalog-\(UUID().uuidString)")
+        let core = try HostCore(
+            dataRoot: data,
+            builtins: native.deletingLastPathComponent().appendingPathComponent("dist/builtins"),
+            launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
+            executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
+        defer {
+            core.shutdown()
+            try? FileManager.default.removeItem(at: data)
+        }
+        _ = try await login(
+            core, url: XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"]),
+            username: "catalog")
+        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["app-center"]))
+        defer { harness.close() }
+        try await harness.until("document.querySelectorAll('article').length === 3")
+        try await harness.until(
+            """
+            Array.from(document.images).filter(image => image.naturalWidth > 0).length === 2
+                && document.querySelectorAll('article')[2].innerText.includes('日历')
+            """)
+        let positions =
+            "Array.from(document.querySelectorAll('article'), item => item.getBoundingClientRect())"
+        try await harness.until("\(positions)[0].top === \(positions)[1].top")
+        harness.web.setFrameSize(NSSize(width: 320, height: 640))
+        try await harness.until(
+            """
+            \(positions)[1].top >= \(positions)[0].bottom
+                && document.documentElement.scrollWidth <= innerWidth
+            """)
+        try await harness.click("服务管理")
+        try await harness.until("document.querySelector('input[type=password]') !== null")
+    }
+
     func testPackagedSettingsBridgeThemeAndResponsiveLayout() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -280,6 +314,9 @@ final class WebViewTests: XCTestCase {
             dataRoot: data, builtins: client.appendingPathComponent("dist/builtins"),
             launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
             executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
+        _ = try await login(
+            core, url: XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"]),
+            username: "settings")
         let entry = try XCTUnwrap(core.catalog.entries["settings"])
         let harness = WebHarness(core: core, entry: entry)
         defer {

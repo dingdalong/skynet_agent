@@ -31,12 +31,35 @@ describe("node", function()
             newservice = function(name, ...)
                 assert.is_true(debug_installed)
                 assert.is_function(dispatch)
-                assert.are.equal("initializing", runtime.state)
+                assert.is_true(runtime.state == "initializing" or runtime.state == "ready" and instance.changing_app)
                 local address = 10 + #launched
                 launched[#launched + 1] = { name, ... }
                 return address
             end,
             name = function(name, address) named[name] = address end,
+            localname = function(name) return named[name] end,
+            request = function()
+                local requests = {}
+                return {
+                    add = function(_, request) requests[#requests + 1] = request end,
+                    select = function()
+                        local index = 0
+                        return function()
+                            index = index + 1
+                            local request = requests[index]
+                            if request then
+                                local call = package.loaded.rpc.call_no_timeout
+                                return request, { call(request[1], request[3], request[4]) }
+                            end
+                        end
+                    end,
+                }
+            end,
+            kill = function(address)
+                for name, value in pairs(named) do
+                    if value == address then named[name] = nil end
+                end
+            end,
         }
         scope = Scope.new({
             ["node"] = false, ["service"] = false, ["log"] = false,
@@ -171,6 +194,58 @@ describe("node", function()
         local ok, err = pcall(function() require("node").init({}) end)
         assert.is_false(ok)
         assert.matches("节点启动回调必须是 function", err)
+    end)
+    it("应用部分启动失败回收全部地址，原服务名可立即重新注册", function()
+        start_services = function(node_instance)
+            named[".app_center"] = 77
+            local center = { source = 77 }
+            failure = 12
+            assert.has_error(function() node_instance:set_instances({ source = 15 }, "agent", 2) end)
+            assert.has_error(function() node_instance:set_instances(center, "agent", 2) end)
+            assert.are.equal(1, #node_instance.services)
+            assert.is_nil(named[".agent_1"])
+            assert.is_nil(named[".agent_2"])
+            failure = nil
+            assert.same({ 13, 14 }, node_instance:set_instances(center, "agent", 2))
+            assert.same({}, node_instance:set_instances(center, "agent", 0))
+            assert.are.equal(1, #node_instance.services)
+        end
+        start()
+        assert.same({}, exits)
+    end)
+    it("节点关服与实例初始化重叠时回收未发布的服务池", function()
+        start_services = function(node_instance)
+            named[".app_center"] = 77
+            local call = package.loaded.rpc.call_no_timeout
+            package.loaded.rpc.call_no_timeout = function(address, command, ...)
+                if command == "init" then node_instance:shutdown({}) end
+                return call(address, command, ...)
+            end
+            local center = { source = 77 }
+            assert.has_error(function() node_instance:set_instances(center, "agent", 2) end)
+            assert.has_error(function() node_instance:set_instances(center, "agent", 1) end)
+            assert.are.equal(1, #node_instance.services)
+            assert.is_nil(named[".agent_1"])
+            assert.is_false(node_instance.changing_app)
+        end
+        start()
+        assert.same({}, exits)
+        forks[1]()
+        assert.same({ 0 }, exits)
+    end)
+    it("节点就绪后新注册的实例仍在接入层关闭后回收", function()
+        start_services = function(node_instance)
+            node_instance.app_center = node_instance:launch("app_center", 1, {}, ".app_center")[1]
+            node_instance:launch("gateway", 1, {}, ".gateway")
+        end
+        start()
+        assert.same({ 13, 14 }, instance:set_instances({ source = instance.app_center }, "agent", 2))
+        assert.is_true(instance:close())
+        local closed = {}
+        for _, call in ipairs(calls) do
+            if call[2] == "close" then closed[#closed + 1] = call[1] end
+        end
+        assert.same({ 12, 14, 13, 11 }, closed)
     end)
     it("部分初始化失败记录错误并回收已创建服务后退出", function()
         package.loaded["etc.cfg"].channel = "develop"

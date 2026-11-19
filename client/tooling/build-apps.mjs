@@ -111,7 +111,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         );
     } else {
         await buildPresentation(`${root}apps/host`, `${root}dist/workspace`);
-        for (const name of ["settings", "agent"]) {
+        await build({
+            entryPoints: [`${root}packages/agent-client/src/protocol.ts`],
+            outfile: `${root}dist/builtins/gateway.js`,
+            bundle: true,
+            platform: "neutral",
+            format: "iife",
+            globalName: "GatewayProtocol",
+            target: "es2020",
+            inject: [`${root}packages/app-runtime/src/text-codec.ts`],
+        });
+        for (const name of ["settings", "agent", "app-center"]) {
             await packageApp(
                 `${root}builtins/${name}`,
                 `${root}dist/builtins/${name}.skapp`,

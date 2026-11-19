@@ -152,7 +152,9 @@ function HotfixWatch:_reload(modules)
     for _, target in ipairs(targets) do
         local response = responses[target.address]
         local report = response and response[3]
-        if response and response[1] == true and type(report) == "table" then
+        if target.closed then
+            self.pending[target.address] = nil
+        elseif response and response[1] == true and type(report) == "table" then
             local pending = self.pending[target.address]
             for _, name in ipairs(report.updated) do
                 updated[self.root .. "/" .. pending[name]] = true
