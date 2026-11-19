@@ -5,13 +5,13 @@ describe("桌面执行设备与路由", function()
     local scope, user, execution, events
     before_each(function()
         events = {}
-        scope = Scope.new({ ["user.mods.execution.execution"] = false,
+        scope = Scope.new({ ["agent.execution"] = false,
             skynet = {}, ["skynet.crypt"] = {},
             log = { info = function() end, failure = function() end } })
-        user = { chat = { sessions = {} }, owner = { publish = function(_, _, name, args)
+        user = { chat = { sessions = {} }, publish = function(_, name, args)
             events[#events + 1] = { name = name, args = args }
-        end } }
-        execution = require("user.mods.execution.execution"):new(user)
+        end }
+        execution = require("agent.execution"):new(user)
     end)
     after_each(function() scope:restore() end)
 
@@ -79,7 +79,7 @@ describe("桌面终端续写状态", function()
             return { done = true, output = "final", exit_code = 0 }
         end }
         local remote = require("agent.remote"):new({ tools = {}, execution_target = {}, owner = {
-            owner = { user = { execution = controller } },
+            owner = { app = { execution = controller } },
             _on_tool_update = function(_, _, record) updates[#updates + 1] = record end,
         } })
         local run = { id = "run", processes = {}, message_id = "message", source_device = "desktop" }

@@ -65,7 +65,7 @@ function M.run(config)
     end
     local function snapshots()
         for _, connection in ipairs(connections) do
-            support.equal(connection.client:request("UserSnapshotReq").ret, 1)
+            support.equal(connection.client:request("AgentSnapshotReq").ret, 1)
         end
     end
     local ok, failure = xpcall(function()
@@ -89,11 +89,11 @@ function M.run(config)
         local ws_signature = "function Websocket:_handle_message(connection, message, message_type)"
         local client_signature = "function ClientService:handle_request(context, id, message_id, name, args)"
         local ws_v2 = marked(ws_source, ws_signature, "AUTO_WS_V2")
-        local client_v2 = marked(client_source, client_signature, "AUTO_CLIENT_V2")
+        local client_v2 = marked(client_source, client_signature, "AUTO_CLIENT_V2", true)
         support.same(updated_files(save_batch({ { ws_path, ws_v2 }, { client_path, client_v2 } })),
             { client_path, ws_path })
         for _, connection in ipairs(connections) do
-            local selected = connection.client:request("UserSnapshotReq", { session_id = connection.session_id })
+            local selected = connection.client:request("AgentSnapshotReq", { session_id = connection.session_id })
             support.equal(selected.ret, 1)
             support.equal(#selected.snapshot.chat_sessions[1].session.messages, 2)
             support.equal(selected.snapshot.chat_sessions[1].session.messages[2].content, "E2E 历史已保存")
@@ -105,7 +105,7 @@ function M.run(config)
         local protocol_path = "src/lualib/network/protocol.lua"
         local protocol_v2 = 'local skynet = require("skynet")\n' ..
             marked(source(protocol_path), "function M:decode_msg(data)", "AUTO_PROTOCOL_V2")
-        local client_v3 = marked(client_source, client_signature, "AUTO_CLIENT_V3")
+        local client_v3 = marked(client_source, client_signature, "AUTO_CLIENT_V3", true)
         local failed = save_batch({
             { ws_path, ws_v2 .. "\nsyntax error\n" },
             { client_path, client_v3 }, { protocol_path, protocol_v2 },
@@ -120,7 +120,7 @@ function M.run(config)
         support.same(updated_files(recovered), { protocol_path, client_path, ws_path })
         start = offset()
         for _, connection in ipairs(connections) do
-            local snapshot = connection.client:request("UserSnapshotReq").snapshot
+            local snapshot = connection.client:request("AgentSnapshotReq").snapshot
             support.equal(#snapshot.chat_sessions[1].session.messages, 4)
         end
         markers(start, { AUTO_WS_V3 = 2, AUTO_PROTOCOL_V2 = 2, AUTO_CLIENT_V3 = 2 },
@@ -149,7 +149,7 @@ function M.run(config)
         local node_source, rpc_source = source(node_path), source(rpc_path)
         local rpc_signature = "function Rpc.send(address, command, ...)"
         local rpc_v2 = marked(rpc_source, rpc_signature, "AUTO_RPC_V2")
-        local client_v4 = marked(client_source, client_signature, "AUTO_CLIENT_V4")
+        local client_v4 = marked(client_source, client_signature, "AUTO_CLIENT_V4", true)
         local incompatible = save_batch({
             { rpc_path, rpc_v2 },
             { client_path, replace(client_v4, "return ClientService",
@@ -180,15 +180,15 @@ function M.run(config)
 
         local before = {}
         for _, connection in ipairs(connections) do
-            local snapshot = connection.client:request("UserSnapshotReq").snapshot
+            local snapshot = connection.client:request("AgentSnapshotReq").snapshot
             support.equal(snapshot.user_id, connection.user_id)
             support.equal(snapshot.chat_sessions[1].session.id, connection.session_id)
             before[connection] = snapshot
         end
-        local user_path = "src/lualib/user/handler.lua"
-        local chat_path = "src/lualib/user/mods/chat/handler.lua"
+        local chat_path = "src/lualib/agent/handler.lua"
         local chat_source = source(chat_path)
         local handlers = {
+            { "AgentSnapshotReq", "AUTO_AGENT_SNAPSHOT_V2", "" },
             { "ChatReq", "AUTO_CHAT_REQUEST_V2", "args, connection" },
             { "MessageCancelReq", "AUTO_CHAT_CANCEL_V2", "args" },
             { "SessionModelSetReq", "AUTO_CHAT_MODEL_V2", "args" },
@@ -197,16 +197,15 @@ function M.run(config)
             chat_source = marked(chat_source, "function REQUEST:" .. handler[1] .. "(" .. handler[3] .. ")",
                 handler[2], true)
         end
-        local handler_batch = save_batch({
-            { user_path, marked(source(user_path), "function REQUEST:UserSnapshotReq()",
-                "AUTO_USER_SNAPSHOT_V2", true) },
-            { chat_path, chat_source },
-        })
-        support.same(updated_files(handler_batch), { user_path, chat_path })
+        local agent_path = "src/service/app/agent.lua"
+        local agent_source = marked(source(agent_path),
+            "function AgentService:handle_request(context, identity, id, name, args)", "AUTO_AGENT_SERVICE_V2")
+        local handler_batch = save_batch({ { chat_path, chat_source }, { agent_path, agent_source } })
+        support.same(updated_files(handler_batch), { chat_path, agent_path })
         start = offset()
         for _, connection in ipairs(connections) do
             local client = connection.client
-            local response = client:request("UserSnapshotReq")
+            local response = client:request("AgentSnapshotReq")
             support.equal(response.ret, 1)
             support.equal(response.snapshot.user_id, connection.user_id)
             support.same(response.snapshot, before[connection])
@@ -226,8 +225,9 @@ function M.run(config)
             }).ret, 1)
         end
         markers(start, {
-            AUTO_USER_SNAPSHOT_V2 = 2, AUTO_CHAT_REQUEST_V2 = 2, AUTO_CHAT_CANCEL_V2 = 2, AUTO_CHAT_MODEL_V2 = 2,
-        }, "存量已登录用户未在两个 client 实例调用热修后的 REQUEST 方法")
+            AUTO_AGENT_SERVICE_V2 = 2, AUTO_AGENT_SNAPSHOT_V2 = 2, AUTO_CHAT_REQUEST_V2 = 2,
+            AUTO_CHAT_CANCEL_V2 = 2, AUTO_CHAT_MODEL_V2 = 2,
+        }, "四个用户应在两个常驻 Agent 实例中调用热修后的服务与 REQUEST 方法")
         support.control(config, "stop")
         for _, connection in ipairs(connections) do support.equal(connection.client:wait_for_close(), 1001) end
         print("自动热修测试通过：预检查、单次日志、多实例、存量历史、" ..

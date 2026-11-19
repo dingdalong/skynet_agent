@@ -3,7 +3,7 @@ local skynet = require("skynet")
 ---@class agent.Remote
 ---@field target table
 ---@field owner agent_session.AgentSession
----@field controller user.Execution
+---@field controller agent.Execution
 ---@field records table<string, table>
 ---@field runs table<string, agent.Run>
 ---@field source_device string?
@@ -16,7 +16,7 @@ local Remote = class()
 function Remote:ctor(options)
     self.target = options.execution_target
     self.owner = options.owner
-    self.controller = self.owner.owner.user.execution
+    self.controller = self.owner.owner.app.execution
     self.records = {}
     self.runs = {}
     self.source_device = nil

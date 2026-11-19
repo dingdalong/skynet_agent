@@ -2,6 +2,7 @@
 
 本文件适用于整个仓库，客户端和服务端在各自目录补充端内规范。
 客户端与服务端分别在 `client`、`server` 维护，共用 `common` 中的协议、枚举与 C 工具核心。
+Talk to me ELI5 by default and go deeper if I ask.
 
 ## 项目与协作
 

@@ -9,6 +9,7 @@
         "server/src/lualib",
         "server/src/lualib/base",
         "server/src/service",
+        "server/src/service/app",
         "server/3rd/lua-openai",
         "server/3rd/lua-protobuf",
         "server/3rd/tableshape",

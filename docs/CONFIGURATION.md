@@ -26,7 +26,7 @@
 渠道中的 `agent.models` 整体替换公共模型清单。配置在进程启动时加载，变更后重启。
 环境变量的读取仅在配置初始化层进行，业务代码通过配置模块获取值。
 
-Skynet 线程与启动配置位于 `server/etc/config`。三类工作池的实例数未指定时取工作线程数，
+Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例数未指定时取工作线程数，
 也可在渠道配置中分别覆盖。
 
 ### 运行与网关
@@ -39,6 +39,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。三类工作池的实�
 | `agent_gateway.socket.host`         | 非空监听地址                         |
 | `agent_gateway.socket.port`         | 1–65535 的整数                       |
 | `agent_gateway.socket.path`         | 以 `/` 开头的 WebSocket 路径         |
+| `agent_gateway.instance.agent`      | 1–32 的整数，按用户名固定路由到常驻 Agent 实例 |
 | `agent_gateway.instance.client`     | 1–32 的整数                          |
 | `agent_gateway.instance.logind`     | 1–32 的整数                          |
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |

@@ -8,16 +8,13 @@ message LoginReq {
   string username = 1;
 }
 
+message UserIdentity {
+  string user_id = 1;
+  string username = 2;
+}
+
 message LoginRes {
   int32 ret = 2;
   ErrorInfo error = 3;
-  UserSnapshot snapshot = 4;
-}
-
-message UserSnapshotReq {}
-
-message UserSnapshotRes {
-  int32 ret = 2;
-  ErrorInfo error = 3;
-  UserSnapshot snapshot = 4;
+  UserIdentity identity = 4;
 }

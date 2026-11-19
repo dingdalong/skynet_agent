@@ -62,7 +62,7 @@ export interface ModelOption {
     name: string;
     model: string;
 }
-export interface UserSnapshot {
+export interface AgentSnapshot {
     user_id: string;
     username: string;
     chat_sessions: ChatSession[];

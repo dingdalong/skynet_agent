@@ -1,19 +1,18 @@
 local class = require("class")
 local skynet = require("skynet")
 local crypt = require("skynet.crypt")
-local rpc = require("rpc")
 local codes = require("enum.error_code")
 local cjson = require("cjson")
 local log = require("log")
 
----@class user.Execution
----@field user user.User
+---@class agent.Execution
+---@field app agent.App
 ---@field devices table<string, table>
 ---@field pending table<string, table>
 local Execution = class()
 
-function Execution:ctor(user)
-    self.user = user
+function Execution:ctor(app)
+    self.app = app
     self.devices = {}
     self.pending = {}
 end
@@ -29,7 +28,7 @@ function Execution:snapshot()
 end
 
 function Execution:publish(device)
-    self.user.owner:publish(self.user, "DesktopUpdatedNtf", { device = {
+    self.app:publish("DesktopUpdatedNtf", { device = {
         id = device.id, name = device.name, online = device.connection ~= nil,
         remote_enabled = device.remote_enabled } })
 end
@@ -51,7 +50,7 @@ function Execution:register(args, connection)
     device.connection, device.name, device.remote_enabled = connection, args.name, args.remote_enabled == true
     device.authorization_id = args.authorization_id
     if not device.remote_enabled then
-        for _, session in pairs(self.user.chat.sessions) do
+        for _, session in pairs(self.app.chat.sessions) do
             if session.execution_target and session.execution_target.device_id == device.id then
                 session:stop_remote()
             end
@@ -87,11 +86,10 @@ function Execution:invoke(target, operation, args, run, call_id, source_device)
     local id = crypt.hexencode(crypt.randomkey()) .. "-" .. tostring(skynet.genid())
     local pending = { connection = connection }
     self.pending[id] = pending
-    local code = rpc.send(connection.websocket_address, "send_response", connection.id, 0,
-        "ExecutionActionNtf", { request_id = id, session_id = run and run.session_id or "",
+    local code = self.app:publish("ExecutionActionNtf", { request_id = id, session_id = run and run.session_id or "",
             run_id = run and run.id or "", tool_call_id = call_id or "", operation = operation,
             arguments = cjson.encode(args), workspace_id = target.workspace_id,
-            remote = source_device ~= target.device_id, authorization_id = device.authorization_id })
+            remote = source_device ~= target.device_id, authorization_id = device.authorization_id }, connection.id)
     if code ~= codes.succ then self.pending[id] = nil; error("桌面执行请求发送失败") end
     local timeout = operation == "execute" and args.name == "apply_patch"
         and args.limits and args.limits.timeout_ms or 30000
@@ -126,10 +124,11 @@ function Execution:disconnect(connection)
     local device = connection.device_id and self.devices[connection.device_id]
     if not device or device.connection ~= connection then return end
     device.connection = nil
+    connection.device_id = nil
     for _, pending in pairs(self.pending) do
         if pending.connection == connection then pending.error = "目标桌面离线，执行结果未确认" end
     end
-    for _, session in pairs(self.user.chat.sessions) do
+    for _, session in pairs(self.app.chat.sessions) do
         if session.execution_target and session.execution_target.device_id == device.id and session.run then
             log.info("execution", "disconnect", "device=%s session=%s", device.id, session.id)
             session.run:cancel()

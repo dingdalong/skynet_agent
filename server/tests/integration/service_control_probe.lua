@@ -17,6 +17,13 @@ function M.run(config)
         support.equal(#snapshot.chat_sessions, 0)
         return client
     end
+    local function agents(status)
+        local addresses = {}
+        for index, address in status:gmatch("%.agent_(%d+) (:%x+) ready") do
+            addresses[tonumber(index)] = address
+        end
+        return addresses
+    end
     local ok, failure = xpcall(function()
         local output = support.control(config, "status", 500)
         for _, name in ipairs({
@@ -25,13 +32,17 @@ function M.run(config)
             assert(output:match("%." .. name .. " :[%da-f]+ ready"), output)
         end
         support.contains(output, "<CMD OK>")
+        local initial = agents(output)
+        support.equal(#initial, 2)
         local idle = connect()
+        support.equal(idle:request("LoginReq", { username = "control-stream" }).ret, 1)
         local streaming = login("control-stream")
+        support.equal(idle:request("AgentSnapshotReq").ret, 1)
         local saved = streaming:send_message(nil, "[e2e:history-set]")
         support.equal(saved.messages[#saved.messages].content, "E2E 历史已保存")
         local script = assert(filesystem.realpath("tests/fixtures/hotfix/client_runtime.lua"))
         support.contains(support.console(config.control_port, "inject .main " .. script), "CLIENT_HOTFIX_OK")
-        local selected = streaming:request("UserSnapshotReq", { session_id = saved.id })
+        local selected = streaming:request("AgentSnapshotReq", { session_id = saved.id })
         support.equal(selected.ret, 1)
         support.equal(#selected.snapshot.chat_sessions[1].session.messages, 2)
         support.equal(selected.snapshot.chat_sessions[1].session.messages[2].content, "E2E 历史已保存")
@@ -41,8 +52,10 @@ function M.run(config)
         streaming:wait_for(function(event)
             return event.name == "MessageDeltaNtf" and event.payload.delta ~= ""
         end)
-        local header_waiting = login("control-header")
+        local header_waiting = login("control-peer")
+        assert(header_waiting:request("ChatReq", { session_id = saved.id, text = "跨用户" }).ret ~= 1)
         header_waiting:request("ChatReq", { text = "[e2e:header-stall]" })
+        support.same(agents(support.control(config, "status")), initial)
         support.until_true(function() return support.health(config.model_url).active_requests == 2 end,
             "关服前必须已有流读取和响应头等待中的模型 HTTP 请求")
         support.control(config, "stop")

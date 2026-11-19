@@ -6,7 +6,8 @@
 ## 边界
 
 网关通过 WebSocket 提供接口。模型对话、会话历史、模型配置和 API Key 位于服务端，
-以 `user` 为所有者，在服务器重启前保留。用户名识别不提供密码认证，数据暂不落盘。
+节点启动时创建固定数量的 `agent` 服务，每个实例在独立 Skynet Lua VM 中运行。
+同一用户名的所有连接路由到同一实例。实例按用户分别保存会话、桌面设备和生成任务，直到服务器重启。
 连接断开不删除会话或停止生成。客户端 Agent 已通过宿主持有的二进制 WebSocket 接入；
 业务缓存与重连规则见 [Agent 客户端](CLIENT_AGENT.md)。
 用户名区分大小写，长度为 1–32 个 Unicode 字符。
@@ -15,26 +16,30 @@
 
 | 名称           | 含义                                                   |
 | -------------- | ------------------------------------------------------ |
-| `client`       | 承载客户端业务的 Skynet 服务，一个实例可以管理多条连接 |
+| `client`       | 在已登录连接与应用服务之间路由请求、响应和通知 |
 | `connection`   | 单条网络连接及用户订阅                                 |
-| `Chat`         | 用户聊天模块，管理会话集合、请求编排与通知             |
+| `agent`        | 常驻应用服务，管理分配到本实例的用户上下文 |
+| `Chat`         | Agent 应用内的会话集合、请求编排与通知 |
 | `AgentSession` | 单个会话，保存展示消息、模型选择与生成任务             |
 | `ChatSession`  | 单会话协议包装，包含会话状态及模型 ID                  |
 | `Agent`        | 模型调用与历史管理对象，由 `agent.agent` 导出          |
-| `user`         | 用户身份、会话集合和后台任务的所有者                   |
+| `user`         | `client` 持有的用户身份与连接集合 |
 
 ```mermaid
 flowchart LR
     C["client 服务"] -->|"1:N"| U["user"]
-    U -->|"1:N"| N["connection 订阅"]
-    U -->|"1:1"| H["Chat"]
+    C -->|"1:N"| N["connection 订阅"]
+    C -->|"按用户名固定路由"| P["agent 服务池中的一个实例"]
+    P -->|"1:N"| B["用户的 Agent 上下文"]
+    B --> H["Chat"]
     H -->|"1:N"| S["AgentSession"]
     S -->|"1:1"| A["🧠 Agent"]
 ```
 
 服务池实例数表示承载容量；连接数、用户数与智能体数分别描述。每个会话持有一个 Agent。
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
-client 服务初始化时加载共享提示词模板。登录只创建用户及 Chat 模块；收到没有 `session_id` 的
+登录返回用户身份。Agent 客户端随后请求 `AgentSnapshotReq`，实例在首个请求时建立该用户的应用上下文。
+每个实例在节点启动时读取一次提示词模板。收到没有 `session_id` 的
 首条 `ChatReq` 后，才创建 AgentSession、工作目录和 Agent，并立即开始该轮生成。
 模板在创建 Agent 时与工具、权限和工作目录配置一起传入。
 基础行为、运行时环境与项目规则分别组装，详见 [Agent 提示词](PROMPTS.md)。
@@ -44,7 +49,7 @@ client 服务初始化时加载共享提示词模板。登录只创建用户及 
 `main` 是进程的生命周期所有者，持有共享 Protobuf schema 和服务地址列表。它按依赖顺序创建、
 命名和初始化服务，最后开放网关监听；启动失败则回收已创建服务。本机控制台在业务服务启动前开放，
 启动卡住时也可显式强制关闭。关闭时先停止热修监听并等待当前批次结束，再停止接入、依次回收
-WebSocket、登录和 client 服务，等待在途命令、连接读循环和后台生成退出后统一结束进程。
+WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循环和后台生成退出后统一结束进程。
 启动和关闭均无超时，正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
 显式强制关闭跳过清理并退出 1。进程重启由外部管理器负责。
 
@@ -60,13 +65,14 @@ WebSocket、登录和 client 服务，等待在途命令、连接读循环和后
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `user.lua`、`user/handler.lua`                  | 用户身份、快照及用户请求                                    |
-| `user/mods/chat/`                               | Chat 业务模块及聊天请求 handler                             |
+| `user.lua`、`applications.lua`                  | 用户身份与连接、应用请求路由登记 |
+| `service/app/agent.lua`                         | Agent 服务的用户分配、请求分发和关服清理 |
+| `agent/app.lua`、`agent/handler.lua`            | 单个用户的 Agent 上下文、快照及请求处理 |
 | `agent_session.lua`、`agent/`                   | 单会话生命周期、模型对话与历史提交                          |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
-独立脚本和 Skynet 内置服务优先于公共入口。`src/service/<name>/<name>.lua` 返回稳定类表，
-使用服务名作为唯一模块名，例如 `require("gateway")`。
+独立脚本和 Skynet 内置服务优先于公共入口。基础服务位于 `src/service/<name>/<name>.lua`，
+应用服务统一放在 `src/service/app/<name>.lua`。两者均以服务名加载稳定类表，例如 `require("agent")`。
 `src/lualib` 保存服务创建的对象与公共模块。各节点的 main 通过 `node.init(callback)` 定制业务启动，
 回调接收节点实例；`node` 先完成公共初始化，再执行回调，最后进入就绪状态。
 `node` 复用服务基础层的初始化与命令分发，统一管理进程生命周期，业务服务清单由 main 决定。
@@ -83,7 +89,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 命令，main 只登记 `force_shutdown`。关闭由初始化所有者发起并保持幂等。
 `close` 成功表示清理完成，重复调用等待同一次结果。关闭期间拒绝新业务，仅允许
 `closing_commands` 显式登记的收尾命令，例如回收迟到的接入 fd 和断线清理。
-在途命令异常也会释放计数，client 服务的独立请求集合继续跟踪已断开连接的后台生成。
+在途命令异常也会释放计数。每个 Agent 服务继续跟踪分配到本实例的所有用户的离线生成任务。
 
 关服与用户取消都会主动关闭模型和权限判断响应流，并终止当前轮涉及的命令，等待生成协程收尾。
 工具调用与结果属于会话历史；副作用发生后失败或取消不会丢弃执行事实，重试从检查点继续。
@@ -100,8 +106,8 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 `node` 导出稳定的 `Node` 类表，公共运行期方法的缺陷修复可使用 `dbgcmd .main HOTFIX node`。
 节点启动回调只执行一次，不保存在节点实例中；业务编排与公共启动流程的调整通过重启生效。
 `develop` 渠道由 node 在业务服务启动完成后创建 `helper.hotfix_watch` 并建立源码基线，
-在节点内协程轮询文件内容，连续保存稳定后串行发起批次。目标是 `.main` 与全部登记且已就绪的业务实例，
-运行期新建实例加入后续批次。其他渠道不自动监听。
+在节点内协程轮询文件内容，连续保存稳定后串行发起批次。目标是 `.main` 与全部登记且已就绪的业务实例。
+其他渠道不自动监听。
 监听同时覆盖库文件与服务主体，基础目录文件映射为短模块名；排除主入口、公共服务入口、
 热修器、监听器自身、预加载脚本和标准库扩展。这些启动代码以及新增、删除文件的变更通过重启生效。
 节点先合并本次变更和失败实例积压的模块，对扫描到的源码内容进行编译，不执行候选函数。
@@ -118,7 +124,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 `send` 成功仅表示消息已交给 Skynet，不能当作远端执行确认。
 
 控制台通过 `.main` 查询状态或发起关闭，操作入口见[服务管理](../DEVELOPMENT.md#服务管理)。
-工作服务使用 `.client_1`、`.logind_1`、`.websocket_1` 等注册名，
+工作服务使用 `.agent_1`、`.client_1`、`.logind_1`、`.websocket_1` 等注册名，
 网关使用 `.gateway`。状态查询并行收集服务状态，失联服务显示 `unavailable`。
 
 ## 连接与内部消息
@@ -130,24 +136,34 @@ sequenceDiagram
     participant W as websocket
     participant L as logind
     participant A as client
+    participant P as agent
     G->>W: accept(fd, address, logind)
     C->>W: LoginReq(username)
     W->>L: call handle_request(connection_id, ...)
     L->>A: call open(connection_id, websocket, username)
-    A-->>L: 用户快照
+    A-->>L: 用户身份
     L->>W: call bind_client(connection_id, client_address)
     L->>W: call send_response(LoginRes)
     W-->>C: LoginRes
     L-->>W: 已处理
+    C->>W: AgentSnapshotReq
+    W->>A: handle_request
+    A->>P: 按用户名选实例，获取该用户的快照
+    P-->>A: 模型、会话、设备
+    A-->>W: AgentSnapshotRes
+    W-->>C: AgentSnapshotRes
     C->>W: ChatReq(session_id?, text, model_id?)
     W->>A: send handle_request(connection_id, ...)
-    A->>A: 动态查找 handler.REQUEST.ChatReq，以 User 为 self 调用
-    A->>A: 查找或创建 AgentSession，登记本轮生成
+    A->>P: 转发绑定的用户身份、连接 ID 和请求
+    P->>P: 查找或创建 AgentSession，登记本轮生成
+    P->>A: publish(SessionUpdatedNtf)
     A->>W: send send_response(SessionUpdatedNtf)
     W-->>C: 已包含首条消息的 ChatSession
+    P-->>A: ChatRes 业务结果
     A->>W: send send_response(ChatRes)
     W-->>C: 任务已接受及 ChatSession
-    A->>W: 向用户所有连接推送更新
+    P->>A: publish
+    A->>W: 向该用户已使用此应用的连接推送更新
     W-->>C: MessageDeltaNtf / SessionUpdatedNtf
 ```
 
@@ -171,21 +187,18 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
 WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-client 在初始化时通过 `package.searchpath("user.handler", package.path)` 定位 `user` 目录，
-固定接入根 `user.handler`，并按目录名排序扫描 `mods` 的第一层子目录。
-只有存在 `handler.lua` 的子目录才加载为 `user.mods.<name>.handler`，不递归扫描。
-目录定位或扫描、`require`、模块返回值及 `REQUEST` 类型校验、请求重名检查任一步失败都会使服务启动失败。
-全部 handler 在局部列表中加载和校验完成后，才将稳定 `REQUEST` 表的引用保存到 `self.request_handlers`，
-每个 client 实例只在初始化时发现一次模块。
+`applications.lua` 登记每个应用可接收的协议请求名。client 校验 WebSocket 来源，按请求查目标，
+始终传递连接绑定的用户身份。main 先启动 N 个 Agent 实例，再将有序地址列表交给所有 client。
+路由使用 `FNV-1a32(用户名) % N + 1` 选择实例。多端登录、断线重连和后续请求均使用同一规则。
+N 独立于 client 池的大小，调整后重启生效，部分用户名会映射到新的实例编号。
+公共服务可在登记项中指定已由节点启动的本地注册名 `address`，各用户的请求都发往同一地址。
+每次路由都携带用户身份与连接 ID，公共服务可据此决定数据的可见范围。
 
-请求到达时，client 先以 WebSocket 的消息来源地址校验连接归属，再从已保存的 `REQUEST` 表中
-按协议短消息名动态查找同名函数，以 User 实例作为 `self` 调用；请求期间不扫描目录或读盘，
-不把处理函数复制到 User 类或其他分发表。新增模块通过重启接入，已有 handler 的兼容方法体修复继续支持原位热修。
-`UserSnapshotReq` 由 `user/handler.lua` 处理；`ChatReq`、`MessageCancelReq`、`SessionModelSetReq`
-由 `user/mods/chat/handler.lua` 处理并通过 `self.chat` 委托同目录的 `chat.lua`。
+Agent 服务校验路由来源和用户 ID，再从 `agent.handler.REQUEST` 动态查找方法。
+返回结果只发给请求连接。应用通知由 client 按来源服务和用户筛选订阅者，桌面工具通知还限定连接 ID。
 协议命名见[公共隐式约定](../../隐式约定.md#公共协议)，handler 与分发规则见
 [服务端隐式约定](../../server/隐式约定.md)。
-未知业务请求（包括重复登录）以 1008 关闭，处理异常以 1011 关闭。
+未知业务请求（包括重复登录）以 1008 关闭。应用请求处理失败时返回该请求对应的失败响应。
 
 ## 配置与传输
 
@@ -236,13 +249,13 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 | 请求                                                   | 成功内容                           |
 | ------------------------------------------------------ | ---------------------------------- |
-| `LoginReq(username)`                                   | 用户身份和所有会话的完整快照       |
-| `UserSnapshotReq`                                      | 最新用户快照，用于重新建立同步基线 |
+| `LoginReq(username)`                                   | `identity` 中的用户名和用户 ID |
+| `AgentSnapshotReq`                                     | 完整 Agent 快照，用于启动及重新建立同步基线 |
 | `ChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
 | `MessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
 | `SessionModelSetReq(session_id, model_id)`             | 更新后的 `ChatSession`             |
 
-`UserSnapshot.chat_sessions` 是 `ChatSession` 列表，允许为空。每项的 `session` 为 `SessionState`，
+`AgentSnapshot.chat_sessions` 是 `ChatSession` 列表，允许为空。每项的 `session` 为 `SessionState`，
 包含会话身份、标题、消息、revision 和运行状态；`model_id`、`permission_model_id` 为该会话的实际模型 ID。
 快照的 `models` 提供公开模型清单，`default_model_id` 用于新草稿；快照中的 `permission_model_id`
 为空时表示权限模型跟随会话选择，否则使用指定模型。
@@ -262,15 +275,14 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 ## 客户端请求与取消
 
 客户端采用 Astryx 工作区与独立 Web 子应用，运行时与表现的所有权、Actor 消息及订阅生命周期见
-[客户端运行时](CLIENT_RUNTIME.md)。当前 Chat 为空白布局应用，尚未建立业务连接。
-连接、身份、pending 请求与会话缓存将在真实业务接入时由宿主持有，页面重建只替换订阅，
-不关闭连接或重放业务命令；此契约须通过真实连接测试验收。
+[客户端运行时](CLIENT_RUNTIME.md)。宿主持有网络连接，Agent 客户端运行时管理请求与会话缓存。
+页面重建只替换订阅。
 
 服务端请求按线路消息编号配对，业务 run_id 跨连接稳定。通知可以先于请求响应到达，
 客户端接入时须按真实会话与任务编号合并，不按文本猜测请求归属。
 会话快照包含版本、部分回答和任务状态；增量出现版本缺口时须重新获取完整快照。
 
-每个会话最多一个生成，不同会话可以并发。生成任务由用户持有，全部连接离线后仍继续执行。
+每个会话最多一个生成，不同会话可以并发。生成任务由该用户的 Agent 服务持有，全部连接离线后仍继续执行。
 停止按会话和任务 ID 定位，确认不表示资源已释放，任务退出后广播停止终态。
 取消已结束任务幂等成功，不存在的会话返回失败；服务关闭时取消任务并等待上游资源释放。
 
@@ -324,7 +336,7 @@ Web 与原生核心均检查版本连续性，出现缺口获取完整快照，�
 
 ## 会话模型与思考流
 
-模型清单由 config 提供；登录和用户快照只包含公开模型描述。`SessionModelSetReq/Res` 按会话设置模型，
+模型清单由 config 提供。Agent 快照只包含公开模型描述。`SessionModelSetReq/Res` 按会话设置模型，
 `ChatSession` 包装同时返回当前模型和实际权限模型 ID。切换不取消正在进行的模型请求，后续请求获取最新配置快照。
 `agent.llm.base` 统一管理模型配置、客户端生命周期、流式响应、思考通知与用量日志。
 主模型与权限模型各持有独立实例；SDK 适配和单次 HTTP 请求的取消状态由同模块的

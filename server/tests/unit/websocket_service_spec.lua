@@ -150,7 +150,7 @@ describe("websocket", function()
         { "零 ID", codec:encode_msg(0, "LoginReq", {}), "binary", 1007 },
         { "响应方向", codec:encode_msg(1, "LoginRes", {}), "binary", 1008 },
         { "通知方向", codec:encode_msg(1, "MessageDeltaNtf", {}), "binary", 1008 },
-        { "普通数据类型", codec:encode_msg(1, "UserSnapshot", {}), "binary", 1008 },
+        { "普通数据类型", codec:encode_msg(1, "UserIdentity", {}), "binary", 1008 },
         { "未知协议", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.UnknownReq")), "binary", 1007 },
         { "内部快照方法", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.snapshot")), "binary", 1007 },
         {

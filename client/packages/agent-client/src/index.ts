@@ -5,7 +5,7 @@ import type {
     ChatSession,
     ReasoningBlock,
     ToolCall,
-    UserSnapshot,
+    AgentSnapshot,
     LocalContext,
 } from "./types";
 export type * from "./types";
@@ -182,7 +182,7 @@ class Turn {
         this.state.buffered.push(packet);
         if (!this.state.syncing) {
             this.state.syncing = true;
-            this.request("UserSnapshotReq", {});
+            this.request("AgentSnapshotReq", {});
         }
     }
     full(session: ChatSession) {
@@ -192,7 +192,7 @@ class Turn {
         if (!existing || session.session.revision > existing.session.revision)
             this.state.sessions[id] = session;
     }
-    snapshot(snapshot: UserSnapshot, login: boolean) {
+    snapshot(snapshot: AgentSnapshot, login: boolean) {
         if (
             !snapshot ||
             snapshot.username !== this.state.configuration.username
@@ -357,18 +357,31 @@ class Turn {
                 pending.name === "DesktopRegisterReq"
             )
                 this.lost(message, false);
-            else if (pending.name === "UserSnapshotReq") this.lost(message);
+            else if (pending.name === "AgentSnapshotReq") this.lost(message);
             else this.state.error = message;
             return;
         }
         switch (pending.name) {
-            case "LoginReq":
-            case "UserSnapshotReq":
-                this.snapshot(
-                    packet.body.snapshot as UserSnapshot,
-                    pending.name === "LoginReq",
-                );
+            case "LoginReq": {
+                const identity = packet.body.identity as {
+                    username: string;
+                    user_id: string;
+                };
+                if (
+                    !identity?.user_id ||
+                    identity.username !== this.state.configuration.username
+                )
+                    throw Error("服务器登录身份不匹配");
+                this.request("AgentSnapshotReq", {}, identity.user_id);
                 break;
+            }
+            case "AgentSnapshotReq": {
+                const snapshot = packet.body.snapshot as AgentSnapshot;
+                if (pending.target && pending.target !== snapshot?.user_id)
+                    throw Error("服务器快照身份不匹配");
+                this.snapshot(snapshot, Boolean(pending.target));
+                break;
+            }
             case "ChatReq": {
                 const session = packet.body.chat_session as ChatSession;
                 this.full(session);

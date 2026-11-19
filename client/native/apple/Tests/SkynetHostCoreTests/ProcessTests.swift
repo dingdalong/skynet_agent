@@ -546,7 +546,7 @@ final class ProcessTests: XCTestCase {
                 XCTAssertEqual(dictionary(state["connection"])["id"] as? String, connectionId)
                 XCTAssertEqual(state["selectedId"] as? String, "session")
                 XCTAssertEqual(state["syncing"] as? Bool, false)
-                XCTAssertEqual(dictionary(state["connection"])["nextId"] as? Int, 3)
+                XCTAssertEqual(dictionary(state["connection"])["nextId"] as? Int, 4)
                 completed.fulfill()
             }
         }

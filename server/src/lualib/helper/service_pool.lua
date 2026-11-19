@@ -21,9 +21,16 @@ function Pool:next()
 end
 
 ---@param key string
+---@param count integer
+---@return integer
+function Pool.slot(key, count)
+    return hash.fnv1a32(key) % count + 1
+end
+
+---@param key string
 ---@return integer
 function Pool:select(key)
-    return self.addresses[hash.fnv1a32(key) % #self.addresses + 1]
+    return self.addresses[self.slot(key, #self.addresses)]
 end
 
 return Pool

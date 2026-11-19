@@ -186,7 +186,7 @@ describe("protobuf", function()
             local id, decoded_name, payload = protocol:decode_msg(decode_hex(vectors.frames[key]))
             assert.are.equal(expected, decoded_name)
             if expected:match("Ntf$") then assert.are.equal(0, id) end
-            if key == "login_success" then assert.are.equal("user-1", payload.snapshot.user_id) end
+            if key == "login_success" then assert.are.equal("user-1", payload.identity.user_id) end
             if key == "chat_first_request" then
                 assert.are.equal("", payload.session_id)
                 assert.are.equal("model-1", payload.model_id)

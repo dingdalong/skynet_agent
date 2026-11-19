@@ -19,7 +19,7 @@ local Loader = {}
 
 ---@class server.AgentGatewayConfig
 ---@field socket server.SocketConfig
----@field instance { client: integer, logind: integer, websocket: integer }
+---@field instance { agent: integer, client: integer, logind: integer, websocket: integer }
 ---@field login_timeout_ticks integer
 
 ---@class server.AgentConfig
@@ -108,6 +108,7 @@ local function validate(config)
     )
 
     local instance = table_field(gateway.instance, "agent_gateway.instance")
+    integer_field(instance.agent, "agent_gateway.instance.agent", 1, 32)
     integer_field(instance.client, "agent_gateway.instance.client", 1, 32)
     integer_field(instance.logind, "agent_gateway.instance.logind", 1, 32)
     integer_field(instance.websocket, "agent_gateway.instance.websocket", 1, 32)
@@ -169,6 +170,7 @@ function Loader.build(common, channel_config, channel_name)
     local gateway = table_field(config.agent_gateway, "agent_gateway")
     gateway.instance = table_field(gateway.instance or {}, "agent_gateway.instance")
     local instance = config.agent_gateway.instance
+    if instance.agent == nil then instance.agent = config.worker_thread end
     instance.client = instance.client or config.worker_thread
     instance.logind = instance.logind or config.worker_thread
     instance.websocket = instance.websocket or config.worker_thread

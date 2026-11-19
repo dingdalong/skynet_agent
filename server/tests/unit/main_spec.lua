@@ -6,7 +6,7 @@ describe("main", function()
         startup, calls, events = nil, {}, {}
         config = {
             protocol = { agent_gateway_schema_dir = "schema" },
-            agent_gateway = { instance = { client = 2, logind = 1, websocket = 3 } },
+            agent_gateway = { instance = { agent = 1, client = 2, logind = 1, websocket = 3 } },
         }
         scope = Scope.new({
             node = { init = function(callback) startup = callback end },
@@ -30,21 +30,23 @@ describe("main", function()
 
     it("在节点启动回调中加载业务 schema 并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema" }, { "launch", "client" }, { "launch", "logind" },
+        assert.same({ { "schema", "schema" }, { "launch", "agent" }, { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
-            { name = "client", count = 2 },
-            { name = "logind", count = 1, params = { client_services = { 11, 12 } } },
+            { name = "agent", count = 1 },
+            { name = "client", count = 2, params = { app_services = { agent = { 11 } } } },
+            { name = "logind", count = 1, params = { client_services = { 12, 13 } } },
             { name = "websocket", count = 3 },
-            { name = "gateway", count = 1, params = { loginds = { 13 }, websockets = { 14, 15, 16 } },
+            { name = "gateway", count = 1, params = { loginds = { 14 }, websockets = { 15, 16, 17 } },
                 registered_name = ".gateway" },
         }, calls)
     end)
     it("服务数量由 main 的业务配置决定，包括空服务池", function()
-        config.agent_gateway.instance = { client = 0, logind = 2, websocket = 0 }
+        config.agent_gateway.instance = { agent = 0, client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
-            { name = "client", count = 0 },
+            { name = "agent", count = 0 },
+            { name = "client", count = 0, params = { app_services = { agent = {} } } },
             { name = "logind", count = 2, params = { client_services = {} } },
             { name = "websocket", count = 0 },
             { name = "gateway", count = 1, params = { loginds = { 11, 12 }, websockets = {} },

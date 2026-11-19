@@ -67,8 +67,8 @@ function Login:handle_request(context, id, message_id, name, args)
         )
     end
     local client_address = self.client_services:select(user_name)
-    local code, snapshot = rpc.call(client_address, "open", id, websocket_address, user_name)
-    if code ~= error_code.succ or type(snapshot) ~= "table" then
+    local code, identity = rpc.call(client_address, "open", id, websocket_address, user_name)
+    if code ~= error_code.succ or type(identity) ~= "table" then
         rpc.send(client_address, "disconnect", id)
         return self:_fail(websocket_address, id, message_id, error_code.call_fail, "客户端上下文初始化失败")
     end
@@ -79,7 +79,7 @@ function Login:handle_request(context, id, message_id, name, args)
     -- 绑定后的断线和写入失败统一由 WebSocket 通知 client 服务。
     return self:_call_websocket(websocket_address, "send_response", id, message_id, "LoginRes", {
         ret = error_code.succ,
-        snapshot = snapshot,
+        identity = identity,
     })
 end
 

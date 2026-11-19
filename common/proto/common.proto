@@ -85,7 +85,7 @@ message ChatSession {
   string permission_model_id = 3;
 }
 
-message UserSnapshot {
+message AgentSnapshot {
   repeated DesktopDevice desktops = 7;
   string user_id = 1;
   string username = 2;

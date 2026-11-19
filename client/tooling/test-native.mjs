@@ -21,7 +21,7 @@ const messageHash = (name) => {
         hash = Math.imul(hash ^ value.charCodeAt(0), 0x1000193) >>> 0;
     return hash;
 };
-const names = ["LoginReq", "UserSnapshotReq", "ChatReq", "SessionModelSetReq"];
+const names = ["LoginReq", "AgentSnapshotReq", "ChatReq", "SessionModelSetReq"];
 const send = (socket, name, id, body) => {
     const type = schema.lookupType(`skynet.agent.v1.${name}`);
     const payload = type.encode(type.create(body)).finish();
@@ -65,7 +65,17 @@ server.on("connection", (socket) => {
         const request = schema
             .lookupType(`skynet.agent.v1.${name}`)
             .decode(data.subarray(9));
-        if (name === "LoginReq") snapshot.username = request.username;
+        if (name === "LoginReq") {
+            snapshot.username = request.username;
+            send(socket, "LoginRes", requestId, {
+                ret: 1,
+                identity: {
+                    username: request.username,
+                    user_id: snapshot.user_id,
+                },
+            });
+            return;
+        }
         if (name === "SessionModelSetReq") {
             const session = snapshot.chat_sessions[0];
             session.model_id = request.model_id;

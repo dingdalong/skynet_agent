@@ -5,9 +5,8 @@ local models = require("agent.models")
 local log = require("log")
 local config = require("etc.cfg").agent
 
----@class user.Chat
----@field new fun(self: user.Chat, user: user.User, templates: agent.PromptTemplates, pending: table): user.Chat
----@field user user.User
+---@class agent.Chat
+---@field app agent.App
 ---@field sessions table<string, agent_session.AgentSession>
 ---@field session_order string[]
 ---@field prompt_templates agent.PromptTemplates
@@ -15,12 +14,12 @@ local config = require("etc.cfg").agent
 local Chat = class()
 
 local function failure(code, message, retryable)
-    log.info("user.chat", "request", "拒绝请求 code=%d reason=%s", code, message)
+    log.info("agent.chat", "request", "拒绝请求 code=%d reason=%s", code, message)
     return { ret = code, error = { message = message, retryable = retryable or false } }
 end
 
-function Chat:ctor(user, templates, pending_runs)
-    self.user = user
+function Chat:ctor(app, templates, pending_runs)
+    self.app = app
     self.sessions = {}
     self.session_order = {}
     self.prompt_templates = templates
@@ -39,7 +38,7 @@ end
 ---@param name string
 ---@param args table
 function Chat:publish(name, args)
-    self.user.owner:publish(self.user, name, args)
+    self.app:publish(name, args)
 end
 
 ---@param args table
@@ -64,12 +63,12 @@ function Chat:chat(args, connection)
     if type(config.llm.api_key) ~= "string" or config.llm.api_key == "" then
         return failure(codes.call_fail, "模型配置未加载", true)
     end
-    local valid, target = pcall(self.user.execution.validate_target, self.user.execution,
+    local valid, target = pcall(self.app.execution.validate_target, self.app.execution,
         args.execution_target, connection)
     if not valid then return failure(codes.invalid_param, tostring(target)) end
     local ok, session = pcall(AgentSession.new, AgentSession, self, model_id, target)
     if not ok then
-        log.failure("user.chat", "chat 创建 Agent 失败", session)
+        log.failure("agent.chat", "chat 创建 Agent 失败", session)
         return failure(codes.call_fail, "创建 Agent 失败", true)
     end
     self.sessions[session.id] = session
@@ -94,7 +93,15 @@ function Chat:set_session_model(args)
 end
 
 function Chat:close()
-    for _, session in pairs(self.sessions) do session:close() end
+    local succeeded = true
+    for id, session in pairs(self.sessions) do
+        local ok, err = pcall(session.close, session)
+        if not ok then
+            log.failure("agent.chat", "close session=" .. id, err)
+            succeeded = false
+        end
+    end
+    return succeeded
 end
 
 return Chat

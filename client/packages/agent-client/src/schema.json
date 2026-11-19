@@ -6,6 +6,37 @@
           "nested": {
             "v1": {
               "nested": {
+                "AgentSnapshot": {
+                  "fields": {
+                    "chat_sessions": {
+                      "id": 3,
+                      "rule": "repeated",
+                      "type": "ChatSession"
+                    },
+                    "default_model_id": { "id": 5, "type": "string" },
+                    "desktops": {
+                      "id": 7,
+                      "rule": "repeated",
+                      "type": "DesktopDevice"
+                    },
+                    "models": {
+                      "id": 4,
+                      "rule": "repeated",
+                      "type": "ModelOption"
+                    },
+                    "permission_model_id": { "id": 6, "type": "string" },
+                    "user_id": { "id": 1, "type": "string" },
+                    "username": { "id": 2, "type": "string" }
+                  }
+                },
+                "AgentSnapshotReq": { "fields": {} },
+                "AgentSnapshotRes": {
+                  "fields": {
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" },
+                    "snapshot": { "id": 4, "type": "AgentSnapshot" }
+                  }
+                },
                 "ChatMessage": {
                   "fields": {
                     "content": { "id": 3, "type": "string" },
@@ -123,8 +154,8 @@
                 "LoginRes": {
                   "fields": {
                     "error": { "id": 3, "type": "ErrorInfo" },
-                    "ret": { "id": 2, "type": "int32" },
-                    "snapshot": { "id": 4, "type": "UserSnapshot" }
+                    "identity": { "id": 4, "type": "UserIdentity" },
+                    "ret": { "id": 2, "type": "int32" }
                   }
                 },
                 "MessageCancelReq": {
@@ -275,35 +306,10 @@
                     "tool": { "id": 3, "type": "ToolCall" }
                   }
                 },
-                "UserSnapshot": {
+                "UserIdentity": {
                   "fields": {
-                    "chat_sessions": {
-                      "id": 3,
-                      "rule": "repeated",
-                      "type": "ChatSession"
-                    },
-                    "default_model_id": { "id": 5, "type": "string" },
-                    "desktops": {
-                      "id": 7,
-                      "rule": "repeated",
-                      "type": "DesktopDevice"
-                    },
-                    "models": {
-                      "id": 4,
-                      "rule": "repeated",
-                      "type": "ModelOption"
-                    },
-                    "permission_model_id": { "id": 6, "type": "string" },
                     "user_id": { "id": 1, "type": "string" },
                     "username": { "id": 2, "type": "string" }
-                  }
-                },
-                "UserSnapshotReq": { "fields": {} },
-                "UserSnapshotRes": {
-                  "fields": {
-                    "error": { "id": 3, "type": "ErrorInfo" },
-                    "ret": { "id": 2, "type": "int32" },
-                    "snapshot": { "id": 4, "type": "UserSnapshot" }
                   }
                 }
               }

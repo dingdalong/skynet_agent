@@ -22,8 +22,8 @@ local config = require("etc.cfg").agent
 ---@field reasoning llm.ReasoningBlock[]?
 
 ---@class agent_session.AgentSession
----@field new fun(self: agent_session.AgentSession, owner: user.Chat, model_id: string): agent_session.AgentSession
----@field owner user.Chat
+---@field new fun(self: agent_session.AgentSession, owner: agent.Chat, model_id: string): agent_session.AgentSession
+---@field owner agent.Chat
 ---@field id string
 ---@field title string
 ---@field updated_at integer
@@ -58,7 +58,7 @@ local function session_title(text)
     return normalized
 end
 
----@param owner user.Chat
+---@param owner agent.Chat
 ---@param model_id string
 function AgentSession:ctor(owner, model_id, target)
     self.owner = owner
@@ -74,7 +74,7 @@ function AgentSession:ctor(owner, model_id, target)
     self.execution_target = target
     local workspace =
         target and target.directory or require("agent.workspace").create(
-            config.tools.workspace_root, owner.user.username, self.id)
+            config.tools.workspace_root, owner.app.identity.username, self.id)
     self.agent = Agent:new(models.resolve(config, model_id), owner.prompt_templates, {
         execution_target = target, workspace = workspace, tools = config.tools,
         project_instructions_max_bytes = config.project_instructions_max_bytes,
@@ -135,7 +135,7 @@ function AgentSession:send_message(args, connection)
     local text = args.text
     if self.run then return failure(codes.server_busy, "该会话仍在生成", true) end
     if self.execution_target then
-        local ok, err = pcall(self.owner.user.execution.available, self.owner.user.execution,
+        local ok, err = pcall(self.owner.app.execution.available, self.owner.app.execution,
             self.execution_target, connection and connection.device_id)
         if not ok then return failure(codes.fail, tostring(err), true) end
     end
@@ -261,9 +261,9 @@ function AgentSession:set_execution(target, connection)
             end
         end
     end
-    target = self.owner.user.execution:validate_target(target, connection)
+    target = self.owner.app.execution:validate_target(target, connection)
     local workspace = target and target.directory or require("agent.workspace").create(
-        config.tools.workspace_root, self.owner.user.username, self.id)
+        config.tools.workspace_root, self.owner.app.identity.username, self.id)
     if executor then executor:close() end
     self.agent.executor = nil
     self.agent.options.workspace, self.agent.options.execution_target = workspace, target

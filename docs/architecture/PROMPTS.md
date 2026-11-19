@@ -10,7 +10,7 @@
 基础行为适用于通用助手；工具与权限说明只在实际提供工具时加入。
 基础行为作为首条 system 消息发送，不使用 Responses API 顶层的 `instructions` 参数。
 
-每个 client 服务在初始化时调用 `Prompts.load_templates()`，将同一份模板交给它管理的 Agent。
+每个常驻 `agent` 实例在初始化时调用一次 `Prompts.load_templates()`，该实例内所有用户的会话共享模板。
 模块加载本身不读取文件，模板变更通过重启服务生效。模板缺失、空白或不是有效 UTF-8 文本时，
 初始化失败。
 
@@ -73,7 +73,7 @@ Agent 在每次新用户任务开始时检查会话根目录，优先使用 `AGE
 ## 接入与验证
 
 `Agent:new(llm_config, prompt_templates, options)` 接收已加载模板，`options` 提供会话工作目录、
-工具与权限配置。独立调用可只传模型配置和模板；网关通过 client 服务与 user 的会话创建流程统一接入。
+工具与权限配置。独立调用可只传模型配置和模板。网关按用户名将会话创建请求路由到固定的 `agent` 实例。
 
 下面的代码在 Skynet 服务中演示不启用工具的独立对话。`llm_config` 由调用方从
 [模型配置](../CONFIGURATION.md#模型与会话)中解析，包含连接信息与请求超时；模板在服务初始化时加载并复用。

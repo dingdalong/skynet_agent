@@ -124,7 +124,9 @@ function M.login(url, username)
         client:close()
         error(ok and "登录失败 ret=" .. tostring(result.ret) or result, 2)
     end
-    return client, result.snapshot, username
+    local snapshot = client:request("AgentSnapshotReq").snapshot
+    support.equal(snapshot.user_id, result.identity.user_id)
+    return client, snapshot, username
 end
 
 return M

@@ -1,6 +1,23 @@
 local codes = require("enum.error_code")
 local log = require("log")
 local REQUEST = {}
+
+function REQUEST:AgentSnapshotReq()
+    return { ret = codes.succ, snapshot = self:snapshot() }
+end
+
+function REQUEST:ChatReq(args, connection)
+    return self.chat:chat(args, connection)
+end
+
+function REQUEST:MessageCancelReq(args)
+    return self.chat:cancel_message(args)
+end
+
+function REQUEST:SessionModelSetReq(args)
+    return self.chat:set_session_model(args)
+end
+
 local function attempt(method, self, args, connection)
     local ok, result = pcall(method, self.execution, args, connection)
     if ok then return result end

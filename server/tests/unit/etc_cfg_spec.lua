@@ -125,6 +125,7 @@ describe("etc.cfg", function()
         assert.are.equal(8, config.worker_thread)
         assert.are.equal("127.0.0.1", config.agent_gateway.socket.host)
         assert.are.equal(18791, config.agent_gateway.socket.port)
+        assert.are.equal(2, config.agent_gateway.instance.agent)
         assert.are.equal(2, config.agent_gateway.instance.client)
         assert.are.equal(2, config.agent_gateway.instance.logind)
         assert.are.equal(2, config.agent_gateway.instance.websocket)
@@ -158,6 +159,7 @@ describe("etc.cfg", function()
 
         local config = loader.build(common, channel, "test")
 
+        assert.are.equal(8, config.agent_gateway.instance.agent)
         assert.are.equal(8, config.agent_gateway.instance.client)
         assert.are.equal(8, config.agent_gateway.instance.logind)
         assert.are.equal(8, config.agent_gateway.instance.websocket)
@@ -189,6 +191,9 @@ describe("etc.cfg", function()
         assert_build_error(loader.build, function(common)
             common.worker_thread = 0
         end, "worker_thread")
+        assert_build_error(loader.build, function(_, channel)
+            channel.agent_gateway.instance.agent = 0
+        end, "agent_gateway.instance.agent")
         assert_build_error(loader.build, function(_, channel)
             channel.agent_gateway.instance.client = 33
         end, "agent_gateway.instance.client")

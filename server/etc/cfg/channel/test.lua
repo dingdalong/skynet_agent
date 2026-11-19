@@ -5,6 +5,7 @@ return {
             port = 18791,
         },
         instance = {
+            agent = 2,
             client = 2,
             logind = 2,
             websocket = 2,

@@ -94,7 +94,7 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 也可通过 Skynet `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .client_1 HOTFIX client user agent.agent agent.llm.base
+dbgcmd .client_1 HOTFIX client user
 ```
 
 目标使用以 `.` 开头的注册名或以 `:` 开头的数字地址。库文件映射到模块名，基础模块使用短名，

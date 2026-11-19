@@ -65,7 +65,7 @@ local function multi_user_flow(login)
     support.equal(last(complete).status, status.completed)
     support.equal(last(complete).content, "E2E 慢速完成")
     restored:close()
-    support.equal(#other:request("UserSnapshotReq").snapshot.chat_sessions, 0)
+    support.equal(#other:request("AgentSnapshotReq").snapshot.chat_sessions, 0)
     other:close()
 end
 
@@ -98,6 +98,33 @@ local function protocol_flow(connect)
     support.equal(ordered:wait_for_close(), 1008)
 end
 
+local function desktop_flow(login)
+    local desktop, _, username = login()
+    local phone = login(username)
+    support.equal(desktop:request("DesktopRegisterReq", {
+        device_id = "desktop", name = "Desktop", authorization_id = "desktop-auth",
+    }).ret, 1)
+    local target = { device_id = "desktop", workspace_id = "workspace", directory = "/project", platform = "macos" }
+    local args = { execution_target = target, text = "[e2e:success]" }
+    support.equal(phone:request("ChatReq", args).ret, 12)
+    local accepted = desktop:request("ChatReq", args)
+    support.equal(accepted.ret, 1)
+    local action = desktop:wait_for(function(event) return event.name == "ExecutionActionNtf" end).payload
+    support.equal(action.operation, "project")
+    support.equal(action.authorization_id, "desktop-auth")
+    local result = { request_id = action.request_id, result = '{"ok":true,"project":{"workspace":"/project"}}' }
+    support.equal(phone:request("ExecutionResultReq", result).ret, 2)
+    support.equal(desktop:request("ExecutionResultReq", result).ret, 1)
+    local complete = phone:wait_run(accepted.chat_session.session.run_id)
+    support.equal(last(complete).content, "E2E 成功")
+    for _, event in ipairs(phone.events) do assert(event.name ~= "ExecutionActionNtf") end
+    desktop:close()
+    phone:wait_for(function(event)
+        return event.name == "DesktopUpdatedNtf" and not event.payload.device.online
+    end)
+    phone:close()
+end
+
 function M.run(config)
     local clients = {}
     local function connect()
@@ -111,19 +138,33 @@ function M.run(config)
         return client, snapshot, name
     end
     local ok, failure = xpcall(function()
-        if config.mode == "ready" then login():close(); return end
+        if config.mode == "ready" then
+            local ready = connect()
+            support.equal(ready:request("LoginReq", { username = "readiness" }).ret, 1)
+            return
+        end
         if config.mode == "live" then
-            local client = login()
-            local result = last(client:send_message(nil, config.live_prompt, 12000))
+            local client, snapshot, username = login()
+            local session = client:send_message(nil, config.live_prompt, 12000)
+            local result = last(session)
             support.equal(result.status, status.completed, "真实模型未成功完成")
             support.equal(result.ret, 0, "成功消息不应携带错误码")
             assert(result.content ~= "", "真实模型未返回内容")
+            client:close()
+            local _, restored = login(username)
+            support.equal(restored.user_id, snapshot.user_id)
+            support.equal(restored.chat_sessions[1].session.id, session.id)
+            support.equal(last(restored.chat_sessions[1].session).content, result.content)
+            local other, independent = login()
+            support.equal(#independent.chat_sessions, 0)
+            support.equal(other:request("MessageCancelReq", { session_id = session.id, run_id = result.run_id }).ret, 2)
             print(result.content)
             return
         end
         protocol_flow(connect)
         chat_flow(login)
         multi_user_flow(login)
+        desktop_flow(login)
         print("网关测试通过：用户路由、离线恢复、多端同步、并发、" ..
             "上下文、取消、重试与协议边界")
     end, debug.traceback)

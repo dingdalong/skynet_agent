@@ -32,6 +32,7 @@ local function module_name(path)
         return (name:gsub("/init$", ""):gsub("/", "."))
     end
     local service, file = path:match("^service/([^/]+)/([^/]+)%.lua$")
+    if service == "app" then return file end
     if service == file then
         return service
     end

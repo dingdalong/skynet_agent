@@ -111,10 +111,19 @@ class Client {
     }
     login(sessions: ChatSession[] = []) {
         this.connect();
+        this.restore(sessions);
+    }
+    restore(sessions: ChatSession[] = []) {
         this.resource(
             "LoginRes",
-            { ret: 1, snapshot: this.snapshot(sessions) },
+            { ret: 1, identity: { user_id: "u1", username: "alice" } },
             this.pending("LoginReq"),
+        );
+        expect(this.state.connection.status).toBe("restoring");
+        this.resource(
+            "AgentSnapshotRes",
+            { ret: 1, snapshot: this.snapshot(sessions) },
+            this.pending("AgentSnapshotReq"),
         );
     }
 }
@@ -185,11 +194,7 @@ describe("native Agent development", () => {
         const client = new Client();
         client.command("$agent.context", nativeContext);
         client.connect();
-        client.resource(
-            "LoginRes",
-            { ret: 1, snapshot: client.snapshot() },
-            client.pending("LoginReq"),
-        );
+        client.restore();
         expect(client.state.connection.status).toBe("restoring");
         client.resource("ExecutionActionNtf", {
             request_id: "call-1",
@@ -312,9 +317,9 @@ describe("public protobuf protocol", () => {
         ).toBe(vectors.frames.chat_request);
         const login = decodePacket(frame(vectors.frames.login_success));
         expect(login.id).toBe(1);
-        expect(login.body.snapshot).toMatchObject({
+        expect(login.body.identity).toEqual({
             username: "alice",
-            default_model_id: "model-1",
+            user_id: "user-1",
         });
         for (const key of [
             "message_streaming",
@@ -349,11 +354,7 @@ describe("Agent actor", () => {
         const newer = session(3, 2);
         newer.session.messages[0].content = "已完成";
         client.resource("SessionUpdatedNtf", { chat_session: newer });
-        client.resource(
-            "LoginRes",
-            { ret: 1, snapshot: client.snapshot([session(1)]) },
-            client.pending("LoginReq"),
-        );
+        client.restore([session(1)]);
         expect(client.state.sessions.s1.session.messages[0].content).toBe(
             "已完成",
         );
@@ -371,12 +372,12 @@ describe("Agent actor", () => {
             revision: 3,
         });
         expect(client.state.syncing).toBe(true);
-        const id = client.pending("UserSnapshotReq");
+        const id = client.pending("AgentSnapshotReq");
         const newer = session(4, 2);
         newer.session.messages[0].content = "完整文本";
         client.resource("SessionUpdatedNtf", { chat_session: newer });
         client.resource(
-            "UserSnapshotRes",
+            "AgentSnapshotRes",
             { ret: 1, snapshot: client.snapshot([session(3)]) },
             id,
         );

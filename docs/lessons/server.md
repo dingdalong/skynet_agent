@@ -161,11 +161,3 @@ Verified · Seen: 1× (2026-11-06)
 入口校验 `Req`，绑定后仅从已登记的 `REQUEST` 表按短消息名查找。保留表引用，每次分发时查函数，以便热修对已有用户生效。 [隐式约定.md](../../server/隐式约定.md)、[client_service_spec.lua](../../server/tests/unit/client_service_spec.lua)
 
 Verified · Seen: 1× (2026-11-07)
-
-<a id="l-061"></a>
-
-### L-061 发现可选 handler 时区分文件缺省和扫描错误
-
-目录读取、属性读取或模块加载失败应中止初始化。先验证所有模块及重名请求，再一次性发布稳定的 handler 表。 [client.lua](../../server/src/service/client/client.lua)、[client_service_spec.lua](../../server/tests/unit/client_service_spec.lua)
-
-Verified · Seen: 1× (2026-11-09)

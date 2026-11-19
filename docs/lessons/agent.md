@@ -94,7 +94,7 @@ Verified · Seen: 1× (2026-11-09)
 
 ### L-063 在桌面执行结果进入 Lua 时归一化 JSON null
 
-`cjson.null` 在 Lua 中是真值。先处理嵌套结果中的可选空字段，再把结果交给执行器，覆盖真实 JSON 解码路径。 [execution.lua](../../server/src/lualib/user/mods/execution/execution.lua)、[desktop_execution_spec.lua](../../server/tests/unit/desktop_execution_spec.lua)
+`cjson.null` 在 Lua 中是真值。先处理嵌套结果中的可选空字段，再把结果交给执行器，覆盖真实 JSON 解码路径。 [execution.lua](../../server/src/lualib/agent/execution.lua)、[desktop_execution_spec.lua](../../server/tests/unit/desktop_execution_spec.lua)
 
 Verified · Seen: 1× (2026-11-09)
 

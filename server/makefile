@@ -58,7 +58,7 @@ OPENSSL_INCLUDE_DIR ?= $(OPENSSL_PREFIX)/include
 OPENSSL_LIB_DIR ?= $(OPENSSL_PREFIX)/lib
 endif
 
-BUSTED_LPATH := ./?.lua;./?/init.lua;./../common/?.lua;./../common/?/init.lua;./src/lualib/?.lua;./src/lualib/?/init.lua;./src/lualib/base/?.lua;./src/service/?/?.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/lua-protobuf/?.lua;./3rd/lua-protobuf/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
+BUSTED_LPATH := ./?.lua;./?/init.lua;./../common/?.lua;./../common/?/init.lua;./src/lualib/?.lua;./src/lualib/?/init.lua;./src/lualib/base/?.lua;./src/service/?/?.lua;./src/service/app/?.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/lua-protobuf/?.lua;./3rd/lua-protobuf/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
 BUSTED_CPATH := ./luaclib/?.so
 
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
@@ -84,7 +84,7 @@ help:
 		"  make test-integration     构建并运行全部假模型与运行时集成测试" \
 		"  make test-probe-support   验证 Lua 网络探针的等待、断线与边界" \
 		"  make test-protobuf-shared  验证 protobuf schema 跨 VM 共享" \
-		"  make test-agent-gateway    运行假模型与四服务网关聊天测试" \
+		"  make test-agent-gateway    运行假模型与网关聊天测试" \
 		"  make test-service-runtime  验证服务命令、RPC 超时与热修" \
 		"  make test-service-control  验证状态查询和进程关闭" \
 		"  make test-live  通过网关调用真实 DeepSeek" \
