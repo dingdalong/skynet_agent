@@ -41,7 +41,7 @@ local log = require("log")
 ---@field root string
 ---@field config agent.ToolConfig
 ---@field permission agent.PermissionConfig
----@field owner agent_session.AgentSession?
+---@field owner agent.session.AgentSession?
 ---@field session_id string
 ---@field remote boolean
 ---@field processes agent.Processes|agent.Remote

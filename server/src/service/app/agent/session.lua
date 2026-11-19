@@ -9,7 +9,7 @@ local crypt = require("skynet.crypt")
 local log = require("log")
 local config = require("etc.cfg").agent
 
----@class agent_session.Message
+---@class agent.session.Message
 ---@field id string
 ---@field role integer
 ---@field content string
@@ -21,14 +21,14 @@ local config = require("etc.cfg").agent
 ---@field tool_calls agent.ToolCall[]?
 ---@field reasoning llm.ReasoningBlock[]?
 
----@class agent_session.AgentSession
----@field new fun(self: agent_session.AgentSession, owner: agent.Chat, model_id: string): agent_session.AgentSession
+---@class agent.session.AgentSession
+---@field new fun(self: agent.session.AgentSession, owner: agent.Chat, model_id: string): agent.session.AgentSession
 ---@field owner agent.Chat
 ---@field id string
 ---@field title string
 ---@field updated_at integer
 ---@field revision integer
----@field messages agent_session.Message[]
+---@field messages agent.session.Message[]
 ---@field agent agent
 ---@field model_id string
 ---@field run agent.Run?
@@ -45,7 +45,7 @@ local function now_ms()
 end
 
 local function failure(code, message, retryable)
-    log.info("agent_session", "request", "拒绝请求 code=%d reason=%s", code, message)
+    log.info("agent.session", "request", "拒绝请求 code=%d reason=%s", code, message)
     return { ret = code, error = { message = message, retryable = retryable or false } }
 end
 
@@ -216,7 +216,7 @@ function AgentSession:_run_request(run, text)
     if run.cancelled then
         assistant.status = status.cancelled
     elseif not ok or not result then
-        skynet.error("[agent_session] _run_request session=" .. self.id .. " run=" .. run.id .. " error="
+        skynet.error("[agent.session] _run_request session=" .. self.id .. " run=" .. run.id .. " error="
             .. tostring(ok and err or result))
         assistant.status = status.failed
         assistant.ret = codes.call_fail

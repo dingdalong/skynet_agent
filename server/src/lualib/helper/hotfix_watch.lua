@@ -27,14 +27,12 @@ local function module_name(path)
         or path:match("^lualib/luaext/") then
         return nil
     end
+    local entry = path:match("^service/([^/]+)/%1%.lua$")
+    if entry then return entry end
     local name = path:match("^lualib/base/(.+)%.lua$") or path:match("^lualib/(.+)%.lua$")
+        or path:match("^service/app/([^/]+/.+)%.lua$") or path:match("^service/([^/]+/.+)%.lua$")
     if name then
         return (name:gsub("/init$", ""):gsub("/", "."))
-    end
-    local service, file = path:match("^service/([^/]+)/([^/]+)%.lua$")
-    if service == "app" then return file end
-    if service == file then
-        return service
     end
 end
 

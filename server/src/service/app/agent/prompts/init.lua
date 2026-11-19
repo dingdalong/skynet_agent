@@ -27,7 +27,7 @@ end
 function Prompts.load_templates()
     local templates = {}
     for _, name in ipairs({ "base", "tools", "permissions", "permission_judge" }) do
-        local path = "src/lualib/agent/prompts/templates/" .. name .. ".md"
+        local path = "src/service/app/agent/prompts/templates/" .. name .. ".md"
         local file, open_error = io.open(path, "rb")
         assert(file, "无法读取提示词模板 " .. path .. ": " .. tostring(open_error))
         local text, read_error = file:read("a")

@@ -184,6 +184,7 @@ describe("service", function()
                 launcher = "./3rd/skynet/service/launcher.lua",
                 debug_console = "./3rd/skynet/service/debug_console.lua",
                 gateway = "./src/service/init.lua",
+                agent = "./src/service/init.lua",
             } },
             { "tests/integration/service_runtime.config", {
                 service_runtime = "./tests/integration/service_runtime.lua",

@@ -2,7 +2,7 @@ local class = require("class")
 local skynet = require("skynet")
 local crypt = require("skynet.crypt")
 
----@class user.User
+---@class client.User
 ---@field identity {user_id: string, username: string}
 ---@field connections table<string, client.Connection>
 local User = class()

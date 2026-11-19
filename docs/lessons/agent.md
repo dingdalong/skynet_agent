@@ -22,7 +22,7 @@ Verified · Seen: 1× (2026-11-04)
 
 ### L-018 收到取消确认后继续等待生成任务的终态
 
-模型调用可能仍在退出。等回滚、释放占用和最终通知完成，再允许下一轮使用该会话。用取消回执先到、终态后到的顺序验证。 [run.lua](../../server/src/lualib/agent/run.lua)、[agent-client.test.ts](../../client/tooling/agent-client.test.ts)
+模型调用可能仍在退出。等回滚、释放占用和最终通知完成，再允许下一轮使用该会话。用取消回执先到、终态后到的顺序验证。 [run.lua](../../server/src/service/app/agent/run.lua)、[agent-client.test.ts](../../client/tooling/agent-client.test.ts)
 
 Verified · Seen: 1× (2026-11-05)
 
@@ -54,7 +54,7 @@ Verified · Seen: 1× (2026-11-06)
 
 ### L-040 断线只释放连接，用户任务继续运行
 
-多端共享用户数据，同会话的生成占用随任务结束释放。用第二条连接恢复快照并观察离线期间的生成结果。 [user.lua](../../server/src/lualib/user.lua)、[AGENT_GATEWAY.md](../../docs/architecture/AGENT_GATEWAY.md)
+多端共享用户数据，同会话的生成占用随任务结束释放。用第二条连接恢复快照并观察离线期间的生成结果。 [app.lua](../../server/src/service/app/agent/app.lua)、[AGENT_GATEWAY.md](../../docs/architecture/AGENT_GATEWAY.md)
 
 Verified · Seen: 1× (2026-11-07)
 
@@ -62,7 +62,7 @@ Verified · Seen: 1× (2026-11-07)
 
 ### L-041 固定快照内容后，按会话版本合并并发推送
 
-快照深拷贝可变消息，登录期间缓冲早到的通知。忽略重复或迟到版本，发现缺口时获取快照，并再次合并等待期间的更新。 [agent_session.lua](../../server/src/lualib/agent_session.lua)、[agent-client.test.ts](../../client/tooling/agent-client.test.ts)
+快照深拷贝可变消息，登录期间缓冲早到的通知。忽略重复或迟到版本，发现缺口时获取快照，并再次合并等待期间的更新。 [session.lua](../../server/src/service/app/agent/session.lua)、[agent-client.test.ts](../../client/tooling/agent-client.test.ts)
 
 Verified · Seen: 1× (2026-11-07)
 
@@ -94,7 +94,7 @@ Verified · Seen: 1× (2026-11-09)
 
 ### L-063 在桌面执行结果进入 Lua 时归一化 JSON null
 
-`cjson.null` 在 Lua 中是真值。先处理嵌套结果中的可选空字段，再把结果交给执行器，覆盖真实 JSON 解码路径。 [execution.lua](../../server/src/lualib/agent/execution.lua)、[desktop_execution_spec.lua](../../server/tests/unit/desktop_execution_spec.lua)
+`cjson.null` 在 Lua 中是真值。先处理嵌套结果中的可选空字段，再把结果交给执行器，覆盖真实 JSON 解码路径。 [execution.lua](../../server/src/service/app/agent/execution.lua)、[desktop_execution_spec.lua](../../server/tests/unit/desktop_execution_spec.lua)
 
 Verified · Seen: 1× (2026-11-09)
 

@@ -34,7 +34,7 @@ describe("用户与客户端服务", function()
             return model.text
         end
         scope = Scope.new({
-            user = false, client = false, agent_session = false, applications = false,
+            client = false, ["client.user"] = false, ["client.applications"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)
                 workspaces[#workspaces + 1] = { username = username, id = id }
@@ -182,7 +182,7 @@ describe("用户与客户端服务", function()
     end)
 
     it("公共服务跨用户共用地址，每个请求和推送仍绑定身份", function()
-        local registry = require("applications")
+        local registry = require("client.applications")
         registry.shared = { address = ".shared", requests = { "CommonReq" } }
         service = require("client"):new()
         service:init(params)
@@ -219,7 +219,7 @@ describe("用户与客户端服务", function()
         local session = apps.alice.chat.sessions[created.id]
         assert.are.equal(require("agent.app"), getmetatable(apps.alice))
         assert.are.equal(require("agent.chat"), getmetatable(apps.alice.chat))
-        assert.are.equal(require("agent_session"), getmetatable(session))
+        assert.are.equal(require("agent.session"), getmetatable(session))
         assert.are.equal(1, #workspaces)
         assert.are.equal(1, #tasks)
         assert.are.equal("pro", session.model_id)

@@ -2,7 +2,7 @@ local class = require("class")
 local skynet = require("skynet")
 ---@class agent.Remote
 ---@field target table
----@field owner agent_session.AgentSession
+---@field owner agent.session.AgentSession
 ---@field controller agent.Execution
 ---@field records table<string, table>
 ---@field runs table<string, agent.Run>

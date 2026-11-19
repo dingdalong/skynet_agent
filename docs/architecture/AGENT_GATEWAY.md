@@ -65,15 +65,16 @@ WebSocket、logind、client 和 agent 服务，等待在途命令、连接读循
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `user.lua`、`applications.lua`                  | 用户身份与连接、应用请求路由登记 |
-| `service/app/agent.lua`                         | Agent 服务的用户分配、请求分发和关服清理 |
-| `agent/app.lua`、`agent/handler.lua`            | 单个用户的 Agent 上下文、快照及请求处理 |
-| `agent_session.lua`、`agent/`                   | 单会话生命周期、模型对话与历史提交                          |
+| `service/client/user.lua`、`service/client/applications.lua` | 用户身份与连接、应用请求路由登记 |
+| `service/app/agent/init.lua`                    | Agent 服务的用户分配、请求分发和关服清理 |
+| `service/app/agent/app.lua`、`service/app/agent/handler.lua` | 单个用户的 Agent 上下文、快照及请求处理 |
+| `service/app/agent/session.lua`、`service/app/agent/agent.lua` | 单会话生命周期、模型对话与历史提交 |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
 独立脚本和 Skynet 内置服务优先于公共入口。基础服务位于 `src/service/<name>/<name>.lua`，
-应用服务统一放在 `src/service/app/<name>.lua`。两者均以服务名加载稳定类表，例如 `require("agent")`。
-`src/lualib` 保存服务创建的对象与公共模块。各节点的 main 通过 `node.init(callback)` 定制业务启动，
+应用入口统一放在 `src/service/app/<name>/init.lua`。两者均以服务名加载稳定类表，例如 `require("agent")`。
+每个服务的私有模块和资源与入口同目录，按模块名加载，例如 `client.user`、`agent.session` 和 `agent.agent`。
+`src/lualib` 保存公共框架、协议与 SDK 适配。各节点的 main 通过 `node.init(callback)` 定制业务启动，
 回调接收节点实例；`node` 先完成公共初始化，再执行回调，最后进入就绪状态。
 `node` 复用服务基础层的初始化与命令分发，统一管理进程生命周期，业务服务清单由 main 决定。
 节点实例的 `launch(name, count, params, registered_name)` 默认按服务名和编号注册；
@@ -108,7 +109,8 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 `develop` 渠道由 node 在业务服务启动完成后创建 `helper.hotfix_watch` 并建立源码基线，
 在节点内协程轮询文件内容，连续保存稳定后串行发起批次。目标是 `.main` 与全部登记且已就绪的业务实例。
 其他渠道不自动监听。
-监听同时覆盖库文件与服务主体，基础目录文件映射为短模块名；排除主入口、公共服务入口、
+监听覆盖库、服务主体和私有模块。应用的 `init.lua` 映射为服务名，子目录的 `init.lua` 映射为模块名，
+例如 `agent.prompts`。基础目录文件映射为短模块名。监听排除主入口、公共服务入口、
 热修器、监听器自身、预加载脚本和标准库扩展。这些启动代码以及新增、删除文件的变更通过重启生效。
 节点先合并本次变更和失败实例积压的模块，对扫描到的源码内容进行编译，不执行候选函数。
 任一文件语法错误都阻止整批分发，保留全部待更新模块供后续保存时重试。
@@ -187,7 +189,7 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
 WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-`applications.lua` 登记每个应用可接收的协议请求名。client 校验 WebSocket 来源，按请求查目标，
+`client.applications` 登记每个应用可接收的协议请求名。client 校验 WebSocket 来源，按请求查目标，
 始终传递连接绑定的用户身份。main 先启动 N 个 Agent 实例，再将有序地址列表交给所有 client。
 路由使用 `FNV-1a32(用户名) % N + 1` 选择实例。多端登录、断线重连和后续请求均使用同一规则。
 N 独立于 client 池的大小，调整后重启生效，部分用户名会映射到新的实例编号。
@@ -302,7 +304,7 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 ## 工具执行与权限
 
-`agent/` 统一保存 Agent、模型封装、工具、工作区、沙盒和权限代码。
+`src/service/app/agent/` 统一保存 Agent、模型封装、工具、工作区、沙盒和权限代码。
 `permission/rules.lua` 只快速阻止，`permission/llm_judge.lua` 独立判断每次通过的动作，
 判断模型与主模型分别持有客户端，请求超时互不修改。输入或终端输出中的指令不能修改权限策略。
 判断结果只对应本次动作和实际权限；失败、格式无效或信息不足时拒绝执行，不产生人工审批请求。

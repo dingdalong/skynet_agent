@@ -7,9 +7,9 @@ local class = require("class")
 ---@field processes table<string, agent.Processes|agent.Remote>
 ---@field id string
 ---@field session_id string?
----@field owner agent_session.AgentSession?
+---@field owner agent.session.AgentSession?
 ---@field message_id string
----@field assistant agent_session.Message
+---@field assistant agent.session.Message
 ---@field retry boolean?
 ---@field close_error string?
 ---@field source_device string?

@@ -94,11 +94,11 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 也可通过 Skynet `debug_console` 对指定实例手动发送模块名：
 
 ```text
-dbgcmd .client_1 HOTFIX client user
+dbgcmd .client_1 HOTFIX client client.user
 ```
 
 目标使用以 `.` 开头的注册名或以 `:` 开头的数字地址。库文件映射到模块名，基础模块使用短名，
-服务主体使用服务名，例如 `user`、`rpc`、`websocket`。手动命令只作用于指定 VM；
+服务主体使用服务名，服务私有模块带服务名前缀，例如 `agent.handler`、`client.user`。手动命令只作用于指定 VM；
 `skipped` 表示该 VM 未加载对应模块，不能据此判断其他实例已更新。
 
 热修日志由节点汇总，包含实际更新文件、失败实例或部分更新结果。批次预检查、重试和稳定方法表机制见

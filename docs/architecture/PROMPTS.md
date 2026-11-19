@@ -6,7 +6,7 @@
 ## 文本与运行时事实
 
 `agent.prompts` 负责加载文本和组装消息。Markdown 模板位于
-`server/src/lualib/agent/prompts/templates/`，按基础行为、工具使用、权限说明和独立权限判断拆分。
+`server/src/service/app/agent/prompts/templates/`，按基础行为、工具使用、权限说明和独立权限判断拆分。
 基础行为适用于通用助手；工具与权限说明只在实际提供工具时加入。
 基础行为作为首条 system 消息发送，不使用 Responses API 顶层的 `instructions` 参数。
 

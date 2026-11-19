@@ -1,11 +1,11 @@
-local User = require("user")
+local User = require("client.user")
 local class = require("class")
 local rpc = require("rpc")
 local skynet = require("skynet")
 local log = require("log")
 local codes = require("enum.error_code")
 local usernames = require("helper.username")
-local applications = require("applications")
+local applications = require("client.applications")
 local Pool = require("helper.service_pool")
 local pools = require("etc.cfg").agent_gateway.instance
 
@@ -17,13 +17,13 @@ local function registered_source(pool, address)
 end
 
 ---@class client.Connection
----@field user user.User
+---@field user client.User
 ---@field websocket integer
 ---@field logind integer
 ---@field targets table<integer, boolean>
 
 ---@class client.Service
----@field users table<string, user.User>
+---@field users table<string, client.User>
 ---@field connections table<string, client.Connection>
 ---@field routes table<string, helper.ServicePool>
 local ClientService = class()

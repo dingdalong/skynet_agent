@@ -29,7 +29,7 @@ local project = require("agent.prompts.project")
 ---@field tools agent.ToolConfig
 ---@field permission agent.PermissionConfig
 ---@field permission_llm llm.Config?
----@field owner agent_session.AgentSession?
+---@field owner agent.session.AgentSession?
 ---@field project_instructions_max_bytes integer?
 ---@field prompt_templates agent.PromptTemplates?
 ---@field execution_target table?

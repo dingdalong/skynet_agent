@@ -32,11 +32,12 @@ describe("hotfix_watch", function()
         os.remove(root)
         assert(lfs.mkdir(root))
         for _, directory in ipairs({ "lualib", "lualib/base", "lualib/helper", "lualib/luaext",
-            "lualib/example", "service", "service/websocket" }) do
+            "lualib/example", "service", "service/websocket", "service/client", "service/app",
+            "service/app/agent", "service/app/agent/prompts" }) do
             assert(lfs.mkdir(root .. "/" .. directory))
         end
-        for _, path in ipairs({ "lualib/user.lua", "lualib/base/rpc.lua",
-            "service/websocket/websocket.lua",
+        for _, path in ipairs({ "service/client/user.lua", "lualib/base/rpc.lua", "service/websocket/websocket.lua",
+            "service/app/agent/init.lua", "service/app/agent/agent.lua", "service/app/agent/prompts/init.lua",
             "main.lua", "service/init.lua", "lualib/base/hotfix.lua", "lualib/base/preload.lua",
             "lualib/luaext/table.lua", "lualib/helper/hotfix_watch.lua", "lualib/example/init.lua" }) do
             write(root .. "/" .. path, "return {}")
@@ -112,7 +113,7 @@ describe("hotfix_watch", function()
     end)
 
     it("内容比较检测同秒同长度修改，稳定后覆盖主节点和全部就绪实例", function()
-        local path = root .. "/lualib/user.lua"
+        local path = root .. "/service/client/user.lua"
         assert(lfs.touch(path, 1, 1))
         write(path, "return{ }")
         assert(lfs.touch(path, 1, 1))
@@ -124,7 +125,7 @@ describe("hotfix_watch", function()
         now = 20
         watch:poll()
         for index, address in ipairs({ 1, 11, 12 }) do
-            assert.same(table.pack(address, "debug", "HOTFIX", "user"), calls[index])
+            assert.same(table.pack(address, "debug", "HOTFIX", "client.user"), calls[index])
         end
         assert.same({ "[hotfix_watch] reload 已更新 files=" .. path }, logs)
     end)
@@ -134,6 +135,7 @@ describe("hotfix_watch", function()
         watch:poll()
         now = 10
         for _, path in ipairs({ "service/websocket/websocket.lua", "lualib/example/init.lua", "main.lua",
+            "service/app/agent/init.lua", "service/app/agent/agent.lua", "service/app/agent/prompts/init.lua",
             "service/init.lua", "lualib/base/hotfix.lua", "lualib/base/preload.lua", "lualib/luaext/table.lua",
             "lualib/helper/hotfix_watch.lua" }) do write(root .. "/" .. path, "return { version = 2 }") end
         watch:poll()
@@ -142,7 +144,8 @@ describe("hotfix_watch", function()
         assert.same({}, calls)
         now = 30
         watch:poll()
-        assert.same(table.pack(1, "debug", "HOTFIX", "example", "rpc", "websocket"), calls[1])
+        assert.same(table.pack(1, "debug", "HOTFIX", "agent", "agent.agent", "agent.prompts",
+            "example", "rpc", "websocket"), calls[1])
     end)
 
     it("保存后还原原内容时不触发更新，下一次真实修改仍可更新", function()

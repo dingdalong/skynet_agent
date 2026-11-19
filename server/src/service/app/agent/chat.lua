@@ -1,5 +1,5 @@
 local class = require("class")
-local AgentSession = require("agent_session")
+local AgentSession = require("agent.session")
 local codes = require("enum.error_code")
 local models = require("agent.models")
 local log = require("log")
@@ -7,7 +7,7 @@ local config = require("etc.cfg").agent
 
 ---@class agent.Chat
 ---@field app agent.App
----@field sessions table<string, agent_session.AgentSession>
+---@field sessions table<string, agent.session.AgentSession>
 ---@field session_order string[]
 ---@field prompt_templates agent.PromptTemplates
 ---@field pending_runs table<agent.Run, boolean>

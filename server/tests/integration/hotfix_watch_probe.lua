@@ -185,7 +185,7 @@ function M.run(config)
             support.equal(snapshot.chat_sessions[1].session.id, connection.session_id)
             before[connection] = snapshot
         end
-        local chat_path = "src/lualib/agent/handler.lua"
+        local chat_path = "src/service/app/agent/handler.lua"
         local chat_source = source(chat_path)
         local handlers = {
             { "AgentSnapshotReq", "AUTO_AGENT_SNAPSHOT_V2", "" },
@@ -197,11 +197,20 @@ function M.run(config)
             chat_source = marked(chat_source, "function REQUEST:" .. handler[1] .. "(" .. handler[3] .. ")",
                 handler[2], true)
         end
-        local agent_path = "src/service/app/agent.lua"
+        local agent_path = "src/service/app/agent/init.lua"
         local agent_source = marked(source(agent_path),
             "function AgentService:handle_request(context, identity, id, name, args)", "AUTO_AGENT_SERVICE_V2")
-        local handler_batch = save_batch({ { chat_path, chat_source }, { agent_path, agent_source } })
-        support.same(updated_files(handler_batch), { chat_path, agent_path })
+        local user_path = "src/service/client/user.lua"
+        local user_source = marked(source(user_path), "function User:ctor(username)", "AUTO_CLIENT_USER_V2")
+        local handler_batch = save_batch({ { chat_path, chat_source }, { agent_path, agent_source },
+            { user_path, user_source } })
+        support.same(updated_files(handler_batch), { chat_path, agent_path, user_path })
+        start = offset()
+        for index = 1, 2 do
+            local new_client = gateway.login(config.gateway_url, "hotfix-new-" .. index)
+            new_client:close()
+        end
+        markers(start, { AUTO_CLIENT_USER_V2 = 2 }, "两个 client 实例未使用热修后的用户构造函数")
         start = offset()
         for _, connection in ipairs(connections) do
             local client = connection.client
