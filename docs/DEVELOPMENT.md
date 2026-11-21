@@ -8,7 +8,7 @@
 | 依赖 | 用途 |
 | --- | --- |
 | Git 与 GitHub SSH | 仓库及子模块 |
-| Docker Engine 与 Compose v2 | 单机运行 App Center、Gateway 和独立应用。使用 host 网络；Docker Desktop 需启用 host networking。 |
+| Docker Engine 与 Compose v2 | 单机运行 MongoDB、App Center、Gateway 和业务应用。Skynet 节点使用 host 网络；MongoDB 仅向本机回环地址发布端口。Docker Desktop 需启用 host networking。 |
 | Node.js 与 pnpm | 客户端 TypeScript、React 和 Astryx 工作区构建测试，版本见 `client/package.json` |
 | 完整 Xcode、macOS/iOS SDK 与模拟器 | 苹果平台宿主、Swift Package Manager 与签名构建 |
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
@@ -74,18 +74,20 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 ./server/control.sh force-stop
 ```
 
-`./server/start.sh` 构建内置 Agent 镜像，先启动 App Center，再启动 Gateway。App Center 读取 `server/apps.d/*.json`，为启用的应用创建容器或接管已有容器。将 `APP_CATALOG_DIR` 指向一个空目录即可只启动两个基础节点。
+`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。App Center 从 `app_center.apps` 读取业务应用目录。空库启动后可以登录并打开应用中心。
+
+首次部署 Agent 时，在部署机执行：
+
+```sh
+./server/appctl submit --app-id agent --name Agent --image skynet-agent-app:local
+```
+
+在「应用中心 → 服务管理」用 `APP_CENTER_ADMIN_TOKEN` 解锁并批准申请。Agent 容器启动并注册后，网关开始转发请求。重启时 App Center 根据 MongoDB 中的批准版本和期望启停状态恢复应用。
 `stop` 让 App Center 在 Gateway 在线期间排空应用，随后关闭 Gateway 并回收基础容器。应用数据和管理员设置保存在命名卷中。
 `force-stop` 强制结束本项目容器。使用自定义 `COMPOSE_PROJECT_NAME` 时，管理命令使用相同的项目名。
 
 日志输出取决于 `server/etc/config` 的 logger 配置；网关错误输出到 stdout/stderr。
 启动和关闭的内部机制见[服务生命周期](architecture/AGENT_GATEWAY.md#服务生命周期)。
-
-### 切换旧部署
-
-如果 `./server/start.sh` 提示当前项目仍有 `deployer`，请在旧版本的检出目录使用原来的项目名和环境文件执行 `./server/control.sh stop`。旧网关会先让旧 Agent 完成收尾，再关闭这组容器。直接从 Docker 面板单独停止 `deployer` 会让旧网关失去管理 Agent 的能力。
-
-切换时沿用同一 Compose 项目名，Agent 就会继续挂载原来的 `<项目名>_agent-work` 工作卷。如果之前手动调整过应用启停状态，请在第一次启动前将旧卷 `<项目名>_gateway-state` 中的 `app_center.json` 复制到新卷 `<项目名>_center-state`。旧卷里没有这个文件时，以 `apps.d` 的配置为准。然后在新版本执行 `./server/start.sh`。
 
 ## 接入新应用
 
@@ -93,17 +95,16 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 将 `.proto` 放在 `../common/proto/`，将应用入口放在 `src/service/app/<模块>/init.lua`。模块名取 `app_id` 并将连字符换成下划线。构建时运行 `bin/lua deploy/check_protocol.lua <app_id> <协议入口>`。
 Actor 提供 `handle_request`、`disconnect`、`drain`，通知通过本节点的 `app_endpoint.publish` 发送。客户端应用用自己的描述建立编解码器。完整示例在 `server/tests/fixtures/echo/`。
 
-在镜像中通过 `ENV APP_SCHEMA` 指定协议入口，可选 `APP_INSTANCES` 指定 Actor 数量。在当前机器构建镜像后，将清单写入应用目录。以下命令在主服运行时接入 Echo：
+在镜像中通过 `ENV APP_SCHEMA` 指定协议入口，可选 `APP_INSTANCES` 指定 Actor 数量。在运行 App Center 的部署机执行：
 
 ```sh
 docker build -f server/Dockerfile --target echo-fixture -t skynet-echo:local .
-cp server/tests/fixtures/echo/echo.json server/apps.d/echo.tmp
-mv server/apps.d/echo.tmp server/apps.d/echo.json
+./server/appctl submit --app-id echo --name Echo --image skynet-echo:local
 ```
 
-`echo.json` 的内容为 `{"app_id":"echo","name":"Echo","image":"skynet-echo:local"}`。文件名须与 `app_id` 一致。省略 `enabled` 时默认启用；管理员在应用中心保存的启停选择优先。升级应用时使用新镜像标签并原子替换清单。目录由部署方写入，应只登记受信任的镜像。仅 App Center 挂载 Docker socket。
+命令返回申请编号。打开「应用中心 → 服务管理」，用管理令牌解锁，核对镜像及其 ID 后批准或拒绝。首次批准默认启用。已批准应用的更新也要提交，审批期间原版本继续服务，批准后按之前的启停选择部署。下架结束在途任务并移除容器，保留工作卷。仅 App Center 挂载 Docker socket。
 
-App Center 约每秒读取清单，向应用容器注入 `APP_ID` 和注册凭据。应用加载协议与 Actor 后在本机回环地址监听随机端口，向 App Center 的 Cluster 端口注册。本次实例通过握手后，Gateway 在自己的 Cluster 地址表中安装路由。应用中心重启后，已有节点会再次报到。应用请求直接从 Gateway 到应用节点。
+App Center 按已批准的镜像 ID 启动容器，并注入 `APP_ID` 和注册凭据。应用加载协议与 Actor 后在本机回环地址监听随机端口，向 App Center 的 Cluster 端口报到。握手通过后 Gateway 安装路由。已在运行的应用直接与 Gateway 通信。
 
 运行 `node client/tooling/docker-apps-e2e.mjs` 可在随机项目和端口复验在线登记、请求与通知、协议冲突、停用及故障恢复。脚本结束时回收该测试项目的容器和卷。
 

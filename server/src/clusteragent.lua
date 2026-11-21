@@ -2,7 +2,7 @@ local skynet = require("skynet")
 local config = require("etc.cfg")
 local remote = setmetatable({}, { __index = skynet })
 local allowed = {
-    [".app_center"] = { directory = true, register = true, request = true, disconnect = true },
+    [".app_center"] = { directory = true, register = true, submit = true, request = true, disconnect = true },
     [".app_routes"] = { update = true, publish = true },
     [".app_endpoint"] = { hello = true, request = true, disconnect = true, events = true, drain = true, finish = true },
 }

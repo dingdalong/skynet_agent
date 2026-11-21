@@ -8,7 +8,7 @@ package.loaded["etc.cfg"] = {
     channel = "test",
     runtime = { control_port = port },
     protocol = { agent_gateway_schema_dir = "unused" },
-    agent_gateway = { instance = { agent = 0, client = 1, logind = 0, websocket = 0 } },
+    agent_gateway = { instance = { client = 1, logind = 0, websocket = 0 } },
 }
 local node = require("node")
 skynet.init(function()

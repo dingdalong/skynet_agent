@@ -180,13 +180,14 @@ public final class HostCore {
                 }
                 switch kind {
                 case "snapshot": reply(.success(self.appSnapshot(appId)))
-                case "catalog.list", "catalog.unlock", "catalog.set":
+                case "catalog.list", "catalog.unlock", "catalog.set", "catalog.review", "catalog.remove":
                     guard appId == "app-center", self.catalog.entries[appId]?.builtin == true,
                         self.gateway.user != nil
                     else { throw failure("permission", "需要登录应用中心") }
                     let messages = [
                         "catalog.list": "AppCenterListReq", "catalog.unlock": "AppCenterUnlockReq",
-                        "catalog.set": "AppCenterSetReq",
+                        "catalog.set": "AppCenterSetReq", "catalog.review": "AppCenterReviewReq",
+                        "catalog.remove": "AppCenterRemoveReq",
                     ]
                     self.gateway.request(messages[kind]!, input: input, completion: reply)
                 case "agent.directory.choose", "agent.remote.set":

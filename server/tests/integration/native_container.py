@@ -41,4 +41,4 @@ if action in ("stop", "wait"):
     while running():
         assert time.monotonic() < deadline
         time.sleep(0.1)
-print(json.dumps(dict(record, running=running(), exit_code=0)))
+print(json.dumps(dict(record, running=running(), exit_code=0, image_id="fixture")))

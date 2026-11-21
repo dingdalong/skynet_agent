@@ -2,7 +2,6 @@
 import http.client
 import json
 import os
-from pathlib import Path
 import re
 import secrets
 import socket
@@ -37,10 +36,10 @@ def operate(action, app, image):
     project = os.environ["APP_PROJECT"]
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project) or not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", app):
         raise ValueError("Invalid project or application ID")
+    if action == "resolve":
+        return {"image_id": request("GET", "/images/" + quote(image, safe="") + "/json")["Id"]}
     labels = {"io.skynet.project": project, "io.skynet.app": app}
     name = project + "-app-" + app
-    managed = Path(os.environ["APP_CENTER_STATE_PATH"]).parent / "managed"
-    marker = managed / (app + ".json")
     record = request("GET", f"/containers/{name}/json", missing=True)
     if record and not labels.items() <= record["Config"]["Labels"].items():
         raise ValueError("Container name belongs to a different application")
@@ -60,10 +59,6 @@ def operate(action, app, image):
             record = None
             outdated = False
         if not record:
-            managed.mkdir(exist_ok=True)
-            temp = marker.with_suffix(".tmp")
-            temp.write_text(json.dumps({"app_id": app, "image": image}))
-            temp.replace(marker)
             env["APP_REGISTRATION_KEY"] = secrets.token_hex(32)
             created = request("POST", "/containers/create?name=" + name,
                               {"Image": image, "Labels": labels, "Env": [k + "=" + v for k, v in env.items()],
@@ -78,8 +73,6 @@ def operate(action, app, image):
     if action not in ("wait", "stop", "remove"):
         raise ValueError("Unknown container action")
     if not record:
-        if action == "remove":
-            marker.unlink(missing_ok=True)
         return {"exit_code": 0}
     path = "/containers/" + record["Id"]
     if action == "stop" and record["State"]["Running"]:
@@ -92,7 +85,6 @@ def operate(action, app, image):
         raise RuntimeError("Application is still running")
     if action == "remove":
         request("DELETE", path)
-        marker.unlink(missing_ok=True)
     return {"exit_code": 0}
 
 

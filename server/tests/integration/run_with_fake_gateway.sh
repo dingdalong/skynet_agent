@@ -52,6 +52,7 @@ trap 'exit 143' TERM
 server_root="$temp_dir/server"
 mkdir -p "$server_root/deploy"
 cp "$project_root/tests/integration/native_container.py" "$server_root/deploy/container.py"
+cp "$project_root/tests/integration/native_catalog.py" "$server_root/deploy/catalog.py"
 if [ "$probe" = hotfix_watch_probe ]; then
     channel=develop
     mkdir -p "$server_root"
@@ -93,7 +94,6 @@ cat >"$env_file" <<EOF
 SKYNET_CFG_CHANNEL=$channel
 DEEPSEEK_API_KEY=e2e-test-key
 AGENT_WORKSPACE_ROOT="$temp_dir/work_dir"
-APP_CENTER_STATE_PATH="$temp_dir/app_center.json"
 APP_CENTER_ADMIN_TOKEN=fixture-registry-token
 EOF
 
@@ -102,7 +102,6 @@ set -a
 APP_CENTER_PORT=19881
 GATEWAY_CLUSTER_PORT=19882
 GATEWAY_PORT=$gateway_port
-APP_CATALOG="$project_root/apps.d"
 CLUSTER_KEY_FILE="$temp_dir/cluster.key"
 FIXTURE_DIR="$temp_dir"
 set +a
@@ -118,6 +117,9 @@ start_center() {
     done
 }
 start_center
+agent_request=$(printf '%s\n' '{"app_id":"agent","name":"Agent","image":"fixture"}' |
+    (cd "$server_root" && ./3rd/skynet/skynet etc/config.submit))
+export AGENT_TEST_REQUEST_ID="$agent_request"
 start_gateway() {
     (cd "$server_root" && exec "$project_root/3rd/skynet/skynet" etc/config) >"$server_log" 2>&1 &
     server_pid=$!
@@ -137,6 +139,7 @@ wait_for_gateway() {
     printf '%s\n' "Agent 网关未在预期时间内启动" >&2
     return 1
 }
+wait_for_gateway approve_agent
 wait_for_gateway
 
 set +e

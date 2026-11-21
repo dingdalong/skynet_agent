@@ -49,8 +49,8 @@ flowchart LR
 
 ## 服务生命周期
 
-每个容器内的 `main` 持有该节点的协议和服务地址。Compose 先启动 App Center，其注册接口就绪后启动 Gateway。
-App Center 独立读取清单和管理 Docker 容器。Gateway 只持有登录协议，由 `app_routes` 接收应用目录并建立本机代理。
+每个 Skynet 容器内的 `main` 持有该节点的协议和服务地址。Compose 等 MongoDB 就绪后启动 App Center，其注册接口就绪后启动 Gateway。
+App Center 从 MongoDB 加载审批和期望启停状态，按批准的镜像 ID 管理 Docker 容器。Gateway 只持有登录协议，由 `app_routes` 接收应用目录并建立本机代理。
 正常关服时，App Center 冻结应用变更并等最后的通知和工具回执交付，然后关闭各应用。Gateway 的连接保持到排空结束。
 应用注册和网关获取目录有就绪期限，失败的应用按退避间隔重试。正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
 显式强制关闭跳过清理并退出 1。进程重启由外部管理器负责。
@@ -59,7 +59,7 @@ App Center 独立读取清单和管理 Docker 容器。Gateway 只持有登录�
 | ----------------------------------------------- | ----------------------------------------------------------- |
 | `base/service.lua`                              | 命令白名单、上下文、初始化、状态、关闭、异常边界、热修注册  |
 | `service/init.lua`                              | 根据 loader 提供的服务名加载业务主体                        |
-| `main.lua`                                      | 业务 schema、服务数量、依赖顺序和初始化参数                 |
+| `main.lua`                                      | 加载登录协议，按依赖顺序启动网关服务 |
 | `base/node.lua` / `main`                        | 公共初始化、服务登记、启动失败回收、状态汇总、进程关闭      |
 | `base/rpc.lua`                                  | 固定 Lua 协议、有超时与无超时调用、状态码、完整多返回值     |
 | `helper/`                                       | Protobuf 加载与接入、服务池轮询与固定路由、开发渠道热修监听 |
@@ -67,7 +67,9 @@ App Center 独立读取清单和管理 Docker 容器。Gateway 只持有登录�
 | `service/websocket/websocket.lua` / `websocket` | 连接生命周期、编解码、协议守卫、写队列和消息路由            |
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
-| `service/client/user.lua`、`service/app/app_center/` | 用户身份与连接、应用服务注册及目录同步 |
+| `service/client/user.lua`                       | 网关持有的用户身份与连接 |
+| `service/app/app_center/`、`center_main.lua`     | 应用申请与审批、容器启停、节点注册和路由发布 |
+| `service/app_routes/`                           | 在网关安装路由并分发给本节点的 `client` 服务 |
 | `service/app_endpoint/`、`app_main.lua`         | 应用节点启动、Cluster 握手、消息编解码、通知和排空 |
 | `service/app/agent/init.lua`                    | Agent 服务的用户分配、请求分发和关服清理 |
 | `service/app/agent/app.lua`、`service/app/agent/handler.lua` | 单个用户的 Agent 上下文、快照及请求处理 |
@@ -191,13 +193,13 @@ WebSocket 提供以下通用命令，第一参均为基础层上下文：
 - `send_response(connection_id, message_id, app_id, kind, body)` 添加公共帧头后串行写入，写完返回 `true`。
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
-WebSocket 校验公共帧类别和请求编号。client 启动时订阅 App Center 的目录，按 `app_id` 转发应用字节、用户身份、连接 ID 和实例代次。
+WebSocket 校验公共帧类别和请求编号。网关的 `app_routes` 从 App Center 获取路由快照。每个 `client` 服务向本机 `app_routes` 订阅，按 `app_id` 转发应用字节、用户身份、连接 ID 和实例代次。
 应用节点完成 Cluster 握手后进入路由表。其 `app_endpoint` 解码消息并按 `FNV-1a32(用户名) % N + 1` 选择 Actor，N 为应用配置的实例数。
-事件缓存在所属应用节点。主服按游标收取事件并交给 client，每次投递校验目标用户、连接和实例代次。
+事件缓存在所属应用节点。App Center 按游标收取事件并发给 Gateway，Gateway 按目标用户、连接和实例代次投递。
 
 管理员停用应用时，主服先撤回新请求的路由。已使用该代次的连接进入收尾状态，Agent 此时只接受已有连接的桌面工具回执。
 应用取消任务、确认最后的通知已投递后退出，App Center 通过 Docker 确认退出状态。再次启用时生成新的代次，用户保留登录和工作目录文件，Agent 从空会话开始。
-应用中心将期望的启用状态写入 `center-state` 卷。启用的应用意外退出时，App Center 重启容器，等待新实例通过注册握手。
+应用中心将期望的启用状态写入 MongoDB 的 `app_center.apps`。启用的应用意外退出时，App Center 重启容器，等待新实例通过注册握手。
 
 Agent 服务校验路由来源和用户 ID，再从 `agent.handler.REQUEST` 动态查找方法。
 返回结果只发给请求连接。应用通知由 client 按来源服务和用户筛选订阅者，桌面工具通知还限定连接 ID。
@@ -217,7 +219,7 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 
 ### Protobuf 编解码
 
-主服 main 加载 `platform.proto` 供登录与 App Center 服务使用。每个应用节点的 main 加载镜像内 `APP_SCHEMA` 指定的入口，如 `agent/schema.proto`。所有 import 路径相对于该镜像的协议目录。
+Gateway 加载 `login.proto`。App Center 加载 `app_center/catalog.proto`，由自己的节点处理目录与审批请求。客户端宿主通过 `platform.proto` 一起加载这两份协议。业务应用加载镜像内 `APP_SCHEMA` 指定的入口，例如 `agent/schema.proto`。
 
 业务服务在初始化阶段调用 `attach()`，随后按完整消息类型名编解码，例如：
 

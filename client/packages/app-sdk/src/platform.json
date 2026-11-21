@@ -26,15 +26,42 @@
                     }
                   }
                 },
+                "AppCenterRemoveReq": {
+                  "fields": { "app_id": { "id": 1, "type": "string" } }
+                },
+                "AppCenterRemoveRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AppCenterReviewReq": {
+                  "fields": {
+                    "app_id": { "id": 1, "type": "string" },
+                    "approve": { "id": 3, "type": "bool" },
+                    "request_id": { "id": 2, "type": "string" }
+                  }
+                },
+                "AppCenterReviewRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
                 "AppCenterService": {
                   "fields": {
                     "app_id": { "id": 1, "type": "string" },
+                    "approved": { "id": 7, "type": "AppCenterVersion" },
+                    "can_set_enabled": { "id": 11, "type": "bool" },
+                    "desired": { "id": 10, "type": "bool" },
                     "enabled": { "id": 5, "type": "bool" },
                     "instances": { "id": 4, "type": "uint32" },
+                    "last": { "id": 9, "type": "AppCenterVersion" },
                     "name": { "id": 2, "type": "string" },
-                    "service": { "id": 3, "type": "string" },
+                    "pending": { "id": 8, "type": "AppCenterVersion" },
                     "transition": { "id": 6, "type": "string" }
-                  }
+                  },
+                  "reserved": [[3, 3]]
                 },
                 "AppCenterSetReq": {
                   "fields": {
@@ -55,6 +82,16 @@
                   "fields": {
                     "error": { "id": 2, "type": "ErrorInfo" },
                     "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AppCenterVersion": {
+                  "fields": {
+                    "accepted": { "id": 5, "type": "bool" },
+                    "image": { "id": 3, "type": "string" },
+                    "image_id": { "id": 4, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "request_id": { "id": 1, "type": "string" },
+                    "reviewer": { "id": 6, "type": "string" }
                   }
                 },
                 "ErrorInfo": {

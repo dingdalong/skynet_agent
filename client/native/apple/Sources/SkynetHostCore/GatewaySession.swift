@@ -86,7 +86,7 @@ final class GatewaySession {
                 pending.removeValue(forKey: id)
                 throw error
             }
-            guard name != "AppCenterSetReq" else { return }
+            guard !["AppCenterSetReq", "AppCenterRemoveReq"].contains(name) else { return }
             queue.asyncAfter(deadline: .now() + 15) {
                 guard self.generation == current else { return }
                 self.pending.removeValue(forKey: id)?.1(.failure(failure("timeout", "网关请求超时")))

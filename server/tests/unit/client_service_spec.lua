@@ -39,7 +39,8 @@ describe("用户与客户端服务", function()
         end
         scope = Scope.new({
             ["skynet.cluster"] = {}, ["network.nodes"] = {},
-            ["app_center.deployment"] = {}, client = false, ["client.user"] = false, ["agent.session"] = false,
+            ["app_center.deployment"] = {}, ["app_center.catalog"] = {},
+            client = false, ["client.user"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)
                 workspaces[#workspaces + 1] = { username = username, id = id }
@@ -291,6 +292,17 @@ describe("用户与客户端服务", function()
         assert.is_nil(center.connections["old"])
     end)
 
+    it("目录只接受当前实例代次的断线通知", function()
+        local center = require("app_center"):new()
+        center.key, center.boot, center.epoch = "key", "gateway", "current"
+        local identity = { username = "alice" }
+        center.connections.a = { username = "alice", admin = true }
+        center:disconnect({}, "key", "gateway", "previous", identity, "a")
+        assert.is_true(center.connections.a.admin)
+        center:disconnect({}, "key", "gateway", "current", identity, "a")
+        assert.is_nil(center.connections.a)
+    end)
+
     it("服务初始化加载一次模板，各会话共享启动快照与项目规则上限", function()
         assert.are.equal(1, template_loads)
         open("a", 100, "alice")
@@ -307,10 +319,21 @@ describe("用户与客户端服务", function()
     it("拒绝未知、停用和启动凭据不匹配的实例注册", function()
         local center = require("app_center"):new()
         assert.is_false(center:register({}, "echo", "wrong", 21234, "g"))
-        center.apps.echo = { app_id = "echo", key = "owned", default = true }
+        center.apps.echo = { app_id = "echo", key = "owned" }
         assert.is_false(center:register({}, "echo", "wrong", 21234, "g"))
-        center.enabled.echo = false
+        center.documents.echo = { approved = {}, desired = false }
         assert.is_false(center:register({}, "echo", "owned", 21234, "g"))
+    end)
+
+    it("申请入口拒绝无效或平台保留的应用 ID", function()
+        local center = require("app_center"):new()
+        center.key = "deployment-key"
+        for _, id in ipairs({ "login", "app-center", "Invalid" }) do
+            local response = center:submit({}, center.key, { app_id = id })
+            assert.are.equal(codes.fail, response.ret)
+            assert.are.equal("应用 ID 无效", response.error.message)
+        end
+        assert.same({}, center.documents)
     end)
 
     it("首发拒绝无效文本、模型与重试组合，不生成会话工作区或任务", function()

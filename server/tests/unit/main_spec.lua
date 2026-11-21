@@ -7,12 +7,12 @@ describe("main", function()
         config = {
             app_center = { gateway_port = 18082 },
             protocol = { agent_gateway_schema_dir = "schema" },
-            agent_gateway = { instance = { agent = 1, client = 2, logind = 1, websocket = 3 } },
+            agent_gateway = { instance = { client = 2, logind = 1, websocket = 3 } },
         }
         scope = Scope.new({
             ["network.nodes"] = { open = function(port) assert.are.equal(18082, port) end },
             node = { init = function(callback) startup = callback end },
-            ["helper.protobuf"] = { load = function(path) events[#events + 1] = { "schema", path } end },
+            ["helper.protobuf"] = { load = function(path, entry) events[#events + 1] = { "schema", path, entry } end },
             ["etc.cfg"] = config,
         })
         local next_address = 10
@@ -30,9 +30,9 @@ describe("main", function()
     end)
     after_each(function() scope:restore() end)
 
-    it("在节点启动回调中加载业务 schema 并按依赖启动服务", function()
+    it("网关只加载登录协议并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema" }, { "launch", "app_routes" },
+        assert.same({ { "schema", "schema", "login.proto" }, { "launch", "app_routes" },
             { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
@@ -45,7 +45,7 @@ describe("main", function()
         }, calls)
     end)
     it("服务数量由 main 的业务配置决定，包括空服务池", function()
-        config.agent_gateway.instance = { agent = 0, client = 0, logind = 2, websocket = 0 }
+        config.agent_gateway.instance = { client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
             { name = "app_routes", count = 1, registered_name = ".app_routes" },

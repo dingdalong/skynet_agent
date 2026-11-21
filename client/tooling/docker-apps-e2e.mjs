@@ -4,10 +4,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { once } from "node:events";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import protobuf from "protobufjs";
@@ -17,9 +14,8 @@ import { loadProtocol } from "./load-protocol.mjs";
 const run = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const project = `skynet-test-${randomUUID().slice(0, 8)}`;
-const catalog = await mkdtemp(join(tmpdir(), "skynet-catalog-"));
 const ports = await Promise.all(
-    Array.from({ length: 3 }, async () => {
+    Array.from({ length: 4 }, async () => {
         for (;;) {
             const server = createServer().listen(
                 randomInt(20000, 32000),
@@ -34,7 +30,7 @@ const ports = await Promise.all(
         }
     }),
 );
-const [gatewayPort, centerPort, clusterPort] = ports.map(
+const [gatewayPort, centerPort, clusterPort, mongoPort] = ports.map(
     (server) => server.address().port,
 );
 await Promise.all(
@@ -45,8 +41,9 @@ const environment = {
     COMPOSE_PROJECT_NAME: project,
     GATEWAY_PORT: String(gatewayPort),
     APP_CENTER_PORT: String(centerPort),
+    APP_MONGO_PORT: String(mongoPort),
+    SKYNET_ENV_FILE: "/dev/null",
     GATEWAY_CLUSTER_PORT: String(clusterPort),
-    APP_CATALOG_DIR: catalog,
     DEEPSEEK_API_KEY: "docker-fixture",
     DEEPSEEK_BASE_URL: "http://127.0.0.1:1",
     APP_CENTER_ADMIN_TOKEN: randomUUID(),
@@ -64,11 +61,22 @@ const appRunning = async (id) =>
     (
         await docker("inspect", "-f", "{{.State.Running}}", container(id))
     ).stdout.trim() === "true";
-const register = async (id, name) =>
-    writeFile(
-        join(catalog, `${id}.json`),
-        JSON.stringify({ app_id: id, name, image: `${project}-${id}:test` }),
-    );
+const submit = async (id, name) =>
+    (
+        await run(
+            "./server/appctl",
+            [
+                "submit",
+                "--app-id",
+                id,
+                "--name",
+                name,
+                "--image",
+                `${project}-${id}:test`,
+            ],
+            options,
+        )
+    ).stdout.trim();
 const namespace = "skynet.agent.v1";
 const platform = (await loadProtocol("platform.proto")).toJSON();
 const echo = (
@@ -145,18 +153,31 @@ try {
         socket.send(Buffer.from(codec.encodePacket(name, id, body), "base64"));
         return until(() => messages.find((packet) => packet.id === id), name);
     };
-    assert.equal(
-        (await request("LoginReq", { username: "docker-probe" })).body.ret,
-        1,
-    );
-    assert.equal(
-        (
-            await request("AppCenterUnlockReq", {
-                token: environment.APP_CENTER_ADMIN_TOKEN,
-            })
-        ).body.ret,
-        1,
-    );
+    const loginAdmin = async () => {
+        assert.equal(
+            (await request("LoginReq", { username: "docker-probe" })).body.ret,
+            1,
+        );
+        await until(
+            async () =>
+                (
+                    await request("AppCenterUnlockReq", {
+                        token: environment.APP_CENTER_ADMIN_TOKEN,
+                    })
+                ).body.ret === 1,
+            "应用中心就绪",
+        );
+    };
+    await loginAdmin();
+    const restartStack = async () => {
+        const closed = once(socket, "close");
+        socket.close();
+        await closed;
+        await run("./server/control.sh", ["stop"], options);
+        await compose("up", "-d", "gateway");
+        await listen();
+        await loginAdmin();
+    };
     const list = async () => (await request("AppCenterListReq")).body.services;
     const enabled = async (id) =>
         (await list()).find((app) => app.app_id === id)?.enabled;
@@ -165,16 +186,46 @@ try {
             (await request("AppCenterSetReq", { app_id, enabled })).body.ret,
             1,
         );
+    const review = async (app_id, request_id, approve) =>
+        (await request("AppCenterReviewReq", { app_id, request_id, approve }))
+            .body;
+    const assertAgentAbsent = async () => {
+        const result = await docker(
+            "ps",
+            "-aq",
+            "--filter",
+            `name=^/${container("agent")}$`,
+        );
+        assert.equal(result.stdout.trim(), "");
+        assert.equal((await request("AgentSnapshotReq")).name, "RoutingError");
+    };
     assert.deepEqual(
-        (await list()).map((app) => app.app_id),
-        ["app-center"],
+        (await list()).map((app) => [app.app_id, app.can_set_enabled]),
+        [["app-center", false]],
     );
     assert.equal(
         (await compose("ps", "-q")).stdout.trim().split("\n").length,
-        2,
+        3,
     );
-    await register("agent", "Agent");
-    await until(() => enabled("agent"), "Agent 就绪");
+    await assertAgentAbsent();
+    const agentRequest = await submit("agent", "Agent");
+    const pendingAgent = (await list()).find((app) => app.app_id === "agent");
+    assert.equal(pendingAgent.pending.request_id, agentRequest);
+    assert.equal(pendingAgent.can_set_enabled, false);
+    await assertAgentAbsent();
+    assert.equal((await review("agent", agentRequest, false)).ret, 1);
+    await assertAgentAbsent();
+    const resubmission = await submit("agent", "Agent");
+    assert.notEqual(resubmission, agentRequest);
+    assert.equal((await review("agent", resubmission, true)).ret, 1);
+    const agentReady = async () =>
+        (await request("AgentSnapshotReq")).body.ret === 1;
+    await until(agentReady, "Agent 批准后就绪");
+    await restartStack();
+    await until(agentReady, "整套服务重启后恢复已启用的 Agent");
+    const restoredAgent = (await list()).find((app) => app.app_id === "agent");
+    assert.equal(restoredAgent.approved.request_id, resubmission);
+    assert.equal(restoredAgent.desired, true);
     const gatewayId = (await compose("ps", "-q", "gateway")).stdout.trim();
     const boot = () =>
         run(
@@ -192,10 +243,55 @@ try {
         "-ec",
         "test ! -e ../common/proto/echo.proto && test ! -d ../common/proto/agent && test ! -d ../common/proto/app_center && test ! -e /var/run/docker.sock",
     );
-    await register("echo", "Echo");
+    const firstRequest = await submit("echo", "Echo");
+    assert.match(firstRequest, /^[0-9a-f]{32}$/);
+    assert.notEqual(
+        (await request("AppCenterUnlockReq", { token: "invalid" })).body.ret,
+        1,
+    );
+    const publicDirectory = (await request("AppCenterListReq")).body;
+    assert.deepEqual(publicDirectory.services, []);
+    assert.ok(!publicDirectory.names.includes("Echo"));
+    assert.notEqual((await review("echo", firstRequest, true)).ret, 1);
+    assert.notEqual(
+        (await request("AppCenterRemoveReq", { app_id: "agent" })).body.ret,
+        1,
+    );
+    assert.equal(
+        (
+            await request("AppCenterUnlockReq", {
+                token: environment.APP_CENTER_ADMIN_TOKEN,
+            })
+        ).body.ret,
+        1,
+    );
+    assert.equal(await submit("echo", "Echo"), firstRequest);
+    const echoService = async () =>
+        (await list()).find((app) => app.app_id === "echo");
+    const pendingEcho = await echoService();
+    assert.equal(pendingEcho.pending.request_id, firstRequest);
+    assert.equal(pendingEcho.can_set_enabled, false);
+    assert.equal((await request("EchoRepeatReq")).name, "RoutingError");
+    assert.equal((await review("echo", firstRequest, false)).ret, 1);
+    assert.equal((await echoService()).can_set_enabled, false);
+    const approvedRequest = await submit("echo", "Echo");
+    assert.notEqual(approvedRequest, firstRequest);
+    await docker("create", "--name", container("echo"), `${project}-echo:test`);
+    assert.equal((await review("echo", approvedRequest, true)).ret, 1);
+    assert.equal((await echoService()).can_set_enabled, true);
+    assert.equal((await review("echo", approvedRequest, true)).ret, 1);
+    assert.notEqual((await review("echo", firstRequest, true)).ret, 1);
+    await compose("kill", "app-center");
+    await docker("rm", container("echo"));
+    await compose("start", "app-center");
     await until(
-        async () => (await list()).some((app) => app.app_id === "echo"),
-        "登记第二个 App",
+        async () =>
+            (
+                await request("AppCenterUnlockReq", {
+                    token: environment.APP_CENTER_ADMIN_TOKEN,
+                })
+            ).body.ret === 1,
+        "恢复审批记录",
     );
     await until(() => enabled("echo"), "Echo 自动启动");
     for (const [messages, expected] of [
@@ -219,6 +315,22 @@ try {
     }
     const payload = { item: { echo_value: "独立协议" } };
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    await compose("pause", "mongodb");
+    try {
+        const unavailable = request("AppCenterSetReq", {
+            app_id: "echo",
+            enabled: false,
+        });
+        assert.deepEqual(
+            (await request("EchoRepeatReq", payload)).body,
+            payload,
+        );
+        const result = (await unavailable).body;
+        assert.notEqual(result.ret, 1);
+        assert.equal(result.error.retryable, true);
+    } finally {
+        await compose("unpause", "mongodb");
+    }
     await until(
         () =>
             messages.some(
@@ -368,31 +480,76 @@ try {
     );
     assert.equal(await boot(), started);
     await set("agent", false);
-    const closed = once(socket, "close");
-    socket.close();
-    await closed;
-    await compose("restart", "gateway");
-    await listen();
-    assert.equal(
-        (await request("LoginReq", { username: "docker-probe" })).body.ret,
-        1,
+    await restartStack();
+    await until(
+        async () => (await list()).length === 3 && (await enabled("echo")),
+        "整套服务重启后恢复已登记应用",
     );
-    assert.equal(
-        (
-            await request("AppCenterUnlockReq", {
-                token: environment.APP_CENTER_ADMIN_TOKEN,
-            })
-        ).body.ret,
-        1,
-    );
-    await until(async () => (await list()).length === 3, "恢复已登记应用");
     assert.equal(await enabled("agent"), false);
+    assert.equal(
+        (await list()).find((app) => app.app_id === "agent").desired,
+        false,
+    );
+    assert.equal((await request("AgentSnapshotReq")).name, "RoutingError");
     assert.equal(await appRunning("agent"), false);
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
     await set("echo", false);
-    await compose("stop", "app-center");
-    await rm(join(catalog, "echo.json"));
-    await compose("start", "app-center");
+    await docker(
+        "build",
+        "-f",
+        "server/Dockerfile",
+        "--target",
+        "echo-fixture",
+        "--label",
+        "test.release=2",
+        "-t",
+        `${project}-echo:test`,
+        ".",
+    );
+    const oldImage = (
+        await docker("inspect", "-f", "{{.Image}}", container("echo"))
+    ).stdout.trim();
+    const update = await submit("echo", "Echo 2");
+    await set("echo", true);
+    assert.equal(
+        (
+            await docker("inspect", "-f", "{{.Image}}", container("echo"))
+        ).stdout.trim(),
+        oldImage,
+    );
+    assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    assert.equal((await review("echo", update, false)).ret, 1);
+    const nextUpdate = await submit("echo", "Echo 2");
+    await set("echo", false);
+    assert.equal((await review("echo", nextUpdate, true)).ret, 1);
+    assert.equal(await appRunning("echo"), false);
+    await set("echo", true);
+    assert.notEqual(
+        (
+            await docker("inspect", "-f", "{{.Image}}", container("echo"))
+        ).stdout.trim(),
+        oldImage,
+    );
+    assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    await docker("tag", oldImage, `${project}-echo:test`);
+    const rollback = await submit("echo", "Echo");
+    assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    assert.equal((await review("echo", rollback, true)).ret, 1);
+    await until(async () => {
+        const image = await docker(
+            "inspect",
+            "-f",
+            "{{.Image}}",
+            container("echo"),
+        ).catch(() => null);
+        return image?.stdout.trim() === oldImage && (await enabled("echo"));
+    }, "批准后更新运行中的镜像");
+    assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    assert.equal(
+        (await request("AppCenterRemoveReq", { app_id: "echo" })).body.ret,
+        1,
+    );
+    await compose("restart", "app-center");
     await until(async () => {
         const unlocked = await request("AppCenterUnlockReq", {
             token: environment.APP_CENTER_ADMIN_TOKEN,
@@ -403,7 +560,7 @@ try {
             services?.length === 2 &&
             services.some((app) => app.app_id === "agent" && !app.enabled)
         );
-    }, "应用中心从配置恢复停用状态并回收移出的应用");
+    }, "应用中心从数据库恢复停用状态和下架结果");
     const remaining = await docker(
         "ps",
         "-a",
@@ -412,6 +569,22 @@ try {
         `name=^/${container("echo")}$`,
     );
     assert.equal(remaining.stdout.trim(), "");
+    const relisted = await submit("echo", "Echo 新名称");
+    const pendingRelist = await echoService();
+    assert.equal(pendingRelist.name, "Echo 新名称");
+    assert.equal(pendingRelist.pending.request_id, relisted);
+    assert.ok(!pendingRelist.approved);
+    assert.equal(pendingRelist.can_set_enabled, false);
+    assert.ok(
+        !(await request("AppCenterListReq")).body.names.includes("Echo 新名称"),
+    );
+    assert.equal((await request("EchoRepeatReq")).name, "RoutingError");
+    assert.equal((await review("echo", relisted, true)).ret, 1);
+    await until(() => enabled("echo"), "重新上架后的路由就绪");
+    assert.ok(
+        (await request("AppCenterListReq")).body.names.includes("Echo 新名称"),
+    );
+    assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
     console.log(
         "Docker 应用接入、同名类型、通知、沙盒、容器启停和故障恢复通过",
     );
@@ -422,16 +595,10 @@ try {
     throw error;
 } finally {
     socket?.terminate();
-    try {
-        await compose("down", "--volumes", "--rmi", "local");
-        for (const id of ["agent", "echo"]) {
-            await docker("rm", "-f", container(id)).catch(() => {});
-            await docker("image", "rm", `${project}-${id}:test`).catch(
-                () => {},
-            );
-        }
-        await docker("volume", "rm", `${project}_agent-work`).catch(() => {});
-    } finally {
-        await rm(catalog, { recursive: true, force: true });
+    await compose("down", "--volumes", "--rmi", "local");
+    for (const id of ["agent", "echo"]) {
+        await docker("rm", "-f", container(id)).catch(() => {});
+        await docker("image", "rm", `${project}-${id}:test`).catch(() => {});
     }
+    await docker("volume", "rm", `${project}_agent-work`).catch(() => {});
 }

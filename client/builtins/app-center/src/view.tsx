@@ -105,6 +105,7 @@ function AppCenter() {
     const [page, setPage] = useState<"discover" | "manage">("discover");
     const [unlock, setUnlock] = useState(false);
     const [pendingId, setPendingId] = useState("");
+    const [removeId, setRemoveId] = useState("");
     const [query, setQuery] = useState("");
     const [changing, setChanging] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -136,6 +137,13 @@ function AppCenter() {
 
     const reload = () => setRefresh((value) => value + 1);
     const managing = page === "manage";
+    useEffect(() => {
+        if (!managing || !directory?.administrator) return;
+        const timer = window.setInterval(() => {
+            if (!document.hidden) setRefresh((value) => value + 1);
+        }, 3000);
+        return () => window.clearInterval(timer);
+    }, [managing, directory?.administrator]);
     const search = query.trim().toLocaleLowerCase();
     const matches = (name: string) => name.toLocaleLowerCase().includes(search);
     const names = directory?.names.filter(matches) ?? [];
@@ -153,18 +161,23 @@ function AppCenter() {
         setPage(destination);
         setQuery("");
         setPendingId("");
+        setRemoveId("");
         setChangeError("");
     }
-    async function change(id: string, enabled: boolean) {
+    async function change(
+        action: string,
+        args: Record<string, string | boolean>,
+    ) {
         if (changing) return;
         setChanging(true);
         setChangeError("");
         try {
-            await request("catalog.set", { app_id: id, enabled });
+            await request(action, args);
         } catch (failure) {
             setChangeError(String(failure));
         } finally {
             setPendingId("");
+            setRemoveId("");
             setChanging(false);
             reload();
         }
@@ -205,9 +218,21 @@ function AppCenter() {
                             service={service}
                             busy={changing}
                             onChange={(enable) => {
-                                if (enable) void change(service.app_id, true);
+                                if (enable)
+                                    void change("catalog.set", {
+                                        app_id: service.app_id,
+                                        enabled: true,
+                                    });
                                 else setPendingId(service.app_id);
                             }}
+                            onReview={(approve) =>
+                                void change("catalog.review", {
+                                    app_id: service.app_id,
+                                    request_id: service.pending!.request_id,
+                                    approve,
+                                })
+                            }
+                            onRemove={() => setRemoveId(service.app_id)}
                         />
                         <Divider />
                     </Fragment>
@@ -325,7 +350,28 @@ function AppCenter() {
                     onOpenChange={(open) => {
                         if (!open && !changing) setPendingId("");
                     }}
-                    onAction={() => void change(pending.app_id, false)}
+                    onAction={() =>
+                        void change("catalog.set", {
+                            app_id: pending.app_id,
+                            enabled: false,
+                        })
+                    }
+                />
+            )}
+            {removeId && (
+                <AlertDialog
+                    isOpen
+                    title={`下架 ${removeId}？`}
+                    description="应用将结束在途任务并移除容器。工作卷会保留，再次上架需要提交申请。"
+                    actionLabel="下架应用"
+                    cancelLabel="取消"
+                    isActionLoading={changing}
+                    onOpenChange={(open) => {
+                        if (!open && !changing) setRemoveId("");
+                    }}
+                    onAction={() =>
+                        void change("catalog.remove", { app_id: removeId })
+                    }
                 />
             )}
         </VStack>

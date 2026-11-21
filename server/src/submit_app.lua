@@ -1,0 +1,18 @@
+local skynet = require("skynet")
+local cluster = require("skynet.cluster")
+local nodes = require("network.nodes")
+local codes = require("enum.error_code")
+local config = require("etc.cfg")
+
+skynet.start(function()
+    local ok, err = pcall(function()
+        local args = require("cjson").decode(io.read("a"))
+        cluster.reload({ center = "127.0.0.1:" .. config.app_center.port })
+        local code, result = cluster.call("center", "@center", "submit", nodes.key(), args)
+        assert(code == codes.succ and result, "应用中心无法接收申请")
+        assert(result.ret == codes.succ, result.error and result.error.message)
+        print(result.request_id)
+    end)
+    if not ok then io.stderr:write(tostring(err), "\n") end
+    os.exit(ok and 0 or 1)
+end)

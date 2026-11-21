@@ -300,6 +300,27 @@ final class WebViewTests: XCTestCase {
             """)
         try await harness.click("服务管理")
         try await harness.until("document.querySelector('input[type=password]') !== null")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            const token = document.querySelector('input[type=password]');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(token, 'catalog-test');
+            token.dispatchEvent(new Event('input', {bubbles:true}));
+            """)
+        try await harness.click("解锁")
+        try await harness.until("document.querySelectorAll('article').length === 6")
+        let buttons =
+            "Array.from(document.querySelectorAll('article'), row => Array.from(row.querySelectorAll('button'), b => b.textContent.trim()).join(','))"
+        try await harness.until(
+            "JSON.stringify(\(buttons)) === JSON.stringify(['','停用,下架','批准,拒绝','','','批准,拒绝,启用,下架'])")
+        try await harness.click("停用")
+        try await harness.until("document.querySelector('[role=alertdialog]') !== null")
+        _ = try await harness.web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=alertdialog] button')).find(b => b.textContent.trim() === '停用').click()"
+        )
+        try await harness.until("\(buttons)[1] === '启用,下架'")
+        _ = try await harness.web.evaluateJavaScript(
+            "document.querySelectorAll('article')[1].querySelector('button').click()")
+        try await harness.until("\(buttons)[1] === '停用,下架'")
     }
 
     func testPackagedSettingsBridgeThemeAndResponsiveLayout() async throws {

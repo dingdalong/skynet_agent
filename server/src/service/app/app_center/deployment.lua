@@ -1,53 +1,9 @@
 local skynet = require("skynet")
 local json = require("cjson")
-local lfs = require("lfs")
 local rpc = require("rpc")
 local codes = require("enum.error_code")
-local config = require("etc.cfg")
-local Frame = require("network.frame")
 local log = require("log")
 local Deployment = {}
-
-local function manifest(directory, filename)
-    local file = assert(io.open(directory .. "/" .. filename, "r"))
-    local bytes = file:read(16385)
-    file:close()
-    assert(bytes and #bytes <= 16384)
-    local record = json.decode(bytes)
-    local id = record.app_id
-    assert(Frame.valid_app(id) and filename == id .. ".json" and id ~= "login" and id ~= "app-center")
-    assert(type(record.image) == "string" and #record.image <= 255 and record.image:match("^[%w][%w./_:@%-]*$"))
-    assert(record.name == nil or type(record.name) == "string")
-    assert(record.enabled == nil or type(record.enabled) == "boolean")
-    for field in pairs(record) do
-        assert(field == "app_id" or field == "image" or field == "name" or field == "enabled",
-            "未知应用配置字段")
-    end
-    return { app_id = id, name = record.name or id, image = record.image, default_enabled = record.enabled ~= false }
-end
-
-function Deployment.discover(directory)
-    local records, invalid = {}, {}
-    directory = directory or config.app_center.catalog
-    for filename in lfs.dir(directory) do
-        local id = filename:match("^(.*)%.json$")
-        if id then
-            local ok, record = pcall(manifest, directory, filename)
-            if ok then records[#records + 1] = record else
-                invalid[id] = true
-                log.failure("app_center", "manifest " .. filename, record)
-            end
-        end
-    end
-    return records, invalid
-end
-
-function Deployment.managed()
-    local parent = config.app_center.state_path:match("^(.*)/") or "."
-    local directory = parent .. "/managed"
-    if lfs.attributes(directory, "mode") == "directory" then return Deployment.discover(directory) end
-    return {}
-end
 
 function Deployment.manage(app, action)
     local command = string.format("python3 deploy/container.py %s '%s' '%s'", action, app.app_id, app.image)
@@ -86,7 +42,7 @@ function Deployment.start(center, app)
         assert(not center.freezing and skynet.now() < deadline, "等待应用注册超时")
         skynet.sleep(10)
     end
-    app.enabled = true
+    app.enabled = not app.outdated
 end
 
 function Deployment.stop(center, app)

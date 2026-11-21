@@ -17,10 +17,9 @@
 | `DEEPSEEK_MODEL`       | 开发渠道的模型名称及新会话默认模型 ID；该 ID 必须存在于模型清单                          |
 | `AGENT_WORKSPACE_ROOT` | 云端会话工作目录的根路径                                                                 |
 | `APP_CENTER_ADMIN_TOKEN` | 应用中心的管理员解锁令牌。省略时只开放普通目录查询。 |
-| `APP_CENTER_STATE_PATH` | 注册状态 JSON 文件路径，父目录须可写。节点启动时按保存的启用状态创建服务；已下线应用的实例数为零。 |
 | `GATEWAY_PORT` | 主机回环端口，默认 18787 |
 | `APP_CENTER_PORT`、`GATEWAY_CLUSTER_PORT` | 两个基础节点的本机 Cluster 端口，默认分别为 18081、18082。每套部署须使用独立的可用端口。 |
-| `APP_CATALOG_DIR` | 宿主机应用清单目录，默认 `./server/apps.d`，启动时只读挂载到 App Center。 |
+| `APP_MONGO_PORT` | 本项目 MongoDB 的本机入口，默认 `127.0.0.1:18083`。同机多个部署项目需使用不同端口。 |
 | `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
 | `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
@@ -46,13 +45,13 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.socket.host`         | 非空监听地址                         |
 | `agent_gateway.socket.port`         | 1–65535 的整数                       |
 | `agent_gateway.socket.path`         | 以 `/` 开头的 WebSocket 路径         |
-| `agent_gateway.instance.agent`      | 1–32 的整数，按用户名固定路由到常驻 Agent 实例 |
+| `application.instances`             | 每个应用节点的业务实例数，范围 1–32。容器指定的 `APP_INSTANCES` 优先于渠道默认值 |
 | `agent_gateway.instance.client`     | 1–32 的整数                          |
 | `agent_gateway.instance.logind`     | 1–32 的整数                          |
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。App Center 将管理员选择保存在 `center-state` 卷的 `/state/app_center.json`，并通过 `cluster-key` 卷与 Gateway 共享节点凭据。操作见[服务管理](DEVELOPMENT.md#服务管理)。
+Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存 `app_center.apps` 中的申请、审批结果和期望启停状态。初始化生成的应用中心专用凭据保存在 `mongo-auth` 卷，两卷应一并保留。`cluster-key` 卷供 App Center 和 Gateway 使用。操作见[服务管理](DEVELOPMENT.md#服务管理)。
 
 ### 模型与会话
 

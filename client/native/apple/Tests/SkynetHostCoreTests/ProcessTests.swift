@@ -563,6 +563,7 @@ final class ProcessTests: XCTestCase {
         let denied = expectation(description: "native Agent capabilities remain builtin-only")
         let operations = [
             "agent.directory.choose", "agent.remote.set", "catalog.list", "catalog.unlock", "catalog.set",
+            "catalog.review", "catalog.remove",
         ]
         denied.expectedFulfillmentCount = operations.count
         for kind in operations {

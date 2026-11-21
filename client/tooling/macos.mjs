@@ -9,6 +9,14 @@ const host = `${root}apps/host`;
 const native = `${root}native`;
 const command = process.argv[2] ?? "build";
 const configuration = command === "test" ? "Debug" : "Release";
+const testApp = command === "test-app";
+const productName = testApp ? "skynet agent test" : "Skynet Agent";
+const derivedData = testApp
+    ? "DerivedData/TestClient"
+    : "DerivedData/Workspace";
+const products = testApp
+    ? `${root}test-artifacts/macos`
+    : `${host}/${derivedData}/Build/Products/${configuration}`;
 const environment = {
     ...process.env,
     DEVELOPER_DIR:
@@ -57,7 +65,14 @@ if (command !== "install") {
                 "-configuration",
                 configuration,
                 "-derivedDataPath",
-                "DerivedData/Workspace",
+                derivedData,
+                ...(testApp
+                    ? [
+                          `PRODUCT_NAME=${productName}`,
+                          "PRODUCT_BUNDLE_IDENTIFIER=app.skynet.agent.test",
+                          `CONFIGURATION_BUILD_DIR=${products}`,
+                      ]
+                    : []),
                 `ARCHS=${process.arch === "arm64" ? "arm64" : "x86_64"}`,
                 "ONLY_ACTIVE_ARCH=YES",
                 "CODE_SIGNING_ALLOWED=NO",
@@ -65,7 +80,7 @@ if (command !== "install") {
             ],
             host,
         );
-        const app = `${host}/DerivedData/Workspace/Build/Products/${configuration}/Skynet Agent.app`;
+        const app = `${products}/${productName}.app`;
         // Sign nested executables first; the source build is local and ad hoc.
         await run("codesign", [
             "--force",
@@ -86,7 +101,8 @@ if (command !== "install") {
             `${app}/Contents/Helpers/agent_worker`,
         ]);
         await run("codesign", ["--force", "--deep", "--sign", "-", app]);
-        if (command === "dev") await run("open", ["-n", app]);
+        if (testApp) console.log(app);
+        else if (command === "dev") await run("open", ["-n", app]);
         else {
             await mkdir(`${root}dist/macos`, { recursive: true });
             const destination = `${root}dist/macos/Skynet Agent.app`;

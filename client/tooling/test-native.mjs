@@ -18,6 +18,8 @@ const messageHash = (name) => {
 const names = [
     "LoginReq",
     "AppCenterListReq",
+    "AppCenterUnlockReq",
+    "AppCenterSetReq",
     "AgentSnapshotReq",
     "AgentChatReq",
     "AgentSessionModelSetReq",
@@ -47,6 +49,8 @@ await new Promise((resolve, reject) => {
     server.once("error", reject);
 });
 server.on("connection", (socket) => {
+    let administrator = false;
+    let agentEnabled = true;
     const id = randomUUID();
     const snapshot = {
         username: "native-agent",
@@ -91,6 +95,44 @@ server.on("connection", (socket) => {
             send(socket, "AppCenterListRes", requestId, {
                 ret: 1,
                 names: ["Agent", "应用中心", "日历"],
+                administrator,
+                services: administrator
+                    ? [
+                          { app_id: "app-center", name: "应用中心" },
+                          {
+                              app_id: "agent",
+                              name: "Agent",
+                              approved: { name: "Agent" },
+                              can_set_enabled: true,
+                              enabled: agentEnabled,
+                              instances: agentEnabled ? 1 : 0,
+                          },
+                          { app_id: "pending", pending: { name: "待审" } },
+                          { app_id: "rejected", last: { accepted: false } },
+                          { app_id: "removed", can_set_enabled: false },
+                          {
+                              app_id: "update",
+                              approved: { name: "已上架" },
+                              pending: { name: "待更新" },
+                              can_set_enabled: true,
+                          },
+                      ]
+                    : [],
+            });
+            return;
+        }
+        if (name === "AppCenterUnlockReq") {
+            administrator = request.token === "catalog-test";
+            send(socket, "AppCenterUnlockRes", requestId, {
+                ret: administrator ? 1 : 0,
+            });
+            return;
+        }
+        if (name === "AppCenterSetReq") {
+            const allowed = administrator && request.app_id === "agent";
+            if (allowed) agentEnabled = request.enabled;
+            send(socket, "AppCenterSetRes", requestId, {
+                ret: allowed ? 1 : 0,
             });
             return;
         }

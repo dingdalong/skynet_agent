@@ -1,0 +1,4 @@
+include "config"
+start = "submit_app"
+thread = 2
+logger = "/dev/null"

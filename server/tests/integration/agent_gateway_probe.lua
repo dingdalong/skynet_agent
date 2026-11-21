@@ -197,6 +197,18 @@ function M.run(config)
         return client, snapshot, name
     end
     local ok, failure = xpcall(function()
+        if config.mode == "approve_agent" then
+            local admin = connect()
+            support.equal(admin:request("LoginReq", { username = "fixture-reviewer" }).ret, 1)
+            local token = assert(os.getenv("APP_CENTER_ADMIN_TOKEN"))
+            support.equal(admin:request("AppCenterUnlockReq", { token = token }).ret, 1)
+            local request_id = assert(os.getenv("AGENT_TEST_REQUEST_ID"))
+            support.equal(admin:request("AppCenterReviewReq", {
+                app_id = "agent", request_id = request_id, approve = true,
+            }).ret, 1)
+            support.equal(admin:request("AgentSnapshotReq").ret, 1)
+            return
+        end
         if config.mode == "ready" or config.mode == "directory_ready" then
             local ready = connect()
             support.equal(ready:request("LoginReq", { username = "readiness" }).ret, 1)

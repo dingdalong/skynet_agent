@@ -25,10 +25,8 @@ return {
     app_center = {
         port = tonumber(os.getenv("APP_CENTER_PORT") or "18081"),
         gateway_port = tonumber(os.getenv("GATEWAY_CLUSTER_PORT") or "18082"),
-        catalog = os.getenv("APP_CATALOG") or "./apps.d",
         key_file = os.getenv("CLUSTER_KEY_FILE") or "./gateway.key",
         admin_token = os.getenv("APP_CENTER_ADMIN_TOKEN"),
-        state_path = os.getenv("APP_CENTER_STATE_PATH") or "./app_center_state.json",
     },
     agent_gateway = {
         socket = {

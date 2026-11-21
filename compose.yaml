@@ -9,14 +9,30 @@ x-node: &node
     NODE_CONTROL_FILES: "1"
     SKYNET_CFG_CHANNEL: ${SKYNET_CFG_CHANNEL:-develop}
 services:
+  mongodb:
+    image: mongo:8.0
+    network_mode: bridge
+    ports: ["127.0.0.1:${APP_MONGO_PORT:-18083}:27017"]
+    entrypoint: ["/bin/bash", "/mongo-start.sh"]
+    volumes:
+      - mongo-data:/data/db
+      - mongo-auth:/auth
+      - ./server/deploy/mongo-start.sh:/mongo-start.sh:ro
+      - ./server/deploy/mongo-init.js:/docker-entrypoint-initdb.d/app-center.js:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(cat /proc/1/comm)\" = mongod && mongosh --quiet --eval 'quit(db.runCommand({ping:1}).ok ? 0 : 1)'"]
+      interval: 2s
+      timeout: 4s
+      retries: 45
   app-center:
     <<: *node
+    depends_on:
+      mongodb: { condition: service_healthy }
     build: { context: ., dockerfile: server/Dockerfile, target: app-center }
     environment:
       <<: *cluster
       APP_PROJECT: ${COMPOSE_PROJECT_NAME:-skynet-agent}
-      APP_CATALOG: /apps.d
-      APP_CENTER_STATE_PATH: /state/app_center.json
+      APP_MONGO_PORT: ${APP_MONGO_PORT:-18083}
       APP_CENTER_ADMIN_TOKEN: ${APP_CENTER_ADMIN_TOKEN:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
@@ -25,8 +41,7 @@ services:
       APP_INSTANCES: ${APP_INSTANCES:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${APP_CATALOG_DIR:-./server/apps.d}:/apps.d:ro
-      - center-state:/state
+      - mongo-auth:/auth:ro
       - cluster-key:/cluster
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/skynet-ready"]
@@ -44,5 +59,6 @@ services:
     volumes:
       - cluster-key:/cluster:ro
 volumes:
-  center-state: {}
+  mongo-data: {}
+  mongo-auth: {}
   cluster-key: {}

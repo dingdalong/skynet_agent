@@ -5,13 +5,26 @@ package skynet.agent.v1;
 import "common.proto";
 
 message AppCenterListReq {}
+message AppCenterVersion {
+  string request_id = 1;
+  string name = 2;
+  string image = 3;
+  string image_id = 4;
+  bool accepted = 5;
+  string reviewer = 6;
+}
 message AppCenterService {
   string app_id = 1;
   string name = 2;
-  string service = 3;
+  reserved 3;
   uint32 instances = 4;
   bool enabled = 5;
   string transition = 6;
+  AppCenterVersion approved = 7;
+  AppCenterVersion pending = 8;
+  AppCenterVersion last = 9;
+  bool desired = 10;
+  bool can_set_enabled = 11;
 }
 message AppCenterListRes {
   int32 ret = 1;
@@ -24,4 +37,8 @@ message AppCenterUnlockReq { string token = 1; }
 message AppCenterUnlockRes { int32 ret = 1; ErrorInfo error = 2; }
 message AppCenterSetReq { string app_id = 1; bool enabled = 2; }
 message AppCenterSetRes { int32 ret = 1; ErrorInfo error = 2; }
+message AppCenterReviewReq { string app_id = 1; string request_id = 2; bool approve = 3; }
+message AppCenterReviewRes { int32 ret = 1; ErrorInfo error = 2; }
+message AppCenterRemoveReq { string app_id = 1; }
+message AppCenterRemoveRes { int32 ret = 1; ErrorInfo error = 2; }
 message AppCenterChangedNtf { string app_id = 1; bool enabled = 2; }

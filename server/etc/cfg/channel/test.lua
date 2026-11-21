@@ -1,12 +1,12 @@
 return {
     runtime = { control_port = os.getenv("NODE_ROLE") == "center" and not os.getenv("APP_ID") and 18004
         or os.getenv("APP_ID") and 18003 or 18001 },
+    application = { instances = 2 },
     agent_gateway = {
         socket = {
             port = tonumber(os.getenv("GATEWAY_PORT") or "18791"),
         },
         instance = {
-            agent = 2,
             client = 2,
             logind = 2,
             websocket = 2,

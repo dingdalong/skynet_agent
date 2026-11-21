@@ -10,7 +10,7 @@ local Loader = {}
 ---@field channel string
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
----@field application { id: string?, schema: string?, instances: integer?, key: string? }
+---@field application { id: string?, schema: string?, instances: integer, key: string? }
 ---@field app_center server.AppCenterConfig
 ---@field agent_gateway server.AgentGatewayConfig
 ---@field agent server.AgentConfig
@@ -18,10 +18,8 @@ local Loader = {}
 ---@class server.AppCenterConfig
 ---@field port integer
 ---@field gateway_port integer
----@field catalog string
 ---@field key_file string
 ---@field admin_token string?
----@field state_path string
 
 ---@class server.SocketConfig
 ---@field host string
@@ -30,7 +28,7 @@ local Loader = {}
 
 ---@class server.AgentGatewayConfig
 ---@field socket server.SocketConfig
----@field instance { agent: integer, client: integer, logind: integer, websocket: integer }
+---@field instance { client: integer, logind: integer, websocket: integer }
 ---@field login_timeout_ticks integer
 
 ---@class server.AgentConfig
@@ -103,6 +101,7 @@ local function validate(config)
     integer_field(runtime.control_port, "runtime.control_port", 1, 65535)
     local protocol = table_field(config.protocol, "protocol")
     string_field(protocol.agent_gateway_schema_dir, "protocol.agent_gateway_schema_dir")
+    integer_field(config.application.instances, "application.instances", 1, 32)
 
     local gateway = table_field(config.agent_gateway, "agent_gateway")
     local socket = table_field(gateway.socket, "agent_gateway.socket")
@@ -119,7 +118,6 @@ local function validate(config)
     )
 
     local instance = table_field(gateway.instance, "agent_gateway.instance")
-    integer_field(instance.agent, "agent_gateway.instance.agent", 1, 32)
     integer_field(instance.client, "agent_gateway.instance.client", 1, 32)
     integer_field(instance.logind, "agent_gateway.instance.logind", 1, 32)
     integer_field(instance.websocket, "agent_gateway.instance.websocket", 1, 32)
@@ -177,11 +175,11 @@ function Loader.build(common, channel_config, channel_name)
     end
     config.channel = channel_name
     config.worker_thread = common.worker_thread
+    config.application.instances = common.application.instances or config.application.instances or config.worker_thread
 
     local gateway = table_field(config.agent_gateway, "agent_gateway")
     gateway.instance = table_field(gateway.instance or {}, "agent_gateway.instance")
     local instance = config.agent_gateway.instance
-    if instance.agent == nil then instance.agent = config.worker_thread end
     instance.client = instance.client or config.worker_thread
     instance.logind = instance.logind or config.worker_thread
     instance.websocket = instance.websocket or config.worker_thread

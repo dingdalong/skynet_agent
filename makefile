@@ -9,7 +9,7 @@ XCODE_DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 PLATFORM ?= $(shell node -p '({darwin:"macos",win32:"windows",linux:"linux"})[process.platform] || "unknown"')
 
 .NOTPARALLEL:
-.PHONY: help install dev build check check-full client-check client-build client-archive client-test client-dev client-core-test client-platforms client-doctor client-preflight
+.PHONY: help install dev build check check-full client-check client-build client-archive client-test macos-test-app client-dev client-core-test client-platforms client-doctor client-preflight
 
 help:
 	@printf '%s\n' \
@@ -22,6 +22,7 @@ help:
 		"  make check-full     基础回归、服务端集成及客户端原生集成（界面另用 Computer Use 验收）" \
 		"  make client-check   格式、类型、令牌、边界、逻辑和原生集成测试" \
 		"  make client-test    所选平台的原生运行时和生命周期集成测试" \
+		"  make macos-test-app 构建固定的 skynet agent test 客户端，供本机界面验收" \
 		"  make client-build   构建客户端；PLATFORM=ios 生成通用模拟器 App" \
 		"  make client-archive PLATFORM=ios 生成 iPhone/iPad 真机归档" \
 		"  make client-dev     按 PLATFORM 构建并启动客户端" \
@@ -37,6 +38,9 @@ install: client-preflight
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs install --platform "$(PLATFORM)"
 
 dev: client-dev
+
+macos-test-app:
+	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/macos.mjs test-app
 
 build: client-preflight
 	@docker build -f server/Dockerfile --target agent -t skynet-agent-app:local .

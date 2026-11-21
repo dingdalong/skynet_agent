@@ -18,10 +18,23 @@ import { Squares2X2Icon } from "@heroicons/react/24/outline";
 export interface Service {
     app_id: string;
     name: string;
-    service: string;
     instances: number;
     enabled: boolean;
     transition: string;
+    approved?: Version;
+    pending?: Version;
+    last?: Version;
+    desired: boolean;
+    can_set_enabled: boolean;
+}
+
+interface Version {
+    name: string;
+    request_id: string;
+    image: string;
+    image_id: string;
+    accepted: boolean;
+    reviewer: string;
 }
 
 const covers = new Map([
@@ -87,10 +100,14 @@ export function ServiceRow({
     service,
     busy,
     onChange,
+    onReview,
+    onRemove,
 }: {
     service: Service;
     busy: boolean;
     onChange: (enabled: boolean) => void;
+    onReview: (approve: boolean) => void;
+    onRemove: () => void;
 }) {
     const failed = service.transition.endsWith("_failed");
     const changing =
@@ -111,11 +128,45 @@ export function ServiceRow({
                         {service.name}
                     </Heading>
                     <Text type="supporting" color="secondary" maxLines={2}>
-                        {service.service} · {service.instances} 个实例
+                        {service.app_id} · {service.instances} 个实例
                     </Text>
+                    {service.approved && (
+                        <Text type="supporting">
+                            已批准 · {service.approved.image} ·{" "}
+                            {service.approved.image_id}
+                        </Text>
+                    )}
+                    {service.pending && (
+                        <Text type="supporting">
+                            {service.approved ? "更新待审" : "首次上架待审"} ·{" "}
+                            {service.pending.name} · {service.pending.image} ·{" "}
+                            {service.pending.image_id}
+                        </Text>
+                    )}
+                    {service.last && (
+                        <Text type="supporting" color="secondary">
+                            最近审批 · {service.last.reviewer}已
+                            {service.last.accepted ? "批准" : "拒绝"}{" "}
+                            {service.last.image}
+                        </Text>
+                    )}
                 </VStack>
             </StackItem>
-            <HStack gap={2} vAlign="center">
+            <HStack gap={2} vAlign="center" wrap="wrap">
+                {service.pending && (
+                    <>
+                        <Button
+                            label="批准"
+                            isDisabled={busy}
+                            onClick={() => onReview(true)}
+                        />
+                        <Button
+                            label="拒绝"
+                            isDisabled={busy}
+                            onClick={() => onReview(false)}
+                        />
+                    </>
+                )}
                 <Badge
                     variant={
                         failed
@@ -128,15 +179,27 @@ export function ServiceRow({
                     }
                     label={
                         transitions[service.transition] ??
-                        (service.enabled ? "运行中" : "已停用")
+                        (service.enabled
+                            ? "运行中"
+                            : service.desired
+                              ? "等待启动"
+                              : "未运行")
                     }
                 />
-                {service.app_id !== "app-center" && (
+                {service.can_set_enabled && (
                     <Button
                         label={failed ? "重试变更" : enable ? "启用" : "停用"}
                         variant="secondary"
                         isDisabled={busy || changing}
                         onClick={() => onChange(enable)}
+                    />
+                )}
+                {service.approved && (
+                    <Button
+                        label="下架"
+                        variant="ghost"
+                        isDisabled={busy || changing}
+                        onClick={onRemove}
                     />
                 )}
             </HStack>

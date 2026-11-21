@@ -17,6 +17,7 @@ end
 local function common_config()
     return {
         worker_thread = 8,
+        application = {},
         runtime = {
             control_port = 18000,
         },
@@ -125,7 +126,7 @@ describe("etc.cfg", function()
         assert.are.equal(8, config.worker_thread)
         assert.are.equal("127.0.0.1", config.agent_gateway.socket.host)
         assert.are.equal(18791, config.agent_gateway.socket.port)
-        assert.are.equal(2, config.agent_gateway.instance.agent)
+        assert.are.equal(2, config.application.instances)
         assert.are.equal(2, config.agent_gateway.instance.client)
         assert.are.equal(2, config.agent_gateway.instance.logind)
         assert.are.equal(2, config.agent_gateway.instance.websocket)
@@ -159,7 +160,7 @@ describe("etc.cfg", function()
 
         local config = loader.build(common, channel, "test")
 
-        assert.are.equal(8, config.agent_gateway.instance.agent)
+        assert.are.equal(8, config.application.instances)
         assert.are.equal(8, config.agent_gateway.instance.client)
         assert.are.equal(8, config.agent_gateway.instance.logind)
         assert.are.equal(8, config.agent_gateway.instance.websocket)
@@ -173,6 +174,13 @@ describe("etc.cfg", function()
         local config = loader.build(common, channel, "test")
 
         assert.are.equal(8, config.worker_thread)
+    end)
+
+    it("应用容器指定的实例数优先于渠道默认值", function()
+        local common = common_config()
+        common.application.instances = 3
+        local config = loader.build(common, require("etc.cfg.channel.test"), "test")
+        assert.are.equal(3, config.application.instances)
     end)
 
     it("深度合并时不修改公共配置和渠道配置", function()
@@ -191,9 +199,9 @@ describe("etc.cfg", function()
         assert_build_error(loader.build, function(common)
             common.worker_thread = 0
         end, "worker_thread")
-        assert_build_error(loader.build, function(_, channel)
-            channel.agent_gateway.instance.agent = 0
-        end, "agent_gateway.instance.agent")
+        assert_build_error(loader.build, function(common)
+            common.application.instances = 0
+        end, "application.instances")
         assert_build_error(loader.build, function(_, channel)
             channel.agent_gateway.instance.client = 33
         end, "agent_gateway.instance.client")
