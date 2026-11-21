@@ -5,10 +5,12 @@ describe("main", function()
     before_each(function()
         startup, calls, events = nil, {}, {}
         config = {
+            app_center = { gateway_port = 18082 },
             protocol = { agent_gateway_schema_dir = "schema" },
             agent_gateway = { instance = { agent = 1, client = 2, logind = 1, websocket = 3 } },
         }
         scope = Scope.new({
+            ["network.nodes"] = { open = function(port) assert.are.equal(18082, port) end },
             node = { init = function(callback) startup = callback end },
             ["helper.protobuf"] = { load = function(path) events[#events + 1] = { "schema", path } end },
             ["etc.cfg"] = config,
@@ -30,11 +32,11 @@ describe("main", function()
 
     it("在节点启动回调中加载业务 schema 并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema" }, { "launch", "app.app_center" },
+        assert.same({ { "schema", "schema" }, { "launch", "app_routes" },
             { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
-            { name = "app.app_center", count = 1, registered_name = ".app_center" },
+            { name = "app_routes", count = 1, registered_name = ".app_routes" },
             { name = "client", count = 2 },
             { name = "logind", count = 1, params = { client_services = { 12, 13 } } },
             { name = "websocket", count = 3 },
@@ -46,7 +48,7 @@ describe("main", function()
         config.agent_gateway.instance = { agent = 0, client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
-            { name = "app.app_center", count = 1, registered_name = ".app_center" },
+            { name = "app_routes", count = 1, registered_name = ".app_routes" },
             { name = "client", count = 0 },
             { name = "logind", count = 2, params = { client_services = {} } },
             { name = "websocket", count = 0 },

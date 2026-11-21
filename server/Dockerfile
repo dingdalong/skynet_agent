@@ -22,18 +22,29 @@ COPY server/3rd/lua-protobuf/*.lua ./3rd/lua-protobuf/
 COPY common/enum ../common/enum
 COPY server/etc ./etc
 COPY server/src/lualib ./src/lualib
+COPY server/src/clusteragent.lua ./src/
 COPY server/src/service/init.lua ./src/service/init.lua
-COPY server/deploy/console.sh ./console.sh
 ENTRYPOINT ["./3rd/skynet/skynet"]
 
-FROM runtime AS gateway
-COPY common/proto/common.proto common/proto/login.proto common/proto/platform.proto ../common/proto/
+FROM runtime AS app-center
+RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+COPY common/proto/common.proto ../common/proto/
 COPY common/proto/app_center ../common/proto/app_center
 RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lua,target=/tmp/lua \
     --mount=type=bind,source=server/deploy/check_protocol.lua,target=/tmp/check_protocol.lua \
-    /tmp/lua /tmp/check_protocol.lua login login.proto && /tmp/lua /tmp/check_protocol.lua app-center app_center/catalog.proto
-COPY server/src/main.lua ./src/
+    /tmp/lua /tmp/check_protocol.lua app-center app_center/catalog.proto
+COPY server/src/center_main.lua ./src/
 COPY server/src/service/app/app_center ./src/service/app/app_center
+COPY server/deploy/container.py ./deploy/container.py
+CMD ["etc/config.center"]
+
+FROM runtime AS gateway
+COPY common/proto/common.proto common/proto/login.proto ../common/proto/
+RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lua,target=/tmp/lua \
+    --mount=type=bind,source=server/deploy/check_protocol.lua,target=/tmp/check_protocol.lua \
+    /tmp/lua /tmp/check_protocol.lua login login.proto
+COPY server/src/main.lua ./src/
+COPY server/src/service/app_routes ./src/service/app_routes
 COPY server/src/service/gateway ./src/service/gateway
 COPY server/src/service/logind ./src/service/logind
 COPY server/src/service/client ./src/service/client
@@ -48,6 +59,7 @@ COPY server/deploy/check_protocol.lua ./deploy/check_protocol.lua
 CMD ["etc/config.app"]
 
 FROM app AS agent
+ENV APP_SCHEMA=agent/schema.proto AGENT_WORKSPACE_ROOT=/work AGENT_SANDBOX_BACKEND=landlock
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \
     && install -d -o 65532 -g 65532 /work
 COPY --from=build /tmp/workspace-sandbox /usr/local/libexec/workspace-sandbox
@@ -61,11 +73,7 @@ RUN bin/lua deploy/check_protocol.lua agent agent/schema.proto
 USER 65532:65532
 
 FROM app AS echo-fixture
+ENV APP_SCHEMA=echo.proto APP_INSTANCES=1
 COPY server/tests/fixtures/echo/echo.proto ../common/proto/
 COPY server/tests/fixtures/echo/init.lua ./src/service/app/echo/init.lua
 RUN bin/lua deploy/check_protocol.lua echo echo.proto
-
-FROM debian:13 AS deployer
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
-COPY server/deploy/manager.py /opt/manager.py
-ENTRYPOINT ["python3", "-B", "/opt/manager.py"]

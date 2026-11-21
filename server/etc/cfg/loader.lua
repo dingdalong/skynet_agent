@@ -2,6 +2,7 @@ local Loader = {}
 
 ---@class server.RuntimeConfig
 ---@field control_port integer
+---@field file_control boolean?
 ---@field executable_search_path string
 
 ---@class server.Config
@@ -9,10 +10,18 @@ local Loader = {}
 ---@field channel string
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
----@field application { id: string?, schema: string?, instances: integer? }
----@field app_center { deployer: string, admin_token: string?, state_path: string }
+---@field application { id: string?, schema: string?, instances: integer?, key: string? }
+---@field app_center server.AppCenterConfig
 ---@field agent_gateway server.AgentGatewayConfig
 ---@field agent server.AgentConfig
+
+---@class server.AppCenterConfig
+---@field port integer
+---@field gateway_port integer
+---@field catalog string
+---@field key_file string
+---@field admin_token string?
+---@field state_path string
 
 ---@class server.SocketConfig
 ---@field host string

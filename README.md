@@ -29,7 +29,7 @@ cp server/.env.example server/.env
 在另一终端运行 `make dev` 启动客户端。连接已有网关时，可以直接从这一步开始。
 打开宿主后填写服务器地址和用户名。登录成功后进入工作区，Agent 自动使用这份身份。
 默认网关为 `ws://127.0.0.1:18787/agent`。在「应用中心」用管理员令牌解锁后，可以单独启停 Agent 容器。
-新 App 的镜像登记、协议和工作目录约定见[接入新应用](docs/DEVELOPMENT.md#接入新应用)。
+Compose 启动 App Center 和 Gateway。App Center 读取 `server/apps.d`，自动启动并接入启用的应用。新 App 的镜像与清单示例见[接入新应用](docs/DEVELOPMENT.md#接入新应用)。
 服务管理使用 `./server/control.sh status|stop|force-stop`。客户端通过系统菜单或 `⌘Q` 退出。
 连接配置、权限范围与恢复规则见 [Agent 客户端](docs/architecture/CLIENT_AGENT.md)。
 `make build` 构建服务端及正式 macOS 客户端，更多入口见 `make help`。

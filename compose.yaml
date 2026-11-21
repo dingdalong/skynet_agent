@@ -1,53 +1,48 @@
 name: skynet-agent
+x-node: &node
+  network_mode: host
+  init: true
+  environment: &cluster
+    APP_CENTER_PORT: ${APP_CENTER_PORT:-18081}
+    GATEWAY_CLUSTER_PORT: ${GATEWAY_CLUSTER_PORT:-18082}
+    CLUSTER_KEY_FILE: /cluster/gateway.key
+    NODE_CONTROL_FILES: "1"
+    SKYNET_CFG_CHANNEL: ${SKYNET_CFG_CHANNEL:-develop}
 services:
-  deployer:
-    build: { context: ., dockerfile: server/Dockerfile, target: deployer }
+  app-center:
+    <<: *node
+    build: { context: ., dockerfile: server/Dockerfile, target: app-center }
     environment:
-      PROJECT: ${COMPOSE_PROJECT_NAME:-skynet-agent}
+      <<: *cluster
+      APP_PROJECT: ${COMPOSE_PROJECT_NAME:-skynet-agent}
+      APP_CATALOG: /apps.d
+      APP_CENTER_STATE_PATH: /state/app_center.json
+      APP_CENTER_ADMIN_TOKEN: ${APP_CENTER_ADMIN_TOKEN:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AGENT_TOOL_TCP_PORTS: ${AGENT_TOOL_TCP_PORTS:-53,80,443}
+      APP_INSTANCES: ${APP_INSTANCES:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    networks: [management]
+      - ${APP_CATALOG_DIR:-./server/apps.d}:/apps.d:ro
+      - center-state:/state
+      - cluster-key:/cluster
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/skynet-ready"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
   gateway:
+    <<: *node
     build: { context: ., dockerfile: server/Dockerfile, target: gateway }
-    depends_on: [deployer]
-    ports:
-      - "127.0.0.1:${GATEWAY_PORT:-18787}:18787"
+    depends_on:
+      app-center: { condition: service_healthy }
     environment:
-      GATEWAY_HOST: 0.0.0.0
-      SKYNET_CFG_CHANNEL: ${SKYNET_CFG_CHANNEL:-develop}
-      APP_DEPLOYER: deployer:18081
-      APP_CENTER_ADMIN_TOKEN: ${APP_CENTER_ADMIN_TOKEN:-}
-      APP_CENTER_STATE_PATH: /state/app_center.json
+      <<: *cluster
+      GATEWAY_PORT: ${GATEWAY_PORT:-18787}
     volumes:
-      - gateway-state:/state
-    networks: [management, apps]
-  agent:
-    profiles: [apps]
-    init: true
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    build: { context: ., dockerfile: server/Dockerfile, target: agent }
-    labels:
-      io.skynet.app: agent
-      io.skynet.name: Agent
-      io.skynet.enabled: "true"
-    environment:
-      APP_ID: agent
-      SKYNET_CFG_CHANNEL: ${SKYNET_CFG_CHANNEL:-develop}
-      APP_INSTANCES: ${APP_INSTANCES:-}
-      APP_SCHEMA: agent/schema.proto
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
-      AGENT_WORKSPACE_ROOT: /work
-      AGENT_SANDBOX_BACKEND: landlock
-      AGENT_TOOL_TCP_PORTS: ${AGENT_TOOL_TCP_PORTS:-53,80,443}
-    volumes:
-      - agent-work:/work
-    networks: [apps]
-networks:
-  management: { internal: true }
-  apps: {}
+      - cluster-key:/cluster:ro
 volumes:
-  gateway-state: {}
-  agent-work: {}
+  center-state: {}
+  cluster-key: {}

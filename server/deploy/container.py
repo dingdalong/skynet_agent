@@ -1,0 +1,100 @@
+"""App Center's local Docker Engine client. One operation per invocation."""
+import http.client
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import socket
+import sys
+from urllib.parse import quote
+
+
+class Engine(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(20)
+        self.sock.connect("/var/run/docker.sock")
+
+
+def request(method, path, data=None, missing=False):
+    engine = Engine("localhost")
+    try:
+        engine.request(method, path, json.dumps(data) if data is not None else None,
+                       {"Content-Type": "application/json"})
+        reply = engine.getresponse()
+        raw = reply.read()
+        if missing and reply.status == 404:
+            return None
+        if reply.status not in (200, 201, 204, 304):
+            raise RuntimeError(f"Docker {method} {path}: HTTP {reply.status}")
+        return json.loads(raw) if raw else {}
+    finally:
+        engine.close()
+
+
+def operate(action, app, image):
+    project = os.environ["APP_PROJECT"]
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project) or not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", app):
+        raise ValueError("Invalid project or application ID")
+    labels = {"io.skynet.project": project, "io.skynet.app": app}
+    name = project + "-app-" + app
+    managed = Path(os.environ["APP_CENTER_STATE_PATH"]).parent / "managed"
+    marker = managed / (app + ".json")
+    record = request("GET", f"/containers/{name}/json", missing=True)
+    if record and not labels.items() <= record["Config"]["Labels"].items():
+        raise ValueError("Container name belongs to a different application")
+    if action == "start":
+        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL") if k in os.environ}
+        env.update(APP_ID=app, NODE_CONTROL_FILES="1")
+        host = {"NetworkMode": "host", "Init": True, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges:true"]}
+        if app == "agent":
+            env.update({k: os.environ[k] for k in ("APP_INSTANCES", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL",
+                        "DEEPSEEK_BASE_URL", "AGENT_TOOL_TCP_PORTS") if k in os.environ})
+            host["Mounts"] = [{"Type": "volume", "Source": project + "_agent-work", "Target": "/work"}]
+        image_id = request("GET", "/images/" + quote(image, safe="") + "/json")["Id"]
+        settings = {k + "=" + v for k, v in env.items()}
+        outdated = bool(record and (record["Image"] != image_id or not settings.issubset(record["Config"]["Env"])))
+        if outdated and not record["State"]["Running"]:
+            request("DELETE", "/containers/" + record["Id"])
+            record = None
+            outdated = False
+        if not record:
+            managed.mkdir(exist_ok=True)
+            temp = marker.with_suffix(".tmp")
+            temp.write_text(json.dumps({"app_id": app, "image": image}))
+            temp.replace(marker)
+            env["APP_REGISTRATION_KEY"] = secrets.token_hex(32)
+            created = request("POST", "/containers/create?name=" + name,
+                              {"Image": image, "Labels": labels, "Env": [k + "=" + v for k, v in env.items()],
+                               "HostConfig": host})
+            record = request("GET", "/containers/" + created["Id"] + "/json")
+        if not record["State"]["Running"]:
+            request("POST", "/containers/" + record["Id"] + "/start")
+        return {"outdated": outdated, "key": next(v.split("=", 1)[1] for v in record["Config"]["Env"]
+                            if v.startswith("APP_REGISTRATION_KEY="))}
+    if action == "inspect":
+        return {"running": bool(record and record["State"]["Running"])}
+    if action not in ("wait", "stop", "remove"):
+        raise ValueError("Unknown container action")
+    if not record:
+        if action == "remove":
+            marker.unlink(missing_ok=True)
+        return {"exit_code": 0}
+    path = "/containers/" + record["Id"]
+    if action == "stop" and record["State"]["Running"]:
+        request("POST", path + "/stop")
+    if action == "wait":
+        result = request("POST", path + "/wait")
+        if result["StatusCode"] != 0:
+            raise RuntimeError("Application exited with status " + str(result["StatusCode"]))
+    if request("GET", path + "/json")["State"]["Running"]:
+        raise RuntimeError("Application is still running")
+    if action == "remove":
+        request("DELETE", path)
+        marker.unlink(missing_ok=True)
+    return {"exit_code": 0}
+
+
+if __name__ == "__main__":
+    print(json.dumps(operate(*sys.argv[1:])))

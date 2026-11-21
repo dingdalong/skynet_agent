@@ -4,13 +4,25 @@ set -eu
 server_root=$(CDPATH= cd -P "$(dirname "$0")/../.." && pwd)
 cd "$server_root/.."
 export COMPOSE_PROJECT_NAME="skynet-live-$(date +%s)-$$"
-export GATEWAY_PORT=0
+ports=$(python3 -c 'import random,socket
+sockets=[]
+while len(sockets)<3:
+    sock=socket.socket()
+    try: sock.bind(("127.0.0.1",random.randrange(20000,32000)))
+    except OSError: sock.close(); continue
+    sockets.append(sock)
+print(*(sock.getsockname()[1] for sock in sockets))')
+set -- $ports
+export GATEWAY_PORT=$1 APP_CENTER_PORT=$2 GATEWAY_CLUSTER_PORT=$3
 env_file=${SKYNET_ENV_FILE:-"$server_root/.env"}
-compose() { docker compose --env-file "$env_file" --profile apps "$@"; }
+compose() { docker compose --env-file "$env_file" "$@"; }
 
 cleanup() {
     result=$?
-    if [ "$result" -ne 0 ]; then compose logs --tail 30 gateway agent >&2; fi
+    if [ "$result" -ne 0 ]; then compose logs --tail 30 gateway app-center >&2; fi
+    SKYNET_ENV_FILE="$env_file" "$server_root/control.sh" stop || true
+    docker rm -f "$COMPOSE_PROJECT_NAME-app-agent" >/dev/null 2>&1 || true
+    docker volume rm "${COMPOSE_PROJECT_NAME}_agent-work" >/dev/null 2>&1 || true
     compose down --volumes
 }
 trap cleanup EXIT
@@ -18,8 +30,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 SKYNET_ENV_FILE="$env_file" "$server_root/start.sh"
-address=$(compose port gateway 18787)
-export AGENT_WS_URL="ws://$address/agent"
+export AGENT_WS_URL="ws://127.0.0.1:$GATEWAY_PORT/agent"
 probe="$server_root/tests/integration/run_probe.sh"
 attempt=0
 until "$probe" agent_gateway_probe ready >/dev/null 2>&1; do

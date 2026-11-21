@@ -63,9 +63,23 @@ end
 function Node:init(start_services)
     skynet.register(".main")
     -- 控制台先就绪，业务服务初始化卡住时仍可显式强制结束进程。
-    local console = skynet.newservice("debug_console", "127.0.0.1", config.runtime.control_port)
-    self.services[#self.services + 1] = { name = "debug_console", address = console }
+    if config.runtime.file_control then
+        os.remove("/tmp/skynet-ready")
+        os.remove("/tmp/skynet-stop")
+    else
+        local console = skynet.newservice("debug_console", "127.0.0.1", config.runtime.control_port)
+        self.services[#self.services + 1] = { name = "debug_console", address = console }
+    end
     start_services(self)
+    if config.runtime.file_control then
+        assert(io.open("/tmp/skynet-ready", "w")):close()
+        skynet.fork(function()
+            while not self.closing do
+                if os.remove("/tmp/skynet-stop") then self:shutdown({}); return end
+                skynet.sleep(20)
+            end
+        end)
+    end
     if config.channel == "develop" then
         self.hotfix_watch = HotfixWatch:new(self)
         self.hotfix_watch:start()
@@ -192,6 +206,7 @@ function node.init(start_services)
         if not ok then
             log.failure(SERVICE_NAME, "init", err)
             pcall(instance.close, instance)
+            skynet.sleep(1)
             os.exit(1)
         end
     end)

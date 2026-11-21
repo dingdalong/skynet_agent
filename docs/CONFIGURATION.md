@@ -12,13 +12,15 @@
 | ---------------------- | ---------------------------------------------------------------------------------------- |
 | `SKYNET_ENV_FILE`      | 启动脚本读取的环境文件路径；未指定时读取 `server/.env`，需在启动脚本前设置               |
 | `SKYNET_CFG_CHANNEL`   | 渠道文件名，省略时使用 `develop`；以字母开头，仅含字母、数字、下划线，且渠道文件必须存在 |
-| `DEEPSEEK_API_KEY`     | Agent 真实模型调用所需的 API Key，仅注入 Agent 容器 |
+| `DEEPSEEK_API_KEY`     | App Center 在创建内置 Agent 容器时传入的模型密钥 |
 | `DEEPSEEK_BASE_URL`    | 开发渠道的模型服务地址                                                                   |
 | `DEEPSEEK_MODEL`       | 开发渠道的模型名称及新会话默认模型 ID；该 ID 必须存在于模型清单                          |
 | `AGENT_WORKSPACE_ROOT` | 云端会话工作目录的根路径                                                                 |
 | `APP_CENTER_ADMIN_TOKEN` | 应用中心的管理员解锁令牌。省略时只开放普通目录查询。 |
 | `APP_CENTER_STATE_PATH` | 注册状态 JSON 文件路径，父目录须可写。节点启动时按保存的启用状态创建服务；已下线应用的实例数为零。 |
 | `GATEWAY_PORT` | 主机回环端口，默认 18787 |
+| `APP_CENTER_PORT`、`GATEWAY_CLUSTER_PORT` | 两个基础节点的本机 Cluster 端口，默认分别为 18081、18082。每套部署须使用独立的可用端口。 |
+| `APP_CATALOG_DIR` | 宿主机应用清单目录，默认 `./server/apps.d`，启动时只读挂载到 App Center。 |
 | `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
 | `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
@@ -50,7 +52,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-配置目录的相对路径以服务端工作目录为基准。Compose 的 Agent 使用 `agent-work` 卷挂载到 `/work`，主服状态保存在 `gateway-state` 卷的 `/state/app_center.json`。操作见[服务管理](DEVELOPMENT.md#服务管理)。
+Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。App Center 将管理员选择保存在 `center-state` 卷的 `/state/app_center.json`，并通过 `cluster-key` 卷与 Gateway 共享节点凭据。操作见[服务管理](DEVELOPMENT.md#服务管理)。
 
 ### 模型与会话
 

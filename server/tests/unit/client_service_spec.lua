@@ -38,6 +38,7 @@ describe("用户与客户端服务", function()
             return model.text
         end
         scope = Scope.new({
+            ["skynet.cluster"] = {}, ["network.nodes"] = {},
             ["app_center.deployment"] = {}, client = false, ["client.user"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)
@@ -62,10 +63,10 @@ describe("用户与客户端服务", function()
                 },
                 max_message_length = 100, session_title_length = 24 } },
             skynet = { localname = function(name)
-                return ({ [".app_endpoint"] = 10, [".app_center"] = 80, [".logind_1"] = 20,
+                return ({ [".app_endpoint"] = 10, [".app_routes"] = 80, [".logind_1"] = 20,
                     [".websocket_1"] = 100, [".websocket_2"] = 200,
                     [".websocket_3"] = 300, [".client_1"] = 10, [".client_2"] = 11, [".shared"] = 77 })[name]
-            end, genid = function() next_id = next_id + 1; return next_id end,
+            end, now = function() return 100 end, genid = function() next_id = next_id + 1; return next_id end,
                 fork = function(callback) tasks[#tasks + 1] = coroutine.create(callback) end,
                 error = function() end, sleep = function() coroutine.yield("sleep") end },
             ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
@@ -280,24 +281,14 @@ describe("用户与客户端服务", function()
         assert.are.equal(count + 1, #events)
     end)
 
-    it("应用中心重推未确认的最新路由，取代旧版本的重试", function()
-        local timers, delivered = {}, {}
-        require("skynet").timeout = function(_, callback) timers[#timers + 1] = callback end
-        require("rpc").call = function(address, command, snapshot)
-            assert.are.equal(10, address)
-            assert.are.equal("sync_routes", command)
-            delivered[#delivered + 1] = snapshot.revision
-            if #delivered < 3 then return codes.call_fail end
-            return codes.succ, true
-        end
+    it("网关重连取得完整路由，同代次相同版本无需重传", function()
         local center = require("app_center"):new()
-        center:subscribe({ source = 10 })
-        assert.is_false(center:_sync())
-        assert.is_false(center:_sync())
-        timers[1]()
-        timers[2]()
-        assert.same({ 1, 2, 2 }, delivered)
-        assert.are.equal(2, #timers)
+        center.key, center.epoch, center.gateway = "key", "epoch", 81
+        assert.are.equal("epoch", center:directory({}, "key", "boot").epoch)
+        assert.is_nil(center:directory({}, "key", "boot", "epoch", 0))
+        center.connections["old"] = {}
+        assert.is_table(center:directory({}, "key", "next"))
+        assert.is_nil(center.connections["old"])
     end)
 
     it("服务初始化加载一次模板，各会话共享启动快照与项目规则上限", function()
@@ -313,20 +304,13 @@ describe("用户与客户端服务", function()
         end
     end)
 
-    it("应用下线等待路由重推成功后才允许回收实例", function()
-        local retry, attempts = nil, 0
-        require("skynet").timeout = function(_, callback) retry = callback end
-        require("rpc").call = function()
-            attempts = attempts + 1
-            if attempts == 1 then return codes.call_fail end
-            return codes.succ, true
-        end
+    it("拒绝未知、停用和启动凭据不匹配的实例注册", function()
         local center = require("app_center"):new()
-        center:subscribe({ source = 10 })
-        local synced = coroutine.create(function() return center:_sync(true) end)
-        assert.same({ true, "sleep" }, { coroutine.resume(synced) })
-        retry()
-        assert.same({ true, true }, { coroutine.resume(synced) })
+        assert.is_false(center:register({}, "echo", "wrong", 21234, "g"))
+        center.apps.echo = { app_id = "echo", key = "owned", default = true }
+        assert.is_false(center:register({}, "echo", "wrong", 21234, "g"))
+        center.enabled.echo = false
+        assert.is_false(center:register({}, "echo", "owned", 21234, "g"))
     end)
 
     it("首发拒绝无效文本、模型与重试组合，不生成会话工作区或任务", function()

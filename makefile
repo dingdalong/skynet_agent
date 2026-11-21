@@ -39,7 +39,8 @@ install: client-preflight
 dev: client-dev
 
 build: client-preflight
-	@docker compose --profile apps build
+	@docker build -f server/Dockerfile --target agent -t skynet-agent-app:local .
+	@docker compose build
 	@$(MAKE) client-build
 
 check:

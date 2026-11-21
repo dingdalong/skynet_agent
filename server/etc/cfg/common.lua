@@ -9,6 +9,7 @@ return {
     worker_thread = tonumber(skynet.getenv("thread")),
     runtime = {
         control_port = 18000,
+        file_control = os.getenv("NODE_CONTROL_FILES") == "1",
         executable_search_path = (os.getenv("PATH") or "")
             .. ":/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
     },
@@ -19,9 +20,13 @@ return {
         id = os.getenv("APP_ID"),
         schema = os.getenv("APP_SCHEMA"),
         instances = tonumber(os.getenv("APP_INSTANCES") or ""),
+        key = os.getenv("APP_REGISTRATION_KEY"),
     },
     app_center = {
-        deployer = os.getenv("APP_DEPLOYER") or "deployer:18081",
+        port = tonumber(os.getenv("APP_CENTER_PORT") or "18081"),
+        gateway_port = tonumber(os.getenv("GATEWAY_CLUSTER_PORT") or "18082"),
+        catalog = os.getenv("APP_CATALOG") or "./apps.d",
+        key_file = os.getenv("CLUSTER_KEY_FILE") or "./gateway.key",
         admin_token = os.getenv("APP_CENTER_ADMIN_TOKEN"),
         state_path = os.getenv("APP_CENTER_STATE_PATH") or "./app_center_state.json",
     },

@@ -25,9 +25,12 @@ server_log="$temp_dir/server.log"
 cleanup() {
     result=$?
     if [ "$result" -ne 0 ]; then
-        for log in "$server_log" "$fake_llm_log" "$temp_dir/app.log"; do
+        for log in "$server_log" "$fake_llm_log" "$temp_dir/app.log" "$temp_dir/center.log"; do
             if [ -f "$log" ]; then cat "$log" >&2; fi
         done
+    fi
+    if [ -f "$temp_dir/native-container.json" ]; then
+        (cd "$server_root" && python3 deploy/container.py stop agent fixture) >/dev/null || true
     fi
     for pid in "$probe_pid" "$server_pid" "$manager_pid" "$fake_llm_pid"; do
         if [ -z "$pid" ]; then continue; fi
@@ -46,17 +49,19 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+server_root="$temp_dir/server"
+mkdir -p "$server_root/deploy"
+cp "$project_root/tests/integration/native_container.py" "$server_root/deploy/container.py"
 if [ "$probe" = hotfix_watch_probe ]; then
-    server_root="$temp_dir/server"
     channel=develop
     mkdir -p "$server_root"
     cp -R "$project_root/src" "$project_root/etc" "$server_root/"
     cp "$project_root/etc/cfg/channel/test.lua" "$server_root/etc/cfg/channel/develop.lua"
-    for directory in 3rd luaclib bin; do
-        ln -s "$project_root/$directory" "$server_root/$directory"
-    done
-    ln -s "$project_root/../common" "$temp_dir/common"
+else
+    for directory in src etc; do ln -s "$project_root/$directory" "$server_root/$directory"; done
 fi
+for directory in 3rd luaclib bin; do ln -s "$project_root/$directory" "$server_root/$directory"; done
+ln -s "$project_root/../common" "$temp_dir/common"
 
 FAKE_LLM_PORT="$fake_llm_port" "$project_root/tests/integration/run_probe.sh" fake_llm_server \
     >"$fake_llm_log" 2>&1 &
@@ -94,10 +99,25 @@ EOF
 
 set -a
 . "$env_file"
-APP_DEPLOYER=127.0.0.1:18081
+APP_CENTER_PORT=19881
+GATEWAY_CLUSTER_PORT=19882
+GATEWAY_PORT=$gateway_port
+APP_CATALOG="$project_root/apps.d"
+CLUSTER_KEY_FILE="$temp_dir/cluster.key"
+FIXTURE_DIR="$temp_dir"
 set +a
-(cd "$server_root" && exec python3 "$project_root/tests/integration/node_manager.py") >"$temp_dir/app.log" 2>&1 &
-manager_pid=$!
+start_center() {
+    (cd "$server_root" && NODE_ROLE=center exec "$project_root/3rd/skynet/skynet" etc/config.center) \
+        >>"$temp_dir/center.log" 2>&1 &
+    manager_pid=$!
+    attempt=0
+    until grep -q '启动完成' "$temp_dir/center.log" && nc -z 127.0.0.1 "$APP_CENTER_PORT"; do
+        attempt=$((attempt + 1))
+        [ "$attempt" -lt 100 ] && kill -0 "$manager_pid" || { cat "$temp_dir/center.log" >&2; return 1; }
+        sleep 0.1
+    done
+}
+start_center
 start_gateway() {
     (cd "$server_root" && exec "$project_root/3rd/skynet/skynet" etc/config) >"$server_log" 2>&1 &
     server_pid=$!
@@ -155,6 +175,8 @@ if ! kill -0 "$server_pid" 2>/dev/null; then
 fi
 if [ "$command_status" -eq 0 ] && [ "$probe" = agent_gateway_probe ]; then
     server_log="$temp_dir/restart.log"
+    wait "$manager_pid"
+    start_center
     start_gateway
     wait_for_gateway directory_ready
     AGENT_WS_URL="$gateway_url" AGENT_TEST_SERVER_LOG="$server_log" \

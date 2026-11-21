@@ -16,7 +16,7 @@ if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
     printf '%s\n' '端口范围必须为 1..65535' >&2
     exit 1
 fi
-# 控制台调用在节点容器的回环接口内执行。
+# 原生开发节点使用回环调试控制台。
 body=$(printf 'call .main "%s"' "$method")
 response=$(printf 'POST / HTTP/1.0\r\nContent-Length: %s\r\n\r\n%s' "${#body}" "$body" \
     | nc -w 15 127.0.0.1 "$port")

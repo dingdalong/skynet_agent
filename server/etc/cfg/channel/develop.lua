@@ -1,7 +1,7 @@
 return {
     agent_gateway = {
         socket = {
-            port = 18787,
+            port = tonumber(os.getenv("GATEWAY_PORT") or "18787"),
         },
     },
     agent = {

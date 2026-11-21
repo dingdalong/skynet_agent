@@ -25,7 +25,7 @@ end
 ---@field users table<string, client.User>
 ---@field connections table<string, client.Connection>
 ---@field apps table<string, table>
----@field cursors table<string, integer>
+---@field cursors table<string, { generation: string, cursor: integer }>
 ---@field revision integer
 ---@field center integer?
 local ClientService = class()
@@ -58,18 +58,17 @@ function ClientService:sync_routes(context, snapshot)
         if not previous or previous.enabled ~= definition.enabled or previous.transition ~= definition.transition then
             changes[#changes + 1] = definition.notification
         end
-        if not previous or previous.generation ~= definition.generation then self.cursors[id] = 0 end
     end
     for id, previous in pairs(self.apps) do
         if not apps[id] then
             changes[#changes + 1] = previous.offline_notification
-            self.cursors[id] = nil
         end
     end
     self.apps, self.revision = apps, snapshot.revision
     for id, state in pairs(self.connections) do
         for app, generation in pairs(state.targets) do
-            if not apps[app] or apps[app].generation ~= generation then state.targets[app] = nil end
+            local current = apps[app] and apps[app].generation
+            if current and current ~= generation then state.targets[app] = nil end
         end
         for _, notification in ipairs(changes) do
             rpc.send(state.websocket, "send_response", id, 0, "app-center", Frame.notification, notification)
@@ -79,7 +78,7 @@ function ClientService:sync_routes(context, snapshot)
 end
 
 function ClientService:init()
-    self.center = assert(skynet.localname(".app_center"))
+    self.center = assert(skynet.localname(".app_routes"))
     local code, snapshot = rpc.call(self.center, "subscribe")
     assert(code == codes.succ and snapshot, "获取应用路由失败")
     self:sync_routes({ source = self.center }, snapshot)
@@ -124,9 +123,12 @@ function ClientService:handle_request(context, id, message_id, app_id, body)
     end
     state.targets[app_id] = app.generation
     local call = app_id == "app-center" and rpc.call_no_timeout or rpc.call
-    local code, result = call(app.address, "request", app.generation, state.user.identity, id, body, draining)
+    local code, result = call(app.address, "request", app.generation, state.user.identity, id, body, draining, app.key)
     if self.connections[id] ~= state then return end
-    if state.targets[app_id] ~= app.generation then return failed(codes.server_busy, "应用服务已下线") end
+    local current = self.apps[app_id]
+    if state.targets[app_id] ~= app.generation or not current or current.generation ~= app.generation then
+        return failed(codes.server_busy, "应用服务已下线")
+    end
     if code ~= codes.succ or type(result) ~= "string" then return failed(codes.call_fail, "应用请求失败") end
     rpc.send(state.websocket, "send_response", id, message_id, app_id, Frame.response, result)
 end
@@ -134,15 +136,18 @@ end
 function ClientService:publish(context, app_id, generation, username, body, connection_id, cursor)
     assert(context.source == self.center, "应用通知来源无效")
     local app = self.apps[app_id]
-    if not app or app.generation ~= generation or cursor <= (self.cursors[app_id] or 0) then return end
-    self.cursors[app_id] = cursor
+    if not app or app.generation ~= generation then return false end
+    local last = self.cursors[app_id]
+    if last and last.generation == generation and cursor <= last.cursor then return true end
+    self.cursors[app_id] = { generation = generation, cursor = cursor }
     local user = self.users[username]
-    if not user then return end
+    if not user then return true end
     for id, state in pairs(user.connections) do
         if state.targets[app_id] == generation and (not connection_id or id == connection_id) then
             rpc.send(state.websocket, "send_response", id, 0, app_id, Frame.notification, body)
         end
     end
+    return true
 end
 
 function ClientService:disconnect(context, id)
@@ -153,7 +158,7 @@ function ClientService:disconnect(context, id)
     for app_id, generation in pairs(state.targets) do
         local app = self.apps[app_id]
         if app and app.address and app.generation == generation then
-            rpc.send(app.address, "disconnect", generation, state.user.identity, id)
+            rpc.send(app.address, "disconnect", generation, state.user.identity, id, app.key)
         end
     end
 end

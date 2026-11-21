@@ -18,6 +18,8 @@ end)
 
 if mode == "startup_slow" or mode == "startup_wait" then
     package.loaded["helper.protobuf"] = { load = function() end }
+    package.loaded["network.nodes"] = { open = function() end }
+    package.loaded["etc.cfg"].app_center = { gateway_port = 18082 }
     dofile("src/main.lua")
 else
     local login_started, login_completed = false, false

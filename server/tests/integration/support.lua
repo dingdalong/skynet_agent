@@ -89,6 +89,14 @@ end
 ---@param timeout_ticks? integer
 ---@return string
 function M.control(config, command, timeout_ticks)
+    if command == "stop" then
+        M.contains(M.console(18004, 'call .main "shutdown"'), "<CMD OK>")
+        M.until_true(function()
+            local fd = socket.open("127.0.0.1", 18004)
+            if fd then socket.close(fd); return false end
+            return true
+        end, "应用中心应先排空应用并关闭", 2000)
+    end
     local native = require("agent_process")
     local filesystem = require("agent_filesystem")
     local handle = native.spawn(assert(filesystem.realpath("bin/process_launcher")), ".",

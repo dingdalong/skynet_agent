@@ -1,5 +1,7 @@
 local class = require("class")
 local cluster = require("skynet.cluster")
+local skynet = require("skynet")
+local config = require("etc.cfg")
 local crypt = require("skynet.crypt")
 local Pool = require("helper.service_pool")
 local Protocol = require("network.protocol")
@@ -19,7 +21,7 @@ local Endpoint = class()
 
 Endpoint.commands = {
     hello = "hello", request = "request", disconnect = "disconnect", publish = "publish",
-    events = "events", drain = "drain", finish = "finish",
+    events = "events", drain = "drain", finish = "finish", announce = "announce",
 }
 
 function Endpoint:ctor()
@@ -43,8 +45,19 @@ function Endpoint:init(params)
     cluster.register("application")
 end
 
+function Endpoint:announce(context, port)
+    assert(context.source == skynet.localname(".main"))
+    local center = cluster.proxy("center", "@center")
+    skynet.fork(function()
+        while not self.draining do
+            rpc.call(center, "register", self.app, config.application.key, port, self.generation)
+            skynet.sleep(100)
+        end
+    end)
+end
+
 function Endpoint:hello()
-    return self.app, self.generation, #self.workers.addresses, self.last
+    return self.app, self.generation, #self.workers.addresses, self.first - 1
 end
 
 function Endpoint:request(_, generation, identity, connection, body, draining)
