@@ -10,7 +10,7 @@ Agent 支持会话恢复、流式消息、模型选择、取消、失败重试�
 
 ## 快速开始
 
-准备 Node.js、pnpm、完整 Xcode 和服务端构建环境，见[开发指南](docs/DEVELOPMENT.md)。
+准备 Docker Compose、Node.js、pnpm 和完整 Xcode，见[开发指南](docs/DEVELOPMENT.md)。
 
 ```bash
 git clone --recurse-submodules git@github.com:dingdalong/skynet_agent.git
@@ -23,13 +23,13 @@ make install
 ```bash
 cp server/.env.example server/.env
 # 填写模型 API Key，如需管理应用，再设置 APP_CENTER_ADMIN_TOKEN
-make -C server build
 ./server/start.sh
 ```
 
 在另一终端运行 `make dev` 启动客户端。连接已有网关时，可以直接从这一步开始。
 打开宿主后填写服务器地址和用户名。登录成功后进入工作区，Agent 自动使用这份身份。
-打开「应用中心」可查看已注册的应用名。管理员解锁后可以查看服务详情、注册或撤销服务池。
+默认网关为 `ws://127.0.0.1:18787/agent`。在「应用中心」用管理员令牌解锁后，可以单独启停 Agent 容器。
+新 App 的镜像登记、协议和工作目录约定见[接入新应用](docs/DEVELOPMENT.md#接入新应用)。
 服务管理使用 `./server/control.sh status|stop|force-stop`。客户端通过系统菜单或 `⌘Q` 退出。
 连接配置、权限范围与恢复规则见 [Agent 客户端](docs/architecture/CLIENT_AGENT.md)。
 `make build` 构建服务端及正式 macOS 客户端，更多入口见 `make help`。

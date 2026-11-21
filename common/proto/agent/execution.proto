@@ -2,17 +2,17 @@ syntax = "proto3";
 package skynet.agent.v1;
 import "common.proto";
 import "agent/types.proto";
-message DesktopRegisterReq {
+message AgentDesktopRegisterReq {
   string device_id = 1;
   string name = 2;
   bool remote_enabled = 3;
   string authorization_id = 4;
 }
-message DesktopRegisterRes { int32 ret = 1; ErrorInfo error = 2; }
-message DesktopUpdatedNtf { DesktopDevice device = 1; }
-message SessionExecutionSetReq { string session_id = 1; ExecutionTarget target = 2; }
-message SessionExecutionSetRes { int32 ret = 1; ErrorInfo error = 2; ChatSession chat_session = 3; }
-message ExecutionActionNtf {
+message AgentDesktopRegisterRes { int32 ret = 1; ErrorInfo error = 2; }
+message AgentDesktopUpdatedNtf { DesktopDevice device = 1; }
+message AgentSessionExecutionSetReq { string session_id = 1; ExecutionTarget target = 2; }
+message AgentSessionExecutionSetRes { int32 ret = 1; ErrorInfo error = 2; ChatSession chat_session = 3; }
+message AgentExecutionActionNtf {
   string request_id = 1;
   string session_id = 2;
   string run_id = 3;
@@ -23,5 +23,5 @@ message ExecutionActionNtf {
   bool remote = 8;
   string authorization_id = 9;
 }
-message ExecutionResultReq { string request_id = 1; string result = 2; }
-message ExecutionResultRes { int32 ret = 1; ErrorInfo error = 2; }
+message AgentExecutionResultReq { string request_id = 1; string result = 2; }
+message AgentExecutionResultRes { int32 ret = 1; ErrorInfo error = 2; }

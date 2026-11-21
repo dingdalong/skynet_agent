@@ -12,12 +12,15 @@
 | ---------------------- | ---------------------------------------------------------------------------------------- |
 | `SKYNET_ENV_FILE`      | 启动脚本读取的环境文件路径；未指定时读取 `server/.env`，需在启动脚本前设置               |
 | `SKYNET_CFG_CHANNEL`   | 渠道文件名，省略时使用 `develop`；以字母开头，仅含字母、数字、下划线，且渠道文件必须存在 |
-| `DEEPSEEK_API_KEY`     | 非空 API Key，启动脚本要求提供                                                           |
+| `DEEPSEEK_API_KEY`     | Agent 真实模型调用所需的 API Key，仅注入 Agent 容器 |
 | `DEEPSEEK_BASE_URL`    | 开发渠道的模型服务地址                                                                   |
 | `DEEPSEEK_MODEL`       | 开发渠道的模型名称及新会话默认模型 ID；该 ID 必须存在于模型清单                          |
 | `AGENT_WORKSPACE_ROOT` | 云端会话工作目录的根路径                                                                 |
 | `APP_CENTER_ADMIN_TOKEN` | 应用中心的管理员解锁令牌。省略时只开放普通目录查询。 |
 | `APP_CENTER_STATE_PATH` | 注册状态 JSON 文件路径，父目录须可写。节点启动时按保存的启用状态创建服务；已下线应用的实例数为零。 |
+| `GATEWAY_PORT` | 主机回环端口，默认 18787 |
+| `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
+| `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
 密钥由服务端持有，不传给客户端。当前接入 DeepSeek；模型服务需要支持项目使用的 Responses API、
 流式输出与工具调用，不能仅凭 OpenAI 兼容的声明判断可用性。
@@ -47,8 +50,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-配置目录的相对路径以服务端工作目录为基准。控制端口变更后，管理脚本需显式传入目标端口，
-见[服务管理](DEVELOPMENT.md#服务管理)。
+配置目录的相对路径以服务端工作目录为基准。Compose 的 Agent 使用 `agent-work` 卷挂载到 `/work`，主服状态保存在 `gateway-state` 卷的 `/state/app_center.json`。操作见[服务管理](DEVELOPMENT.md#服务管理)。
 
 ### 模型与会话
 
@@ -90,7 +92,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 `justification` 并通过权限判断。默认沙盒允许联网，写入限制在会话工作目录。
 文件独立保留在磁盘，不随清空聊天历史或服务端重启自动删除。
 
-服务端保留桌面执行目标、目录绑定与远程授权协议；新客户端尚未接入这些能力。
+macOS 客户端支持桌面执行目标、目录绑定和工具回执。Agent 停用期间可在原连接交付已发出工具请求的回执。
 执行、取消、重试和授权机制见[工具执行与权限](architecture/AGENT_GATEWAY.md#工具执行与权限)。
 
 ## 客户端偏好

@@ -86,6 +86,7 @@ final class GatewaySession {
                 pending.removeValue(forKey: id)
                 throw error
             }
+            guard name != "AppCenterSetReq" else { return }
             queue.asyncAfter(deadline: .now() + 15) {
                 guard self.generation == current else { return }
                 self.pending.removeValue(forKey: id)?.1(.failure(failure("timeout", "网关请求超时")))
@@ -112,7 +113,11 @@ final class GatewaySession {
             event(name)
             return
         }
-        guard let (expected, reply) = pending.removeValue(forKey: id) else { return }
+        guard let (expected, reply) = pending[id], let appId = packet["app"] as? String,
+            codec.objectForKeyedSubscript("GatewayProtocol")?
+                .invokeMethod("ownerOf", withArguments: [expected])?.toString() == appId
+        else { return }
+        pending.removeValue(forKey: id)
         guard expected == name, body["ret"] as? Int == 1 else {
             reply(.failure(failure("gateway", dictionary(body["error"])["message"] as? String ?? "服务器拒绝请求")))
             return

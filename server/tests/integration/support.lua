@@ -92,7 +92,7 @@ function M.control(config, command, timeout_ticks)
     local native = require("agent_process")
     local filesystem = require("agent_filesystem")
     local handle = native.spawn(assert(filesystem.realpath("bin/process_launcher")), ".",
-        { "/bin/sh", "./control.sh", command, tostring(config.control_port) },
+        { "/bin/sh", "./deploy/console.sh", command, tostring(config.control_port) },
         { "PATH=" .. config.command_path, "LC_ALL=C" }, false)
     local output, readers, ids = {}, 0, {}
     local function attach(fd)

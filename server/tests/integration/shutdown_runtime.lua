@@ -44,10 +44,14 @@ else
                 string.format(".shutdown_worker_%d", index))
         end
         if mode == "login" then
+            require("helper.protobuf").load("../common/proto", "login.proto")
+            local codec = require("network.protocol"):new()
+            codec:init("login")
             local logind = instance:launch("logind", 1, { client_services = { instance.services[2].address } })[1]
             skynet.fork(function()
                 local code, handled = rpc.call(
-                    logind, "handle_request", "login", 1, "LoginReq", { username = "shutdown" }
+                    logind, "handle_request", "login", 1, "login",
+                    codec:encode_body("LoginReq", { username = "shutdown" })
                 )
                 assert(code == codes.succ and handled)
                 login_completed = true

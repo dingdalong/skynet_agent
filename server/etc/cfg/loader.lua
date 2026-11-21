@@ -9,6 +9,8 @@ local Loader = {}
 ---@field channel string
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
+---@field application { id: string?, schema: string?, instances: integer? }
+---@field app_center { deployer: string, admin_token: string?, state_path: string }
 ---@field agent_gateway server.AgentGatewayConfig
 ---@field agent server.AgentConfig
 

@@ -9,6 +9,8 @@ local rules = require("agent.permission.rules")
 local log = require("log")
 
 ---@class agent.ToolConfig
+---@field sandbox_backend string?
+---@field tcp_ports string?
 ---@field workspace_root string
 ---@field timeout_ms integer
 ---@field max_processes integer

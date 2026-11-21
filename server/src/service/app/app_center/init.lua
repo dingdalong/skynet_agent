@@ -6,11 +6,24 @@ local config = require("etc.cfg")
 local Pool = require("helper.service_pool")
 local json = require("cjson")
 local log = require("log")
+local Protocol = require("network.protocol")
+local Frame = require("network.frame")
+local Deployment = require("app_center.deployment")
 ---@class app_center.Service
+---@field apps table<string, table>
+---@field clients table<integer, integer>
+---@field acknowledged table<integer, integer>
+---@field connections table<string, table>
+---@field enabled table<string, boolean>
+---@field revision integer
+---@field changing table?
+---@field closed boolean
+---@field freezing boolean
+---@field codec network.Protocol
 local Center = class()
 
 Center.commands = {
-    subscribe = "subscribe", handle_request = "handle_request", disconnect = "disconnect", freeze = "freeze",
+    subscribe = "subscribe", request = "request", disconnect = "disconnect", freeze = "freeze",
 }
 
 function Center:ctor()
@@ -22,37 +35,47 @@ function Center:ctor()
     self.revision = 0
     self.changing = nil
     self.closed = false
+    self.freezing = false
+    self.codec = Protocol:new()
 end
 
-function Center:register(id, name, service, count, addresses, requests, cleanup_requests)
-    assert(type(id) == "string" and id ~= "" and type(name) == "string" and name ~= "", "无效应用")
-    assert(not self.apps[id] and count > 0 and #requests > 0, "应用声明无效或重复")
-    local seen = { LoginReq = true }
-    for other, app in pairs(self.apps) do
-        if other ~= id then
-            for _, request in ipairs(app.requests) do seen[request] = true end
+function Center:_discover()
+    local records = Deployment.discover()
+    if self.freezing then return end
+    local seen = {}
+    for _, record in ipairs(records) do
+        local id = record.app_id
+        assert(Frame.valid_app(id) and id ~= "login" and id ~= "app-center" and not seen[id], "无效应用清单")
+        seen[id] = true
+        local app = self.apps[id]
+        if not app then
+            app = { app_id = id, name = record.name, service = record.service, count = 0, enabled = false }
+            self.apps[id] = app
+            Deployment.watch(self, app)
+            self:_sync()
+        elseif app.service ~= record.service then
+            app.service, app.address, app.generation = record.service, nil, nil
+            app.enabled, app.count = false, 0
+            self:_sync()
+        end
+        app.name = record.name
+        local desired = self.enabled[id]
+        if desired == nil then desired = record.default_enabled end
+        if not self.freezing and not self.changing and ((desired and not app.enabled)
+            or (not desired and (record.running or app.transition))) and skynet.now() >= (app.retry_at or 0) then
+            self:_change(app, desired, false)
         end
     end
-    for _, request in ipairs(requests) do
-        assert(request:match("Req$") and not seen[request], "应用请求重复或无效: " .. request)
-        seen[request] = true
+    for id, app in pairs(self.apps) do
+        if id ~= "app-center" and not seen[id] and not self.changing then
+            self.apps[id] = nil
+            self:_sync()
+        end
     end
-    for _, cleanup in ipairs(cleanup_requests or {}) do
-        local found = false
-        for _, request in ipairs(requests) do if cleanup == request then found = true; break end end
-        assert(found, "清理请求未登记: " .. cleanup)
-    end
-    self.apps[id] = { app_id = id, name = name, service = service, addresses = addresses, requests = requests,
-        count = count, cleanup_requests = cleanup_requests, enabled = #addresses > 0 }
 end
 
-local function set_instances(app, enabled)
-    local code, addresses = rpc.call_no_timeout(".main", "set_instances", app.service, enabled and app.count or 0)
-    assert(code == codes.succ and addresses, "服务实例变更失败: " .. app.service)
-    app.addresses, app.enabled = addresses, enabled
-end
-
-function Center:init(params)
+function Center:init()
+    self.codec:init("app-center")
     local file, err, errno = io.open(config.app_center.state_path, "r")
     if file then
         local data = file:read("a")
@@ -65,22 +88,25 @@ function Center:init(params)
     else
         assert(errno == 2, err)
     end
-    self:register("app-center", "应用中心", "app_center", 1, { skynet.self() },
-        { "AppCenterListReq", "AppCenterUnlockReq", "AppCenterSetReq" })
-    if params.agent_count > 0 then
-        local routes = require("agent.routes")
-        self:register("agent", "Agent", "agent", params.agent_count, {}, routes.requests, routes.cleanup_requests)
-        if self.enabled.agent ~= false then set_instances(self.apps.agent, true) end
-    end
+    self.apps["app-center"] = { app_id = "app-center", name = "应用中心", service = "app_center",
+        address = skynet.self(), generation = "local", count = 1, enabled = true }
     self:_sync()
+    skynet.fork(function()
+        while not self.closed do
+            local ok, err = pcall(self._discover, self)
+            if not ok then log.failure("app_center", "discover", err) end
+            skynet.sleep(100)
+        end
+    end)
 end
 
 function Center:_snapshot()
     local apps = {}
     for _, app in pairs(self.apps) do
-        apps[#apps + 1] = { app_id = app.app_id, service = app.service, addresses = app.addresses,
-            requests = app.requests, cleanup_requests = app.cleanup_requests, enabled = app.enabled,
-            transition = app.transition }
+        apps[#apps + 1] = { app_id = app.app_id, address = app.address, generation = app.generation,
+            enabled = app.enabled, transition = app.transition, notification = self.codec:encode_body(
+                "AppCenterChangedNtf", { app_id = app.app_id, enabled = app.enabled }),
+            offline_notification = self.codec:encode_body("AppCenterChangedNtf", { app_id = app.app_id }) }
     end
     return { apps = apps, revision = self.revision }
 end
@@ -131,8 +157,7 @@ function Center:_sync(wait)
     return synced
 end
 
-function Center:_set(app, enabled)
-    if app.enabled == enabled and not app.transition then return end
+function Center:_save(app, enabled)
     local desired = table.copy(self.enabled)
     desired[app.app_id] = enabled
     local path = config.app_center.state_path
@@ -142,10 +167,15 @@ function Center:_set(app, enabled)
     assert(written and closed, write_error or close_error)
     assert(os.rename(path .. ".tmp", path))
     self.enabled = desired
+end
+
+function Center:_set(app, enabled, persist)
+    if persist then self:_save(app, enabled) end
+    if enabled and app.enabled and not app.transition then return end
     app.transition = enabled and "enabling" or "disabling"
     app.enabled = false
     self:_sync(true)
-    set_instances(app, enabled)
+    if enabled then Deployment.start(self, app) else Deployment.stop(self, app) end
     app.transition = nil
     self:_sync(true)
 end
@@ -171,7 +201,7 @@ function Center:handle_request(context, identity, id, name, args)
             if app.enabled then names[#names + 1] = app.name end
             if connection.admin then
                 services[#services + 1] = { app_id = app.app_id, name = app.name, service = app.service,
-                    instances = #app.addresses, enabled = app.enabled, transition = app.transition }
+                    instances = app.count, enabled = app.enabled, transition = app.transition }
             end
         end
         table.sort(names)
@@ -186,36 +216,50 @@ function Center:handle_request(context, identity, id, name, args)
     end
     if name ~= "AppCenterSetReq" or not connection.admin then return failure("需要管理员权限") end
     local app = self.apps[args.app_id]
-    if not app or app.app_id == "app-center" then return failure("此应用不能变更注册") end
-    if self.closed then return failure("节点正在关闭") end
+    if not app or app.app_id == "app-center" then return failure("此应用无法启停") end
+    if self.freezing or self.closed then return failure("节点正在关闭") end
     if args.enabled and app.transition == "disable_failed" then return failure("请先完成服务下线") end
-    local enabled = args.enabled == true
+    return self:_change(app, args.enabled == true, true)
+end
+
+function Center:_change(app, enabled, persist)
     local change = self.changing
     if change then
         if change.app ~= app or change.enabled ~= enabled then
-            return failure("应用注册正在变更，请稍后重试")
+            return failure("应用正在启停，请稍后重试")
         end
+        if persist and self.enabled[app.app_id] ~= enabled then self:_save(app, enabled) end
         while not change.response do skynet.sleep(1) end
         return change.response
     end
     change = { app = app, enabled = enabled }
     self.changing = change
-    local ok, err = pcall(self._set, self, app, enabled)
+    local ok, err = pcall(self._set, self, app, enabled, persist)
     if not ok then
         if app.transition then
-            app.transition = args.enabled and "enable_failed" or "disable_failed"
+            app.transition = enabled and "enable_failed" or "disable_failed"
             self:_sync()
         end
         log.failure("app_center", "set app=" .. app.app_id, err)
-        change.response = failure("注册变更未完成，请刷新并重试")
+        change.response = failure("应用启停未完成，请刷新并重试")
+        app.retry_delay = math.min(3000, (app.retry_delay or 50) * 2)
+        app.retry_at = skynet.now() + app.retry_delay
     else
+        app.retry_at, app.retry_delay = nil, nil
         change.response = { ret = codes.succ }
     end
     self.changing = nil
     return change.response
 end
 
-function Center:disconnect(context, identity, id)
+function Center:request(context, generation, identity, id, body)
+    assert(generation == "local", "无效的目录代次")
+    local name, args = self.codec:decode_body(body, "Req")
+    local response = self:handle_request(context, identity, id, name, args)
+    return self.codec:encode_body(name:gsub("Req$", "Res"), response)
+end
+
+function Center:disconnect(context, _, identity, id)
     local connection = self.connections[id]
     if connection and connection.client == context.source and connection.username == identity.username then
         self.connections[id] = nil
@@ -229,8 +273,14 @@ end
 
 function Center:freeze(context)
     assert(context.source == skynet.localname(".main"), "节点来源无效")
-    self.closed = true
+    self.freezing = true
     while self.changing do skynet.sleep(1) end
+    for id, app in pairs(self.apps) do
+        if id ~= "app-center" then
+            assert(self:_change(app, false, false).ret == codes.succ, "应用排空失败")
+        end
+    end
+    self.closed = true
     return true
 end
 

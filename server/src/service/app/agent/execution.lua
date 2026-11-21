@@ -28,7 +28,7 @@ function Execution:snapshot()
 end
 
 function Execution:publish(device)
-    self.app:publish("DesktopUpdatedNtf", { device = {
+    self.app:publish("AgentDesktopUpdatedNtf", { device = {
         id = device.id, name = device.name, online = device.connection ~= nil,
         remote_enabled = device.remote_enabled } })
 end
@@ -86,7 +86,8 @@ function Execution:invoke(target, operation, args, run, call_id, source_device)
     local id = crypt.hexencode(crypt.randomkey()) .. "-" .. tostring(skynet.genid())
     local pending = { connection = connection }
     self.pending[id] = pending
-    local code = self.app:publish("ExecutionActionNtf", { request_id = id, session_id = run and run.session_id or "",
+    local code = self.app:publish("AgentExecutionActionNtf", {
+        request_id = id, session_id = run and run.session_id or "",
             run_id = run and run.id or "", tool_call_id = call_id or "", operation = operation,
             arguments = cjson.encode(args), workspace_id = target.workspace_id,
             remote = source_device ~= target.device_id, authorization_id = device.authorization_id }, connection.id)

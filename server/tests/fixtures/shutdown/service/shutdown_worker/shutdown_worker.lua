@@ -2,7 +2,11 @@ local class = require("class")
 local skynet = require("skynet")
 
 local Worker = class()
-Worker.commands = { open = "open" }
+Worker.commands = { open = "open", freeze = "freeze" }
+
+function Worker:freeze()
+    return true
+end
 
 function Worker:ctor()
     self.mode = "normal"

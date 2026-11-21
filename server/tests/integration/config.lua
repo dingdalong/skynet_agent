@@ -29,6 +29,7 @@ local config = {
     control_port = port("AGENT_TEST_CONTROL_PORT", "18001"),
     server_root = os.getenv("AGENT_TEST_SERVER_ROOT") or ".",
     server_log = os.getenv("AGENT_TEST_SERVER_LOG"),
+    app_log = os.getenv("AGENT_TEST_APP_LOG"),
     live_prompt = os.getenv("AGENT_LIVE_PROMPT") or "请只回复：live-ok",
     command_path = os.getenv("PATH") or "/usr/bin:/bin",
 }

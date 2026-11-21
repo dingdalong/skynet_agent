@@ -3,11 +3,11 @@ local pb = require("pb")
 local pb_unsafe = require("pb.unsafe")
 
 ---@param schema_directory string
-local function load_proto(schema_directory)
+local function load_proto(schema_directory, entry)
     local protoc = require("protoc").new()
     protoc.include_imports = true
     protoc.paths = { schema_directory }
-    protoc:loadfile("schema.proto")
+    protoc:loadfile(entry or "schema.proto")
 end
 
 ---@param pb_path string
@@ -28,7 +28,7 @@ local M = {}
 ---优先加载预编译的 `pb.bytes`，源码入口为 `schema.proto`。
 ---@param schema_directory string protobuf schema 目录
 ---@return true
-function M.load(schema_directory)
+function M.load(schema_directory, entry)
     pb_unsafe.use("local")
     assert(
         type(schema_directory) == "string" and schema_directory ~= "",
@@ -39,12 +39,12 @@ function M.load(schema_directory)
     end
 
     local pb_path = schema_directory .. "/pb.bytes"
-    if file.is_file(pb_path) then
+    if not entry and file.is_file(pb_path) then
         load_pb(pb_path)
         return true
     end
 
-    local loaded, load_error = pcall(load_proto, schema_directory)
+    local loaded, load_error = pcall(load_proto, schema_directory, entry)
     if not loaded then
         error(string.format(
             "加载 protobuf schema 失败 dir=%s: %s",

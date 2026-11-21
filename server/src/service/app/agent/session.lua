@@ -105,7 +105,7 @@ end
 
 function AgentSession:_publish()
     self.revision = self.revision + 1
-    self.owner:publish("SessionUpdatedNtf", { chat_session = self:snapshot() })
+    self.owner:publish("AgentSessionUpdatedNtf", { chat_session = self:snapshot() })
 end
 
 ---@param model_id string
@@ -125,7 +125,7 @@ function AgentSession:_on_reasoning(run, block, delta, tool_id)
     self.revision = self.revision + 1
     local update = table.copy(block)
     update.text = delta
-    self.owner:publish("ReasoningDeltaNtf", { session_id = self.id,
+    self.owner:publish("AgentReasoningDeltaNtf", { session_id = self.id,
         message_id = run.message_id, tool_call_id = tool_id or "", block = update, revision = self.revision })
 end
 
@@ -189,7 +189,7 @@ function AgentSession:_on_delta(run, delta)
     if run.cancelled then error("用户已取消生成", 0) end
     run.assistant.content = run.assistant.content .. delta
     self.revision = self.revision + 1
-    self.owner:publish("MessageDeltaNtf", {
+    self.owner:publish("AgentMessageDeltaNtf", {
         session_id = self.id, run_id = run.id, message_id = run.assistant.id,
         delta = delta, revision = self.revision,
     })
@@ -199,7 +199,7 @@ end
 ---@param record table
 function AgentSession:_on_tool_update(message_id, record)
     self.revision = self.revision + 1
-    self.owner:publish("ToolUpdatedNtf", { session_id = self.id, message_id = message_id,
+    self.owner:publish("AgentToolUpdatedNtf", { session_id = self.id, message_id = message_id,
         tool = table.deep_copy(record), revision = self.revision })
 end
 

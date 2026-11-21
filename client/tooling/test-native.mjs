@@ -19,16 +19,25 @@ const names = [
     "LoginReq",
     "AppCenterListReq",
     "AgentSnapshotReq",
-    "ChatReq",
-    "SessionModelSetReq",
+    "AgentChatReq",
+    "AgentSessionModelSetReq",
 ];
 const send = (socket, name, id, body) => {
     const type = schema.lookupType(`skynet.agent.v1.${name}`);
     const payload = type.encode(type.create(body)).finish();
-    const packet = Buffer.alloc(payload.length + 9);
+    const app = name.startsWith("Login")
+        ? "login"
+        : name.startsWith("AppCenter")
+          ? "app-center"
+          : "agent";
+    const offset = 6 + app.length;
+    const packet = Buffer.alloc(payload.length + offset + 4);
+    packet[0] = id === 0 ? 3 : 2;
+    packet[5] = app.length;
+    packet.write(app, 6);
     packet.writeUInt32BE(id, 1);
-    packet.writeUInt32BE(messageHash(name), 5);
-    packet.set(payload, 9);
+    packet.writeUInt32BE(messageHash(name), offset);
+    packet.set(payload, offset + 4);
     socket.send(packet);
 };
 
@@ -55,8 +64,10 @@ server.on("connection", (socket) => {
             return;
         }
         const name =
-            data.length >= 9 &&
-            names.find((name) => data.readUInt32BE(5) === messageHash(name));
+            data.length >= 10 + data[5] &&
+            names.find(
+                (name) => data.readUInt32BE(6 + data[5]) === messageHash(name),
+            );
         if (!name) {
             socket.send(data);
             return;
@@ -64,7 +75,7 @@ server.on("connection", (socket) => {
         const requestId = data.readUInt32BE(1);
         const request = schema
             .lookupType(`skynet.agent.v1.${name}`)
-            .decode(data.subarray(9));
+            .decode(data.subarray(10 + data[5]));
         if (name === "LoginReq") {
             snapshot.username = request.username;
             send(socket, "LoginRes", requestId, {
@@ -83,18 +94,20 @@ server.on("connection", (socket) => {
             });
             return;
         }
-        if (name === "SessionModelSetReq") {
+        if (name === "AgentSessionModelSetReq") {
             const session = snapshot.chat_sessions[0];
             session.model_id = request.model_id;
             session.session.revision++;
-            send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
-            send(socket, "SessionModelSetRes", requestId, {
+            send(socket, "AgentSessionUpdatedNtf", 0, {
+                chat_session: session,
+            });
+            send(socket, "AgentSessionModelSetRes", requestId, {
                 ret: 1,
                 chat_session: session,
             });
             return;
         }
-        if (name !== "ChatReq") {
+        if (name !== "AgentChatReq") {
             send(socket, name.replace("Req", "Res"), requestId, {
                 ret: 1,
                 snapshot,
@@ -147,7 +160,7 @@ server.on("connection", (socket) => {
         };
         snapshot.chat_sessions = [session];
         const accepted = structuredClone(session);
-        send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
+        send(socket, "AgentSessionUpdatedNtf", 0, { chat_session: session });
         const webkit = snapshot.username === "webkit-agent";
         const reasoning = {
             id: "plan",
@@ -168,7 +181,7 @@ server.on("connection", (socket) => {
         };
         function updateTool() {
             message.tool_calls = [tool];
-            send(socket, "ToolUpdatedNtf", 0, {
+            send(socket, "AgentToolUpdatedNtf", 0, {
                 session_id: "session",
                 message_id: "assistant",
                 revision: ++session.session.revision,
@@ -177,7 +190,7 @@ server.on("connection", (socket) => {
         }
         function reasoningDelta(block, text, toolId) {
             block.text += text;
-            send(socket, "ReasoningDeltaNtf", 0, {
+            send(socket, "AgentReasoningDeltaNtf", 0, {
                 session_id: "session",
                 message_id: "assistant",
                 tool_call_id: toolId,
@@ -193,14 +206,17 @@ server.on("connection", (socket) => {
             tool.reasoning.push(permission);
             reasoningDelta(permission, "确认当前工作目录。", tool.id);
         }
-        send(socket, "MessageDeltaNtf", 0, {
+        send(socket, "AgentMessageDeltaNtf", 0, {
             session_id: "session",
             message_id: "assistant",
             run_id: "run",
             delta: "binary✓",
             revision: ++session.session.revision,
         });
-        send(socket, "ChatRes", requestId, { ret: 1, chat_session: accepted });
+        send(socket, "AgentChatRes", requestId, {
+            ret: 1,
+            chat_session: accepted,
+        });
         message.content =
             snapshot.username === "webkit-agent"
                 ? "binary✓\n\n" +
@@ -218,7 +234,9 @@ server.on("connection", (socket) => {
                 message.status = 2;
                 session.session.run_id = "";
                 session.session.revision++;
-                send(socket, "SessionUpdatedNtf", 0, { chat_session: session });
+                send(socket, "AgentSessionUpdatedNtf", 0, {
+                    chat_session: session,
+                });
                 tool.status = "completed";
                 tool.output = "background✓";
                 updateTool();

@@ -29,8 +29,8 @@ help:
 		"  make client-doctor  查看平台状态与锁定依赖版本" \
 		"  make client-core-test 独立验证共享 C++ 核心" \
 		"" \
-		"服务管理：./server/start.sh；./server/control.sh status|stop|force-stop [端口]" \
-		"扩展管理：./server/control.sh extensions-status|extensions-reload [端口]"
+		"服务管理：./server/start.sh，./server/control.sh status|stop|force-stop" \
+		"应用管理：在应用中心启停已登记的容器"
 
 install: client-preflight
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" install --frozen-lockfile
@@ -39,7 +39,7 @@ install: client-preflight
 dev: client-dev
 
 build: client-preflight
-	@$(MAKE) -C "$(SERVER_DIR)" build
+	@docker compose --profile apps build
 	@$(MAKE) client-build
 
 check:
@@ -48,6 +48,7 @@ check:
 
 check-full: check
 	@$(MAKE) -C "$(SERVER_DIR)" test-integration
+	@node client/tooling/docker-apps-e2e.mjs
 
 client-check:
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" run format:check

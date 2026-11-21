@@ -37,7 +37,8 @@ function M.run(config)
     assert(filesystem.realpath(config.server_root) ~= filesystem.realpath("."),
         "自动热修测试只能修改独立源码副本")
     local connections = {}
-    local function log(offset) return support.read(config.server_log):sub((offset or 0) + 1) end
+    local logfile = config.server_log
+    local function log(offset) return support.read(logfile):sub((offset or 0) + 1) end
     local function offset() return #log() end
     local function source(path) return support.read(config.server_root .. "/" .. path) end
     local function save_batch(files, expected)
@@ -87,7 +88,7 @@ function M.run(config)
         local ws_path, client_path = "src/service/websocket/websocket.lua", "src/service/client/client.lua"
         local ws_source, client_source = source(ws_path), source(client_path)
         local ws_signature = "function Websocket:_handle_message(connection, message, message_type)"
-        local client_signature = "function ClientService:handle_request(context, id, message_id, name, args)"
+        local client_signature = "function ClientService:handle_request(context, id, message_id, app_id, body)"
         local ws_v2 = marked(ws_source, ws_signature, "AUTO_WS_V2")
         local client_v2 = marked(client_source, client_signature, "AUTO_CLIENT_V2", true)
         support.same(updated_files(save_batch({ { ws_path, ws_v2 }, { client_path, client_v2 } })),
@@ -102,9 +103,9 @@ function M.run(config)
         end
         markers(0, { AUTO_WS_V2 = 2, AUTO_CLIENT_V2 = 2 })
 
-        local protocol_path = "src/lualib/network/protocol.lua"
+        local protocol_path = "src/lualib/network/frame.lua"
         local protocol_v2 = 'local skynet = require("skynet")\n' ..
-            marked(source(protocol_path), "function M:decode_msg(data)", "AUTO_PROTOCOL_V2")
+            marked(source(protocol_path), "function Frame.unpack(data)", "AUTO_PROTOCOL_V2")
         local client_v3 = marked(client_source, client_signature, "AUTO_CLIENT_V3", true)
         local failed = save_batch({
             { ws_path, ws_v2 .. "\nsyntax error\n" },
@@ -131,7 +132,7 @@ function M.run(config)
         local execution_failure = save_batch({
             { ws_path, replace(ws_v4, "return Websocket", 'error("AUTO_WS_CANDIDATE_ERROR")\nreturn Websocket') },
             { protocol_path, protocol_v3 },
-        }, "热修失败")
+        }, "部分更新")
         for _, name in ipairs({ "websocket_1", "websocket_2" }) do
             assert(execution_failure:match("%." .. name .. ":.*AUTO_WS_CANDIDATE_ERROR"), execution_failure)
         end
@@ -189,9 +190,9 @@ function M.run(config)
         local chat_source = source(chat_path)
         local handlers = {
             { "AgentSnapshotReq", "AUTO_AGENT_SNAPSHOT_V2", "" },
-            { "ChatReq", "AUTO_CHAT_REQUEST_V2", "args, connection" },
-            { "MessageCancelReq", "AUTO_CHAT_CANCEL_V2", "args" },
-            { "SessionModelSetReq", "AUTO_CHAT_MODEL_V2", "args" },
+            { "AgentChatReq", "AUTO_CHAT_REQUEST_V2", "args, connection" },
+            { "AgentMessageCancelReq", "AUTO_CHAT_CANCEL_V2", "args" },
+            { "AgentSessionModelSetReq", "AUTO_CHAT_MODEL_V2", "args" },
         }
         for _, handler in ipairs(handlers) do
             chat_source = marked(chat_source, "function REQUEST:" .. handler[1] .. "(" .. handler[3] .. ")",
@@ -199,18 +200,20 @@ function M.run(config)
         end
         local agent_path = "src/service/app/agent/init.lua"
         local agent_source = marked(source(agent_path),
-            "function AgentService:handle_request(context, identity, id, name, args)", "AUTO_AGENT_SERVICE_V2")
+            "function AgentService:handle_request(context, identity, id, name, args, draining)",
+            "AUTO_AGENT_SERVICE_V2")
         local user_path = "src/service/client/user.lua"
         local user_source = marked(source(user_path), "function User:ctor(username)", "AUTO_CLIENT_USER_V2")
-        local handler_batch = save_batch({ { chat_path, chat_source }, { agent_path, agent_source },
-            { user_path, user_source } })
-        support.same(updated_files(handler_batch), { chat_path, agent_path, user_path })
+        support.same(updated_files(save_batch({ { user_path, user_source } })), { user_path })
         start = offset()
         for index = 1, 2 do
             local new_client = gateway.login(config.gateway_url, "hotfix-new-" .. index)
             new_client:close()
         end
         markers(start, { AUTO_CLIENT_USER_V2 = 2 }, "两个 client 实例未使用热修后的用户构造函数")
+        logfile = assert(config.app_log)
+        local handler_batch = save_batch({ { chat_path, chat_source }, { agent_path, agent_source } })
+        support.same(updated_files(handler_batch), { chat_path, agent_path })
         start = offset()
         for _, connection in ipairs(connections) do
             local client = connection.client
@@ -224,12 +227,12 @@ function M.run(config)
             support.equal(#session.messages, #previous.messages + 2)
             for index, message in ipairs(previous.messages) do support.same(session.messages[index], message) end
             support.equal(session.messages[#session.messages].content, "E2E 历史通过")
-            local switched = client:request("SessionModelSetReq", {
+            local switched = client:request("AgentSessionModelSetReq", {
                 session_id = session.id, model_id = response.snapshot.default_model_id,
             })
             support.equal(switched.ret, 1)
             support.equal(switched.chat_session.session.id, session.id)
-            support.equal(client:request("MessageCancelReq", {
+            support.equal(client:request("AgentMessageCancelReq", {
                 session_id = session.id, run_id = session.messages[#session.messages].run_id,
             }).ret, 1)
         end

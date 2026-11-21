@@ -1,0 +1,4 @@
+syntax = "proto3";
+
+import public "login.proto";
+import public "app_center/catalog.proto";

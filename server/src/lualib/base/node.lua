@@ -12,8 +12,6 @@ local HotfixWatch = require("helper.hotfix_watch")
 ---@field new fun(self: base.Node): base.Node
 ---@field services {name: string, address: integer, ready: boolean?, closed: boolean?}[]
 ---@field app_center integer?
----@field app_groups table<string, table[]>
----@field changing_app boolean
 ---@field hotfix_watch helper.HotfixWatch?
 ---@field closing boolean
 ---@field close_started boolean
@@ -23,14 +21,12 @@ local HotfixWatch = require("helper.hotfix_watch")
 ---@field force_shutdown_started boolean
 local Node = class()
 
-Node.commands = { shutdown = "shutdown", force_shutdown = "force_shutdown", set_instances = "set_instances" }
-Node.initializing_commands = { force_shutdown = true, set_instances = true }
+Node.commands = { shutdown = "shutdown", force_shutdown = "force_shutdown" }
+Node.initializing_commands = { force_shutdown = true }
 
 function Node:ctor()
     self.services = {}
     self.app_center = nil
-    self.app_groups = {}
-    self.changing_app = false
     self.hotfix_watch = nil
     self.closing = false
     self.close_started = false
@@ -44,90 +40,23 @@ end
 ---@param count integer
 ---@param params table?
 ---@param registered_name string? 单实例可指定注册名
----@param group table[]? 由应用中心统一上下线的实例
 ---@return integer[]
-function Node:launch(name, count, params, registered_name, group)
+function Node:launch(name, count, params, registered_name)
     assert(registered_name == nil or count == 1, "显式服务名仅支持单实例")
     local addresses = {}
-    local position = #self.services + 1
-    if group and self.app_center then
-        for index, service in ipairs(self.services) do
-            if service.address == self.app_center then position = index + 1; break end
-        end
-    end
     for index = 1, count do
         assert(not self.closing, "服务启动已取消")
         local address = skynet.newservice(name)
-        local registered = registered_name or string.format(".%s_%d", name, index)
+        local registered = registered_name or string.format(".%s_%d", name:gsub("^app%.", ""), index)
         local service = { name = registered, address = address }
-        table.insert(self.services, position + index - 1, service)
-        if group then group[#group + 1] = service end
+        self.services[#self.services + 1] = service
         skynet.name(registered, address)
-        if group then assert(skynet.localname(registered) == address, "服务名已被占用: " .. registered) end
         local code = rpc.call_no_timeout(address, "init", params or {})
         assert(code == error_code.succ, "初始化服务失败: " .. registered)
         service.ready = true
         addresses[index] = address
     end
     return addresses
-end
-
-function Node:_retire(group, rollback)
-    local requests, waiting = skynet.request(), {}
-    for _, service in ipairs(group) do
-        service.ready = false
-        if not service.closed then
-            waiting[service.address] = service
-            requests:add(table.pack(service.address, "lua", "close", true))
-        end
-    end
-    for request, response in requests:select() do
-        if response and response[1] == error_code.succ and response[2] == true then
-            waiting[request[1]].closed = true
-            waiting[request[1]] = nil
-        end
-    end
-    for _, service in pairs(waiting) do log.failure(SERVICE_NAME, "retire", "清理失败 name=" .. service.name) end
-    assert(not next(waiting) or rollback, "应用实例未完成清理")
-    for index = #group, 1, -1 do
-        local service = group[index]
-        skynet.kill(service.address)
-        assert(skynet.localname(service.name) ~= service.address, "旧服务名尚未释放: " .. service.name)
-        service.closed = true
-        if self.hotfix_watch then self.hotfix_watch.pending[service.address] = nil end
-        for position, record in ipairs(self.services) do
-            if record == service then table.remove(self.services, position); break end
-        end
-        table.remove(group, index)
-    end
-end
-
----@param context base.CommandContext
----@param name string
----@param count integer
----@return integer[]
-function Node:set_instances(context, name, count)
-    assert(context.source == skynet.localname(".app_center"), "应用生命周期来源无效")
-    assert(not self.closing and not self.changing_app, "节点正在关闭或变更服务")
-    local group = self.app_groups[name] or {}
-    self.app_groups[name] = group
-    self.changing_app = true
-    local ok, result = pcall(function()
-        if count == 0 then
-            self:_retire(group, false)
-            return {}
-        end
-        assert(#group == 0, "现有服务尚未下线")
-        local started, addresses = pcall(self.launch, self, name, count, nil, nil, group)
-        if not started or self.closing then
-            self:_retire(group, true)
-            error(started and "节点正在关闭" or addresses)
-        end
-        return addresses
-    end)
-    self.changing_app = false
-    assert(ok, result)
-    return result
 end
 
 ---@param start_services fun(instance: base.Node)
@@ -184,15 +113,15 @@ function Node:close()
     end
     self.close_started = true
     self.closing = true
+    local succeeded = true
     if self.app_center then
-        rpc.call_no_timeout(self.app_center, "freeze")
+        local code, frozen = rpc.call_no_timeout(self.app_center, "freeze")
+        succeeded = code == error_code.succ and frozen == true
     end
-    while self.changing_app do skynet.sleep(1) end
     if self.hotfix_watch then
         self.hotfix_watch:close()
     end
     local started = skynet.now()
-    local succeeded = true
     for index = #self.services, 1, -1 do
         local service = self.services[index]
         if service.name ~= "debug_console" then

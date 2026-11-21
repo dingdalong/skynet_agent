@@ -1,5 +1,5 @@
 import type { Command, Effect, Json, Transition } from "@skynet/contracts";
-import { decodePacket, encodePacket, type Packet } from "./protocol";
+import { decodePacket, encodePacket, ownerOf, type Packet } from "./protocol";
 import type {
     AgentState,
     ChatSession,
@@ -81,7 +81,7 @@ class Turn {
         const { connection } = this.state;
         if (
             Object.values(connection.pending).some(
-                (request) => request.name === "ChatReq",
+                (request) => request.name === "AgentChatReq",
             )
         )
             this.state.notice =
@@ -117,7 +117,7 @@ class Turn {
         const { connection } = this.state;
         if (
             Object.values(connection.pending).some(
-                (request) => request.name === "ChatReq",
+                (request) => request.name === "AgentChatReq",
             )
         )
             this.state.notice =
@@ -236,7 +236,7 @@ class Turn {
     register() {
         const local = this.state.local;
         if (!local || local.canExecute === false) return;
-        this.request("DesktopRegisterReq", {
+        this.request("AgentDesktopRegisterReq", {
             device_id: local.deviceId,
             name: local.name,
             remote_enabled: local.remoteEnabled,
@@ -277,7 +277,7 @@ class Turn {
         }
         if (
             connection.status === "unavailable" &&
-            packet.name !== "ExecutionActionNtf"
+            packet.name !== "AgentExecutionActionNtf"
         )
             return;
         if (this.state.connection.status === "restoring") {
@@ -287,11 +287,11 @@ class Turn {
             return;
         }
         const body = packet.body;
-        if (packet.name === "SessionUpdatedNtf") {
+        if (packet.name === "AgentSessionUpdatedNtf") {
             this.full(body.chat_session as ChatSession);
             return;
         }
-        if (packet.name === "DesktopUpdatedNtf") {
+        if (packet.name === "AgentDesktopUpdatedNtf") {
             const device = body.device as import("./types").DesktopDevice;
             this.state.desktops = [
                 ...this.state.desktops.filter((item) => item.id !== device.id),
@@ -299,7 +299,7 @@ class Turn {
             ];
             return;
         }
-        if (packet.name === "ExecutionActionNtf") {
+        if (packet.name === "AgentExecutionActionNtf") {
             if (!this.state.local) throw Error("本机执行器不可用");
             const id = this.emit("agent.execute", body as Record<string, Json>);
             this.state.localEffects[id] = {
@@ -327,7 +327,7 @@ class Turn {
             return;
         }
         switch (packet.name) {
-            case "MessageDeltaNtf":
+            case "AgentMessageDeltaNtf":
                 if (
                     message.status !== 1 ||
                     message.run_id !== body.run_id ||
@@ -338,7 +338,7 @@ class Turn {
                 }
                 message.content += String(body.delta);
                 break;
-            case "ToolUpdatedNtf": {
+            case "AgentToolUpdatedNtf": {
                 const tool = body.tool as ToolCall;
                 if (!tool || tool.run_id !== message.run_id) {
                     this.resync(packet);
@@ -351,7 +351,7 @@ class Turn {
                 else message.tool_calls[index] = tool;
                 break;
             }
-            case "ReasoningDeltaNtf": {
+            case "AgentReasoningDeltaNtf": {
                 const block = body.block as ReasoningBlock;
                 if (!block || block.run_id !== message.run_id) {
                     this.resync(packet);
@@ -383,7 +383,11 @@ class Turn {
         const connection = this.state.connection;
         const pending = connection.pending[String(packet.id)];
         if (!pending) return; // Timed-out and previous-connection responses never release a new operation.
-        if (packet.name !== pending.name.replace(/Req$/, "Res"))
+        if (
+            packet.app !== ownerOf(pending.name) ||
+            (packet.name !== "RoutingError" &&
+                packet.name !== pending.name.replace(/Req$/, "Res"))
+        )
             throw Error("服务器响应类型与请求不匹配");
         delete connection.pending[String(packet.id)];
         if (packet.body.ret !== 1) {
@@ -391,7 +395,7 @@ class Turn {
             const message = error?.message || "服务器拒绝了请求";
             if (
                 pending.name === "LoginReq" ||
-                pending.name === "DesktopRegisterReq"
+                pending.name === "AgentDesktopRegisterReq"
             )
                 this.lost(message, false);
             else if (
@@ -425,7 +429,7 @@ class Turn {
                 this.snapshot(snapshot, Boolean(pending.target));
                 break;
             }
-            case "ChatReq": {
+            case "AgentChatReq": {
                 const session = packet.body.chat_session as ChatSession;
                 this.full(session);
                 const remaining =
@@ -448,11 +452,11 @@ class Turn {
                 this.state.notice = "";
                 break;
             }
-            case "SessionModelSetReq":
-            case "SessionExecutionSetReq":
+            case "AgentSessionModelSetReq":
+            case "AgentSessionExecutionSetReq":
                 this.full(packet.body.chat_session as ChatSession);
                 break;
-            case "DesktopRegisterReq": {
+            case "AgentDesktopRegisterReq": {
                 connection.status = "online";
                 const buffered = this.state.buffered;
                 this.state.buffered = [];
@@ -460,7 +464,7 @@ class Turn {
                 break;
             }
             // Cancellation is acknowledged here, but the run stays active until its terminal snapshot.
-            case "MessageCancelReq":
+            case "AgentMessageCancelReq":
                 break;
         }
     }
@@ -486,7 +490,7 @@ class Turn {
                 (connection.status === "online" ||
                     connection.status === "unavailable")
             ) {
-                this.request("ExecutionResultReq", {
+                this.request("AgentExecutionResultReq", {
                     request_id: execution.requestId,
                     result: JSON.stringify(
                         payload.error
@@ -561,7 +565,7 @@ export function startAgent(
     const connection = turn.state.connection;
     if (
         Object.values(connection.pending).some(
-            (request) => request.name === "ChatReq",
+            (request) => request.name === "AgentChatReq",
         )
     )
         turn.state.notice = "上次发送的结果未确认，请先查看服务器恢复的会话。";
@@ -656,7 +660,7 @@ export function reduceAgent(
                         state.connection.pending,
                     ).find(
                         (request) =>
-                            request.name === "SessionExecutionSetReq" &&
+                            request.name === "AgentSessionExecutionSetReq" &&
                             request.target === state.selectedId,
                     );
                     if (changing?.text === id) break;
@@ -664,7 +668,7 @@ export function reduceAgent(
                     if ((session.execution_target?.workspace_id ?? "") === id)
                         break;
                     turn.request(
-                        "SessionExecutionSetReq",
+                        "AgentSessionExecutionSetReq",
                         { session_id: state.selectedId, target: target ?? {} },
                         state.selectedId,
                         id,
@@ -712,7 +716,7 @@ export function reduceAgent(
                         state.connection.pending,
                     ).find(
                         (request) =>
-                            request.name === "SessionModelSetReq" &&
+                            request.name === "AgentSessionModelSetReq" &&
                             request.target === state.selectedId,
                     );
                     if (changing?.text === modelId) break;
@@ -720,7 +724,7 @@ export function reduceAgent(
                     if (state.sessions[state.selectedId]?.model_id === modelId)
                         break;
                     turn.request(
-                        "SessionModelSetReq",
+                        "AgentSessionModelSetReq",
                         { session_id: state.selectedId, model_id: modelId },
                         state.selectedId,
                         modelId,
@@ -786,7 +790,7 @@ export function reduceAgent(
                 if (!retry) state.drafts[state.selectedId] = text;
                 state.error = "";
                 turn.request(
-                    "ChatReq",
+                    "AgentChatReq",
                     {
                         session_id: state.selectedId,
                         text: retry ? "" : text,
@@ -817,14 +821,14 @@ export function reduceAgent(
                     session.session.cancelling ||
                     Object.values(state.connection.pending).some(
                         (request) =>
-                            request.name === "MessageCancelReq" &&
+                            request.name === "AgentMessageCancelReq" &&
                             request.target === target,
                     )
                 )
                     break;
                 state.error = "";
                 turn.request(
-                    "MessageCancelReq",
+                    "AgentMessageCancelReq",
                     {
                         session_id: target,
                         run_id: body.runId,

@@ -6,6 +6,125 @@
           "nested": {
             "v1": {
               "nested": {
+                "AgentChatReq": {
+                  "fields": {
+                    "execution_target": { "id": 6, "type": "ExecutionTarget" },
+                    "model_id": { "id": 5, "type": "string" },
+                    "retry_run_id": { "id": 4, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" },
+                    "text": { "id": 3, "type": "string" }
+                  }
+                },
+                "AgentChatRes": {
+                  "fields": {
+                    "chat_session": { "id": 4, "type": "ChatSession" },
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "AgentDesktopRegisterReq": {
+                  "fields": {
+                    "authorization_id": { "id": 4, "type": "string" },
+                    "device_id": { "id": 1, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "remote_enabled": { "id": 3, "type": "bool" }
+                  }
+                },
+                "AgentDesktopRegisterRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AgentDesktopUpdatedNtf": {
+                  "fields": { "device": { "id": 1, "type": "DesktopDevice" } }
+                },
+                "AgentExecutionActionNtf": {
+                  "fields": {
+                    "arguments": { "id": 6, "type": "string" },
+                    "authorization_id": { "id": 9, "type": "string" },
+                    "operation": { "id": 5, "type": "string" },
+                    "remote": { "id": 8, "type": "bool" },
+                    "request_id": { "id": 1, "type": "string" },
+                    "run_id": { "id": 3, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" },
+                    "tool_call_id": { "id": 4, "type": "string" },
+                    "workspace_id": { "id": 7, "type": "string" }
+                  }
+                },
+                "AgentExecutionResultReq": {
+                  "fields": {
+                    "request_id": { "id": 1, "type": "string" },
+                    "result": { "id": 2, "type": "string" }
+                  }
+                },
+                "AgentExecutionResultRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AgentMessageCancelReq": {
+                  "fields": {
+                    "run_id": { "id": 3, "type": "string" },
+                    "session_id": { "id": 2, "type": "string" }
+                  }
+                },
+                "AgentMessageCancelRes": {
+                  "fields": {
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "AgentMessageDeltaNtf": {
+                  "fields": {
+                    "delta": { "id": 4, "type": "string" },
+                    "message_id": { "id": 3, "type": "string" },
+                    "revision": { "id": 5, "type": "uint32" },
+                    "run_id": { "id": 2, "type": "string" },
+                    "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "AgentReasoningDeltaNtf": {
+                  "fields": {
+                    "block": { "id": 4, "type": "ReasoningBlock" },
+                    "message_id": { "id": 2, "type": "string" },
+                    "revision": { "id": 5, "type": "uint32" },
+                    "session_id": { "id": 1, "type": "string" },
+                    "tool_call_id": { "id": 3, "type": "string" }
+                  }
+                },
+                "AgentSessionExecutionSetReq": {
+                  "fields": {
+                    "session_id": { "id": 1, "type": "string" },
+                    "target": { "id": 2, "type": "ExecutionTarget" }
+                  }
+                },
+                "AgentSessionExecutionSetRes": {
+                  "fields": {
+                    "chat_session": { "id": 3, "type": "ChatSession" },
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AgentSessionModelSetReq": {
+                  "fields": {
+                    "model_id": { "id": 2, "type": "string" },
+                    "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "AgentSessionModelSetRes": {
+                  "fields": {
+                    "chat_session": { "id": 4, "type": "ChatSession" },
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
+                "AgentSessionUpdatedNtf": {
+                  "fields": {
+                    "chat_session": { "id": 1, "type": "ChatSession" }
+                  }
+                },
                 "AgentSnapshot": {
                   "fields": {
                     "chat_sessions": {
@@ -37,55 +156,12 @@
                     "snapshot": { "id": 4, "type": "AgentSnapshot" }
                   }
                 },
-                "AppCenterChangedNtf": {
+                "AgentToolUpdatedNtf": {
                   "fields": {
-                    "app_id": { "id": 1, "type": "string" },
-                    "enabled": { "id": 2, "type": "bool" }
-                  }
-                },
-                "AppCenterListReq": { "fields": {} },
-                "AppCenterListRes": {
-                  "fields": {
-                    "administrator": { "id": 5, "type": "bool" },
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "names": { "id": 3, "rule": "repeated", "type": "string" },
-                    "ret": { "id": 1, "type": "int32" },
-                    "services": {
-                      "id": 4,
-                      "rule": "repeated",
-                      "type": "AppCenterService"
-                    }
-                  }
-                },
-                "AppCenterService": {
-                  "fields": {
-                    "app_id": { "id": 1, "type": "string" },
-                    "enabled": { "id": 5, "type": "bool" },
-                    "instances": { "id": 4, "type": "uint32" },
-                    "name": { "id": 2, "type": "string" },
-                    "service": { "id": 3, "type": "string" },
-                    "transition": { "id": 6, "type": "string" }
-                  }
-                },
-                "AppCenterSetReq": {
-                  "fields": {
-                    "app_id": { "id": 1, "type": "string" },
-                    "enabled": { "id": 2, "type": "bool" }
-                  }
-                },
-                "AppCenterSetRes": {
-                  "fields": {
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
-                  }
-                },
-                "AppCenterUnlockReq": {
-                  "fields": { "token": { "id": 1, "type": "string" } }
-                },
-                "AppCenterUnlockRes": {
-                  "fields": {
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
+                    "message_id": { "id": 2, "type": "string" },
+                    "revision": { "id": 4, "type": "uint32" },
+                    "session_id": { "id": 1, "type": "string" },
+                    "tool": { "id": 3, "type": "ToolCall" }
                   }
                 },
                 "ChatMessage": {
@@ -110,22 +186,6 @@
                     }
                   }
                 },
-                "ChatReq": {
-                  "fields": {
-                    "execution_target": { "id": 6, "type": "ExecutionTarget" },
-                    "model_id": { "id": 5, "type": "string" },
-                    "retry_run_id": { "id": 4, "type": "string" },
-                    "session_id": { "id": 2, "type": "string" },
-                    "text": { "id": 3, "type": "string" }
-                  }
-                },
-                "ChatRes": {
-                  "fields": {
-                    "chat_session": { "id": 4, "type": "ChatSession" },
-                    "error": { "id": 3, "type": "ErrorInfo" },
-                    "ret": { "id": 2, "type": "int32" }
-                  }
-                },
                 "ChatSession": {
                   "fields": {
                     "execution_target": { "id": 4, "type": "ExecutionTarget" },
@@ -142,23 +202,6 @@
                     "remote_enabled": { "id": 4, "type": "bool" }
                   }
                 },
-                "DesktopRegisterReq": {
-                  "fields": {
-                    "authorization_id": { "id": 4, "type": "string" },
-                    "device_id": { "id": 1, "type": "string" },
-                    "name": { "id": 2, "type": "string" },
-                    "remote_enabled": { "id": 3, "type": "bool" }
-                  }
-                },
-                "DesktopRegisterRes": {
-                  "fields": {
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
-                  }
-                },
-                "DesktopUpdatedNtf": {
-                  "fields": { "device": { "id": 1, "type": "DesktopDevice" } }
-                },
                 "ErrorInfo": {
                   "fields": {
                     "message": { "id": 2, "type": "string" },
@@ -166,68 +209,12 @@
                   },
                   "reserved": [[1, 1], "code"]
                 },
-                "ExecutionActionNtf": {
-                  "fields": {
-                    "arguments": { "id": 6, "type": "string" },
-                    "authorization_id": { "id": 9, "type": "string" },
-                    "operation": { "id": 5, "type": "string" },
-                    "remote": { "id": 8, "type": "bool" },
-                    "request_id": { "id": 1, "type": "string" },
-                    "run_id": { "id": 3, "type": "string" },
-                    "session_id": { "id": 2, "type": "string" },
-                    "tool_call_id": { "id": 4, "type": "string" },
-                    "workspace_id": { "id": 7, "type": "string" }
-                  }
-                },
-                "ExecutionResultReq": {
-                  "fields": {
-                    "request_id": { "id": 1, "type": "string" },
-                    "result": { "id": 2, "type": "string" }
-                  }
-                },
-                "ExecutionResultRes": {
-                  "fields": {
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
-                  }
-                },
                 "ExecutionTarget": {
                   "fields": {
                     "device_id": { "id": 1, "type": "string" },
                     "directory": { "id": 3, "type": "string" },
                     "platform": { "id": 4, "type": "string" },
                     "workspace_id": { "id": 2, "type": "string" }
-                  }
-                },
-                "LoginReq": {
-                  "fields": { "username": { "id": 1, "type": "string" } }
-                },
-                "LoginRes": {
-                  "fields": {
-                    "error": { "id": 3, "type": "ErrorInfo" },
-                    "identity": { "id": 4, "type": "UserIdentity" },
-                    "ret": { "id": 2, "type": "int32" }
-                  }
-                },
-                "MessageCancelReq": {
-                  "fields": {
-                    "run_id": { "id": 3, "type": "string" },
-                    "session_id": { "id": 2, "type": "string" }
-                  }
-                },
-                "MessageCancelRes": {
-                  "fields": {
-                    "error": { "id": 3, "type": "ErrorInfo" },
-                    "ret": { "id": 2, "type": "int32" }
-                  }
-                },
-                "MessageDeltaNtf": {
-                  "fields": {
-                    "delta": { "id": 4, "type": "string" },
-                    "message_id": { "id": 3, "type": "string" },
-                    "revision": { "id": 5, "type": "uint32" },
-                    "run_id": { "id": 2, "type": "string" },
-                    "session_id": { "id": 1, "type": "string" }
                   }
                 },
                 "MessageRole": {
@@ -262,41 +249,6 @@
                     "text": { "id": 4, "type": "string" }
                   }
                 },
-                "ReasoningDeltaNtf": {
-                  "fields": {
-                    "block": { "id": 4, "type": "ReasoningBlock" },
-                    "message_id": { "id": 2, "type": "string" },
-                    "revision": { "id": 5, "type": "uint32" },
-                    "session_id": { "id": 1, "type": "string" },
-                    "tool_call_id": { "id": 3, "type": "string" }
-                  }
-                },
-                "SessionExecutionSetReq": {
-                  "fields": {
-                    "session_id": { "id": 1, "type": "string" },
-                    "target": { "id": 2, "type": "ExecutionTarget" }
-                  }
-                },
-                "SessionExecutionSetRes": {
-                  "fields": {
-                    "chat_session": { "id": 3, "type": "ChatSession" },
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
-                  }
-                },
-                "SessionModelSetReq": {
-                  "fields": {
-                    "model_id": { "id": 2, "type": "string" },
-                    "session_id": { "id": 1, "type": "string" }
-                  }
-                },
-                "SessionModelSetRes": {
-                  "fields": {
-                    "chat_session": { "id": 4, "type": "ChatSession" },
-                    "error": { "id": 3, "type": "ErrorInfo" },
-                    "ret": { "id": 2, "type": "int32" }
-                  }
-                },
                 "SessionState": {
                   "fields": {
                     "cancelling": { "id": 7, "type": "bool" },
@@ -310,11 +262,6 @@
                     "run_id": { "id": 6, "type": "string" },
                     "title": { "id": 2, "type": "string" },
                     "updated_at": { "id": 3, "type": "uint64" }
-                  }
-                },
-                "SessionUpdatedNtf": {
-                  "fields": {
-                    "chat_session": { "id": 1, "type": "ChatSession" }
                   }
                 },
                 "ToolCall": {
@@ -348,20 +295,6 @@
                     "working_directory": { "id": 14, "type": "string" }
                   },
                   "oneofs": { "_exit_code": { "oneof": ["exit_code"] } }
-                },
-                "ToolUpdatedNtf": {
-                  "fields": {
-                    "message_id": { "id": 2, "type": "string" },
-                    "revision": { "id": 4, "type": "uint32" },
-                    "session_id": { "id": 1, "type": "string" },
-                    "tool": { "id": 3, "type": "ToolCall" }
-                  }
-                },
-                "UserIdentity": {
-                  "fields": {
-                    "user_id": { "id": 1, "type": "string" },
-                    "username": { "id": 2, "type": "string" }
-                  }
                 }
               }
             }

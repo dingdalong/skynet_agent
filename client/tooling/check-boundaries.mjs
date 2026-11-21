@@ -67,7 +67,8 @@ async function inspect(folder) {
                 isAgentClient &&
                 !name.startsWith("./") &&
                 name !== "@skynet/contracts" &&
-                name !== "protobufjs/light"
+                name !== "@skynet/app-sdk/platform" &&
+                name !== "@skynet/app-sdk/protocol"
             )
                 failures.push(
                     `${relative}: business protocol layer cannot import ${name}`,

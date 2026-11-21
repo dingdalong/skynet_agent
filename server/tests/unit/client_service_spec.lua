@@ -1,5 +1,9 @@
 local Scope = require("tests.support.modules")
 local codes = require("enum.error_code")
+local cjson = require("cjson")
+local Pool = require("helper.service_pool")
+local function pack(name, args) return cjson.encode({ name, args }) end
+local function unpack_body(body) return table.unpack(cjson.decode(body)) end
 local status = require("agent.message_status")
 
 describe("用户与客户端服务", function()
@@ -34,7 +38,7 @@ describe("用户与客户端服务", function()
             return model.text
         end
         scope = Scope.new({
-            client = false, ["client.user"] = false, ["agent.session"] = false,
+            ["app_center.deployment"] = {}, client = false, ["client.user"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)
                 workspaces[#workspaces + 1] = { username = username, id = id }
@@ -58,34 +62,46 @@ describe("用户与客户端服务", function()
                 },
                 max_message_length = 100, session_title_length = 24 } },
             skynet = { localname = function(name)
-                return ({ [".app_center"] = 80, [".logind_1"] = 20, [".websocket_1"] = 100, [".websocket_2"] = 200,
+                return ({ [".app_endpoint"] = 10, [".app_center"] = 80, [".logind_1"] = 20,
+                    [".websocket_1"] = 100, [".websocket_2"] = 200,
                     [".websocket_3"] = 300, [".client_1"] = 10, [".client_2"] = 11, [".shared"] = 77 })[name]
             end, genid = function() next_id = next_id + 1; return next_id end,
                 fork = function(callback) tasks[#tasks + 1] = coroutine.create(callback) end,
                 error = function() end, sleep = function() coroutine.yield("sleep") end },
             ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
             log = { info = function() end, failure = function() end },
-            rpc = { call = function(address, command)
-                assert.are.equal(80, address)
-                assert.are.equal("subscribe", command)
-                return codes.succ, { revision = 1, apps = { { app_id = "agent", addresses = agent_addresses,
-                    enabled = true, requests = require("agent.routes").requests } } }
-            end, call_no_timeout = function(address, command, ...)
-                return codes.succ, instances[address][command](instances[address], { source = 10 }, ...)
+            rpc = { call = function(address, command, _, identity, id, body, draining)
+                if command == "subscribe" then
+                    return codes.succ, { revision = 1, apps = { { app_id = "agent", address = 1,
+                        generation = "generation", enabled = true } } }
+                end
+                local name, args = unpack_body(body)
+                local worker = address == 1 and Pool:new(agent_addresses):select(identity.username) or address
+                local result = instances[worker]:handle_request({ source = 10 }, identity, id, name, args, draining)
+                return codes.succ, pack(name:gsub("Req$", "Res"), result)
             end, send = function(address, command, ...)
                 if command == "publish" then
-                    local username = ...
-                    assert.are.equal(10, address)
-                    for _, agent in ipairs(agent_addresses) do
-                        if instances[agent].users[username] then
-                            service:publish({ source = agent }, ...)
-                            return codes.succ
-                        end
-                    end
-                    error("未知 Agent 用户")
+                    local username, name, args, id = ...
+                    next_id = next_id + 1
+                    service:publish({ source = 80 }, "agent", "generation", username, pack(name, args), id, next_id)
+                    return codes.succ
                 end
                 if command == "disconnect" then
-                    instances[address]:disconnect({ source = 10 }, ...)
+                    local _, identity, id = ...
+                    local worker = Pool:new(agent_addresses):select(identity.username)
+                    instances[worker]:disconnect({ source = 10 }, identity, id)
+                    return codes.succ
+                end
+                if command == "send_response" then
+                    local id, seq, _, kind, body = ...
+                    local name, args
+                    if kind == 4 then
+                        name, args = "RoutingError", { ret = body:byte(), error = { message = body:sub(2) } }
+                    else
+                        name, args = unpack_body(body)
+                    end
+                    events[#events + 1] = { address = address, command = command,
+                        args = table.pack(id, seq, name, args) }
                     return codes.succ
                 end
                 events[#events + 1] = { address = address, command = command, args = table.pack(...) }
@@ -103,7 +119,8 @@ describe("用户与客户端服务", function()
     end)
 
     local function request(id, name, args, connection, source)
-        service:handle_request({ source = source or 100 }, connection or "a", id, name, args)
+        local app = name == "CommonReq" and "common" or "agent"
+        service:handle_request({ source = source or 100 }, connection or "a", id, app, pack(name, args))
         return events[#events].args[4]
     end
 
@@ -117,7 +134,7 @@ describe("用户与客户端服务", function()
     local function send(session_id, text, connection, extra)
         local args = extra or {}
         args.session_id, args.text = session_id, text
-        return request(2, "ChatReq", args, connection)
+        return request(2, "AgentChatReq", args, connection)
     end
 
     local function first(text, extra)
@@ -152,8 +169,8 @@ describe("用户与客户端服务", function()
 
     it("并发请求共享用户上下文，断开连接后丢弃迟到响应", function()
         local rpc = require("rpc")
-        local call = rpc.call_no_timeout
-        rpc.call_no_timeout = function(address, command, ...)
+        local call = rpc.call
+        rpc.call = function(address, command, ...)
             local code, result = call(address, command, ...)
             coroutine.yield("reply")
             return code, result
@@ -161,7 +178,7 @@ describe("用户与客户端服务", function()
         local function start(id)
             service:open({ source = 20 }, id, 100, "alice")
             return coroutine.create(function()
-                service:handle_request({ source = 100 }, id, 2, "AgentSnapshotReq", {})
+                service:handle_request({ source = 100 }, id, 2, "agent", pack("AgentSnapshotReq", {}))
             end)
         end
         local first_connection, second_connection = start("a"), start("b")
@@ -177,11 +194,11 @@ describe("用户与客户端服务", function()
 
     it("应用请求失败可重试，失败期间保留登录身份", function()
         local rpc = require("rpc")
-        local call = rpc.call_no_timeout
+        local call = rpc.call
         service:open({ source = 20 }, "a", 100, "alice")
-        rpc.call_no_timeout = function() return codes.call_fail end
+        rpc.call = function() return codes.call_fail end
         assert.are.equal(codes.call_fail, request(2, "AgentSnapshotReq", {}).ret)
-        rpc.call_no_timeout = call
+        rpc.call = call
         assert.are.equal(codes.succ, request(3, "AgentSnapshotReq", {}).ret)
         assert.are.equal(service.users.alice.identity.user_id, apps.alice.identity.user_id)
     end)
@@ -190,7 +207,7 @@ describe("用户与客户端服务", function()
         service = require("client"):new()
         service:init()
         service:sync_routes({ source = 80 }, { revision = 2, apps = {
-            { app_id = "common", enabled = true, addresses = { 77 }, requests = { "CommonReq" } },
+            { app_id = "common", enabled = true, address = 77, generation = "common" },
         } })
         local requests = {}
         instances[77] = { handle_request = function(_, _, identity)
@@ -204,9 +221,9 @@ describe("用户与客户端服务", function()
         assert.same({ "alice", "bob" }, requests)
         assert.same({}, apps)
         events = {}
-        service:publish({ source = 88 }, "alice", "CommonNtf", {})
-        service:publish({ source = 77 }, "alice", "CommonNtf", {}, "bob")
-        service:publish({ source = 77 }, "alice", "CommonNtf", {})
+        assert.has_error(function() service:publish({ source = 88 }, "common") end, "应用通知来源无效")
+        service:publish({ source = 80 }, "common", "common", "alice", pack("CommonNtf", {}), "bob", 1)
+        service:publish({ source = 80 }, "common", "common", "alice", pack("CommonNtf", {}), nil, 2)
         assert.are.equal(1, #events)
         assert.are.equal("alice", events[1].args[1])
     end)
@@ -234,24 +251,33 @@ describe("用户与客户端服务", function()
         assert.are.equal(2, #created.messages)
         assert.are.equal("第一条消息", created.title)
         assert.are.equal(1, created.revision)
-        assert.are.equal("ChatRes", events[#events].args[3])
+        assert.are.equal("AgentChatRes", events[#events].args[3])
         assert.are.equal(created.id, events[1].args[4].chat_session.session.id)
         assert.are.equal(2, #events[1].args[4].chat_session.session.messages)
     end)
 
     it("服务变更整表替换，拒绝过期快照和未授权更新", function()
         open("a", 100, "alice")
-        local snapshot = { revision = 3, apps = { { app_id = "agent", addresses = { 1 },
-            requests = require("agent.routes").requests, enabled = false } } }
+        local snapshot = { revision = 3, apps = { { app_id = "agent", address = 1, generation = "generation",
+            enabled = false,
+            notification = pack("AppCenterChangedNtf", {}) } } }
         assert.has_error(function() service:sync_routes({ source = 100 }, snapshot) end, "应用目录来源无效")
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
         snapshot.revision = 2
+        snapshot.apps[1] = table.copy(snapshot.apps[1])
         snapshot.apps[1].enabled = true
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
         assert.are.equal(codes.server_busy, request(2, "AgentSnapshotReq", {}).ret)
         snapshot.revision = 4
+        snapshot.apps[1].generation = "next-generation"
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
         assert.are.equal(codes.succ, request(3, "AgentSnapshotReq", {}).ret)
+        local count = #events
+        local body = pack("AgentMessageDeltaNtf", {})
+        service:publish({ source = 80 }, "agent", "generation", "alice", body, "a", 100)
+        assert.are.equal(count, #events)
+        service:publish({ source = 80 }, "agent", "next-generation", "alice", body, "a", 1)
+        assert.are.equal(count + 1, #events)
     end)
 
     it("应用中心重推未确认的最新路由，取代旧版本的重试", function()
@@ -307,7 +333,7 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         for _, args in ipairs({ {}, { text = "" }, { text = string.rep("x", 101) }, { text = "\255" },
             { text = "问题", model_id = "unknown" }, { text = "问题", retry_run_id = "old" } }) do
-            local response = request(2, "ChatReq", args)
+            local response = request(2, "AgentChatReq", args)
             assert.are.equal(codes.invalid_param, response.ret)
         end
         assert.same({}, apps.alice:snapshot().chat_sessions)
@@ -343,20 +369,20 @@ describe("用户与客户端服务", function()
         assert.are.equal("pro", session.agent.options.permission_llm.model)
         assert.is_true(coroutine.resume(tasks[1]))
         local run = session.run
-        local switched = request(3, "SessionModelSetReq", { session_id = session.id, model_id = "test" })
+        local switched = request(3, "AgentSessionModelSetReq", { session_id = session.id, model_id = "test" })
         assert.are.equal(codes.succ, switched.ret)
         assert.are.equal("test", switched.chat_session.model_id)
         assert.are.equal("test", switched.chat_session.permission_model_id)
         assert.are.equal(run, session.run)
         assert.are.equal("test", session.agent.llm_config.model)
         require("etc.cfg").agent.permission.model_id = "pro"
-        request(4, "SessionModelSetReq", { session_id = session.id, model_id = "test" })
+        request(4, "AgentSessionModelSetReq", { session_id = session.id, model_id = "test" })
         assert.are.equal("pro", session.agent.permission_config.model)
         assert.are.equal("pro", user:snapshot().permission_model_id)
-        local denied = request(5, "SessionModelSetReq", { session_id = session.id, model_id = "unknown" })
+        local denied = request(5, "AgentSessionModelSetReq", { session_id = session.id, model_id = "unknown" })
         assert.are.equal(codes.invalid_param, denied.ret)
         assert.are.equal("test", session.model_id)
-        assert.are.equal(codes.fail, request(6, "SessionModelSetReq", {
+        assert.are.equal(codes.fail, request(6, "AgentSessionModelSetReq", {
             session_id = "unknown", model_id = "pro" }).ret)
         assert.is_true(coroutine.resume(tasks[1]))
     end)
@@ -368,26 +394,24 @@ describe("用户与客户端服务", function()
         local created = response.chat_session.session
         assert.are.equal("新会话的问题", created.messages[1].content)
         assert.are.equal(status.streaming, created.messages[2].status)
-        request(44, "MessageCancelReq", { session_id = created.id, run_id = created.run_id })
+        request(44, "AgentMessageCancelReq", { session_id = created.id, run_id = created.run_id })
         local event = events[#events]
         assert.are.equal(100, event.address)
         assert.are.equal("send_response", event.command)
         assert.are.equal("a", event.args[1])
         assert.are.equal(44, event.args[2])
-        assert.are.equal("MessageCancelRes", event.args[3])
+        assert.are.equal("AgentMessageCancelRes", event.args[3])
         assert.is_true(apps.alice.chat.sessions[created.id].run.cancelled)
         assert.is_true(coroutine.resume(tasks[1]))
     end)
 
-    for _, name in ipairs({ "UnknownReq", "LoginReq" }) do
-        it("拒绝用户不支持的请求 " .. name, function()
-            open("a", 100, "alice")
-            events = {}
-            service:handle_request({ source = 100 }, "a", 2, name, {})
-            assert.same({ { address = 100, command = "close_connection",
-                args = table.pack("a", codes.websocket_policy_violation, "未知请求") } }, events)
-        end)
-    end
+    it("未知应用返回关联的路由错误，重复登录关闭连接", function()
+        open("a", 100, "alice")
+        service:handle_request({ source = 100 }, "a", 2, "unknown", "opaque")
+        assert.are.equal("RoutingError", events[#events].args[3])
+        service:handle_request({ source = 100 }, "a", 3, "login", "")
+        assert.are.equal("close_connection", events[#events].command)
+    end)
 
     it("同名共享用户，异名隔离，断线只移除订阅", function()
         local a = open("a", 100, "alice")
@@ -432,28 +456,28 @@ describe("用户与客户端服务", function()
         local created = first()
         assert.are.equal(3, #events)
         assert.are.equal(0, events[1].args[2])
-        assert.are.equal("SessionUpdatedNtf", events[1].args[3])
-        assert.are.equal(codes.fail, request(2, "ChatReq", { session_id = created.id, text = "越权" }, "c", 300).ret)
+        assert.are.equal("AgentSessionUpdatedNtf", events[1].args[3])
+        local response = request(2, "AgentChatReq", { session_id = created.id, text = "越权" }, "c", 300)
+        assert.are.equal(codes.fail, response.ret)
         local count = #events
-        service:handle_request({ source = 999 }, "a", 3, "ChatReq", { text = "伪造" })
-        service:handle_request({ source = 100 }, "missing", 4, "ChatReq", { text = "无效连接" })
+        service:handle_request({ source = 999 }, "a", 3, "AgentChatReq", { text = "伪造" })
+        service:handle_request({ source = 100 }, "missing", 4, "AgentChatReq", { text = "无效连接" })
         assert.are.equal(count, #events)
         assert.are.equal(1, #apps.alice:snapshot().chat_sessions)
         assert.same({}, apps.bob:snapshot().chat_sessions)
     end)
 
-    it("服务拒绝其他 client 冒用身份或断开已有用户连接", function()
-        require("etc.cfg").agent_gateway.instance.client = 2
+    it("应用只接受本节点入口绑定的身份和断线事件", function()
         local agent = instances[1]
         local identity = { username = "alice", user_id = "alice-id" }
         local function snapshot(source, user)
             return agent:handle_request({ source = source }, user, "a", "AgentSnapshotReq", {})
         end
-        assert.has_error(function() snapshot(10, identity) end)
+        assert.has_error(function() snapshot(11, identity) end)
         assert.is_nil(apps.alice)
-        assert.are.equal(codes.succ, snapshot(11, identity).ret)
-        assert.has_error(function() snapshot(11, { username = "alice", user_id = "other" }) end)
-        assert.has_error(function() agent:disconnect({ source = 10 }, identity, "a") end)
+        assert.are.equal(codes.succ, snapshot(10, identity).ret)
+        assert.has_error(function() snapshot(10, { username = "alice", user_id = "other" }) end)
+        assert.has_error(function() agent:disconnect({ source = 11 }, identity, "a") end)
         assert.is_truthy(apps.alice.connections.a)
         local bob = { username = "bob", user_id = "bob-id" }
         assert.are.equal(codes.succ, snapshot(10, bob).ret)
@@ -466,15 +490,15 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         open("b", 200, "bob")
         local device = { device_id = "desktop", name = "Alice", authorization_id = "auth" }
-        assert.are.equal(codes.succ, request(2, "DesktopRegisterReq", device).ret)
+        assert.are.equal(codes.succ, request(2, "AgentDesktopRegisterReq", device).ret)
         assert.are.equal(2, #events)
         assert.are.equal("a", events[1].args[1])
         assert.same({}, apps.bob:snapshot().desktops)
         device.name = "Bob"
-        assert.are.equal(codes.succ, request(2, "DesktopRegisterReq", device, "b", 200).ret)
+        assert.are.equal(codes.succ, request(2, "AgentDesktopRegisterReq", device, "b", 200).ret)
         local pending = { connection = apps.alice.connections.a }
         apps.alice.execution.pending.call = pending
-        request(3, "ExecutionResultReq", { request_id = "call", result = "{}" }, "b", 200)
+        request(3, "AgentExecutionResultReq", { request_id = "call", result = "{}" }, "b", 200)
         assert.is_nil(pending.result)
         service:disconnect({ source = 200 }, "b")
         assert.are.equal("Alice", apps.alice:snapshot().desktops[1].name)
@@ -491,7 +515,7 @@ describe("用户与客户端服务", function()
         assert.are.equal(2, #tasks)
         local user = apps.alice
         local run = user.chat.sessions[first_id].run
-        request(4, "MessageCancelReq", { session_id = first_id, run_id = run.id }, "b", 200)
+        request(4, "AgentMessageCancelReq", { session_id = first_id, run_id = run.id }, "b", 200)
         assert.is_true(run.cancelled)
         assert.are.equal(run, user.chat.sessions[first_id].run)
         assert.is_true(coroutine.resume(tasks[1]))
@@ -536,14 +560,14 @@ describe("用户与客户端服务", function()
         local revision = session.revision
         session:_on_tool_update(run.message_id, record)
         local update = events[#events].args[4]
-        assert.are.equal("ToolUpdatedNtf", events[#events].args[3])
+        assert.are.equal("AgentToolUpdatedNtf", events[#events].args[3])
         assert.are.equal(run.message_id, update.message_id)
         assert.are.equal(revision + 1, update.revision)
         assert.are.equal(current, session.run)
         record.output = "终态"
         assert.are.equal("初始", update.tool.output)
         run:on_reasoning({ id = "thinking", text = "全部", status = "completed" }, "新增", "tool")
-        assert.are.equal("ReasoningDeltaNtf", events[#events].args[3])
+        assert.are.equal("AgentReasoningDeltaNtf", events[#events].args[3])
         assert.are.equal("新增", events[#events].args[4].block.text)
     end)
 
@@ -551,11 +575,11 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         local created = first()
         assert.is_true(coroutine.resume(tasks[1]))
-        assert.are.equal(codes.succ, request(3, "MessageCancelReq", {
+        assert.are.equal(codes.succ, request(3, "AgentMessageCancelReq", {
             session_id = created.id, run_id = created.run_id }).ret)
-        assert.are.equal(codes.invalid_param, request(4, "MessageCancelReq", {
+        assert.are.equal(codes.invalid_param, request(4, "AgentMessageCancelReq", {
             session_id = created.id, run_id = "" }).ret)
-        assert.are.equal(codes.fail, request(5, "MessageCancelReq", {
+        assert.are.equal(codes.fail, request(5, "AgentMessageCancelReq", {
             session_id = "unknown", run_id = created.run_id }).ret)
     end)
 

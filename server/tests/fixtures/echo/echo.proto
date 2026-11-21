@@ -1,0 +1,7 @@
+syntax = "proto3";
+package skynet.agent.v1;
+
+message ChatMessage { string echo_value = 1; }
+message EchoRepeatReq { ChatMessage item = 1; }
+message EchoRepeatRes { ChatMessage item = 1; }
+message EchoRepeatedNtf { ChatMessage item = 1; }

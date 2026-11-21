@@ -1,7 +1,7 @@
 local skynet = require("skynet")
 local socket = require("skynet.socket")
 local websocket = require("http.websocket")
-local Protocol = require("network.protocol")
+local Protocol = require("tests.support.wire_protocol")
 local gateway = require("integration.gateway_socket")
 local support = require("integration.support")
 

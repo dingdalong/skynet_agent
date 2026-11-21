@@ -2,9 +2,8 @@ local protobuf = require("helper.protobuf")
 local pb = require("pb")
 
 local hashing = require("helper.hash")
-local UINT32_MASK = 0xffffffff
-local HEADER_FORMAT = ">BI4I4"
 ---@class network.Protocol
+---@field app_id string?
 ---@field new fun(self: network.Protocol): network.Protocol
 ---@field hash_to_name table<integer, string>
 ---@field name_to_type table<string, string>
@@ -12,12 +11,14 @@ local HEADER_FORMAT = ">BI4I4"
 local M = require("class")()
 
 function M:ctor()
+    self.app_id = nil
     self.hash_to_name = {}
     self.name_to_type = {}
     self.short_name_to_full_name = {}
 end
 
-function M:init()
+function M:init(app_id)
+    self.app_id = app_id
     protobuf.attach()
     self.hash_to_name = {}
     self.name_to_type = {}
@@ -55,41 +56,42 @@ function M:init()
     end
 end
 
----编码完整 WebSocket 业务帧。
----@param message_id integer
----@param name string protobuf 短消息名或完整消息名
----@param args table
----@return string
-function M:encode_msg(message_id, name, args)
-    assert(
-        type(message_id) == "number"
-        and message_id >= 0
-        and message_id <= UINT32_MASK
-        and message_id % 1 == 0,
-        "消息 ID 必须是 0 到 4294967295 之间的整数"
-    )
+---校验当前应用的对外消息命名和请求响应配对。
+function M:validate()
+    local prefix = self.app_id:gsub("^%l", string.upper):gsub("%-(%w)", string.upper)
+    for name in pairs(self.short_name_to_full_name) do
+        local suffix = name:sub(-3)
+        if suffix == "Req" or suffix == "Res" or suffix == "Ntf" then
+            assert(name:sub(1, #prefix) == prefix, "协议缺少应用前缀: " .. name)
+            if suffix ~= "Ntf" then
+                local peer = name:sub(1, -4) .. (suffix == "Req" and "Res" or "Req")
+                assert(self.short_name_to_full_name[peer], "协议缺少配对消息: " .. peer)
+            end
+        end
+    end
+end
+
+function M:encode_body(name, args)
     local type_name = self.name_to_type[name] or self.short_name_to_full_name[name]
     assert(type_name, "未知 protobuf 消息类型: " .. tostring(name))
     local args_bin = protobuf.encode(type_name, args)
-    return string.pack(HEADER_FORMAT, 0, message_id, hashing.fnv1a32(type_name)) .. args_bin
+    return string.pack(">I4", hashing.fnv1a32(type_name)) .. args_bin
 end
 
----解码完整 WebSocket 业务帧。
+---按当前应用的类型表解码消息体。
 ---@param data string
----@return integer message_id
+---@param suffix string
 ---@return string message_name
 ---@return table args
-function M:decode_msg(data)
-    assert(type(data) == "string", "protobuf 消息帧必须是 string")
-    local compression, message_id, type_hash, offset = string.unpack(HEADER_FORMAT, data)
-    assert(compression == 0, "MVP 不支持压缩 protobuf 消息")
-
+function M:decode_body(data, suffix)
+    local type_hash, offset = string.unpack(">I4", data)
     local type_name = self.hash_to_name[type_hash]
     assert(type_name, "未知 protobuf 消息哈希: " .. tostring(type_hash))
     local short_name = type_name:match("([^.]+)$")
     assert(short_name, "protobuf 消息名无效: " .. type_name)
 
-    return message_id, short_name, protobuf.decode(type_name, data:sub(offset))
+    assert(short_name:sub(-3) == suffix, "无效的业务消息方向")
+    return short_name, protobuf.decode(type_name, data:sub(offset))
 end
 
 return M

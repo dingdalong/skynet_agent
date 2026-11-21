@@ -1,19 +1,18 @@
 local class = require("class")
 local skynet = require("skynet")
-local Pool = require("helper.service_pool")
 local Prompts = require("agent.prompts")
 local App = require("agent.app")
-local config = require("etc.cfg")
 local log = require("log")
 local codes = require("enum.error_code")
 
 ---@class agent.Service
 ---@field users table<string, agent.App>
 ---@field templates agent.PromptTemplates?
+---@field available boolean
 local AgentService = class()
 
 AgentService.commands = {
-    handle_request = "handle_request", disconnect = "disconnect",
+    handle_request = "handle_request", disconnect = "disconnect", drain = "drain",
 }
 AgentService.closing_commands = { disconnect = true, handle_request = true }
 
@@ -33,15 +32,15 @@ function AgentService:_user(identity, source)
     if app then
         assert(source == app.router and identity.user_id == app.identity.user_id, "Agent 用户身份或来源无效")
     else
-        local slot = Pool.slot(identity.username, config.agent_gateway.instance.client)
-        assert(source == skynet.localname(".client_" .. slot), "Agent 请求来源无效")
+        assert(source == skynet.localname(".app_endpoint"), "Agent 请求来源无效")
     end
     return app
 end
 
-function AgentService:handle_request(context, identity, id, name, args)
+function AgentService:handle_request(context, identity, id, name, args, draining)
     local app = self:_user(identity, context.source)
-    if not self.available and (name ~= "ExecutionResultReq" or not app or not app.connections[id]) then
+    local receipt = name == "AgentExecutionResultReq" and app and app.connections[id]
+    if (draining or not self.available) and not receipt then
         return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
     end
     if not app then
@@ -79,6 +78,11 @@ function AgentService:close()
         end
     end
     return succeeded
+end
+
+function AgentService:drain(context)
+    assert(context.source == skynet.localname(".app_endpoint"), "应用节点来源无效")
+    return self:close()
 end
 
 return AgentService

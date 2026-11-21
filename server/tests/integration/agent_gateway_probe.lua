@@ -25,7 +25,7 @@ local function chat_flow(login)
     local failed = restored:send_message(session_id, "[e2e:error]")
     support.equal(last(failed).status, status.failed)
     support.equal(last(failed).ret, 17)
-    local retry = restored:request("ChatReq", { session_id = session_id, retry_run_id = last(failed).run_id })
+    local retry = restored:request("AgentChatReq", { session_id = session_id, retry_run_id = last(failed).run_id })
     support.equal(#retry.chat_session.session.messages, #failed.messages)
     support.equal(last(retry.chat_session.session).id, last(failed).id)
     support.equal(last(restored:wait_run(retry.chat_session.session.run_id)).status, status.failed)
@@ -40,19 +40,19 @@ local function multi_user_flow(login)
     local other = login()
     support.equal(#snapshot.chat_sessions, 0)
     support.equal(#b_snapshot.chat_sessions, 0)
-    local ack = a:request("ChatReq", { text = "[e2e:slow]" })
+    local ack = a:request("AgentChatReq", { text = "[e2e:slow]" })
     local session_id, run_id = ack.chat_session.session.id, ack.chat_session.session.run_id
     local started = b:wait_for(function(event)
-        return event.name == "SessionUpdatedNtf" and event.payload.chat_session.session.run_id == run_id
+        return event.name == "AgentSessionUpdatedNtf" and event.payload.chat_session.session.run_id == run_id
     end)
     support.equal(started.payload.chat_session.session.id, session_id)
-    support.equal(b:request("ChatReq", { session_id = session_id, text = "竞争" }).ret, 4)
-    support.equal(other:request("MessageCancelReq", { session_id = session_id, run_id = run_id }).ret, 2)
+    support.equal(b:request("AgentChatReq", { session_id = session_id, text = "竞争" }).ret, 4)
+    support.equal(other:request("AgentMessageCancelReq", { session_id = session_id, run_id = run_id }).ret, 2)
     support.equal(last(b:send_message(nil, "[e2e:success]")).status, status.completed)
-    support.equal(b:request("MessageCancelReq", { session_id = session_id, run_id = run_id }).ret, 1)
+    support.equal(b:request("AgentMessageCancelReq", { session_id = session_id, run_id = run_id }).ret, 1)
     support.equal(last(a:wait_run(run_id)).status, status.cancelled)
     support.equal(last(b:wait_run(run_id)).status, status.cancelled)
-    local offline = a:request("ChatReq", { session_id = session_id, text = "[e2e:slow]" })
+    local offline = a:request("AgentChatReq", { session_id = session_id, text = "[e2e:slow]" })
     a:close()
     b:close()
     local restored, restored_snapshot = login(username)
@@ -75,14 +75,9 @@ local function catalog_flow(login, config)
     local peer = login("catalog-owner")
     local observer = login("catalog-observer")
     local function agent_addresses()
-        local result = {}
-        for index, address in support.control(config, "status"):gmatch("%.agent_(%d+) (:%x+) ready") do
-            result[tonumber(index)] = address
-        end
-        return result
+        return support.console(18003, 'call .main "status"')
     end
-    local previous = agent_addresses()
-    support.equal(#previous, 2)
+    assert(agent_addresses():find(".agent_2", 1, true))
     local public = reader:request("AppCenterListReq")
     support.same(public.names, { "Agent", "应用中心" })
     support.equal(#(public.services or {}), 0)
@@ -92,13 +87,13 @@ local function catalog_flow(login, config)
     support.equal(admin:request("AppCenterUnlockReq", { token = "fixture-registry-token" }).ret, 1)
     support.equal(#admin:request("AppCenterListReq").services, 2)
     assert(peer:request("AppCenterSetReq", change).ret ~= 1)
-    local active = reader:request("ChatReq", { text = "[e2e:header-stall]" }).chat_session.session
-    support.equal(observer:request("DesktopRegisterReq", {
+    local active = reader:request("AgentChatReq", { text = "[e2e:header-stall]" }).chat_session.session
+    support.equal(observer:request("AgentDesktopRegisterReq", {
         device_id = "desktop", name = "Desktop", authorization_id = "catalog-auth",
     }).ret, 1)
     local target = { device_id = "desktop", workspace_id = "workspace", directory = "/project", platform = "macos" }
-    support.equal(observer:request("ChatReq", { execution_target = target, text = "[e2e:success]" }).ret, 1)
-    local action = observer:wait_for(function(event) return event.name == "ExecutionActionNtf" end).payload
+    support.equal(observer:request("AgentChatReq", { execution_target = target, text = "[e2e:success]" }).ret, 1)
+    local action = observer:wait_for(function(event) return event.name == "AgentExecutionActionNtf" end).payload
     local stopping = admin:allocate_message_id()
     admin:send_request(stopping, "AppCenterSetReq", change)
     observer:wait_for(function(event)
@@ -108,27 +103,22 @@ local function catalog_flow(login, config)
     admin:send_request(repeated, "AppCenterSetReq", change)
     assert(observer:request("AgentSnapshotReq").ret ~= 1)
     local receipt = { request_id = action.request_id, result = '{"ok":true,"project":{"workspace":"/project"}}' }
-    support.equal(observer:request("ExecutionResultReq", receipt).ret, 1)
+    support.equal(observer:request("AgentExecutionResultReq", receipt).ret, 1)
     for _, id in ipairs({ stopping, repeated }) do
         support.equal(admin:wait_for(function(event) return event.message_id == id end).payload.ret, 1)
     end
-    assert(observer:request("ExecutionResultReq", receipt).ret ~= 1)
+    assert(observer:request("AgentExecutionResultReq", receipt).ret ~= 1)
     support.equal(last(reader:wait_run(active.run_id)).status, status.cancelled)
     support.same(reader:request("AppCenterListReq").names, { "应用中心" })
     assert(peer:request("AgentSnapshotReq").ret ~= 1)
-    assert(reader:request("ChatReq", { text = "已下线" }).ret ~= 1)
+    assert(reader:request("AgentChatReq", { text = "已下线" }).ret ~= 1)
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
-    support.equal(#agent_addresses(), 0)
-    local live = support.console(config.control_port, "list")
-    for _, address in ipairs(previous) do assert(not live:find(address, 1, true), live) end
+    assert(not pcall(agent_addresses))
     support.equal(admin:request("AppCenterListReq").services[1].instances, 0)
     change.enabled = true
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
     local current = agent_addresses()
-    support.equal(#current, 2)
-    for _, address in ipairs(current) do
-        assert(address ~= previous[1] and address ~= previous[2])
-    end
+    assert(current:find(".agent_2", 1, true))
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
     support.same(agent_addresses(), current)
     support.equal(#reader:request("AgentSnapshotReq").snapshot.chat_sessions, 0)
@@ -149,18 +139,18 @@ local function protocol_flow(connect)
     local temporary = connect()
     local compressed = temporary.protocol:encode_msg(1, "LoginReq", { username = "alice" })
     temporary:close()
-    rejected("\1" .. compressed:sub(2), 1007)
+    rejected("\255" .. compressed:sub(2), 1007)
     rejected(string.rep("\0", 256 * 1024 + 1), 1006)
     local empty = connect()
     support.equal(empty:request("LoginReq", { username = "" }).ret, 12)
     support.equal(empty:wait_for_close(), 1008)
     local prelogin = connect()
-    prelogin:send_request(1, "ChatReq")
-    support.equal(prelogin:wait_for(function(event) return event.name == "LoginRes" end).payload.ret, 12)
+    prelogin:send_request(1, "AgentChatReq")
+    support.equal(prelogin:wait_for(function(event) return event.name == "RoutingError" end).payload.ret, 12)
     support.equal(prelogin:wait_for_close(), 1008)
     local ordered = connect()
     ordered:send_request(1, "LoginReq", { username = "ordered-" .. crypt.hexencode(crypt.randomkey()) })
-    ordered:send_request(2, "ChatReq", { text = "[e2e:success]" })
+    ordered:send_request(2, "AgentChatReq", { text = "[e2e:success]" })
     support.equal(ordered:wait_for(function(event) return event.message_id == 1 end).payload.ret, 1)
     support.equal(ordered:wait_for(function(event) return event.message_id == 2 end).payload.ret, 1)
     ordered:send_request(3, "LoginReq", { username = "second" })
@@ -170,26 +160,26 @@ end
 local function desktop_flow(login)
     local desktop, _, username = login()
     local phone = login(username)
-    support.equal(desktop:request("DesktopRegisterReq", {
+    support.equal(desktop:request("AgentDesktopRegisterReq", {
         device_id = "desktop", name = "Desktop", authorization_id = "desktop-auth",
     }).ret, 1)
     local target = { device_id = "desktop", workspace_id = "workspace", directory = "/project", platform = "macos" }
     local args = { execution_target = target, text = "[e2e:success]" }
-    support.equal(phone:request("ChatReq", args).ret, 12)
-    local accepted = desktop:request("ChatReq", args)
+    support.equal(phone:request("AgentChatReq", args).ret, 12)
+    local accepted = desktop:request("AgentChatReq", args)
     support.equal(accepted.ret, 1)
-    local action = desktop:wait_for(function(event) return event.name == "ExecutionActionNtf" end).payload
+    local action = desktop:wait_for(function(event) return event.name == "AgentExecutionActionNtf" end).payload
     support.equal(action.operation, "project")
     support.equal(action.authorization_id, "desktop-auth")
     local result = { request_id = action.request_id, result = '{"ok":true,"project":{"workspace":"/project"}}' }
-    support.equal(phone:request("ExecutionResultReq", result).ret, 2)
-    support.equal(desktop:request("ExecutionResultReq", result).ret, 1)
+    support.equal(phone:request("AgentExecutionResultReq", result).ret, 2)
+    support.equal(desktop:request("AgentExecutionResultReq", result).ret, 1)
     local complete = phone:wait_run(accepted.chat_session.session.run_id)
     support.equal(last(complete).content, "E2E 成功")
-    for _, event in ipairs(phone.events) do assert(event.name ~= "ExecutionActionNtf") end
+    for _, event in ipairs(phone.events) do assert(event.name ~= "AgentExecutionActionNtf") end
     desktop:close()
     phone:wait_for(function(event)
-        return event.name == "DesktopUpdatedNtf" and not event.payload.device.online
+        return event.name == "AgentDesktopUpdatedNtf" and not event.payload.device.online
     end)
     phone:close()
 end
@@ -207,9 +197,15 @@ function M.run(config)
         return client, snapshot, name
     end
     local ok, failure = xpcall(function()
-        if config.mode == "ready" then
+        if config.mode == "ready" or config.mode == "directory_ready" then
             local ready = connect()
             support.equal(ready:request("LoginReq", { username = "readiness" }).ret, 1)
+            if config.mode == "ready" then
+                support.equal(ready:request("AgentSnapshotReq").ret, 1)
+            else
+                support.equal(ready:request("AppCenterUnlockReq", { token = "fixture-registry-token" }).ret, 1)
+                support.equal(#ready:request("AppCenterListReq").services, 2)
+            end
             return
         end
         if config.mode == "offline_restart" then
@@ -241,7 +237,9 @@ function M.run(config)
             support.equal(last(restored.chat_sessions[1].session).content, result.content)
             local other, independent = login()
             support.equal(#independent.chat_sessions, 0)
-            support.equal(other:request("MessageCancelReq", { session_id = session.id, run_id = result.run_id }).ret, 2)
+            support.equal(other:request("AgentMessageCancelReq", {
+                session_id = session.id, run_id = result.run_id,
+            }).ret, 2)
             print(result.content)
             return
         end

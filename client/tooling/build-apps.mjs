@@ -19,6 +19,8 @@ const aliases = {
     "@skynet/agent-client/types": `${root}packages/agent-client/src/types.ts`,
     "@skynet/agent-client": `${root}packages/agent-client/src/index.ts`,
     "@skynet/app-sdk/react": `${root}packages/app-sdk/src/react.tsx`,
+    "@skynet/app-sdk/protocol": `${root}packages/app-sdk/src/protocol.ts`,
+    "@skynet/app-sdk/platform": `${root}packages/app-sdk/src/platform.ts`,
     "@skynet/app-sdk": `${root}packages/app-sdk/src/bridge.ts`,
     "@skynet/tokens": `${root}packages/tokens/theme.ts`,
 };
@@ -112,7 +114,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     } else {
         await buildPresentation(`${root}apps/host`, `${root}dist/workspace`);
         await build({
-            entryPoints: [`${root}packages/agent-client/src/protocol.ts`],
+            entryPoints: [`${root}packages/app-sdk/src/platform.ts`],
             outfile: `${root}dist/builtins/gateway.js`,
             bundle: true,
             platform: "neutral",

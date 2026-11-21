@@ -150,9 +150,9 @@ describe("native Agent development", () => {
         client.state = startAgent(client.state, true).state;
         client.login([session()]);
         client.resource(
-            "DesktopRegisterRes",
+            "AgentDesktopRegisterRes",
             { ret: 1 },
-            client.pending("DesktopRegisterReq"),
+            client.pending("AgentDesktopRegisterReq"),
         );
         client.command("session.select", { id: "s1" });
         const change = (enabled: boolean) =>
@@ -163,13 +163,13 @@ describe("native Agent development", () => {
         change(false);
         expect(client.state.connection.status).toBe("unavailable");
         expect(client.state.connection.id).toBe("physical1");
-        const cleanup = client.resource("ExecutionActionNtf", {
+        const cleanup = client.resource("AgentExecutionActionNtf", {
             request_id: "cleanup",
             operation: "cancel",
         });
         client.effect(cleanup.effects![0].id, { ok: true });
-        expect(client.pending("ExecutionResultReq")).toBeGreaterThan(0);
-        client.resource("SessionUpdatedNtf", { chat_session: session() });
+        expect(client.pending("AgentExecutionResultReq")).toBeGreaterThan(0);
+        client.resource("AgentSessionUpdatedNtf", { chat_session: session() });
         expect(client.state.sessions).toEqual({});
         change(true);
         expect(client.state.selectedId).toBe("");
@@ -179,13 +179,13 @@ describe("native Agent development", () => {
             client.pending("AgentSnapshotReq"),
         );
         client.resource(
-            "DesktopRegisterRes",
+            "AgentDesktopRegisterRes",
             { ret: 1 },
-            client.pending("DesktopRegisterReq"),
+            client.pending("AgentDesktopRegisterReq"),
         );
         expect(client.state.connection.status).toBe("online");
         expect(client.state.connection.id).toBe("physical1");
-        expect(client.pending("ChatReq")).toBeNaN();
+        expect(client.pending("AgentChatReq")).toBeNaN();
     });
     it("waits on the logged-in connection when Agent is offline at first open", () => {
         const client = new Client();
@@ -220,7 +220,7 @@ describe("native Agent development", () => {
         client.login();
         expect(client.state.supportsLocal).toBe(false);
         expect(client.state.connection.status).toBe("online");
-        expect(client.pending("DesktopRegisterReq")).toBeNaN();
+        expect(client.pending("AgentDesktopRegisterReq")).toBeNaN();
         expect(
             client.last.effects?.some(
                 (effect) => effect.kind === "agent.execute",
@@ -244,9 +244,9 @@ describe("native Agent development", () => {
         const updated = session(2, 2);
         updated.model_id = "model2";
         client.resource(
-            "SessionModelSetRes",
+            "AgentSessionModelSetRes",
             { ret: 1, chat_session: updated },
-            client.pending("SessionModelSetReq"),
+            client.pending("AgentSessionModelSetReq"),
         );
         expect(
             client.command("model.select", { id: "model2" }).effects,
@@ -259,7 +259,7 @@ describe("native Agent development", () => {
         client.connect();
         client.restore();
         expect(client.state.connection.status).toBe("restoring");
-        client.resource("ExecutionActionNtf", {
+        client.resource("AgentExecutionActionNtf", {
             request_id: "call-1",
             session_id: "s1",
             run_id: "run-1",
@@ -270,9 +270,9 @@ describe("native Agent development", () => {
         });
         expect(client.state.buffered).toHaveLength(1);
         const registered = client.resource(
-            "DesktopRegisterRes",
+            "AgentDesktopRegisterRes",
             { ret: 1 },
-            client.pending("DesktopRegisterReq"),
+            client.pending("AgentDesktopRegisterReq"),
         );
         expect(client.state.connection.status).toBe("online");
         const effect = registered.effects!.find(
@@ -283,7 +283,7 @@ describe("native Agent development", () => {
             ok: true,
             project: { workspace: "/project" },
         });
-        expect(client.pending("ExecutionResultReq")).toBeGreaterThan(0);
+        expect(client.pending("AgentExecutionResultReq")).toBeGreaterThan(0);
         const packet = client.last.effects!.find(
             (effect) => effect.kind === "socket.send",
         )!;
@@ -299,11 +299,11 @@ describe("native Agent development", () => {
         client.state.supportsLocal = false;
         client.login();
         client.resource(
-            "DesktopRegisterRes",
+            "AgentDesktopRegisterRes",
             { ret: 1 },
-            client.pending("DesktopRegisterReq"),
+            client.pending("AgentDesktopRegisterReq"),
         );
-        const result = client.resource("ExecutionActionNtf", {
+        const result = client.resource("AgentExecutionActionNtf", {
             request_id: "call-1",
             session_id: "s1",
             run_id: "run-1",
@@ -323,13 +323,13 @@ describe("native Agent development", () => {
         const client = new Client();
         client.login();
         client.command("$agent.context", nativeContext);
-        client.resource("DesktopUpdatedNtf", {
+        client.resource("AgentDesktopUpdatedNtf", {
             device: { id: "mac-1", name: "Mac", online: true },
         });
         client.resource(
-            "DesktopRegisterRes",
+            "AgentDesktopRegisterRes",
             { ret: 1 },
-            client.pending("DesktopRegisterReq"),
+            client.pending("AgentDesktopRegisterReq"),
         );
         client.command("execution.select", { workspaceId: "forged" });
         expect(client.state.error).toContain("尚未授权");
@@ -342,7 +342,7 @@ describe("native Agent development", () => {
         expect(
             result.effects?.some((effect) => effect.kind === "socket.send"),
         ).toBe(true);
-        expect(client.pending("ChatReq")).toBeGreaterThan(0);
+        expect(client.pending("AgentChatReq")).toBeGreaterThan(0);
     });
     it("binds the Agent transport to the identity confirmed by the host", () => {
         const client = new Client();
@@ -364,7 +364,7 @@ describe("public protobuf protocol", () => {
         );
         expect(
             hex(
-                encodePacket("ChatReq", 2, {
+                encodePacket("AgentChatReq", 2, {
                     session_id: "session-1",
                     text: "你好",
                 }),
@@ -397,7 +397,7 @@ describe("public protobuf protocol", () => {
         expect(() => decodePacket("bad")).toThrow();
         expect(() => encodePacket("LoginReq", 0x1_0000_0000, {})).toThrow();
         expect(() =>
-            encodePacket("ChatReq", 1, { text: "x".repeat(262_144) }),
+            encodePacket("AgentChatReq", 1, { text: "x".repeat(262_144) }),
         ).toThrow("256");
     });
 });
@@ -408,18 +408,18 @@ describe("Agent actor", () => {
         client.connect();
         const newer = session(3, 2);
         newer.session.messages[0].content = "已完成";
-        client.resource("SessionUpdatedNtf", { chat_session: newer });
+        client.resource("AgentSessionUpdatedNtf", { chat_session: newer });
         client.restore([session(1)]);
         expect(client.state.sessions.s1.session.messages[0].content).toBe(
             "已完成",
         );
-        client.resource("SessionUpdatedNtf", { chat_session: session(2) });
+        client.resource("AgentSessionUpdatedNtf", { chat_session: session(2) });
         expect(client.state.sessions.s1.session.revision).toBe(3);
     });
     it("repairs revision gaps and ignores duplicates, including pushes racing a snapshot", () => {
         const client = new Client();
         client.login([session()]);
-        client.resource("MessageDeltaNtf", {
+        client.resource("AgentMessageDeltaNtf", {
             session_id: "s1",
             run_id: "r1",
             message_id: "m1",
@@ -430,7 +430,7 @@ describe("Agent actor", () => {
         const id = client.pending("AgentSnapshotReq");
         const newer = session(4, 2);
         newer.session.messages[0].content = "完整文本";
-        client.resource("SessionUpdatedNtf", { chat_session: newer });
+        client.resource("AgentSessionUpdatedNtf", { chat_session: newer });
         client.resource(
             "AgentSnapshotRes",
             { ret: 1, snapshot: client.snapshot([session(3)]) },
@@ -441,7 +441,7 @@ describe("Agent actor", () => {
         expect(client.state.sessions.s1.session.messages[0].content).toBe(
             "完整文本",
         );
-        client.resource("MessageDeltaNtf", {
+        client.resource("AgentMessageDeltaNtf", {
             session_id: "s1",
             run_id: "r1",
             message_id: "m1",
@@ -455,7 +455,7 @@ describe("Agent actor", () => {
     it("merges reasoning, tools and empty terminal reasoning blocks without changing answer text", () => {
         const client = new Client();
         client.login([session()]);
-        client.resource("ReasoningDeltaNtf", {
+        client.resource("AgentReasoningDeltaNtf", {
             session_id: "s1",
             message_id: "m1",
             block: {
@@ -466,13 +466,13 @@ describe("Agent actor", () => {
             },
             revision: 2,
         });
-        client.resource("ReasoningDeltaNtf", {
+        client.resource("AgentReasoningDeltaNtf", {
             session_id: "s1",
             message_id: "m1",
             block: { id: "b1", run_id: "r1", text: "", status: "completed" },
             revision: 3,
         });
-        client.resource("ToolUpdatedNtf", {
+        client.resource("AgentToolUpdatedNtf", {
             session_id: "s1",
             message_id: "m1",
             tool: {
@@ -501,12 +501,12 @@ describe("Agent actor", () => {
         client.login([session(1, 2)]);
         client.command("draft.set", { target: "", text: "新任务" });
         client.command("chat.send", { target: "", text: "新任务" });
-        const id = client.pending("ChatReq");
+        const id = client.pending("AgentChatReq");
         client.command("session.select", { id: "s1" });
         client.command("draft.set", { target: "s1", text: "另一份草稿" });
         const created = session();
         created.session.id = "s2";
-        client.resource("ChatRes", { ret: 1, chat_session: created }, id);
+        client.resource("AgentChatRes", { ret: 1, chat_session: created }, id);
         expect(client.state.selectedId).toBe("s1");
         expect(client.state.drafts.s1).toBe("另一份草稿");
         expect(client.state.drafts[""]).toBe("");
@@ -515,9 +515,13 @@ describe("Agent actor", () => {
         const client = new Client();
         client.login();
         client.command("chat.send", { target: "", text: "第一条" });
-        const id = client.pending("ChatReq");
+        const id = client.pending("AgentChatReq");
         client.command("draft.set", { target: "", text: "准备的下一条" });
-        client.resource("ChatRes", { ret: 1, chat_session: session() }, id);
+        client.resource(
+            "AgentChatRes",
+            { ret: 1, chat_session: session() },
+            id,
+        );
         expect(client.state.selectedId).toBe("s1");
         expect(client.state.drafts.s1).toBe("准备的下一条");
         expect(client.state.drafts[""]).toBe("");
@@ -525,7 +529,7 @@ describe("Agent actor", () => {
     it("accepts background process tool updates after the model turn has completed", () => {
         const client = new Client();
         client.login([session(1, 2)]);
-        client.resource("ToolUpdatedNtf", {
+        client.resource("AgentToolUpdatedNtf", {
             session_id: "s1",
             message_id: "m1",
             revision: 2,
@@ -548,10 +552,12 @@ describe("Agent actor", () => {
         client.login([session()]);
         client.command("session.select", { id: "s1" });
         client.command("chat.cancel", { target: "s1", runId: "r1" });
-        const cancelled = client.pending("MessageCancelReq");
-        client.resource("MessageCancelRes", { ret: 1 }, cancelled);
+        const cancelled = client.pending("AgentMessageCancelReq");
+        client.resource("AgentMessageCancelRes", { ret: 1 }, cancelled);
         expect(client.state.sessions.s1.session.run_id).toBe("r1");
-        client.resource("SessionUpdatedNtf", { chat_session: session(2, 3) });
+        client.resource("AgentSessionUpdatedNtf", {
+            chat_session: session(2, 3),
+        });
         expect(client.state.sessions.s1.session.run_id).toBe("");
         client.command("session.new");
         client.command("chat.send", { target: "", text: "不能重放" });
@@ -566,24 +572,24 @@ describe("Agent actor", () => {
         client.login([session()]);
         client.command("session.select", { id: "s1" });
         client.command("chat.cancel", { target: "s1", runId: "expired" });
-        expect(client.pending("MessageCancelReq")).toBeNaN();
+        expect(client.pending("AgentMessageCancelReq")).toBeNaN();
         const failed = session(2, 4);
         failed.session.messages[0].error = {
             message: "temporary",
             retryable: true,
         };
-        client.resource("SessionUpdatedNtf", { chat_session: failed });
+        client.resource("AgentSessionUpdatedNtf", { chat_session: failed });
         client.command("draft.set", { target: "s1", text: "下一条草稿" });
         client.command("chat.retry", { target: "s1", runId: "expired" });
-        expect(client.pending("ChatReq")).toBeNaN();
+        expect(client.pending("AgentChatReq")).toBeNaN();
         client.command("chat.retry", { target: "s1", runId: "r1" });
         const retried = session(3);
         retried.session.run_id = "r2";
         retried.session.messages[0].run_id = "r2";
         client.resource(
-            "ChatRes",
+            "AgentChatRes",
             { ret: 1, chat_session: retried },
-            client.pending("ChatReq"),
+            client.pending("AgentChatReq"),
         );
         expect(client.state.sessions.s1.session.messages[0].id).toBe(
             failed.session.messages[0].id,
@@ -605,7 +611,7 @@ describe("Agent actor", () => {
         client.command("$resource", {
             key: connection.key,
             connectionId: connection.id,
-            data: encodePacket("ChatRes", 2, {
+            data: encodePacket("AgentChatRes", 2, {
                 ret: 1,
                 chat_session: session(),
             }),

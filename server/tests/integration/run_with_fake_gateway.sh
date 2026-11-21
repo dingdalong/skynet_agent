@@ -15,6 +15,7 @@ fake_llm_url="http://127.0.0.1:$fake_llm_port"
 temp_dir=$(mktemp -d)
 fake_llm_pid=
 server_pid=
+manager_pid=
 probe_pid=
 server_root=$project_root
 channel=test
@@ -24,11 +25,11 @@ server_log="$temp_dir/server.log"
 cleanup() {
     result=$?
     if [ "$result" -ne 0 ]; then
-        for log in "$server_log" "$fake_llm_log"; do
+        for log in "$server_log" "$fake_llm_log" "$temp_dir/app.log"; do
             if [ -f "$log" ]; then cat "$log" >&2; fi
         done
     fi
-    for pid in "$probe_pid" "$server_pid" "$fake_llm_pid"; do
+    for pid in "$probe_pid" "$server_pid" "$manager_pid" "$fake_llm_pid"; do
         if [ -z "$pid" ]; then continue; fi
         kill "$pid" 2>/dev/null || true
         attempt=0
@@ -91,24 +92,23 @@ APP_CENTER_STATE_PATH="$temp_dir/app_center.json"
 APP_CENTER_ADMIN_TOKEN=fixture-registry-token
 EOF
 
-if [ "$probe" = hotfix_watch_probe ]; then
-    (
-        set -a
-        . "$env_file"
-        set +a
-        cd "$server_root"
-        exec "$project_root/3rd/skynet/skynet" etc/config
-    ) >"$server_log" 2>&1 &
-else
-    SKYNET_ENV_FILE="$env_file" "$project_root/start.sh" >"$server_log" 2>&1 &
-fi
-server_pid=$!
+set -a
+. "$env_file"
+APP_DEPLOYER=127.0.0.1:18081
+set +a
+(cd "$server_root" && exec python3 "$project_root/tests/integration/node_manager.py") >"$temp_dir/app.log" 2>&1 &
+manager_pid=$!
+start_gateway() {
+    (cd "$server_root" && exec "$project_root/3rd/skynet/skynet" etc/config) >"$server_log" 2>&1 &
+    server_pid=$!
+}
+start_gateway
 
 wait_for_gateway() {
     attempt=1
     while [ "$attempt" -le 40 ] && kill -0 "$server_pid" 2>/dev/null; do
         if AGENT_WS_URL="$gateway_url" \
-            "$project_root/tests/integration/run_probe.sh" agent_gateway_probe ready >/dev/null 2>&1; then
+            "$project_root/tests/integration/run_probe.sh" agent_gateway_probe "${1:-ready}" >/dev/null 2>&1; then
             return
         fi
         attempt=$((attempt + 1))
@@ -121,7 +121,7 @@ wait_for_gateway
 
 set +e
 AGENT_WS_URL="$gateway_url" AGENT_FAKE_LLM_URL="$fake_llm_url" \
-    AGENT_TEST_SERVER_ROOT="$server_root" AGENT_TEST_SERVER_LOG="$server_log" \
+    AGENT_TEST_SERVER_ROOT="$server_root" AGENT_TEST_SERVER_LOG="$server_log" AGENT_TEST_APP_LOG="$temp_dir/app.log" \
     "$project_root/tests/integration/run_probe.sh" "$probe" &
 probe_pid=$!
 wait "$probe_pid"
@@ -155,9 +155,8 @@ if ! kill -0 "$server_pid" 2>/dev/null; then
 fi
 if [ "$command_status" -eq 0 ] && [ "$probe" = agent_gateway_probe ]; then
     server_log="$temp_dir/restart.log"
-    SKYNET_ENV_FILE="$env_file" "$project_root/start.sh" >"$server_log" 2>&1 &
-    server_pid=$!
-    wait_for_gateway
+    start_gateway
+    wait_for_gateway directory_ready
     AGENT_WS_URL="$gateway_url" AGENT_TEST_SERVER_LOG="$server_log" \
         "$project_root/tests/integration/run_probe.sh" "$probe" offline_restart
 fi

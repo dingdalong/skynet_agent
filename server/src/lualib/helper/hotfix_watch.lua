@@ -29,6 +29,8 @@ local function module_name(path)
     end
     local entry = path:match("^service/([^/]+)/%1%.lua$")
     if entry then return entry end
+    local application = path:match("^service/app/([^/]+)/init%.lua$")
+    if application then return "app." .. application end
     local name = path:match("^lualib/base/(.+)%.lua$") or path:match("^lualib/(.+)%.lua$")
         or path:match("^service/app/([^/]+/.+)%.lua$") or path:match("^service/([^/]+/.+)%.lua$")
     if name then

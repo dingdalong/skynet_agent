@@ -6,15 +6,15 @@ function REQUEST:AgentSnapshotReq()
     return { ret = codes.succ, snapshot = self:snapshot() }
 end
 
-function REQUEST:ChatReq(args, connection)
+function REQUEST:AgentChatReq(args, connection)
     return self.chat:chat(args, connection)
 end
 
-function REQUEST:MessageCancelReq(args)
+function REQUEST:AgentMessageCancelReq(args)
     return self.chat:cancel_message(args)
 end
 
-function REQUEST:SessionModelSetReq(args)
+function REQUEST:AgentSessionModelSetReq(args)
     return self.chat:set_session_model(args)
 end
 
@@ -24,13 +24,13 @@ local function attempt(method, self, args, connection)
     log.failure("execution", "request", result)
     return { ret = codes.invalid_param, error = { message = tostring(result):match("[^\n]+$"), retryable = false } }
 end
-function REQUEST:DesktopRegisterReq(args, connection)
+function REQUEST:AgentDesktopRegisterReq(args, connection)
     return attempt(self.execution.register, self, args, connection)
 end
-function REQUEST:ExecutionResultReq(args, connection)
+function REQUEST:AgentExecutionResultReq(args, connection)
     return attempt(self.execution.result, self, args, connection)
 end
-function REQUEST:SessionExecutionSetReq(args, connection)
+function REQUEST:AgentSessionExecutionSetReq(args, connection)
     local session = self.chat.sessions[args.session_id]
     if not session then return { ret = codes.fail } end
     local ok, result = pcall(session.set_execution, session, args.target, connection)

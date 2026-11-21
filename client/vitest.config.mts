@@ -8,6 +8,12 @@ export default defineConfig({
         alias: {
             "@skynet/contracts": local("./packages/contracts/src/index.ts"),
             "@skynet/app-runtime": local("./packages/app-runtime/src/index.ts"),
+            "@skynet/app-sdk/platform": local(
+                "./packages/app-sdk/src/platform.ts",
+            ),
+            "@skynet/app-sdk/protocol": local(
+                "./packages/app-sdk/src/protocol.ts",
+            ),
             "@skynet/agent-client": local(
                 "./packages/agent-client/src/index.ts",
             ),

@@ -144,7 +144,7 @@ describe("hotfix_watch", function()
         assert.same({}, calls)
         now = 30
         watch:poll()
-        assert.same(table.pack(1, "debug", "HOTFIX", "agent", "agent.agent", "agent.prompts",
+        assert.same(table.pack(1, "debug", "HOTFIX", "agent.agent", "agent.prompts", "app.agent",
             "example", "rpc", "websocket"), calls[1])
     end)
 

@@ -78,7 +78,7 @@ function UnlockDialog({
                     value={token}
                     hasAutoFocus
                     isRequired
-                    description="解锁后可查看服务详情、注册或撤销服务。"
+                    description="解锁后可查看服务详情并启停应用。"
                     status={
                         error ? { type: "error", message: error } : undefined
                     }
@@ -316,9 +316,9 @@ function AppCenter() {
             {pending && (
                 <AlertDialog
                     isOpen
-                    title={`撤销${pending.name}的注册？`}
-                    description="这将停止所有用户的任务并清空服务内存中的会话。工作目录里的文件会保留。"
-                    actionLabel="撤销注册"
+                    title={`停用${pending.name}？`}
+                    description="应用将结束所有用户的在途任务并停止容器。内存中的会话会清空，工作目录里的文件会保留。"
+                    actionLabel="停用"
                     cancelLabel="取消"
                     actionVariant="destructive"
                     isActionLoading={changing}

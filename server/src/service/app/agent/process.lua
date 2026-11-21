@@ -108,7 +108,9 @@ function Processes:start(argv, cwd, tty, mode, timeout, run, record, dependencie
     assert(active < self.config.max_processes, "会话运行进程数量已达上限")
     local env = sandbox.environment(self.root)
     for _, value in ipairs(extra_env or {}) do env[#env + 1] = value end
-    if mode ~= "require_escalated" then argv = sandbox.command(argv, self.root, dependencies) end
+    if mode ~= "require_escalated" then
+        argv = sandbox.command(argv, self.root, dependencies, self.config)
+    end
     local handle = native.spawn(self.launcher, cwd, argv, env, tty)
     self.sequence = self.sequence + 1
     local id = self.session_id .. ":" .. self.sequence

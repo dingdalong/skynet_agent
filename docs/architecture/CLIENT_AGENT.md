@@ -21,8 +21,8 @@ flowchart LR
 
 - `builtins/agent/src/view.tsx` 负责表现和临时编辑输入，草稿变更立即提交所属业务状态。
 - `packages/agent-client` 包含环境无关的协议、会话状态和命令转换；选择器与类型可单独供 UI 引用。
-- 客户端生成器和原生测试均从 `common/proto/schema.proto` 加载登录和 Agent 协议。
-  `pnpm protocol:generate` 生成描述，`pnpm protocol:check` 检测漂移。
+- `@skynet/app-sdk/protocol` 提供公共帧及按应用选择的编解码器。宿主 `gateway.js` 包含登录和应用中心协议，Agent 业务包另带自己的 `agent/schema.proto` 描述。
+  在 `client` 下运行 `pnpm protocol:generate` 生成描述，`pnpm protocol:check` 检测漂移。
 - 原生资源代理持有连接与重连计时器，工作区与子应用通过该代理联网。
 - iPhone/iPad 复用同一业务协议，以进程内 JSC VM 运行可信内置 Agent；
   远程操作已有桌面项目或服务器目录，不注册执行器和获取手机开发目录。

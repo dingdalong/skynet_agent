@@ -76,10 +76,11 @@ export function AppGallery({ names }: { names: string[] }) {
 }
 
 const transitions: Record<string, string> = {
-    enabling: "正在注册",
-    disabling: "正在下线",
-    enable_failed: "注册未完成",
-    disable_failed: "下线未完成",
+    enabling: "正在启动",
+    disabling: "正在停用",
+    enable_failed: "启动失败",
+    disable_failed: "停用未完成",
+    unavailable: "连接中断",
 };
 
 export function ServiceRow({
@@ -127,14 +128,12 @@ export function ServiceRow({
                     }
                     label={
                         transitions[service.transition] ??
-                        (service.enabled ? "已注册" : "已下线")
+                        (service.enabled ? "运行中" : "已停用")
                     }
                 />
                 {service.app_id !== "app-center" && (
                     <Button
-                        label={
-                            failed ? "重试变更" : enable ? "注册" : "撤销注册"
-                        }
+                        label={failed ? "重试变更" : enable ? "启用" : "停用"}
                         variant="secondary"
                         isDisabled={busy || changing}
                         onClick={() => onChange(enable)}

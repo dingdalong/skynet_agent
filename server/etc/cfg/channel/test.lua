@@ -1,5 +1,5 @@
 return {
-    runtime = { control_port = 18001 },
+    runtime = { control_port = os.getenv("APP_ID") and 18003 or 18001 },
     agent_gateway = {
         socket = {
             port = 18791,

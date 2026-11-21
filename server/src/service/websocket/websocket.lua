@@ -3,7 +3,8 @@ local skynet = require("skynet")
 local queue = require("skynet.queue")
 local socket = require("skynet.socket")
 local websocket = require("http.websocket")
-local protocol = require("network.protocol")
+local Frame = require("network.frame")
+local crypt = require("skynet.crypt")
 local rpc = require("rpc")
 local log = require("log")
 local error_code = require("enum.error_code")
@@ -36,12 +37,12 @@ Websocket.closing_commands = { accept = true, close_connection = true }
 function Websocket:ctor()
     self.connections = {}
     self.fds = {}
-    self.protocol = protocol:new()
+    self.boot_id = nil
     self.closing = false
 end
 
 function Websocket:init()
-    self.protocol:init()
+    self.boot_id = crypt.hexencode(crypt.randomkey())
 end
 
 ---@param connection network.Connection
@@ -119,20 +120,22 @@ function Websocket:_write(connection, payload)
     end)
 end
 
----@param _ base.CommandContext
+---@param context base.CommandContext
 ---@param id string
 ---@param message_id integer
----@param name string
----@param args table
+---@param app_id string
+---@param kind integer
+---@param body string
 ---@return boolean
-function Websocket:send_response(_, id, message_id, name, args)
+function Websocket:send_response(context, id, message_id, app_id, kind, body)
     local connection = self.connections[id]
     if not connection then
         return false
     end
-    local encoded, payload = pcall(self.protocol.encode_msg, self.protocol, message_id, name, args)
+    if context.source ~= connection.client_address and context.source ~= connection.logind then return false end
+    local encoded, payload = pcall(Frame.pack, kind, message_id, app_id, body)
     if not encoded then
-        log.failure("websocket", "encode connection=" .. id .. " name=" .. name, payload)
+        log.failure("websocket", "encode connection=" .. id .. " app=" .. app_id, payload)
     end
     if not encoded or not self:_write(connection, payload) then
         self:_close(connection, error_code.websocket_internal_error, "服务端响应失败")
@@ -150,17 +153,17 @@ function Websocket:_handle_message(connection, message, message_type)
     end
     if message_type ~= "binary" then
         log.info("websocket", "message", "拒绝非二进制消息 connection=%s", connection.id)
-        self:_close(connection, error_code.websocket_unsupported_data, "仅支持二进制 Protobuf 消息")
+        self:_close(connection, error_code.websocket_unsupported_data, "仅支持二进制帧")
         return
     end
-    local decoded, id, name, args = pcall(self.protocol.decode_msg, self.protocol, message)
-    if not decoded or id == 0 then
-        log.failure("websocket", "decode connection=" .. connection.id, decoded and "消息 ID 为零" or id)
-        self:_close(connection, error_code.websocket_invalid_payload_data, "无效的 Protobuf 消息")
+    local decoded, kind, id, app_id, body = pcall(Frame.unpack, message)
+    if not decoded then
+        log.failure("websocket", "decode connection=" .. connection.id, kind)
+        self:_close(connection, error_code.websocket_invalid_payload_data, "无效公共帧")
         return
     end
-    if name:sub(-3) ~= "Req" then
-        log.info("websocket", "message", "拒绝消息方向 connection=%s name=%s", connection.id, name)
+    if kind ~= Frame.request then
+        log.info("websocket", "message", "拒绝消息方向 connection=%s name=%s", connection.id, app_id)
         self:_close(connection, error_code.websocket_policy_violation, "无效的请求消息")
         return
     end
@@ -171,11 +174,11 @@ function Websocket:_handle_message(connection, message, message_type)
     connection.last_message_id = id
     local code, handled
     if connection.client_address then
-        code = rpc.send(connection.client_address, "handle_request", connection.id, id, name, args)
+        code = rpc.send(connection.client_address, "handle_request", connection.id, id, app_id, body)
         handled = true
     else
         -- 只暂停本连接的读协程；logind 回调本服务时仍可执行绑定和写响应。
-        code, handled = rpc.call(connection.logind, "handle_request", connection.id, id, name, args)
+        code, handled = rpc.call(connection.logind, "handle_request", connection.id, id, app_id, body)
     end
     if code ~= error_code.succ or handled ~= true then
         self:_close(connection, error_code.websocket_internal_error, "服务端消息处理失败")
@@ -196,7 +199,7 @@ function Websocket:accept(_, fd, addr, logind_address)
         return
     end
     local connection = {
-        id = string.format("%x:%d", skynet.self(), skynet.genid()),
+        id = string.format("%s:%x:%d", self.boot_id, skynet.self(), skynet.genid()),
         fd = fd,
         logind = logind_address,
         last_message_id = 0,

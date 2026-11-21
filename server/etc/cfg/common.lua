@@ -15,13 +15,19 @@ return {
     protocol = {
         agent_gateway_schema_dir = "../common/proto",
     },
+    application = {
+        id = os.getenv("APP_ID"),
+        schema = os.getenv("APP_SCHEMA"),
+        instances = tonumber(os.getenv("APP_INSTANCES") or ""),
+    },
     app_center = {
+        deployer = os.getenv("APP_DEPLOYER") or "deployer:18081",
         admin_token = os.getenv("APP_CENTER_ADMIN_TOKEN"),
         state_path = os.getenv("APP_CENTER_STATE_PATH") or "./app_center_state.json",
     },
     agent_gateway = {
         socket = {
-            host = "127.0.0.1",
+            host = os.getenv("GATEWAY_HOST") or "127.0.0.1",
             path = "/agent",
         },
         login_timeout_ticks = 1000,
@@ -29,6 +35,8 @@ return {
     agent = {
         project_instructions_max_bytes = 32768,
         tools = {
+            sandbox_backend = os.getenv("AGENT_SANDBOX_BACKEND") or "native",
+            tcp_ports = os.getenv("AGENT_TOOL_TCP_PORTS"),
             workspace_root = os.getenv("AGENT_WORKSPACE_ROOT") or "./work_dir",
             timeout_ms = 300000,
             max_processes = 8,

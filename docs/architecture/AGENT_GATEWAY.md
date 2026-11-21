@@ -6,7 +6,7 @@
 ## 边界
 
 网关通过 WebSocket 提供接口。模型对话、会话历史、模型配置和 API Key 位于服务端，
-节点启动时创建固定数量的 `agent` 服务，每个实例在独立 Skynet Lua VM 中运行。
+Agent 容器启动时创建配置数量的 `agent` 服务，每个实例在独立 Skynet Lua VM 中运行。
 同一用户名的所有连接路由到同一实例。实例按用户分别保存会话、桌面设备和生成任务，直到服务器重启。
 连接断开不删除会话或停止生成。客户端 Agent 已通过宿主持有的二进制 WebSocket 接入；
 业务缓存与重连规则见 [Agent 客户端](CLIENT_AGENT.md)。
@@ -30,7 +30,8 @@ flowchart LR
     Registry["App Center"] -->|"订阅与目录变更"| C["client 服务"]
     C -->|"1:N"| U["user"]
     C -->|"1:N"| N["connection 订阅"]
-    C -->|"按用户名固定路由"| P["agent 服务池中的一个实例"]
+    C -->|"app_id、代次、身份与原始字节"| E["Agent 容器的 app_endpoint"]
+    E -->|"按用户名固定路由"| P["agent 服务池中的一个实例"]
     P -->|"1:N"| B["用户的 Agent 上下文"]
     B --> H["Chat"]
     H -->|"1:N"| S["AgentSession"]
@@ -41,7 +42,7 @@ flowchart LR
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
 登录返回用户身份。Agent 客户端随后请求 `AgentSnapshotReq`，实例在首个请求时建立该用户的应用上下文。
 每个实例在节点启动时读取一次提示词模板。收到没有 `session_id` 的
-首条 `ChatReq` 后，才创建 AgentSession、工作目录和 Agent，并立即开始该轮生成。
+首条 `AgentChatReq` 后，才创建 AgentSession、工作目录和 Agent，并立即开始该轮生成。
 模板在创建 Agent 时与工具、权限和工作目录配置一起传入。
 基础行为、运行时环境与项目规则分别组装，详见 [Agent 提示词](PROMPTS.md)。
 
@@ -50,7 +51,7 @@ flowchart LR
 `main` 是进程的生命周期所有者，持有共享 Protobuf schema 和服务地址列表。它按依赖顺序创建、
 命名和初始化服务，最后开放网关监听；启动失败则回收已创建服务。本机控制台在业务服务启动前开放，
 启动卡住时也可显式强制关闭。关服时先冻结应用上下线、等候进行中的变更和热修结束，再停止接入，
-依次关闭 WebSocket、logind、client、应用实例和应用中心，等待在途命令、连接读循环和后台生成退出后结束进程。
+应用中心先排空各应用并停止容器，节点再依次关闭网关、WebSocket、logind、client 和应用中心。
 启动和关闭均无超时，正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
 显式强制关闭跳过清理并退出 1。进程重启由外部管理器负责。
 
@@ -67,14 +68,14 @@ flowchart LR
 | `service/logind/logind.lua` / `logind`          | 按用户名固定路由、绑定、登录响应、失败关闭                  |
 | `service/client/client.lua` / `client`          | 用户集合、连接路由和更新推送                                |
 | `service/client/user.lua`、`service/app/app_center/` | 用户身份与连接、应用服务注册及目录同步 |
-| `service/app/agent/routes.lua`                  | Agent 对外开放的请求清单 |
+| `service/app_endpoint/`、`app_main.lua`         | 应用节点启动、Cluster 握手、消息编解码、通知和排空 |
 | `service/app/agent/init.lua`                    | Agent 服务的用户分配、请求分发和关服清理 |
 | `service/app/agent/app.lua`、`service/app/agent/handler.lua` | 单个用户的 Agent 上下文、快照及请求处理 |
 | `service/app/agent/session.lua`、`service/app/agent/agent.lua` | 单会话生命周期、模型对话与历史提交 |
 
 `src/service/init.lua` 是公共业务入口，统一调用 `service.start(SERVICE_NAME)`。
 独立脚本和 Skynet 内置服务优先于公共入口。基础服务位于 `src/service/<name>/<name>.lua`，
-应用入口统一放在 `src/service/app/<name>/init.lua`。两者均以服务名加载稳定类表，例如 `require("agent")`。
+应用入口统一放在 `src/service/app/<name>/init.lua`，以 `app.<name>` 加载稳定类表，例如 `require("app.agent")`。节点内的实例仍使用 `.agent_1` 等地址。
 每个服务的私有模块和资源与入口同目录，按模块名加载，例如 `client.user`、`agent.session` 和 `agent.agent`。
 `src/lualib` 保存公共框架与协议编解码。各节点的 main 通过 `node.init(callback)` 定制业务启动，
 回调接收节点实例；`node` 先完成公共初始化，再执行回调，最后进入就绪状态。
@@ -89,7 +90,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 返回格式为 `状态码, 业务结果...`；Lua 异常会被记录并转换为 `call_fail`。
 
 初始化只能执行一次。服务就绪前拒绝业务命令；初始化期间仅放行 `initializing_commands` 显式登记的
-命令。main 在启动时接受显式强制关服和应用中心的实例创建请求。关闭由初始化所有者发起并保持幂等。
+命令。main 在启动时接受显式强制关服。关闭由初始化所有者发起并保持幂等。
 `close` 成功表示清理完成，重复调用等待同一次结果。关闭期间拒绝新业务，仅允许
 `closing_commands` 显式登记的收尾命令，例如回收迟到的接入 fd 和断线清理。
 在途命令异常也会释放计数。每个 Agent 服务继续跟踪分配到本实例的所有用户的离线生成任务。
@@ -156,19 +157,19 @@ sequenceDiagram
     P-->>A: 模型、会话、设备
     A-->>W: AgentSnapshotRes
     W-->>C: AgentSnapshotRes
-    C->>W: ChatReq(session_id?, text, model_id?)
+    C->>W: AgentChatReq(session_id?, text, model_id?)
     W->>A: send handle_request(connection_id, ...)
     A->>P: 转发绑定的用户身份、连接 ID 和请求
     P->>P: 查找或创建 AgentSession，登记本轮生成
-    P->>A: publish(SessionUpdatedNtf)
-    A->>W: send send_response(SessionUpdatedNtf)
+    P->>A: publish(AgentSessionUpdatedNtf)
+    A->>W: send send_response(AgentSessionUpdatedNtf)
     W-->>C: 已包含首条消息的 ChatSession
-    P-->>A: ChatRes 业务结果
-    A->>W: send send_response(ChatRes)
+    P-->>A: AgentChatRes 业务结果
+    A->>W: send send_response(AgentChatRes)
     W-->>C: 任务已接受及 ChatSession
     P->>A: publish
     A->>W: 向该用户已使用此应用的连接推送更新
-    W-->>C: MessageDeltaNtf / SessionUpdatedNtf
+    W-->>C: AgentMessageDeltaNtf / AgentSessionUpdatedNtf
 ```
 
 WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同步等待 logind，暂停当前连接的读取；
@@ -187,25 +188,22 @@ WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同�
 WebSocket 提供以下通用命令，第一参均为基础层上下文：
 
 - `bind_client(connection_id, client_address)`：绑定存活连接，拒绝覆盖其他 client 服务。
-- `send_response(connection_id, message_id, name, args)`：编码并串行写入；写完返回 `true`。
+- `send_response(connection_id, message_id, app_id, kind, body)` 添加公共帧头后串行写入，写完返回 `true`。
 - `close_connection(connection_id, code, reason)`：移除连接、通知 client 服务并关闭；重复操作无副作用。
 
-WebSocket 入口校验 protobuf 消息存在且属于 `Req` 请求方向。
-`agent.routes` 声明 Agent 可接收的请求。节点启动后 App Center 登记有序的服务池，每个 client
-在开放网关之前订阅完整目录，此后接收变更快照。client 校验 WebSocket 来源，在本地查表并转发连接绑定的身份。
-路由使用 `FNV-1a32(用户名) % N + 1` 选择实例。多端登录、断线重连和后续请求均使用同一规则。
-N 独立于 client 池的大小，调整后重启生效，部分用户名会映射到新的实例编号。
-公共服务使用单实例池。应用中心管理员可在线注册或撤销整组服务，启用状态保存在节点本地。
-下线时先让全部 client 停止分配新请求，保留在途工具的清理回执。节点取消任务、关闭工具后销毁整组 Actor，释放旧地址。
-上线时按配置创建全新的实例，全部就绪后一次性登记。用户登录和工作目录文件保留，聊天会话从空快照开始。
-节点启动时先读取应用中心保存的启用状态，已下线的应用显示零个实例。
-每次路由都携带用户身份与连接 ID，公共服务可据此决定数据的可见范围。
+WebSocket 校验公共帧类别和请求编号。client 启动时订阅 App Center 的目录，按 `app_id` 转发应用字节、用户身份、连接 ID 和实例代次。
+应用节点完成 Cluster 握手后进入路由表。其 `app_endpoint` 解码消息并按 `FNV-1a32(用户名) % N + 1` 选择 Actor，N 为应用配置的实例数。
+事件缓存在所属应用节点。主服按游标收取事件并交给 client，每次投递校验目标用户、连接和实例代次。
+
+管理员停用应用时，主服先撤回新请求的路由。已使用该代次的连接进入收尾状态，Agent 此时只接受已有连接的桌面工具回执。
+应用取消任务、确认最后的通知已投递后退出，部署服务确认容器已停止。再次启用时生成新的代次，用户保留登录和工作目录文件，Agent 从空会话开始。
+应用中心将期望的启用状态写入 `gateway-state` 卷。启用的应用发生意外退出时，主服重新启动该容器并等待就绪。
 
 Agent 服务校验路由来源和用户 ID，再从 `agent.handler.REQUEST` 动态查找方法。
 返回结果只发给请求连接。应用通知由 client 按来源服务和用户筛选订阅者，桌面工具通知还限定连接 ID。
 协议命名见[公共隐式约定](../../隐式约定.md#公共协议)，handler 与分发规则见
 [服务端隐式约定](../../server/隐式约定.md)。
-未知业务请求（包括重复登录）以 1008 关闭。应用请求处理失败时返回该请求对应的失败响应。
+重复登录以 1008 关闭。未知应用、应用下线或远端调用失败会收到与原 `app_id` 和请求编号匹配的路由错误。
 
 ## 配置与传输
 
@@ -219,16 +217,14 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 
 ### Protobuf 编解码
 
-`helper.protobuf.load(schema_directory)` 从 `schema.proto` 加载登录和应用协议，
-所有 import 路径相对于 schema 目录。目录中存在 `pb.bytes` 时优先读取该 FileDescriptorSet。
-需要预编译时，在 `common/proto/` 执行 `protoc -I . --include_imports --descriptor_set_out=pb.bytes schema.proto`。
+主服 main 加载 `platform.proto` 供登录与 App Center 服务使用。每个应用节点的 main 加载镜像内 `APP_SCHEMA` 指定的入口，如 `agent/schema.proto`。所有 import 路径相对于该镜像的协议目录。
 
 业务服务在初始化阶段调用 `attach()`，随后按完整消息类型名编解码，例如：
 
 ```lua
 local protobuf = require("helper.protobuf")
 
--- main 已完成唯一 schema 的加载，当前服务接入只读 schema。
+-- 接入本节点 main 持有的协议。
 protobuf.attach()
 
 local data = protobuf.encode("skynet.agent.v1.LoginReq", {
@@ -237,18 +233,16 @@ local data = protobuf.encode("skynet.agent.v1.LoginReq", {
 local message = protobuf.decode("skynet.agent.v1.LoginReq", data)
 ```
 
-helper 失败时抛出 Lua error，需要捕获时由调用方使用 `pcall`。`network.protocol` 独立管理
-9 字节帧及类型哈希，每个 WebSocket 服务在自身 VM 中初始化协议对象。
-schema、helper 公开接口或 `pb.so` 变化后必须重启；共享 schema 的持有者不能提前退出。
+`network.protocol` 管理节点内的类型哈希。新增应用协议时，发布应用客户端并更新其容器。主服可持续运行。
 
 ## 外部消息格式
 
-共享协议位于 `common/proto`。Agent 的会话、执行和业务类型集中在 `agent/`，
-服务端、独立 Lua 网络探针和客户端生成器使用同一入口。
+Agent 的会话、执行和业务类型位于 `common/proto/agent/`。客户端 App 和对应服务端节点各带一份兼容的协议。
 固定二进制向量和真实网络检查入口见[开发指南](../DEVELOPMENT.md#测试与验收)。
 
-每帧是 `压缩标志 uint8 | 消息 ID uint32 | 类型哈希 uint32 | Protobuf args`，固定头为 9 字节，
-多字节整数使用网络字节序。类型哈希按完整 Protobuf 消息名计算 FNV-1a 32 位哈希。
+每帧是 `类别 u8 | 请求编号 u32 | app_id 长度 u8 | app_id ASCII | 载荷`，整数使用网络字节序。
+类别 1、2、3 分别表示请求、响应、通知。其载荷为 `完整消息名 FNV-1a32 u32 | Protobuf 字节`。
+类别 4 表示平台路由错误，载荷为 `错误码 u8 | UTF-8 说明`。App ID 长度为 1–63 字节，采用小写字母、数字和单个连字符分段，以字母开头。
 WebSocket 负责消息边界、长度和分片重组，业务层不再增加长度字段。
 
 请求消息 ID 从 1 严格递增，达到 `2^32 - 1` 后关闭连接，服务端忽略已处理 ID。
@@ -259,25 +253,25 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 | ------------------------------------------------------ | ---------------------------------- |
 | `LoginReq(username)`                                   | `identity` 中的用户名和用户 ID |
 | `AgentSnapshotReq`                                     | 完整 Agent 快照，用于启动及重新建立同步基线 |
-| `ChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
-| `MessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
-| `SessionModelSetReq(session_id, model_id)`             | 更新后的 `ChatSession`             |
+| `AgentChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
+| `AgentMessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
+| `AgentSessionModelSetReq(session_id, model_id)`             | 更新后的 `ChatSession`             |
 
 `AgentSnapshot.chat_sessions` 是 `ChatSession` 列表，允许为空。每项的 `session` 为 `SessionState`，
 包含会话身份、标题、消息、revision 和运行状态；`model_id`、`permission_model_id` 为该会话的实际模型 ID。
 快照的 `models` 提供公开模型清单，`default_model_id` 用于新草稿；快照中的 `permission_model_id`
 为空时表示权限模型跟随会话选择，否则使用指定模型。
 
-`ChatReq.session_id` 缺省或空串时，先校验文本、模型和重试参数，再创建会话并发送首条消息。
+`AgentChatReq.session_id` 缺省或空串时，先校验文本、模型和重试参数，再创建会话并发送首条消息。
 无会话 ID 不能重试；非空但不存在的 ID 返回失败，不创建会话。`model_id` 仅在首次创建时生效。
-`ChatRes`、`SessionModelSetRes` 与 `SessionUpdatedNtf` 统一通过 `chat_session` 返回完整包装。
-`SessionUpdatedNtf` 在开始生成、模型切换、取消请求和最终完成时携带完整会话包装；
-`MessageDeltaNtf` 携带会话、任务、消息 ID、增量和递增会话版本。
+`AgentChatRes`、`AgentSessionModelSetRes` 与 `AgentSessionUpdatedNtf` 统一通过 `chat_session` 返回完整包装。
+`AgentSessionUpdatedNtf` 在开始生成、模型切换、取消请求和最终完成时携带完整会话包装；
+`AgentMessageDeltaNtf` 携带会话、任务、消息 ID、增量和递增会话版本。
 快照包含消息状态、部分回答和活动任务。消息状态分为生成中、完成、停止和失败。
 时间为毫秒时间戳，业务 ID 为不透明字符串；`run_id` 跨连接稳定，与线路请求编号分离。
 
-只接受二进制帧和 `Req` 方向消息。文本帧以 1003 关闭，损坏数据、未知哈希、非零压缩标志或消息 ID 0
-以 1007 关闭，错误消息方向以 1008 关闭。未绑定时只接受 `LoginReq`，其他业务请求先返回登录错误，
+网关只接受二进制请求帧。文本帧以 1003 关闭，无效公共帧以 1007 关闭，错误帧方向以 1008 关闭。
+应用节点校验业务类型哈希和 `Req` 后缀。未绑定时只接受 `LoginReq`，其他业务请求先返回登录错误，
 再以 1008 关闭。入站消息上限为 256 KiB；附件应使用独立 HTTP 数据通道。
 
 ## 客户端请求与取消
@@ -323,12 +317,12 @@ macOS 客户端通过 Swift 绑定同一 C ABI，在原生宿主授权的本机�
 `process_launcher` 监督进程组，在控制连接关闭时终止子进程。C 变更需重新构建和重启。
 
 会话 `execution_target` 为空时使用云端工作区，否则路由到指定桌面和工作区绑定。
-桌面通过 `DesktopRegisterReq` 登记在线状态、远程开关和本次授权标识；只有目标桌面连接可以设置目录。
-`SessionExecutionSetReq` 切换目标，保留历史并追加环境变更，不复制文件；执行中和后台进程未退出时拒绝切换。
-首发草稿可通过 `ChatReq.execution_target` 提交目标。项目规则由实际执行端读取。
+桌面通过 `AgentDesktopRegisterReq` 登记在线状态、远程开关和本次授权标识；只有目标桌面连接可以设置目录。
+`AgentSessionExecutionSetReq` 切换目标，保留历史并追加环境变更，不复制文件；执行中和后台进程未退出时拒绝切换。
+首发草稿可通过 `AgentChatReq.execution_target` 提交目标。项目规则由实际执行端读取。
 
-云端在准备动作后执行规则及独立模型判断，再通过 `ExecutionActionNtf` 定向下发工具操作，
-桌面用 `ExecutionResultReq` 回传结构化结果。工作区从本机绑定查找，不接受远程传入任意路径；
+云端在准备动作后执行规则及独立模型判断，再通过 `AgentExecutionActionNtf` 定向下发工具操作，
+桌面用 `AgentExecutionResultReq` 回传结构化结果。工作区从本机绑定查找，不接受远程传入任意路径；
 执行时复查已准备的动作、参数、实际目录和授权标识。调用 ID 去重，断线不自动重放。
 关闭远程撤销旧授权、停止远程来源进程；控制与状态回收仍可完成，本机来源进程继续。
 桌面断线会终止其进程；服务器以结果未确认结束任务，重连恢复设备状态。
@@ -338,20 +332,20 @@ macOS 使用 Seatbelt，Linux 使用 bubblewrap，默认只写本会话目录且
 沙盒外执行必须明确指定权限并经过判断，运行账号权限不变；隔离能力不可用时不自动降级。
 文件写入使用目录句柄逐级检查、拒绝符号链接并原子替换单个文件；多文件操作失败时报告已完成的部分。
 
-`ChatMessage.tool_calls` 保存工具记录，`ToolUpdatedNtf` 更新单条记录并推进会话 revision。
+`ChatMessage.tool_calls` 保存工具记录，`AgentToolUpdatedNtf` 更新单条记录并推进会话 revision。
 工具更新可能来自已结束回答的后台进程，因此按消息和工具 ID 定位，不依赖当前生成任务。
 Web 与原生核心均检查版本连续性，出现缺口获取完整快照，重复或迟到通知不覆盖新状态。
 
 ## 会话模型与思考流
 
-模型清单由 config 提供。Agent 快照只包含公开模型描述。`SessionModelSetReq/Res` 按会话设置模型，
+模型清单由 config 提供。Agent 快照只包含公开模型描述。`AgentSessionModelSetReq/Res` 按会话设置模型，
 `ChatSession` 包装同时返回当前模型和实际权限模型 ID。切换不取消正在进行的模型请求，后续请求获取最新配置快照。
 `agent.llm.base` 统一管理模型配置、客户端生命周期、流式响应、思考通知与用量日志。
 Agent 在自己的 Lua VM 内安装 `service/app/agent/llm/openai/` 中的传输和流解析适配，再加载第三方 `lua-openai` SDK。
 主模型与权限模型各持有独立实例；SDK 适配和单次 HTTP 请求的取消状态由同模块的
 `Base.Client`、`Base.Request` 管理，类表从模块导出以支持原位热修。`agent.Run` 管理整轮任务。
 
-助手消息与工具记录分别保存主模型和权限模型的思考块。`ReasoningDeltaNtf.block.text` 为新增文本，
+助手消息与工具记录分别保存主模型和权限模型的思考块。`AgentReasoningDeltaNtf.block.text` 为新增文本，
 终态通知可携带空文本；客户端按块身份追加，沿用会话 revision 去重和缺口恢复。
 完整快照包含累计内容；取消和失败保留部分思考，重试建立新块并保留原尝试。
 模型原始输出用于上下文续接，工具权限思考不混入主模型工具结果。

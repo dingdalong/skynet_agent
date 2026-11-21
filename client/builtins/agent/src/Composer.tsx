@@ -32,7 +32,7 @@ function WorkspaceSelector({
     );
     const changing = Object.values(state.connection.pending).some(
         (item) =>
-            item.name === "SessionExecutionSetReq" &&
+            item.name === "AgentSessionExecutionSetReq" &&
             item.target === state.selectedId,
     );
     if (!state.supportsLocal && !target?.device_id) return null;
@@ -120,9 +120,9 @@ export function Composer({ state, send }: Props) {
     );
     const cancelling =
         session?.session.cancelling ||
-        pending.some((item) => item.name === "MessageCancelReq");
+        pending.some((item) => item.name === "AgentMessageCancelReq");
     const changingModel = pending.find(
-        (item) => item.name === "SessionModelSetReq",
+        (item) => item.name === "AgentSessionModelSetReq",
     );
     const online = state.connection.status === "online";
     const canSend =

@@ -13,18 +13,18 @@ message AgentSnapshotRes {
   AgentSnapshot snapshot = 4;
 }
 
-message SessionModelSetReq {
+message AgentSessionModelSetReq {
   string session_id = 1;
   string model_id = 2;
 }
 
-message SessionModelSetRes {
+message AgentSessionModelSetRes {
   int32 ret = 2;
   ErrorInfo error = 3;
   ChatSession chat_session = 4;
 }
 
-message ReasoningDeltaNtf {
+message AgentReasoningDeltaNtf {
   string session_id = 1;
   string message_id = 2;
   string tool_call_id = 3;
@@ -33,7 +33,7 @@ message ReasoningDeltaNtf {
   uint32 revision = 5;
 }
 
-message ChatReq {
+message AgentChatReq {
   ExecutionTarget execution_target = 6;
   string session_id = 2;
   string text = 3;
@@ -41,27 +41,27 @@ message ChatReq {
   string model_id = 5;
 }
 
-message ChatRes {
+message AgentChatRes {
   int32 ret = 2;
   ErrorInfo error = 3;
   ChatSession chat_session = 4;
 }
 
-message MessageCancelReq {
+message AgentMessageCancelReq {
   string session_id = 2;
   string run_id = 3;
 }
 
-message MessageCancelRes {
+message AgentMessageCancelRes {
   int32 ret = 2;
   ErrorInfo error = 3;
 }
 
-message SessionUpdatedNtf {
+message AgentSessionUpdatedNtf {
   ChatSession chat_session = 1;
 }
 
-message MessageDeltaNtf {
+message AgentMessageDeltaNtf {
   string session_id = 1;
   string run_id = 2;
   string message_id = 3;
@@ -69,7 +69,7 @@ message MessageDeltaNtf {
   uint32 revision = 5;
 }
 
-message ToolUpdatedNtf {
+message AgentToolUpdatedNtf {
   string session_id = 1;
   string message_id = 2;
   ToolCall tool = 3;

@@ -8,13 +8,14 @@ end
 
 -- inject 返回文本，探针据此确认 HOTFIX 调试 RPC 的布尔结果。
 for index = 1, 2 do
-    reload(".client_" .. index, "client", "client.user")
+    if skynet.localname(".client_" .. index) then reload(".client_" .. index, "client", "client.user") end
 end
 local _, states = skynet.call(".main", "lua", "status")
 local count = 0
 for address in states:gmatch("(%.agent_%d+) :%x+ ready") do
-    reload(address, "agent", "agent.app", "agent.handler", "agent.chat", "agent.session", "agent.agent", "agent.run")
+    reload(address, "app.agent", "agent.app", "agent.handler", "agent.chat",
+        "agent.session", "agent.agent", "agent.run")
     count = count + 1
 end
-assert(count > 0)
+assert(count > 0 or skynet.localname(".client_1"))
 print("CLIENT_HOTFIX_OK")

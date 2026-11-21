@@ -30,11 +30,11 @@ describe("main", function()
 
     it("在节点启动回调中加载业务 schema 并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema" }, { "launch", "app_center" },
+        assert.same({ { "schema", "schema" }, { "launch", "app.app_center" },
             { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
-            { name = "app_center", count = 1, params = { agent_count = 1 }, registered_name = ".app_center" },
+            { name = "app.app_center", count = 1, registered_name = ".app_center" },
             { name = "client", count = 2 },
             { name = "logind", count = 1, params = { client_services = { 12, 13 } } },
             { name = "websocket", count = 3 },
@@ -46,7 +46,7 @@ describe("main", function()
         config.agent_gateway.instance = { agent = 0, client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
-            { name = "app_center", count = 1, params = { agent_count = 0 }, registered_name = ".app_center" },
+            { name = "app.app_center", count = 1, registered_name = ".app_center" },
             { name = "client", count = 0 },
             { name = "logind", count = 2, params = { client_services = {} } },
             { name = "websocket", count = 0 },

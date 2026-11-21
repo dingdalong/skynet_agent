@@ -47,27 +47,27 @@ for mode in normal login failure slow_close startup_slow startup_wait force_read
         startup_slow)
             wait_for_marker SHUTDOWN_FIXTURE_INIT_FINISHED
             wait_for_marker '启动完成'
-            ./control.sh stop "$port" >"$temp_dir/control.log"
+            ./deploy/console.sh stop "$port" >"$temp_dir/control.log"
             expected=0
             ;;
         startup_wait)
             wait_for_marker SHUTDOWN_FIXTURE_INIT_WAITING
-            ./control.sh status "$port" >"$temp_dir/status.log"
+            ./deploy/console.sh status "$port" >"$temp_dir/status.log"
             grep -q initializing "$temp_dir/status.log"
-            ./control.sh force-stop "$port" >"$temp_dir/control.log"
+            ./deploy/console.sh force-stop "$port" >"$temp_dir/control.log"
             expected=1
             ;;
         force_ready)
             wait_for_marker SHUTDOWN_FIXTURE_READY
-            ./control.sh force-stop "$port" >"$temp_dir/control.log"
+            ./deploy/console.sh force-stop "$port" >"$temp_dir/control.log"
             expected=1
             ;;
         closing_wait)
             wait_for_marker SHUTDOWN_FIXTURE_READY
-            ./control.sh stop "$port" >"$temp_dir/stop.log"
-            ./control.sh stop "$port" >"$temp_dir/repeated-stop.log"
+            ./deploy/console.sh stop "$port" >"$temp_dir/stop.log"
+            ./deploy/console.sh stop "$port" >"$temp_dir/repeated-stop.log"
             wait_for_marker SHUTDOWN_FIXTURE_CLOSE_WAITING
-            ./control.sh force-stop "$port" >"$temp_dir/control.log"
+            ./deploy/console.sh force-stop "$port" >"$temp_dir/control.log"
             expected=1
             ;;
     esac

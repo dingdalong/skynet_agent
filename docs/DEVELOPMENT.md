@@ -8,6 +8,7 @@
 | 依赖 | 用途 |
 | --- | --- |
 | Git 与 GitHub SSH | 仓库及子模块 |
+| Docker Engine 与 Compose v2 | 主服、应用节点和部署服务的构建、运行与跨容器测试 |
 | Node.js 与 pnpm | 客户端 TypeScript、React 和 Astryx 工作区构建测试，版本见 `client/package.json` |
 | 完整 Xcode、macOS/iOS SDK 与模拟器 | 苹果平台宿主、Swift Package Manager 与签名构建 |
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
@@ -19,7 +20,7 @@
 macOS 可通过 Homebrew 安装 OpenSSL；服务端默认从 Homebrew 查找，其他位置可指定
 `OPENSSL_PREFIX`，或 `OPENSSL_INCLUDE_DIR`、`OPENSSL_LIB_DIR`。
 使用 `luarocks install busted` 安装测试入口，并确认其使用 Lua 5.5。
-Linux 服务端还需要 autoconf；工具沙箱需要 bubblewrap 和相关 namespace 能力。
+原生 Linux 测试使用 autoconf、bubblewrap 和用户 namespace。Docker 中的 Agent 工作目录沙盒使用 Landlock，要求 Docker 的 Linux 内核支持 ABI 6 或更高版本。
 
 ## 目录与日常命令
 
@@ -73,22 +74,37 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 ./server/control.sh force-stop
 ```
 
-控制脚本通过仅监听回环地址的 Skynet 控制台访问 `.main`。调整 `runtime.control_port` 后，
-在命令的第二个参数传入目标端口，例如 `./server/control.sh status <控制台端口>`。
-
-`stop` 的响应表示关闭命令已接收，最终清理结果以服务端进程退出码为准：成功为 0，失败为 1。
-正常关闭等待在途任务和资源清理；`force-stop` 可在启动、运行或关闭等待期间显式调用，
-跳过清理并以 1 退出，不会自动触发。进程重启交给外部管理器。
+`./server/start.sh` 构建镜像，预创建应用容器并启动部署服务和主服。应用中心按保存的启用状态启动应用。
+`stop` 通过主服容器的本地控制台发起正常关闭，等待主进程的退出结果，然后回收 Compose 服务。命名卷保留。
+`force-stop` 强制结束本项目容器。使用自定义 `COMPOSE_PROJECT_NAME` 时，管理命令使用相同的项目名。
 
 日志输出取决于 `server/etc/config` 的 logger 配置；网关错误输出到 stdout/stderr。
 启动和关闭的内部机制见[服务生命周期](architecture/AGENT_GATEWAY.md#服务生命周期)。
+
+## 接入新应用
+
+在新镜像中复用 `server/Dockerfile` 的 `app` 阶段。外部项目可先在本仓库执行 `docker build -f server/Dockerfile --target app -t skynet-app-base .`，再以 `FROM skynet-app-base` 构建自己的镜像。
+将 `.proto` 放在 `../common/proto/`，将应用入口放在 `src/service/app/<模块>/init.lua`。模块名取 `app_id` 并将连字符换成下划线。构建时运行 `bin/lua deploy/check_protocol.lua <app_id> <协议入口>`。
+Actor 提供 `handle_request`、`disconnect`、`drain`，通知通过本节点的 `app_endpoint.publish` 发送。客户端应用用自己的描述建立编解码器。完整示例在 `server/tests/fixtures/echo/`。
+
+将预构建镜像声明为同一 Compose 项目的服务，加入 `apps` 网络和 `apps` profile。设置标签 `io.skynet.app`、`io.skynet.name`，环境变量 `APP_ID`、`APP_SCHEMA`，可选 `APP_INSTANCES`。`io.skynet.enabled=true` 指定首次发现时默认启用。每个应用使用一个容器，容器内可以有多个 Actor。
+以下命令可在主服运行时登记 Echo。它与 Agent 声明了同名、不同字段的 `ChatMessage`。
+
+```sh
+docker compose --env-file server/.env -f compose.yaml -f server/tests/fixtures/echo/compose.yaml \
+  --profile apps create --build echo
+```
+
+打开应用中心，解锁管理员并启用 Echo。主服通过部署服务发现容器，等应用完成 Cluster 握手后开放路由。平台要求管理员信任加入 `apps` 网络的镜像，网络内的应用可以相互访问 Cluster 端口。只有部署服务挂载 Docker socket，其 HTTP 管理接口位于独立的 `management` 网络。
+
+运行 `node client/tooling/docker-apps-e2e.mjs` 可在随机项目和端口复验在线登记、请求与通知、协议冲突、停用及故障恢复。脚本结束时回收该测试项目的容器和卷。
 
 ## 热更新
 
 热更新仅用于兼容的缺陷修复。新增功能、公开接口、配置、schema、持久数据格式、
 第三方库与 C 模块变更通过重新构建或重启生效，完整编码约束见 [AGENTS.md](../AGENTS.md#热更新编码规范)。
 
-`develop` 渠道在业务服务启动完成后自动监听 `server/src`。保存已有模块的兼容方法修改即可热修；
+`develop` 渠道在业务服务启动完成后监听该节点的 `src`。Compose 默认把源码打入镜像，本机源码改动需要重新构建对应镜像。使用源码绑定挂载的开发环境中，保存已有模块的兼容方法修改即可热修；
 其他渠道不自动监听。启用监听器，以及新增或删除源码文件后，需要重启。
 
 也可通过 Skynet `debug_console` 对指定实例手动发送模块名：
@@ -115,7 +131,7 @@ dbgcmd .client_1 HOTFIX client client.user
 | `make client-check` | 格式、TypeScript、令牌、导入边界、几何逻辑与原生进程集成 |
 | `make client-test` | 实际 JSC 子进程、权限、更新、故障、任务与本地 WebSocket 生命周期 |
 | `make client-test PLATFORM=ios` | 模拟器内独立 JSC VM、移动权限、前后台恢复与真实 WebKit 触控布局 |
-| `make check-full` | 基础回归、服务端集成与客户端原生集成 |
+| `make check-full` | 基础回归、服务端集成、客户端原生集成与 Docker 跨应用验收 |
 | `make -C server test-live` | 服务端真实模型网关探针 |
 | `make build` | 服务端与最新 macOS Release 构建 |
 

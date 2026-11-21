@@ -2,11 +2,12 @@ local Scope = require("tests.support.modules")
 local codes = require("enum.error_code")
 local hash = require("helper.hash")
 local protobuf = require("helper.protobuf")
-local Protocol = require("network.protocol")
+local Protocol = require("tests.support.wire_protocol")
 
 protobuf.load("../common/proto")
 local codec = Protocol:new()
 codec:init()
+local login = codec:encode_body("LoginRes", { ret = 1 })
 
 describe("websocket", function()
     local scope, instance, handles, timers, sent, writes, closed, call, fail_write, wait_write, next_id, raw_closed
@@ -25,6 +26,7 @@ describe("websocket", function()
         fail_write, wait_write, next_id = false, false, 0
         call = function() return codes.succ, true end
         scope = Scope.new({
+            ["skynet.crypt"] = { randomkey = function() return "salt" end, hexencode = tostring },
             ["websocket"] = false, ["log"] = false,
             ["etc.cfg"] = { agent_gateway = { socket = { path = "/agent" }, login_timeout_ticks = 1000 } },
             skynet = {
@@ -69,11 +71,9 @@ describe("websocket", function()
             return codes.succ, true
         end
         message(1, 1)
-        message(1, 2, "ChatReq")
-        message(1, 2, "ChatReq")
-        assert.same({ 30, "handle_request", connection.id, 2, "ChatReq", {
-            session_id = "", text = "", retry_run_id = "", model_id = "",
-        } }, sent[1])
+        message(1, 2, "AgentChatReq")
+        message(1, 2, "AgentChatReq")
+        assert.same({ 30, "handle_request", connection.id, 2, "agent", codec:encode_body("AgentChatReq", {}) }, sent[1])
         assert.are.equal(1, #sent)
     end)
     it("同步等待只阻塞当前连接，回调可绑定并写响应", function()
@@ -87,7 +87,7 @@ describe("websocket", function()
         assert.same({ true, "login" }, { coroutine.resume(reader) })
         local other = accept(2)
         assert.is_not_nil(other)
-        assert.is_true(instance:send_response({}, connection.id, 1, "LoginRes", { ret = 1 }))
+        assert.is_true(instance:send_response({ source = 20 }, connection.id, 1, "login", 2, login))
         assert.is_true(coroutine.resume(reader))
         assert.are.equal(30, connection.client_address)
     end)
@@ -117,7 +117,7 @@ describe("websocket", function()
         local current = accept(1)
         timers[1]()
         old_handle.close()
-        assert.is_false(instance:send_response({}, old.id, 1, "LoginRes", { ret = 1 }))
+        assert.is_false(instance:send_response({ source = 20 }, old.id, 1, "login", 2, login))
         assert.are.equal(current, instance.connections[current.id])
         assert.are.equal(1, #closed)
     end)
@@ -126,7 +126,7 @@ describe("websocket", function()
         wait_write = true
         local result
         local writer = coroutine.create(function()
-            result = instance:send_response({}, connection.id, 1, "LoginRes", { ret = 1 })
+            result = instance:send_response({ source = 20 }, connection.id, 1, "login", 2, login)
         end)
         assert.same({ true, "writing" }, { coroutine.resume(writer) })
         instance:close_connection({}, connection.id, 1000, "close")
@@ -138,25 +138,19 @@ describe("websocket", function()
         local connection = accept(1)
         instance:bind_client({}, connection.id, 30)
         fail_write = true
-        assert.is_false(instance:send_response({}, connection.id, 1, "LoginRes", { ret = 1 }))
+        assert.is_false(instance:send_response({ source = 20 }, connection.id, 1, "login", 2, login))
         assert.same({ 30, "disconnect", connection.id }, sent[1])
         local other = accept(2)
-        assert.is_false(instance:send_response({}, other.id, 1, "UnknownRes", {}))
+        assert.is_false(instance:send_response({ source = 20 }, other.id, 1, "@invalid", 2, ""))
         assert.are.equal(2, #closed)
     end)
     for _, case in ipairs({
         { "文本", "text", "text", 1003 },
         { "短帧", "bad", "binary", 1007 },
-        { "零 ID", codec:encode_msg(0, "LoginReq", {}), "binary", 1007 },
+        { "零 ID", string.pack(">BI4s1", 1, 0, "login"), "binary", 1007 },
         { "响应方向", codec:encode_msg(1, "LoginRes", {}), "binary", 1008 },
-        { "通知方向", codec:encode_msg(1, "MessageDeltaNtf", {}), "binary", 1008 },
-        { "普通数据类型", codec:encode_msg(1, "UserIdentity", {}), "binary", 1008 },
-        { "未知协议", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.UnknownReq")), "binary", 1007 },
-        { "内部快照方法", string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1.snapshot")), "binary", 1007 },
-        {
-            "内部生成方法",
-            string.pack(">BI4I4", 0, 1, hash.fnv1a32("skynet.agent.v1._run_request")), "binary", 1007,
-        },
+        { "通知方向", codec:encode_msg(0, "AgentMessageDeltaNtf", {}), "binary", 1008 },
+        { "空应用 ID", string.pack(">BI4s1", 1, 1, ""), "binary", 1007 },
     }) do
         it("拒绝" .. case[1], function()
             local connection = accept(1)

@@ -2,7 +2,7 @@ local class = require("class")
 local skynet = require("skynet")
 local websocket = require("http.websocket")
 local crypt = require("skynet.crypt")
-local Protocol = require("network.protocol")
+local Protocol = require("tests.support.wire_protocol")
 local support = require("integration.support")
 
 ---@class integration.AgentSocket
@@ -97,19 +97,21 @@ function AgentSocket:request(name, args)
     local id = self:allocate_message_id()
     self:send_request(id, name, args)
     local response = name:gsub("Req$", "Res")
-    return self:wait_for(function(event) return event.message_id == id and event.name == response end).payload
+    return self:wait_for(function(event)
+        return event.message_id == id and (event.name == response or event.name == "RoutingError")
+    end).payload
 end
 
 function AgentSocket:wait_run(run_id, timeout_ticks)
     return self:wait_for(function(event)
-        if event.name ~= "SessionUpdatedNtf" then return false end
+        if event.name ~= "AgentSessionUpdatedNtf" then return false end
         local session = event.payload.chat_session.session
         return session.run_id == "" and session.messages[#session.messages].run_id == run_id
     end, timeout_ticks).payload.chat_session.session
 end
 
 function AgentSocket:send_message(session_id, text, timeout_ticks)
-    local result = self:request("ChatReq", { session_id = session_id, text = text })
+    local result = self:request("AgentChatReq", { session_id = session_id, text = text })
     support.equal(result.ret, 1, "发送消息失败")
     return self:wait_run(result.chat_session.session.run_id, timeout_ticks)
 end
