@@ -5,7 +5,7 @@ if api_key == "" then
     api_key = nil
 end
 
-local database_prefix = skynet.getenv("start") == "center_main" and "CATALOG_MONGO_" or "APP_MONGO_"
+local database_prefix = skynet.getenv("start") == "center_main" and "APP_CENTER_MONGO_" or "APP_MONGO_"
 local database_name = os.getenv(database_prefix .. "DATABASE")
 
 return {

@@ -3,7 +3,7 @@ const admin = db.getSiblingDB("admin");
 const password = require("fs").readFileSync("/data/db/.bootstrap-password", "utf8").trim();
 if (!admin.auth("bootstrap", password).ok) throw Error("MongoDB 管理员认证失败");
 
-for (const prefix of ["CATALOG_MONGO_", "APP_MONGO_"]) {
+for (const prefix of ["APP_CENTER_MONGO_", "APP_MONGO_"]) {
     const database = process.env[prefix + "DATABASE"];
     const user = process.env[prefix + "USERNAME"];
     const pwd = process.env[prefix + "PASSWORD"];

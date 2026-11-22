@@ -3,7 +3,7 @@ import XCTest
 @testable import SkynetHostCore
 
 final class WorkspaceTests: XCTestCase {
-    func testDesktopInsertionRecoveryAndCatalogChanges() throws {
+    func testDesktopInsertionRecoveryAndAppCatalogChanges() throws {
         var workspace = Workspace()
         let apps: Set<String> = ["agent", "settings", "notes"]
         workspace.reconcileLaunchers(knownApps: apps)

@@ -5,7 +5,7 @@ export default defineApp({
     reduce(state, command) {
         return {
             state:
-                command.type === "$catalog"
+                command.type === "$appCatalog"
                     ? { revision: state.revision + 1 }
                     : state,
         };

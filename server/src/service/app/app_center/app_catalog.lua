@@ -3,7 +3,7 @@ local codes = require("enum.error_code")
 local queue = require("skynet.queue")
 local crypt = require("skynet.crypt")
 local Deployment = require("app_center.deployment")
-local Catalog = {}
+local AppCatalog = {}
 
 local function store(command, ...)
     return rpc.call_timeout(180, ".database", command, "apps", ...)
@@ -24,7 +24,7 @@ local function save(center, doc)
     center.documents[doc._id] = doc
 end
 
-function Catalog.refresh(center, id)
+function AppCatalog.refresh(center, id)
     if not center.uncertain[id] then return end
     local code, current = store("find_one", { _id = id })
     assert(code == codes.succ, "数据库暂时不可用")
@@ -32,12 +32,12 @@ function Catalog.refresh(center, id)
     center.uncertain[id] = nil
 end
 
-function Catalog.lock(center, id)
+function AppCatalog.lock(center, id)
     center.locks[id] = center.locks[id] or queue()
     return center.locks[id]
 end
 
-function Catalog.open(center)
+function AppCatalog.open(center)
     local code, documents = store("find")
     assert(code == codes.succ, "无法读取应用目录")
     for _, doc in ipairs(documents) do center.documents[doc._id] = doc end
@@ -47,7 +47,7 @@ local function same(left, right)
     return left and left.name == right.name and left.image == right.image and left.image_id == right.image_id
 end
 
-function Catalog.submit(center, id, args)
+function AppCatalog.submit(center, id, args)
     assert(type(args.name) == "string" and #args.name > 0 and #args.name <= 128 and utf8.len(args.name),
         "应用名称无效")
     assert(type(args.image) == "string" and #args.image <= 255 and args.image:match("^[%w][%w./_:@%-]*$"),
@@ -66,7 +66,7 @@ function Catalog.submit(center, id, args)
     return candidate.request_id
 end
 
-function Catalog.review(center, id, args, reviewer)
+function AppCatalog.review(center, id, args, reviewer)
     local doc = table.copy(assert(center.documents[id], "未找到申请"))
     local accepted = args.approve == true
     if doc.last and doc.last.request_id == args.request_id then
@@ -84,7 +84,7 @@ function Catalog.review(center, id, args, reviewer)
     save(center, doc)
 end
 
-function Catalog.remove(center, id)
+function AppCatalog.remove(center, id)
     local doc = table.copy(assert(center.documents[id], "应用未登记"))
     assert(doc.approved, "应用尚未批准")
     if doc.removed then return end
@@ -92,16 +92,16 @@ function Catalog.remove(center, id)
     save(center, doc)
 end
 
-function Catalog.can_set_enabled(doc)
+function AppCatalog.can_set_enabled(doc)
     return doc.approved ~= nil and not doc.removed
 end
 
-function Catalog.set(center, id, desired)
+function AppCatalog.set(center, id, desired)
     local doc = table.copy(assert(center.documents[id], "应用未登记"))
-    assert(Catalog.can_set_enabled(doc), "应用尚未上架")
+    assert(AppCatalog.can_set_enabled(doc), "应用尚未上架")
     if doc.desired == desired then return end
     doc.desired = desired
     save(center, doc)
 end
 
-return Catalog
+return AppCatalog

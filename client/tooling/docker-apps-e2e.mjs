@@ -44,7 +44,7 @@ const environment = {
     APP_MONGO_HOST: "127.0.0.1",
     APP_MONGO_PORT: String(mongoPort),
     APP_MONGO_PASSWORD: randomUUID(),
-    CATALOG_MONGO_PASSWORD: randomUUID(),
+    APP_CENTER_MONGO_PASSWORD: randomUUID(),
     SKYNET_ENV_FILE: "/dev/null",
     GATEWAY_CLUSTER_PORT: String(clusterPort),
     DEEPSEEK_API_KEY: "docker-fixture",
@@ -136,7 +136,7 @@ try {
             "--no-deps",
             "-T",
             "-e",
-            "CATALOG_MONGO_PASSWORD=invalid-test-password",
+            "APP_CENTER_MONGO_PASSWORD=invalid-test-password",
             "app-center",
         ),
         (error) =>

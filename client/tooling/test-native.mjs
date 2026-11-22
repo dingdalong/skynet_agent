@@ -122,7 +122,7 @@ server.on("connection", (socket) => {
             return;
         }
         if (name === "AppCenterUnlockReq") {
-            administrator = request.token === "catalog-test";
+            administrator = request.token === "app-center-test";
             send(socket, "AppCenterUnlockRes", requestId, {
                 ret: administrator ? 1 : 0,
             });

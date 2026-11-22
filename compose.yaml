@@ -6,11 +6,11 @@ x-app-database: &app-database
   APP_MONGO_AUTH_DB: ${APP_MONGO_AUTH_DB:-${APP_MONGO_DATABASE:-applications}}
   APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-applications}
   APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
-x-catalog-database: &catalog-database
-  CATALOG_MONGO_DATABASE: ${CATALOG_MONGO_DATABASE:-app_center}
-  CATALOG_MONGO_AUTH_DB: ${CATALOG_MONGO_AUTH_DB:-${CATALOG_MONGO_DATABASE:-app_center}}
-  CATALOG_MONGO_USERNAME: ${CATALOG_MONGO_USERNAME:-app_center}
-  CATALOG_MONGO_PASSWORD: ${CATALOG_MONGO_PASSWORD:-}
+x-app-center-database: &app-center-database
+  APP_CENTER_MONGO_DATABASE: ${APP_CENTER_MONGO_DATABASE:-app_center}
+  APP_CENTER_MONGO_AUTH_DB: ${APP_CENTER_MONGO_AUTH_DB:-${APP_CENTER_MONGO_DATABASE:-app_center}}
+  APP_CENTER_MONGO_USERNAME: ${APP_CENTER_MONGO_USERNAME:-app_center}
+  APP_CENTER_MONGO_PASSWORD: ${APP_CENTER_MONGO_PASSWORD:-}
 x-node: &node
   network_mode: host
   init: true
@@ -27,7 +27,7 @@ services:
     network_mode: bridge
     ports: ["127.0.0.1:${APP_MONGO_PORT:-18083}:27017"]
     environment:
-      <<: [*app-database, *catalog-database]
+      <<: [*app-database, *app-center-database]
     entrypoint: ["/bin/bash", "/mongo-start.sh"]
     volumes:
       - mongo-data:/data/db
@@ -44,7 +44,7 @@ services:
       mongodb: { condition: service_healthy }
     build: { context: ., dockerfile: server/Dockerfile, target: app-center }
     environment:
-      <<: [*cluster, *catalog-database]
+      <<: [*cluster, *app-center-database]
       APP_PROJECT: ${COMPOSE_PROJECT_NAME:-skynet-agent}
       APP_CENTER_ADMIN_TOKEN: ${APP_CENTER_ADMIN_TOKEN:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}

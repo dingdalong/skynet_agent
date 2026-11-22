@@ -24,7 +24,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { request } from "@skynet/app-sdk";
 import { AppBoundary, useAppSnapshot } from "@skynet/app-sdk/react";
-import { AppGallery, ServiceRow, type Service } from "./Catalog";
+import { AppGallery, ServiceRow, type Service } from "./AppCenterViews";
 
 interface Directory {
     names: string[];
@@ -64,7 +64,7 @@ function UnlockDialog({
                     setBusy(true);
                     setError("");
                     try {
-                        await request("catalog.unlock", { token });
+                        await request("app-center.unlock", { token });
                         unlocked();
                     } catch (failure) {
                         setError(String(failure));
@@ -116,7 +116,7 @@ function AppCenter() {
         if (snapshot?.user) {
             setLoading(true);
             setLoadError("");
-            void request("catalog.list").then(
+            void request("app-center.list").then(
                 (value) => {
                     if (!active) return;
                     setDirectory(value as unknown as Directory);
@@ -219,14 +219,14 @@ function AppCenter() {
                             busy={changing}
                             onChange={(enable) => {
                                 if (enable)
-                                    void change("catalog.set", {
+                                    void change("app-center.set", {
                                         app_id: service.app_id,
                                         enabled: true,
                                     });
                                 else setPendingId(service.app_id);
                             }}
                             onReview={(approve) =>
-                                void change("catalog.review", {
+                                void change("app-center.review", {
                                     app_id: service.app_id,
                                     request_id: service.pending!.request_id,
                                     approve,
@@ -351,7 +351,7 @@ function AppCenter() {
                         if (!open && !changing) setPendingId("");
                     }}
                     onAction={() =>
-                        void change("catalog.set", {
+                        void change("app-center.set", {
                             app_id: pending.app_id,
                             enabled: false,
                         })
@@ -370,7 +370,7 @@ function AppCenter() {
                         if (!open && !changing) setRemoveId("");
                     }}
                     onAction={() =>
-                        void change("catalog.remove", { app_id: removeId })
+                        void change("app-center.remove", { app_id: removeId })
                     }
                 />
             )}

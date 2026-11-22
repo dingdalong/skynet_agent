@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 umask 077
-: "${CATALOG_MONGO_PASSWORD:?请在 server/.env 中设置 CATALOG_MONGO_PASSWORD}"
+: "${APP_CENTER_MONGO_PASSWORD:?请在 server/.env 中设置 APP_CENTER_MONGO_PASSWORD}"
 : "${APP_MONGO_PASSWORD:?请在 server/.env 中设置 APP_MONGO_PASSWORD}"
 secret=/data/db/.bootstrap-password
 if [ ! -s "$secret" ]; then

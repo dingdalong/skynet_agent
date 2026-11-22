@@ -562,8 +562,9 @@ final class ProcessTests: XCTestCase {
         let lease = host.attach(appId: "test.untrusted") { _ in }
         let denied = expectation(description: "native Agent capabilities remain builtin-only")
         let operations = [
-            "agent.directory.choose", "agent.remote.set", "catalog.list", "catalog.unlock", "catalog.set",
-            "catalog.review", "catalog.remove",
+            "agent.directory.choose", "agent.remote.set", "app-center.list", "app-center.unlock",
+            "app-center.set",
+            "app-center.review", "app-center.remove",
         ]
         denied.expectedFulfillmentCount = operations.count
         for kind in operations {
@@ -760,7 +761,7 @@ final class ProcessTests: XCTestCase {
         let transaction = expectation(description: "failed metadata commit rolls back package removal")
         host.queue.async {
             do {
-                try self.host.catalog.remove("test.remove") {
+                try self.host.appCatalog.remove("test.remove") {
                     throw failure("storage", "injected disk failure")
                 }
                 XCTFail("Removal should fail when metadata cannot commit")
@@ -768,8 +769,8 @@ final class ProcessTests: XCTestCase {
                 XCTAssertEqual((error as? HostError)?.code, "storage")
             }
             do {
-                let entry = try XCTUnwrap(self.host.catalog.entries["test.remove"])
-                _ = try self.host.catalog.verify(entry.root)
+                let entry = try XCTUnwrap(self.host.appCatalog.entries["test.remove"])
+                _ = try self.host.appCatalog.verify(entry.root)
             } catch {
                 XCTFail("Rolled-back package failed verification: \(error)")
             }

@@ -221,7 +221,7 @@ main 在整个进程生命周期内存活，不提前释放 schema。
 
 ### Protobuf 编解码
 
-Gateway 加载 `login.proto`。App Center 加载 `app_center/catalog.proto`，由自己的节点处理目录与审批请求。客户端宿主通过 `platform.proto` 一起加载这两份协议。业务应用加载镜像内 `APP_SCHEMA` 指定的入口，例如 `agent/schema.proto`。
+Gateway 加载 `login.proto`。App Center 加载 `app_center/schema.proto`，由自己的节点处理目录与审批请求。客户端宿主通过 `platform.proto` 一起加载这两份协议。业务应用加载镜像内 `APP_SCHEMA` 指定的入口，例如 `agent/schema.proto`。
 
 业务服务在初始化阶段调用 `attach()`，随后按完整消息类型名编解码，例如：
 

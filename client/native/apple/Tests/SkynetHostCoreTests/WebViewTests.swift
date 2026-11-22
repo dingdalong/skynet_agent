@@ -161,7 +161,7 @@ final class WebViewTests: XCTestCase {
             launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
             executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
         _ = try await login(core, url: url, username: "webkit-agent")
-        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
+        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
         defer {
             harness.close()
             core.shutdown()
@@ -263,12 +263,12 @@ final class WebViewTests: XCTestCase {
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
     }
 
-    func testAppCenterCoversAndResponsiveCatalog() async throws {
+    func testAppCenterCoversAndResponsiveAppCatalog() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let data = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "catalog-\(UUID().uuidString)")
+            "app-center-\(UUID().uuidString)")
         let core = try HostCore(
             dataRoot: data,
             builtins: native.deletingLastPathComponent().appendingPathComponent("dist/builtins"),
@@ -280,8 +280,8 @@ final class WebViewTests: XCTestCase {
         }
         _ = try await login(
             core, url: XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"]),
-            username: "catalog")
-        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["app-center"]))
+            username: "app-center-test")
+        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["app-center"]))
         defer { harness.close() }
         try await harness.until("document.querySelectorAll('article').length === 3")
         try await harness.until(
@@ -303,7 +303,7 @@ final class WebViewTests: XCTestCase {
         _ = try await harness.web.evaluateJavaScript(
             """
             const token = document.querySelector('input[type=password]');
-            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(token, 'catalog-test');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(token, 'app-center-test');
             token.dispatchEvent(new Event('input', {bubbles:true}));
             """)
         try await harness.click("解锁")
@@ -338,7 +338,7 @@ final class WebViewTests: XCTestCase {
         _ = try await login(
             core, url: XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"]),
             username: "settings")
-        let entry = try XCTUnwrap(core.catalog.entries["settings"])
+        let entry = try XCTUnwrap(core.appCatalog.entries["settings"])
         let harness = WebHarness(core: core, entry: entry)
         defer {
             harness.close()
@@ -391,7 +391,7 @@ final class WebViewTests: XCTestCase {
         try await harness.until("document.body.innerText.includes('减少动态效果')")
         try await harness.until(
             "document.querySelector('input[role=switch]').parentElement.getBoundingClientRect().width>=28")
-        let agent = WebHarness(core: core, entry: try XCTUnwrap(core.catalog.entries["agent"]))
+        let agent = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
         defer { agent.close() }
         try await agent.untilToolbar("new", labelContaining: "新建会话")
         try await agent.waitForPresentation(1)

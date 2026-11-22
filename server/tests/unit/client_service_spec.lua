@@ -39,7 +39,7 @@ describe("用户与客户端服务", function()
         end
         scope = Scope.new({
             ["skynet.cluster"] = {}, ["network.nodes"] = {},
-            ["app_center.deployment"] = {}, ["app_center.catalog"] = {},
+            ["app_center.deployment"] = {}, ["app_center.app_catalog"] = {},
             client = false, ["client.user"] = false, ["agent.session"] = false,
             agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
             ["agent.workspace"] = { create = function(_, username, id)

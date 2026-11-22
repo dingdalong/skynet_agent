@@ -5,7 +5,7 @@
 
 ## 环境文件
 
-将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key、目录库密码和业务库密码。该文件使用 shell 兼容语法，
+将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key、App Center 数据库密码和业务库密码。该文件使用 shell 兼容语法，
 由 `server/start.sh` 加载；只保存本机密钥和环境选择，不提交真实密钥。可用环境变量如下：
 
 | 变量                   | 用途与可用值                                                                             |
@@ -21,7 +21,7 @@
 | `APP_CENTER_PORT`、`GATEWAY_CLUSTER_PORT` | 两个基础节点的本机 Cluster 端口，默认分别为 18081、18082。每套部署须使用独立的可用端口。 |
 | `APP_MONGO_HOST`、`APP_MONGO_PORT` | 节点连接的 MongoDB 主机和端口。Compose 将本机回环端口映射到 MongoDB 容器。 |
 | `APP_MONGO_DATABASE`、`APP_MONGO_AUTH_DB`、`APP_MONGO_USERNAME`、`APP_MONGO_PASSWORD` | Gateway 和业务应用使用的业务库、认证库、账号及密码。 |
-| `CATALOG_MONGO_DATABASE`、`CATALOG_MONGO_AUTH_DB`、`CATALOG_MONGO_USERNAME`、`CATALOG_MONGO_PASSWORD` | App Center 的目录库、认证库、账号及密码。目录库应单独授权。 |
+| `APP_CENTER_MONGO_DATABASE`、`APP_CENTER_MONGO_AUTH_DB`、`APP_CENTER_MONGO_USERNAME`、`APP_CENTER_MONGO_PASSWORD` | App Center 专用的数据库、认证库、账号及密码。 |
 | `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
 | `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
@@ -53,7 +53,7 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。启动脚本为缺少的账号创建对应库的读写权限。已有账号改密时需同步更新 MongoDB 和环境文件。目录库的 `apps` 集合保存申请、审批结果和期望启停状态。`cluster-key` 卷供 App Center 和 Gateway 使用。操作见[服务管理](DEVELOPMENT.md#服务管理)。
+Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。启动脚本为缺少的账号创建对应库的读写权限。已有账号改密时需同步更新 MongoDB 和环境文件。App Center 数据库的 `apps` 集合保存申请、审批结果和期望启停状态。`cluster-key` 卷供 App Center 和 Gateway 使用。操作见[服务管理](DEVELOPMENT.md#服务管理)。
 
 ### 模型与会话
 

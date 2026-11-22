@@ -69,11 +69,11 @@ local function multi_user_flow(login)
     other:close()
 end
 
-local function catalog_flow(login, config)
-    local admin = login("catalog-owner")
-    local reader = login("catalog-reader")
-    local peer = login("catalog-owner")
-    local observer = login("catalog-observer")
+local function app_center_flow(login, config)
+    local admin = login("app-center-owner")
+    local reader = login("app-center-reader")
+    local peer = login("app-center-owner")
+    local observer = login("app-center-observer")
     local function agent_addresses()
         return support.console(18003, 'call .main "status"')
     end
@@ -89,7 +89,7 @@ local function catalog_flow(login, config)
     assert(peer:request("AppCenterSetReq", change).ret ~= 1)
     local active = reader:request("AgentChatReq", { text = "[e2e:header-stall]" }).chat_session.session
     support.equal(observer:request("AgentDesktopRegisterReq", {
-        device_id = "desktop", name = "Desktop", authorization_id = "catalog-auth",
+        device_id = "desktop", name = "Desktop", authorization_id = "app-center-auth",
     }).ret, 1)
     local target = { device_id = "desktop", workspace_id = "workspace", directory = "/project", platform = "macos" }
     support.equal(observer:request("AgentChatReq", { execution_target = target, text = "[e2e:success]" }).ret, 1)
@@ -222,7 +222,7 @@ function M.run(config)
         end
         if config.mode == "offline_restart" then
             local admin = connect()
-            support.equal(admin:request("LoginReq", { username = "catalog-owner" }).ret, 1)
+            support.equal(admin:request("LoginReq", { username = "app-center-owner" }).ret, 1)
             support.same(admin:request("AppCenterListReq").names, { "应用中心" })
             assert(admin:request("AgentSnapshotReq").ret ~= 1)
             local file <close> = assert(io.open(config.server_log))
@@ -259,7 +259,7 @@ function M.run(config)
         chat_flow(login)
         multi_user_flow(login)
         desktop_flow(login)
-        catalog_flow(login, config)
+        app_center_flow(login, config)
         print("网关测试通过：用户路由、离线恢复、多端同步、并发、" ..
             "上下文、取消、重试与协议边界")
     end, debug.traceback)

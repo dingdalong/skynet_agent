@@ -33,7 +33,7 @@ COPY common/proto/common.proto ../common/proto/
 COPY common/proto/app_center ../common/proto/app_center
 RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lua,target=/tmp/lua \
     --mount=type=bind,source=server/deploy/check_protocol.lua,target=/tmp/check_protocol.lua \
-    /tmp/lua /tmp/check_protocol.lua app-center app_center/catalog.proto
+    /tmp/lua /tmp/check_protocol.lua app-center app_center/schema.proto
 COPY server/src/center_main.lua server/src/submit_app.lua ./src/
 COPY server/src/service/app/app_center ./src/service/app/app_center
 COPY server/deploy/container.py ./deploy/
