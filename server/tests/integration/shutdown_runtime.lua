@@ -70,7 +70,12 @@ else
                 return
             end
             assert(instance:close() == (mode ~= "failure"))
-            assert(instance.services[2].closed and instance.services[3].closed)
+            for _, service in ipairs(instance.services) do
+                if service.name ~= "debug_console" then
+                    local failed = mode == "failure" and service.name == ".shutdown_worker_2"
+                    assert(service.closed == (not failed), service.name)
+                end
+            end
             if mode == "login" then
                 assert(login_completed, "关闭必须等待在途登录完成")
             end

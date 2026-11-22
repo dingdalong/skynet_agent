@@ -60,13 +60,11 @@ mongo_compose() { docker compose -p "$mongo_project" -f "$project_root/../compos
 export MONGO_HOST=127.0.0.1 MONGO_PORT=0
 MONGO_BOOTSTRAP_PASSWORD=$(openssl rand -hex 24)
 export MONGO_BOOTSTRAP_PASSWORD
-export GATEWAY_MONGO_DATABASE=gateway GATEWAY_MONGO_USERNAME=gateway
 export APP_CENTER_MONGO_DATABASE=app_center APP_CENTER_MONGO_USERNAME=app_center
 APP_CENTER_MONGO_PROVISION_PASSWORD=$(openssl rand -hex 24)
 export APP_CENTER_MONGO_PROVISION_PASSWORD
-GATEWAY_MONGO_PASSWORD=$(openssl rand -hex 24)
 APP_CENTER_MONGO_PASSWORD=$(openssl rand -hex 24)
-export GATEWAY_MONGO_PASSWORD APP_CENTER_MONGO_PASSWORD
+export APP_CENTER_MONGO_PASSWORD
 mongo_compose up -d --wait mongodb
 unset MONGO_BOOTSTRAP_PASSWORD
 published=$(mongo_compose port mongodb 27017)

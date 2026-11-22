@@ -70,7 +70,6 @@ function Node:init(start_services)
         local console = skynet.newservice("debug_console", "127.0.0.1", config.runtime.control_port)
         self.services[#self.services + 1] = { name = "debug_console", address = console }
     end
-    self:launch("database", 1, nil, ".database")
     start_services(self)
     if config.runtime.file_control then
         assert(io.open("/tmp/skynet-ready", "w")):close()

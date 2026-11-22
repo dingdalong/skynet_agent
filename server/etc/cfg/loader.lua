@@ -10,12 +10,20 @@ local Loader = {}
 ---@field channel string
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
----@field database { host: string, port: integer, name: string?, authdb: string?, username: string?, password: string? }
+---@field database server.DatabaseConfig?
 ---@field database_admin server.DatabaseAdminConfig?
 ---@field application { id: string?, schema: string?, instances: integer, key: string? }
 ---@field app_center server.AppCenterConfig
 ---@field agent_gateway server.AgentGatewayConfig
 ---@field agent server.AgentConfig
+
+---@class server.DatabaseConfig
+---@field host string
+---@field port integer
+---@field name string?
+---@field authdb string?
+---@field username string?
+---@field password string?
 
 ---@class server.DatabaseAdminConfig
 ---@field password string?
@@ -103,12 +111,14 @@ end
 local function validate(config)
     integer_field(config.worker_thread, "worker_thread", 1, 32)
     string_field(config.channel, "channel")
-    local database = table_field(config.database, "database")
-    string_field(database.host, "database.host")
-    integer_field(database.port, "database.port", 1, 65535)
-    if database.password then
-        for _, key in ipairs({ "name", "authdb", "username", "password" }) do
-            string_field(database[key], "database." .. key)
+    if config.database ~= nil then
+        local database = table_field(config.database, "database")
+        string_field(database.host, "database.host")
+        integer_field(database.port, "database.port", 1, 65535)
+        if database.password then
+            for _, key in ipairs({ "name", "authdb", "username", "password" }) do
+                string_field(database[key], "database." .. key)
+            end
         end
     end
     local runtime = table_field(config.runtime, "runtime")

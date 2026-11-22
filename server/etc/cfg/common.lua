@@ -6,18 +6,18 @@ if api_key == "" then
 end
 
 local entry = skynet.getenv("start")
-local database = {
-    host = os.getenv("MONGO_HOST") or "127.0.0.1",
-    port = tonumber(os.getenv("MONGO_PORT") or "18083"),
-}
-local prefix = entry == "center_main" and "APP_CENTER_MONGO_" or entry == "main" and "GATEWAY_MONGO_"
-if prefix then
-    database.name = os.getenv(prefix .. "DATABASE")
-    database.authdb = os.getenv(prefix .. "AUTH_DB") or database.name
-    database.username = os.getenv(prefix .. "USERNAME")
-    database.password = os.getenv(prefix .. "PASSWORD")
-else
+local database
+if entry == "center_main" then
+    local name = os.getenv("APP_CENTER_MONGO_DATABASE")
+    database = {
+        host = os.getenv("MONGO_HOST") or "127.0.0.1",
+        port = tonumber(os.getenv("MONGO_PORT") or "18083"),
+        name = name, authdb = os.getenv("APP_CENTER_MONGO_AUTH_DB") or name,
+        username = os.getenv("APP_CENTER_MONGO_USERNAME"), password = os.getenv("APP_CENTER_MONGO_PASSWORD"),
+    }
+elseif entry ~= "main" then
     local settings = os.getenv("APP_DATABASE_CONFIG")
+    assert(settings or entry ~= "app_main", "业务节点缺少应用数据库连接配置")
     if settings then
         local ok, assigned = pcall(require("cjson").decode, settings)
         assert(ok and type(assigned) == "table", "应用数据库连接配置无效")

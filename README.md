@@ -22,8 +22,8 @@ make install
 
 ```bash
 cp server/.env.example server/.env
-# 在 server/.env 中填写模型 API Key、管理员令牌和四个独立的数据库密码
-# MONGO_BOOTSTRAP_PASSWORD、GATEWAY_MONGO_PASSWORD、APP_CENTER_MONGO_PASSWORD、APP_CENTER_MONGO_PROVISION_PASSWORD
+# 在 server/.env 中填写模型 API Key、管理员令牌和三个独立的数据库密码
+# MONGO_BOOTSTRAP_PASSWORD、APP_CENTER_MONGO_PASSWORD、APP_CENTER_MONGO_PROVISION_PASSWORD
 ./server/start.sh
 # 首次部署 Agent 时提交本地镜像，命令会返回申请编号
 ./server/appctl submit --app-id agent --name Agent --image skynet-agent-app:local

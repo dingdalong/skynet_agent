@@ -33,7 +33,7 @@ if action == "start" and not running():
         child = subprocess.Popen(["3rd/skynet/skynet", "etc/config.app"], stdin=subprocess.DEVNULL,
                                  stdout=output, stderr=output, start_new_session=True,
                                  env=dict({k: v for k, v in os.environ.items()
-                                           if not k.startswith(("APP_CENTER_MONGO_", "GATEWAY_MONGO_"))},
+                                           if not k.startswith("APP_CENTER_MONGO_")},
                                           APP_ID=app, APP_REGISTRATION_KEY=key, APP_DATABASE_CONFIG=json.dumps(database),
                                           APP_SCHEMA="agent/schema.proto"))
     record = {"key": key, "pid": child.pid}

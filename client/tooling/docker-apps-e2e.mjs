@@ -44,10 +44,6 @@ const environment = {
     MONGO_HOST: "127.0.0.1",
     MONGO_PORT: String(mongoPort),
     MONGO_BOOTSTRAP_PASSWORD: randomUUID(),
-    GATEWAY_MONGO_DATABASE: "gateway",
-    GATEWAY_MONGO_AUTH_DB: "gateway",
-    GATEWAY_MONGO_USERNAME: "gateway",
-    GATEWAY_MONGO_PASSWORD: randomUUID(),
     APP_CENTER_MONGO_DATABASE: "app_center",
     APP_CENTER_MONGO_AUTH_DB: "app_center",
     APP_CENTER_MONGO_USERNAME: "app_center",
@@ -189,6 +185,8 @@ try {
         )
     ).stdout.trim();
     await mongo(`
+        if (db.getSiblingDB("gateway").getUser("gateway"))
+            throw Error("初始化时创建了已移除的 Gateway 数据库账号");
         const privileges = admin.getRole("app_database_accounts", {showPrivileges: true}).inheritedPrivileges;
         if (privileges.some(p => p.actions.includes("dropUser") && p.resource.db !== "app_credentials"))
             throw Error("应用账号管理范围超出专属认证库");
@@ -333,7 +331,16 @@ try {
     assert.equal((await review("agent", resubmission, true)).ret, 1);
     const agentReady = async () =>
         (await request("AgentSnapshotReq")).body.ret === 1;
-    await until(agentReady, "Agent 批准后就绪");
+    await until(() => enabled("agent"), "Agent 批准后就绪");
+    await compose("pause", "mongodb");
+    try {
+        await compose("restart", "--no-deps", "gateway");
+        await listen();
+        await loginAdmin();
+        await until(agentReady, "MongoDB 暂停期间网关重新启动、登录并转发");
+    } finally {
+        await compose("unpause", "mongodb");
+    }
     await restartStack();
     await until(agentReady, "整套服务重启后恢复已启用的 Agent");
     const restoredAgent = (await list()).find((app) => app.app_id === "agent");

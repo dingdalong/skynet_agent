@@ -6,6 +6,7 @@ local protobuf = require("helper.protobuf")
 require("node").init(function(node)
     local app = config.application
     assert(frame.valid_app(app.id) and app.schema, "缺少应用节点配置")
+    node:launch("database", 1, nil, ".database")
     protobuf.load(config.protocol.agent_gateway_schema_dir, app.schema)
     local workers = node:launch("app." .. app.id:gsub("-", "_"), app.instances)
     local endpoint = node:launch("app_endpoint", 1, { app = app.id, workers = workers }, ".app_endpoint")[1]
