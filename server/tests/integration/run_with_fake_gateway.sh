@@ -58,15 +58,9 @@ mongo_project="skynet-native-${temp_dir##*.}-$$"
 mongo_project=$(printf '%s' "$mongo_project" | tr '[:upper:]' '[:lower:]')
 mongo_compose() { docker compose -p "$mongo_project" -f "$project_root/../compose.yaml" "$@"; }
 export MONGO_HOST=127.0.0.1 MONGO_PORT=0
-MONGO_BOOTSTRAP_PASSWORD=$(openssl rand -hex 24)
-export MONGO_BOOTSTRAP_PASSWORD
-export APP_CENTER_MONGO_DATABASE=app_center APP_CENTER_MONGO_USERNAME=app_center
-APP_CENTER_MONGO_PROVISION_PASSWORD=$(openssl rand -hex 24)
-export APP_CENTER_MONGO_PROVISION_PASSWORD
-APP_CENTER_MONGO_PASSWORD=$(openssl rand -hex 24)
-export APP_CENTER_MONGO_PASSWORD
+MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)
+export MONGO_ROOT_PASSWORD
 mongo_compose up -d --wait mongodb
-unset MONGO_BOOTSTRAP_PASSWORD
 published=$(mongo_compose port mongodb 27017)
 export MONGO_PORT=${published##*:}
 if [ "$probe" = hotfix_watch_probe ]; then

@@ -43,12 +43,7 @@ const environment = {
     APP_CENTER_PORT: String(centerPort),
     MONGO_HOST: "127.0.0.1",
     MONGO_PORT: String(mongoPort),
-    MONGO_BOOTSTRAP_PASSWORD: randomUUID(),
-    APP_CENTER_MONGO_DATABASE: "app_center",
-    APP_CENTER_MONGO_AUTH_DB: "app_center",
-    APP_CENTER_MONGO_USERNAME: "app_center",
-    APP_CENTER_MONGO_PROVISION_PASSWORD: randomUUID(),
-    APP_CENTER_MONGO_PASSWORD: randomUUID(),
+    MONGO_ROOT_PASSWORD: randomUUID(),
     SKYNET_ENV_FILE: "/dev/null",
     GATEWAY_CLUSTER_PORT: String(clusterPort),
     DEEPSEEK_API_KEY: "docker-fixture",
@@ -75,9 +70,9 @@ const mongo = async (script) =>
             "--eval",
             `
         const admin = db.getSiblingDB("admin");
-        if (!admin.auth("bootstrap", process.env.MONGO_INITDB_ROOT_PASSWORD).ok)
+        if (!admin.auth("root", process.env.MONGO_INITDB_ROOT_PASSWORD).ok)
             throw Error("测试管理员登录失败");
-        const apps = db.getSiblingDB("app_center").apps;
+        const apps = db.getSiblingDB("skynet_agent").app_center;
         const users = db.getSiblingDB("app_credentials");
         const fixture = db.getSiblingDB("isolation_fixture");
         ${script}
@@ -185,11 +180,6 @@ try {
         )
     ).stdout.trim();
     await mongo(`
-        if (db.getSiblingDB("gateway").getUser("gateway"))
-            throw Error("初始化时创建了已移除的 Gateway 数据库账号");
-        const privileges = admin.getRole("app_database_accounts", {showPrivileges: true}).inheritedPrivileges;
-        if (privileges.some(p => p.actions.includes("dropUser") && p.resource.db !== "app_credentials"))
-            throw Error("应用账号管理范围超出专属认证库");
         apps.insertOne({_id: "legacy", revision: 1, desired: false,
             approved: {name: "旧应用", request_id: "legacy", image: "legacy", image_id: "legacy"}});
         apps.insertOne({_id: "agent", revision: 1, desired: true,
@@ -203,7 +193,7 @@ try {
             "--no-deps",
             "-T",
             "-e",
-            "APP_CENTER_MONGO_PASSWORD=invalid-test-password",
+            "MONGO_ROOT_PASSWORD=invalid-test-password",
             "app-center",
         ),
         (error) =>
@@ -222,6 +212,39 @@ try {
             }
         }, "网关");
     };
+    const loginOnce = async (username) => {
+        const client = await connect();
+        try {
+            const response = once(client, "message", {
+                signal: AbortSignal.timeout(12_000),
+            });
+            client.send(
+                Buffer.from(
+                    codec.encodePacket("LoginReq", 1, { username }),
+                    "base64",
+                ),
+            );
+            const [data] = await response;
+            const packet = codec.decodePacket(data.toString("base64"));
+            assert.equal(packet.name, "LoginRes");
+            return packet.body;
+        } finally {
+            client.close();
+        }
+    };
+    const simultaneous = await Promise.all(
+        [" parallel ", "parallel"].map(loginOnce),
+    );
+    assert.equal(simultaneous[0].ret, 1);
+    assert.deepEqual(simultaneous[0].identity, simultaneous[1].identity);
+    assert.equal(
+        await mongo(`
+        const records = db.getSiblingDB("skynet_agent").user.find({_id: "parallel"}).toArray();
+        if (records.length !== 1) throw Error("同名用户记录数错误");
+        print(records[0].user_id);
+    `),
+        simultaneous[0].identity.user_id,
+    );
     const messages = [];
     const directoryFrames = new WeakMap();
     const listen = async () => {
@@ -240,11 +263,13 @@ try {
         socket.send(Buffer.from(codec.encodePacket(name, id, body), "base64"));
         return until(() => messages.find((packet) => packet.id === id), name);
     };
+    let loginId;
     const loginAdmin = async () => {
-        assert.equal(
-            (await request("LoginReq", { username: "docker-probe" })).body.ret,
-            1,
-        );
+        const login = (await request("LoginReq", { username: "docker-probe" }))
+            .body;
+        assert.equal(login.ret, 1);
+        loginId ??= login.identity.user_id;
+        assert.equal(login.identity.user_id, loginId);
         await until(
             async () =>
                 (
@@ -331,16 +356,11 @@ try {
     assert.equal((await review("agent", resubmission, true)).ret, 1);
     const agentReady = async () =>
         (await request("AgentSnapshotReq")).body.ret === 1;
-    await until(() => enabled("agent"), "Agent 批准后就绪");
-    await compose("pause", "mongodb");
-    try {
-        await compose("restart", "--no-deps", "gateway");
-        await listen();
-        await loginAdmin();
-        await until(agentReady, "MongoDB 暂停期间网关重新启动、登录并转发");
-    } finally {
-        await compose("unpause", "mongodb");
-    }
+    await until(agentReady, "Agent 批准后就绪");
+    await compose("restart", "--no-deps", "gateway");
+    await listen();
+    await loginAdmin();
+    await until(agentReady, "单独重启网关后以原用户 ID 访问运行中的 Agent");
     await restartStack();
     await until(agentReady, "整套服务重启后恢复已启用的 Agent");
     const restoredAgent = (await list()).find((app) => app.app_id === "agent");
@@ -397,9 +417,12 @@ try {
     const approvedRequest = await submit("echo", "Echo");
     assert.notEqual(approvedRequest, firstRequest);
     await docker("create", "--name", container("echo"), `${project}-echo:test`);
-    await mongo(
-        'admin.revokeRolesFromUser("app_provisioner", ["app_database_accounts"])',
-    );
+    await mongo(`
+        const res = apps.getDB().runCommand({collMod: "app_center", validator: {
+            $or: [{_id: {$ne: "echo"}}, {database: {$exists: false}}]
+        }});
+        if (!res.ok) throw Error("未能设置审批写入校验器");
+    `);
     const interrupted = await review("echo", approvedRequest, true);
     assert.notEqual(interrupted.ret, 1);
     assert.ok(interrupted.error.retryable);
@@ -409,13 +432,7 @@ try {
         const intent = doc.database_request;
         if ("database" in doc || doc.approved || intent.request_id !== doc.pending.request_id ||
             ["name", "username", "password"].some(field => field in intent))
-            throw Error("账号创建失败后应只保留待审申请");
-        // 让建库成功，仅拒绝发布正式的应用记录。
-        const res = apps.getDB().runCommand({collMod: "apps", validator: {
-            $or: [{_id: {$ne: "echo"}}, {database: {$exists: false}}]
-        }});
-        if (!res.ok) throw Error("未能设置测试校验器");
-        admin.grantRolesToUser("app_provisioner", ["app_database_accounts"]);
+            throw Error("审批写回失败后应只保留待审申请");
         print(intent.seed);
     `);
     assert.ok(/^[0-9a-f]{64}$/.test(retrySeed));
@@ -424,9 +441,6 @@ try {
             .get(await request("AppCenterListReq"))
             .includes(retrySeed),
     );
-    const unpublished = await review("echo", approvedRequest, true);
-    assert.notEqual(unpublished.ret, 1);
-    assert.ok(unpublished.error.retryable);
     await compose("kill", "app-center");
     await mongo(`
         const doc = apps.findOne({_id: "echo"});
@@ -441,7 +455,7 @@ try {
         // 临时把测试空集合替换为同名视图，使重启后的建库命令失败。
         business.getCollection("_app_center").drop();
         business.createView("_app_center", "fixture_source", []);
-        if (!apps.getDB().runCommand({collMod: "apps", validator: {}}).ok) throw Error("恢复校验器失败");
+        if (!apps.getDB().runCommand({collMod: "app_center", validator: {}}).ok) throw Error("恢复校验器失败");
     `);
     await compose("start", "app-center");
     await until(
@@ -521,6 +535,9 @@ try {
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
     await compose("pause", "mongodb");
     try {
+        const failedLogin = await loginOnce("docker-probe");
+        assert.notEqual(failedLogin.ret, 1);
+        assert.equal(failedLogin.error.retryable, true);
         const unavailable = request("AppCenterSetReq", {
             app_id: "echo",
             enabled: false,

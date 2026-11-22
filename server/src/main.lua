@@ -3,6 +3,7 @@ local protobuf = require("helper.protobuf")
 local config = require("etc.cfg")
 
 node.init(function(instance)
+    instance:launch("database", 1, nil, ".database")
     protobuf.load(config.protocol.agent_gateway_schema_dir, "login.proto")
     local count = config.agent_gateway.instance
     require("network.nodes").open(config.app_center.gateway_port)

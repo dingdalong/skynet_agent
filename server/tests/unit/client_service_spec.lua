@@ -126,8 +126,12 @@ describe("用户与客户端服务", function()
         return events[#events].args[4]
     end
 
+    local function stored_identity(name)
+        return { username = name, user_id = "id-" .. name }
+    end
+
     local function open(id, websocket, username)
-        if not service:open({ source = 20 }, id, websocket, username) then return nil end
+        if not service:open({ source = 20 }, id, websocket, stored_identity(username)) then return nil end
         local snapshot = request(1, "AgentSnapshotReq", {}, id, websocket).snapshot
         table.remove(events)
         return snapshot
@@ -149,9 +153,9 @@ describe("用户与客户端服务", function()
         agent_addresses[2] = 2
         service = require("client"):new()
         service:init()
-        assert.is_nil(service:open({ source = 10 }, "bad", 100, "alice"))
-        assert.is_nil(service:open({ source = 20 }, "bad", 10, "alice"))
-        local identity = service:open({ source = 20 }, "a", 100, "alice")
+        assert.is_nil(service:open({ source = 10 }, "bad", 100, stored_identity("alice")))
+        assert.is_nil(service:open({ source = 20 }, "bad", 10, stored_identity("alice")))
+        local identity = service:open({ source = 20 }, "a", 100, stored_identity("alice"))
         assert.same({ user_id = identity.user_id, username = "alice" }, identity)
         assert.same({}, instances[1].users)
         assert.same({}, instances[2].users)
@@ -178,7 +182,7 @@ describe("用户与客户端服务", function()
             return code, result
         end
         local function start(id)
-            service:open({ source = 20 }, id, 100, "alice")
+            service:open({ source = 20 }, id, 100, stored_identity("alice"))
             return coroutine.create(function()
                 service:handle_request({ source = 100 }, id, 2, "agent", pack("AgentSnapshotReq", {}))
             end)
@@ -197,7 +201,7 @@ describe("用户与客户端服务", function()
     it("应用请求失败可重试，失败期间保留登录身份", function()
         local rpc = require("rpc")
         local call = rpc.call
-        service:open({ source = 20 }, "a", 100, "alice")
+        service:open({ source = 20 }, "a", 100, stored_identity("alice"))
         rpc.call = function() return codes.call_fail end
         assert.are.equal(codes.call_fail, request(2, "AgentSnapshotReq", {}).ret)
         rpc.call = call
@@ -217,7 +221,7 @@ describe("用户与客户端服务", function()
             return { ret = codes.succ }
         end }
         for _, name in ipairs({ "alice", "bob" }) do
-            service:open({ source = 20 }, name, 100, name)
+            service:open({ source = 20 }, name, 100, stored_identity(name))
             request(2, "CommonReq", {}, name)
         end
         assert.same({ "alice", "bob" }, requests)
@@ -434,13 +438,13 @@ describe("用户与客户端服务", function()
         assert.same({}, c.chat_sessions)
     end)
 
-    it("服务计数重新开始时，新用户 ID 也不能复用旧 ID", function()
+    it("服务重启后仍绑定数据库返回的同一用户 ID", function()
         local previous = open("a", 100, "alice")
         next_id = 0
         local restarted_service = require("client"):new()
         restarted_service:init(params)
-        local restarted = restarted_service:open({ source = 20 }, "a", 100, "alice")
-        assert.are_not.equal(previous.user_id, restarted.user_id)
+        local restarted = restarted_service:open({ source = 20 }, "a", 100, stored_identity("alice"))
+        assert.are.equal(previous.user_id, restarted.user_id)
     end)
 
     it("离线任务继续完成，快照与模型上下文均恢复", function()

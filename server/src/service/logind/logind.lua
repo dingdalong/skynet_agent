@@ -82,9 +82,13 @@ function Login:handle_request(context, id, message_id, app_id, body)
             websocket_address, id, message_id, error_code.invalid_param, "用户名须为 1–32 个字符"
         )
     end
+    local code, identity = rpc.call_timeout(180, ".database", "user_identity", user_name)
+    if code ~= error_code.succ or not identity then
+        return self:_fail(websocket_address, id, message_id, error_code.call_fail, "暂时无法确认用户身份")
+    end
     local client_address = self.client_services:select(user_name)
-    local code, identity = rpc.call(client_address, "open", id, websocket_address, user_name)
-    if code ~= error_code.succ or type(identity) ~= "table" then
+    local opened, bound = rpc.call(client_address, "open", id, websocket_address, identity)
+    if opened ~= error_code.succ or not bound then
         rpc.send(client_address, "disconnect", id)
         return self:_fail(websocket_address, id, message_id, error_code.call_fail, "客户端上下文初始化失败")
     end

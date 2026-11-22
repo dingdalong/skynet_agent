@@ -32,15 +32,17 @@ describe("main", function()
 
     it("网关只加载登录协议并按依赖启动服务", function()
         startup(instance)
-        assert.same({ { "schema", "schema", "login.proto" }, { "launch", "app_routes" },
+        assert.same({ { "launch", "database" }, { "schema", "schema", "login.proto" },
+            { "launch", "app_routes" },
             { "launch", "client" }, { "launch", "logind" },
             { "launch", "websocket" }, { "launch", "gateway" } }, events)
         assert.same({
+            { name = "database", count = 1, registered_name = ".database" },
             { name = "app_routes", count = 1, registered_name = ".app_routes" },
             { name = "client", count = 2 },
-            { name = "logind", count = 1, params = { client_services = { 12, 13 } } },
+            { name = "logind", count = 1, params = { client_services = { 13, 14 } } },
             { name = "websocket", count = 3 },
-            { name = "gateway", count = 1, params = { loginds = { 14 }, websockets = { 15, 16, 17 } },
+            { name = "gateway", count = 1, params = { loginds = { 15 }, websockets = { 16, 17, 18 } },
                 registered_name = ".gateway" },
         }, calls)
     end)
@@ -48,11 +50,12 @@ describe("main", function()
         config.agent_gateway.instance = { client = 0, logind = 2, websocket = 0 }
         startup(instance)
         assert.same({
+            { name = "database", count = 1, registered_name = ".database" },
             { name = "app_routes", count = 1, registered_name = ".app_routes" },
             { name = "client", count = 0 },
             { name = "logind", count = 2, params = { client_services = {} } },
             { name = "websocket", count = 0 },
-            { name = "gateway", count = 1, params = { loginds = { 12, 13 }, websockets = {} },
+            { name = "gateway", count = 1, params = { loginds = { 13, 14 }, websockets = {} },
                 registered_name = ".gateway" },
         }, calls)
     end)

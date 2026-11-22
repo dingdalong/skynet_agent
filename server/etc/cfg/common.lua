@@ -7,15 +7,14 @@ end
 
 local entry = skynet.getenv("start")
 local database
-if entry == "center_main" then
-    local name = os.getenv("APP_CENTER_MONGO_DATABASE")
+if entry == "center_main" or entry == "main" then
     database = {
         host = os.getenv("MONGO_HOST") or "127.0.0.1",
         port = tonumber(os.getenv("MONGO_PORT") or "18083"),
-        name = name, authdb = os.getenv("APP_CENTER_MONGO_AUTH_DB") or name,
-        username = os.getenv("APP_CENTER_MONGO_USERNAME"), password = os.getenv("APP_CENTER_MONGO_PASSWORD"),
+        name = "skynet_agent", authdb = "admin", username = "root", password = os.getenv("MONGO_ROOT_PASSWORD"),
+        platform_collection = entry == "center_main" and "app_center" or "user",
     }
-elseif entry ~= "main" then
+else
     local settings = os.getenv("APP_DATABASE_CONFIG")
     assert(settings or entry ~= "app_main", "业务节点缺少应用数据库连接配置")
     if settings then
@@ -28,10 +27,6 @@ end
 
 return {
     database = database,
-    database_admin = entry == "center_main" and {
-        password = os.getenv("APP_CENTER_MONGO_PROVISION_PASSWORD"),
-        user_authdb = "app_credentials",
-    } or nil,
     worker_thread = tonumber(skynet.getenv("thread")),
     runtime = {
         control_port = 18000,
@@ -49,6 +44,7 @@ return {
         key = os.getenv("APP_REGISTRATION_KEY"),
     },
     app_center = {
+        user_authdb = "app_credentials",
         port = tonumber(os.getenv("APP_CENTER_PORT") or "18081"),
         gateway_port = tonumber(os.getenv("GATEWAY_CLUSTER_PORT") or "18082"),
         key_file = os.getenv("CLUSTER_KEY_FILE") or "./gateway.key",

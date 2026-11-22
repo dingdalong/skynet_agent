@@ -50,7 +50,7 @@ function Deployment.start(center, app)
     local process = container_process(app, "start", "w")
     process:write(json.encode({ host = config.database.host, port = config.database.port,
         name = database.name, username = database.username, password = database.password,
-        authdb = config.database_admin.user_authdb }))
+        authdb = config.app_center.user_authdb }))
     local ok, reason, status = process:close()
     app.outdated = reason == "exit" and status == 3
     assert(ok or app.outdated, "启动应用容器失败")

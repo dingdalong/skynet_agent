@@ -14,6 +14,12 @@ describe("logind", function()
             ["logind"] = false, ["log"] = false,
             skynet = { error = function() end },
             ["rpc"] = {
+                call_timeout = function(_, address, command, name)
+                    assert.are.equal(".database", address)
+                    assert.are.equal("user_identity", command)
+                    if fail.identity then return codes.call_fail end
+                    return codes.succ, { username = name, user_id = "user" }
+                end,
                 call = function(address, command, ...)
                     local args = table.pack(...)
                     calls[#calls + 1] = { address, command, ... }
@@ -32,12 +38,20 @@ describe("logind", function()
 
     it("按用户名固定路由并按 open、绑定、响应编排登录", function()
         assert.is_true(instance:handle_request({ source = 20 }, "c1", 1, "login", login))
-        assert.same({ 12, "open", "c1", 20, "alice" }, calls[1])
+        assert.same({ 12, "open", "c1", 20, { username = "alice", user_id = "user" } }, calls[1])
         assert.same({ 20, "bind_client", "c1", 12 }, calls[2])
         assert.are.equal("send_response", calls[3][2])
         assert.are.equal(codes.succ, select(2, codec:decode_body(calls[3][7], "Res")).ret)
         instance:handle_request({ source = 20 }, "c2", 1, "login", login)
         assert.are.equal(12, calls[4][1])
+    end)
+    it("无法确认持久身份时拒绝登录并允许重试", function()
+        fail.identity = true
+        instance:handle_request({ source = 20 }, "c", 1, "login", login)
+        local _, result = codec:decode_body(calls[1][7], "Res")
+        assert.are.equal(codes.call_fail, result.ret)
+        assert.is_true(result.error.retryable)
+        assert.are.equal("close_connection", calls[2][2])
     end)
     it("初始化失败清理客户端上下文后写入失败响应并关闭", function()
         fail.open = { codes.call_fail }

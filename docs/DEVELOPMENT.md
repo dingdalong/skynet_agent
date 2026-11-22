@@ -74,9 +74,7 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 ./server/control.sh force-stop
 ```
 
-`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。App Center 与业务 App 启动本机的 `.database`。App Center 通过它读取应用记录并管理专属数据库账号。Gateway 在内存中管理登录连接和路由。空库启动后可以登录并打开应用中心。
-
-替换运行中的 Gateway 前先执行 `./server/control.sh stop`，再执行 `./server/start.sh`。Gateway 重启会为重新登录的用户生成新 ID；一起排空并重启 Agent，可避免它用内存中缓存的旧 ID 拒绝同名用户。App Center 会按原启停状态恢复应用。
+`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。每个节点启动本机的 `.database`。Gateway 在 `skynet_agent.user` 中取得持久用户身份，在内存中管理连接和路由。App Center 从 `skynet_agent.app_center` 读取应用记录，按期望状态恢复应用。单独重启 Gateway 后，用户重新登录即可继续访问运行中的 Agent。
 
 首次部署 Agent 时，在部署机执行：
 

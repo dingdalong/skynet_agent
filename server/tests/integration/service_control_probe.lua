@@ -32,7 +32,7 @@ function M.run(config)
             assert(output:match("%." .. name .. " :[%da-f]+ ready"), output)
         end
         support.contains(output, "<CMD OK>")
-        support.excludes(output, ".database")
+        assert(output:match("%.database :[%da-f]+ ready"), output)
         local app_status = support.console(18003, 'call .main "status"')
         assert(app_status:match("%.database :[%da-f]+ ready"), app_status)
         local center_status = support.console(18004, 'call .main "status"')

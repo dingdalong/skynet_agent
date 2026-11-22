@@ -50,7 +50,7 @@ flowchart LR
 ## 服务生命周期
 
 每个 Skynet 容器内的 `main` 持有该节点的协议和服务地址。Compose 等 MongoDB 就绪后启动 App Center，其注册接口就绪后启动 Gateway。
-App Center 和业务 App 在业务服务之前启动本机唯一的 `.database`，通过 Skynet 原生 MongoDB 驱动建立连接。各服务通过本机 RPC 读写集合，关服时在业务服务退出后断开连接。
+每个节点在业务服务之前启动本机唯一的 `.database`，通过 Skynet 原生 MongoDB 驱动建立连接。各服务通过本机 RPC 读写集合，关服时在业务服务退出后断开连接。
 首次批准时，App Center 在 `database_request` 保存私有重试种子和审批上下文。本机 `.database` 创建并验证专属账号，用该账号在目标库创建空集合。成功后，App Center 一次写入 `database` 和批准版本，同时清除重试信息。若写回前重启，同一申请会复用原账号完成审批。启动时 App Center 通过标准输入将凭据交给部署脚本，业务节点从 `config.database` 获取连接参数。
 App Center 从 MongoDB 加载审批和期望启停状态，按批准的镜像 ID 管理 Docker 容器。Gateway 只持有登录协议，由 `app_routes` 接收应用目录并建立本机代理。
 正常关服时，App Center 冻结应用变更并等最后的通知和工具回执交付，然后关闭各应用。Gateway 的连接保持到排空结束。
@@ -144,13 +144,16 @@ sequenceDiagram
     participant C as 客户端
     participant G as gateway
     participant W as websocket
+    participant D as Gateway 的 .database
     participant L as logind
     participant A as client
     participant P as agent
     G->>W: accept(fd, address, logind)
     C->>W: LoginReq(username)
     W->>L: call handle_request(connection_id, ...)
-    L->>A: call open(connection_id, websocket, username)
+    L->>D: 读取或创建持久用户身份
+    D-->>L: 用户身份
+    L->>A: call open(connection_id, websocket, identity)
     A-->>L: 用户身份
     L->>W: call bind_client(connection_id, client_address)
     L->>W: call send_response(LoginRes)
@@ -181,7 +184,7 @@ WebSocket 只按连接是否绑定 client 服务选择路由。未绑定时同�
 其他连接仍可并发处理，logind 对 WebSocket 的绑定和写入回调也能执行。绑定后异步转发给 client 服务。
 `logind` 不保存连接级登录状态，也不参与登录后的转发。
 
-登录严格按 `client.open → websocket.bind_client → websocket.send_response(LoginRes)` 编排。
+登录严格按 `database.user_identity → client.open → websocket.bind_client → websocket.send_response(LoginRes)` 编排。
 绑定先于成功响应，客户端收到成功响应后可以立即发送业务消息。失败时先同步写响应，再关闭连接；
 绑定前失败由 logind 清理该连接订阅，绑定后断线或写入失败由 WebSocket 通知 client 服务。
 调用超时或处理结果不是 `true` 时，WebSocket 以 1011 关闭连接。
@@ -202,7 +205,7 @@ WebSocket 校验公共帧类别和请求编号。网关的 `app_routes` 从 App 
 
 管理员停用应用时，主服先撤回新请求的路由。已使用该代次的连接进入收尾状态，Agent 此时只接受已有连接的桌面工具回执。
 应用取消任务、确认最后的通知已投递后退出，App Center 通过 Docker 确认退出状态。再次启用时生成新的代次，用户保留登录和工作目录文件，Agent 从空会话开始。
-应用中心将期望的启用状态写入 MongoDB 的 `app_center.apps`。启用的应用意外退出时，App Center 重启容器，等待新实例通过注册握手。
+应用中心将期望的启用状态写入 MongoDB 的 `skynet_agent.app_center`。启用的应用意外退出时，App Center 重启容器，等待新实例通过注册握手。
 
 Agent 服务校验路由来源和用户 ID，再从 `agent.handler.REQUEST` 动态查找方法。
 返回结果只发给请求连接。应用通知由 client 按来源服务和用户筛选订阅者，桌面工具通知还限定连接 ID。
@@ -295,7 +298,7 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 历史保留全部轮次，模型上下文保留已完成响应和已执行工具事实，未完成思考保存在消息记录中。
 最新失败轮次支持原位重试，保留用户和助手消息 ID，为新一轮生成分配新 run_id；
-后续已有新消息时旧失败轮次不能重试。用户数据保留在服务端进程内存，暂不持久化。
+后续已有新消息时旧失败轮次不能重试。聊天和执行状态保留在 Agent 进程内存，用户身份保存在 MongoDB。
 
 ## 安全与验证
 

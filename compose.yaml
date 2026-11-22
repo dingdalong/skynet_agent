@@ -1,14 +1,11 @@
 name: skynet-agent
-x-app-center-database: &app-center-database
-  APP_CENTER_MONGO_PROVISION_PASSWORD: ${APP_CENTER_MONGO_PROVISION_PASSWORD:-}
-  APP_CENTER_MONGO_DATABASE: ${APP_CENTER_MONGO_DATABASE:-app_center}
-  APP_CENTER_MONGO_AUTH_DB: ${APP_CENTER_MONGO_AUTH_DB:-${APP_CENTER_MONGO_DATABASE:-app_center}}
-  APP_CENTER_MONGO_USERNAME: ${APP_CENTER_MONGO_USERNAME:-app_center}
-  APP_CENTER_MONGO_PASSWORD: ${APP_CENTER_MONGO_PASSWORD:-}
 x-node: &node
   network_mode: host
   init: true
   environment: &cluster
+    MONGO_HOST: ${MONGO_HOST:-127.0.0.1}
+    MONGO_PORT: ${MONGO_PORT:-18083}
+    MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
     APP_CENTER_PORT: ${APP_CENTER_PORT:-18081}
     GATEWAY_CLUSTER_PORT: ${GATEWAY_CLUSTER_PORT:-18082}
     CLUSTER_KEY_FILE: /cluster/gateway.key
@@ -20,14 +17,12 @@ services:
     network_mode: bridge
     ports: ["127.0.0.1:${MONGO_PORT:-18083}:27017"]
     environment:
-      <<: *app-center-database
-      MONGO_INITDB_ROOT_USERNAME: bootstrap
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_BOOTSTRAP_PASSWORD:-}
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
     entrypoint: ["/bin/bash", "/mongo-start.sh"]
     volumes:
       - mongo-data:/data/db
       - ./server/deploy/mongo-start.sh:/mongo-start.sh:ro
-      - ./server/deploy/mongo-init.js:/docker-entrypoint-initdb.d/app-center.js:ro
     healthcheck:
       test: ["CMD-SHELL", "test \"$$(cat /proc/1/comm)\" = mongod && mongosh --quiet --eval 'quit(db.runCommand({ping:1}).ok ? 0 : 1)'"]
       interval: 2s
@@ -39,9 +34,7 @@ services:
       mongodb: { condition: service_healthy }
     build: { context: ., dockerfile: server/Dockerfile, target: app-center }
     environment:
-      <<: [*cluster, *app-center-database]
-      MONGO_HOST: ${MONGO_HOST:-127.0.0.1}
-      MONGO_PORT: ${MONGO_PORT:-18083}
+      <<: *cluster
       APP_PROJECT: ${COMPOSE_PROJECT_NAME:-skynet-agent}
       APP_CENTER_ADMIN_TOKEN: ${APP_CENTER_ADMIN_TOKEN:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}

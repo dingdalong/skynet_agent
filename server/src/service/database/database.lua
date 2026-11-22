@@ -8,23 +8,26 @@ local log = require("log")
 
 ---@class database.Service
 ---@field client table? 节点独占的 MongoDB 客户端
----@field admin table? 应用中心用于账号管理的连接
 ---@field db table? 当前业务库
 local Database = class()
 
 Database.commands = { find = "find", find_one = "find_one", insert = "insert", replace_one = "replace_one",
-    provision = "provision", revoke = "revoke" }
+    user_identity = "user_identity", provision = "provision", revoke = "revoke" }
 
 function Database:ctor()
-    self.admin = nil
     self.client = nil
     self.db = nil
 end
 
--- 重复创建同定义的空集合是幂等的。只有实际能写入分配的库，业务节点才就绪。
-local function confirm_app_database(db)
-    local reply = db:runCommand("create", "_app_center", "writeConcern", { w = 1, j = true })
-    assert(reply.ok == 1 and not reply.writeConcernError, "无法确认应用专属库的写权限")
+-- 已有集合可能配置了校验器；同名视图不能作为可写集合使用。
+local function ensure_collection(db, name)
+    local reply = db:runCommand("create", name, "writeConcern", { w = 1, j = true })
+    if reply.code == 48 then
+        local info = db:runCommand("listCollections", 1, "filter", { name = name, type = "collection" })
+        assert(info.ok == 1 and info.cursor.firstBatch[1], "已有命名空间不是可写集合 " .. name)
+        return
+    end
+    assert(reply.ok == 1 and not reply.writeConcernError, "无法创建数据库集合 " .. name)
 end
 
 function Database:init()
@@ -32,26 +35,31 @@ function Database:init()
     assert(database.password and database.password ~= "", "数据库密码未配置")
     self.client = mongo.client(database)
     self.db = self.client:getDB(database.name)
-    if config.application.id then confirm_app_database(self.db) end
-    if config.database_admin then
-        local password = config.database_admin.password
-        assert(password and password ~= "", "应用数据库管理密码未配置")
-        self.admin = mongo.client({ host = database.host, port = database.port,
-            username = "app_provisioner", authdb = "admin", password = password })
+    ensure_collection(self.db, database.platform_collection or "_app_center")
+    if database.platform_collection == "user" then
+        local reply = self.db:runCommand("createIndexes", "user", "indexes",
+            { { key = { user_id = 1 }, name = "user_id", unique = true } }, "writeConcern", { w = 1, j = true })
+        assert(reply.ok == 1 and not reply.writeConcernError, "无法确认用户 ID 唯一索引")
     end
     log.info("database", "init", "已连接 host=%s port=%d database=%s", database.host, database.port, database.name)
 end
 
 function Database:close()
     if self.client then self.client:disconnect() end
-    if self.admin then self.admin:disconnect() end
-    self.client, self.db, self.admin = nil, nil, nil
+    self.client, self.db = nil, nil
 end
 
-local function administration(self, context)
-    assert(self.admin and context.source == skynet.localname(".app_center"),
-        "仅本机应用中心可管理数据库账号")
-    return self.admin
+---按用户名原子读取或创建身份，只有首次登录会写入候选 ID。
+function Database:user_identity(_, name)
+    assert(config.database.platform_collection == "user", "仅网关可绑定登录身份")
+    local id = "user-" .. crypt.hexencode(crypt.randomkey() .. crypt.randomkey())
+    local result = self.db:runCommand("findAndModify", "user", "query", { _id = name },
+        "update", { ["$setOnInsert"] = { user_id = id } }, "upsert", true, "new", true,
+        "writeConcern", { w = 1, j = true })
+    assert(result.ok == 1 and not result.writeConcernError, "无法确认用户身份")
+    local doc = result.value
+    assert(doc and doc._id == name and type(doc.user_id) == "string" and doc.user_id ~= "", "用户记录无效")
+    return { username = name, user_id = doc.user_id }
 end
 
 local function user_info(db, username)
@@ -66,10 +74,11 @@ local function check_role(user, database)
 end
 
 local function app_users(self, context, account)
-    local admin = administration(self, context)
+    assert(config.database.platform_collection == "app_center" and context.source == skynet.localname(".app_center"),
+        "仅本机应用中心可管理数据库账号")
     assert(account.name:match("^app_%x+$") and #account.name == 36 and account.username == account.name,
         "应用数据库标识无效")
-    return admin:getDB(config.database_admin.user_authdb)
+    return self.client:getDB(config.app_center.user_authdb)
 end
 
 function Database:provision(context, seed)
@@ -85,8 +94,8 @@ function Database:provision(context, seed)
     end
     check_role(user, account.name)
     local connection = mongo.client({ host = config.database.host, port = config.database.port,
-        username = account.username, password = account.password, authdb = config.database_admin.user_authdb })
-    local ok = pcall(confirm_app_database, connection:getDB(account.name))
+        username = account.username, password = account.password, authdb = config.app_center.user_authdb })
+    local ok = pcall(ensure_collection, connection:getDB(account.name), "_app_center")
     connection:disconnect()
     assert(ok, "未能创建应用数据库")
     return account

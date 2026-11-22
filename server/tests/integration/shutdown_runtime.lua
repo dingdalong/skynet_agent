@@ -46,6 +46,7 @@ else
                 string.format(".shutdown_worker_%d", index))
         end
         if mode == "login" then
+            instance:launch("database", 1, nil, ".database")
             require("helper.protobuf").load("../common/proto", "login.proto")
             local codec = require("network.protocol"):new()
             codec:init("login")

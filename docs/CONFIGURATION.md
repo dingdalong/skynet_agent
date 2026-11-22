@@ -5,7 +5,7 @@
 
 ## 环境文件
 
-将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key，并分别设置 MongoDB 实例管理员、App Center 和应用账号管理员的密码。该文件使用 shell 兼容语法，
+将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key，并设置 MongoDB 实例管理员的密码。该文件使用 shell 兼容语法，
 由 `server/start.sh` 加载；只保存本机密钥和环境选择，不提交真实密钥。可用环境变量如下：
 
 | 变量                   | 用途与可用值                                                                             |
@@ -19,10 +19,8 @@
 | `APP_CENTER_ADMIN_TOKEN` | 应用中心的管理员解锁令牌。省略时只开放普通目录查询。 |
 | `GATEWAY_PORT` | 主机回环端口，默认 18787 |
 | `APP_CENTER_PORT`、`GATEWAY_CLUSTER_PORT` | 两个基础节点的本机 Cluster 端口，默认分别为 18081、18082。每套部署须使用独立的可用端口。 |
-| `MONGO_HOST`、`MONGO_PORT` | App Center 与业务 App 使用的 MongoDB 实例地址，默认 `127.0.0.1:18083`。 |
-| `MONGO_BOOTSTRAP_PASSWORD` | 实例管理员 `bootstrap` 的密码。认证库为 `admin`，Compose 仅向 MongoDB 容器提供这个密码。 |
-| `APP_CENTER_MONGO_DATABASE`、`APP_CENTER_MONGO_AUTH_DB`、`APP_CENTER_MONGO_USERNAME`、`APP_CENTER_MONGO_PASSWORD` | App Center 专用的数据库、认证库、账号及密码。 |
-| `APP_CENTER_MONGO_PROVISION_PASSWORD` | App Center 管理专属账号时，以 `app_provisioner` 向 `admin` 认证所用的密码。 |
+| `MONGO_HOST`、`MONGO_PORT` | Gateway、App Center 与业务 App 使用的 MongoDB 实例地址，默认 `127.0.0.1:18083`。 |
+| `MONGO_ROOT_PASSWORD` | 实例管理员 `root` 的密码，认证库为 `admin`。Compose 将此密码提供给 MongoDB、Gateway 和 App Center。 |
 | `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
 | `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
@@ -54,31 +52,26 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。首次初始化时，MongoDB 用 `MONGO_BOOTSTRAP_PASSWORD` 创建实例管理员。复用已有数据卷时填写该账号的当前密码，改密时同步更新 MongoDB 和环境文件。`cluster-key` 卷供 App Center 和 Gateway 使用。
+Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。首次初始化时，MongoDB 用 `MONGO_ROOT_PASSWORD` 创建实例管理员。复用已有数据卷时填写该账号的当前密码，改密时同步更新 MongoDB 和环境文件。`cluster-key` 卷供 App Center 和 Gateway 使用。
 
-首次批准时，App Center 创建专属账号，核对权限，再用该账号登录并在目标库创建空集合 `_app_center`。成功后，App Center 在同一次写入中确认审批，并将库名、用户名、密码和状态保存到 `app_center.apps` 的顶层 `database` 字段。创建失败时申请保持待审。创建期间的私有字段 `database_request` 用于重试，成功后清除。
+首次批准时，App Center 创建专属账号，核对权限，再用该账号登录并在目标库创建空集合 `_app_center`。成功后，App Center 在同一次写入中确认审批，并将库名、用户名、密码和状态保存到 `skynet_agent.app_center` 的顶层 `database` 字段。创建失败时申请保持待审。创建期间的私有字段 `database_request` 用于重试，成功后清除。
 
 创建业务容器时，App Center 将实例地址与该 App 的专属库名、认证库、账号和密码组装成 `APP_DATABASE_CONFIG`，由业务节点的 `config.database` 读取。该启动参数由部署脚本注入。专属账号在 `app_credentials` 认证，仅有自己数据库的 `readWrite` 权限。停用、重启和升级复用该记录。下架后旧库名保存在 `archived_databases`，再次批准会分配空库。
 
 ### MongoDB 账号关系
 
 ```mermaid
-flowchart TD
-    root["bootstrap · 在 admin 认证 · root"]
-    center["app_center · App Center 数据账号"]
-    provision["app_provisioner · App Center 授权账号"]
-    catalog[("app_center 库 · apps 集合")]
-    app["业务 App 专属账号 · 在 app_credentials 认证"]
-    data[("该 App 的专属库")]
-    root -->|初始化| center
-    root -->|初始化| provision
-    center -->|读写审批和数据库分配记录| catalog
-    provision -->|创建、授权和撤销| app
-    catalog -.->|启动时向对应 App 下发凭据| app
-    app -->|readWrite| data
+flowchart LR
+    gateway["Gateway"] -->|使用| root["root · 在 admin 认证"]
+    center["App Center"] -->|使用| root
+    root -->|保存登录身份| users[("skynet_agent.user")]
+    root -->|保存审批和数据库分配记录| apps[("skynet_agent.app_center")]
+    root -->|创建和授权| account["业务 App 专属账号"]
+    account -->|readWrite| data[("该 App 专属库")]
+    root -->|可管理| data
 ```
 
-`bootstrap` 可以管理所有数据库。`app_provisioner` 具有跨库授予角色的权限，供 App Center 在审批和下架时使用。每个业务容器只收到自己的账号和密码。使用 Compass 查看所有库时，填写实例地址、用户名 `bootstrap`、认证库 `admin` 和 `server/.env` 中的 `MONGO_BOOTSTRAP_PASSWORD`。
+Gateway 首次登录时按规范化用户名创建用户记录，同名用户在网关重启后仍取得同一个 `user_id`。用 Compass 查看所有库时，填写本机实例地址、用户名 `root`、认证库 `admin`，密码取自 `server/.env` 的 `MONGO_ROOT_PASSWORD`。
 
 ### 模型与会话
 

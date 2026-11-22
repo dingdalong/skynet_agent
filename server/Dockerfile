@@ -23,6 +23,7 @@ COPY common/enum ../common/enum
 COPY server/etc ./etc
 COPY server/src/lualib ./src/lualib
 COPY server/src/clusteragent.lua ./src/
+COPY server/src/service/database ./src/service/database
 COPY server/src/service/init.lua ./src/service/init.lua
 ENTRYPOINT ["./3rd/skynet/skynet"]
 
@@ -34,7 +35,6 @@ RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lu
     --mount=type=bind,source=server/deploy/check_protocol.lua,target=/tmp/check_protocol.lua \
     /tmp/lua /tmp/check_protocol.lua app-center app_center/schema.proto
 COPY server/src/center_main.lua server/src/submit_app.lua ./src/
-COPY server/src/service/database ./src/service/database
 COPY server/src/service/app/app_center ./src/service/app/app_center
 COPY server/deploy/container.py ./deploy/
 CMD ["etc/config.center"]
@@ -53,7 +53,6 @@ COPY server/src/service/websocket ./src/service/websocket
 CMD ["etc/config"]
 
 FROM runtime AS app
-COPY server/src/service/database ./src/service/database
 COPY server/src/app_main.lua ./src/
 COPY server/src/service/app_endpoint ./src/service/app_endpoint
 COPY --from=build /opt/skynet/server/3rd/skynet/3rd/lua/lua ./bin/lua

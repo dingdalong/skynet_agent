@@ -85,19 +85,20 @@ function ClientService:init()
     log.info("client", "init", "应用路由已加载")
 end
 
-function ClientService:open(context, id, websocket_address, name)
+function ClientService:open(context, id, websocket_address, identity)
     if not registered_source("logind", context.source) or not registered_source("websocket", websocket_address) then
         log.failure("client", "open", "登录或连接服务来源无效")
         return nil
     end
     assert(not self.connections[id], "连接已经绑定 client 服务")
-    if not name or usernames.normalize(name) ~= name then return nil end
+    local name = identity.username
+    if not name or usernames.normalize(name) ~= name or type(identity.user_id) ~= "string" then return nil end
     local user = self.users[name]
     if not user then
-        user = User:new(name)
+        user = User:new(identity)
         self.users[name] = user
-        log.info("client", "open", "创建用户 user=%s", user.identity.user_id)
     end
+    assert(user.identity.user_id == identity.user_id, "登录身份与当前连接不一致")
     local state = { user = user, websocket = websocket_address, logind = context.source, targets = {} }
     user.connections[id] = state
     self.connections[id] = state

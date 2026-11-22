@@ -203,7 +203,7 @@ function M.run(config)
             "function AgentService:handle_request(context, identity, id, name, args, draining)",
             "AUTO_AGENT_SERVICE_V2")
         local user_path = "src/service/client/user.lua"
-        local user_source = marked(source(user_path), "function User:ctor(username)", "AUTO_CLIENT_USER_V2")
+        local user_source = marked(source(user_path), "function User:ctor(identity)", "AUTO_CLIENT_USER_V2", true)
         support.same(updated_files(save_batch({ { user_path, user_source } })), { user_path })
         start = offset()
         for index = 1, 2 do

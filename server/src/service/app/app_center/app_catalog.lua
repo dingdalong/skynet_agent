@@ -6,7 +6,7 @@ local Deployment = require("app_center.deployment")
 local AppCatalog = {}
 
 local function store(command, ...)
-    return rpc.call_timeout(180, ".database", command, "apps", ...)
+    return rpc.call_timeout(180, ".database", command, "app_center", ...)
 end
 
 local function save(center, doc)
