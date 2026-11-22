@@ -21,7 +21,6 @@ local Catalog = require("app_center.catalog")
 ---@field acknowledged integer
 ---@field connections table<string, table>
 ---@field documents table<string, table>
----@field store integer?
 ---@field locks table
 ---@field reconciling table
 ---@field uncertain table
@@ -43,7 +42,6 @@ function Center:ctor()
     self.gateway_seen, self.acknowledged = 0, 0
     self.connections = {}
     self.documents, self.locks, self.reconciling, self.uncertain, self.retired = {}, {}, {}, {}, {}
-    self.store = nil
     self.revision = 0
     self.closed = false
     self.freezing = false

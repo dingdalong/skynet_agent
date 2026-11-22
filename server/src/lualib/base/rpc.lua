@@ -32,6 +32,9 @@ local function request(ticks, address, command, ...)
     return table.unpack(result, 2, result.n)
 end
 
+---为嵌套调用预留向上游返回业务错误的时间。
+Rpc.call_timeout = request
+
 ---@param address integer|string
 ---@param command string
 ---@param ... any

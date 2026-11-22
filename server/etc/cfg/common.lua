@@ -5,7 +5,18 @@ if api_key == "" then
     api_key = nil
 end
 
+local database_prefix = skynet.getenv("start") == "center_main" and "CATALOG_MONGO_" or "APP_MONGO_"
+local database_name = os.getenv(database_prefix .. "DATABASE")
+
 return {
+    database = {
+        host = os.getenv("APP_MONGO_HOST") or "127.0.0.1",
+        port = tonumber(os.getenv("APP_MONGO_PORT") or "18083"),
+        name = database_name,
+        authdb = os.getenv(database_prefix .. "AUTH_DB") or database_name,
+        username = os.getenv(database_prefix .. "USERNAME"),
+        password = os.getenv(database_prefix .. "PASSWORD"),
+    },
     worker_thread = tonumber(skynet.getenv("thread")),
     runtime = {
         control_port = 18000,

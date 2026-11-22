@@ -44,7 +44,9 @@ def operate(action, app, image):
     if record and not labels.items() <= record["Config"]["Labels"].items():
         raise ValueError("Container name belongs to a different application")
     if action == "start":
-        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL") if k in os.environ}
+        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL",
+               "APP_MONGO_HOST", "APP_MONGO_PORT", "APP_MONGO_DATABASE", "APP_MONGO_AUTH_DB",
+               "APP_MONGO_USERNAME", "APP_MONGO_PASSWORD") if k in os.environ}
         env.update(APP_ID=app, NODE_CONTROL_FILES="1")
         host = {"NetworkMode": "host", "Init": True, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges:true"]}
         if app == "agent":

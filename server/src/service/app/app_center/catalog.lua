@@ -1,16 +1,23 @@
-local skynet = require("skynet")
+local rpc = require("rpc")
+local codes = require("enum.error_code")
 local queue = require("skynet.queue")
 local crypt = require("skynet.crypt")
 local Deployment = require("app_center.deployment")
 local Catalog = {}
 
-local function store(center, action, record)
-    return skynet.call(center.store, "lua", action, record)
+local function store(command, ...)
+    return rpc.call_timeout(180, ".database", command, "apps", ...)
 end
 
 local function save(center, doc)
     doc.revision = (doc.revision or 0) + 1
-    if not store(center, "save", doc) then
+    local code, count
+    if doc.revision == 1 then
+        code, count = store("insert", doc)
+    else
+        code, count = store("replace_one", { _id = doc._id, revision = doc.revision - 1 }, doc)
+    end
+    if code ~= codes.succ or count ~= 1 then
         center.uncertain[doc._id] = true
         error("数据库写入未确认，请重试", 0)
     end
@@ -19,8 +26,9 @@ end
 
 function Catalog.refresh(center, id)
     if not center.uncertain[id] then return end
-    local current = assert(store(center, "get", { _id = id }), "数据库暂时不可用")
-    center.documents[id] = current._id and current or nil
+    local code, current = store("find_one", { _id = id })
+    assert(code == codes.succ, "数据库暂时不可用")
+    center.documents[id] = current
     center.uncertain[id] = nil
 end
 
@@ -30,8 +38,8 @@ function Catalog.lock(center, id)
 end
 
 function Catalog.open(center)
-    center.store = skynet.newservice("catalog_store")
-    local documents = assert(store(center, "load"), "无法读取应用目录")
+    local code, documents = store("find")
+    assert(code == codes.succ, "无法读取应用目录")
     for _, doc in ipairs(documents) do center.documents[doc._id] = doc end
 end
 

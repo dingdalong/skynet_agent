@@ -43,6 +43,7 @@ cleanup() {
         kill -KILL "$pid" 2>/dev/null || true
         wait "$pid" 2>/dev/null || true
     done
+    if [ -n "${mongo_project:-}" ]; then mongo_compose down --volumes; fi
     rm -rf "$temp_dir"
 }
 trap cleanup EXIT
@@ -52,7 +53,19 @@ trap 'exit 143' TERM
 server_root="$temp_dir/server"
 mkdir -p "$server_root/deploy"
 cp "$project_root/tests/integration/native_container.py" "$server_root/deploy/container.py"
-cp "$project_root/tests/integration/native_catalog.py" "$server_root/deploy/catalog.py"
+# 原生节点连接此轮独占的 MongoDB，重启节点时保留同一个数据库。
+mongo_project="skynet-native-${temp_dir##*.}-$$"
+mongo_project=$(printf '%s' "$mongo_project" | tr '[:upper:]' '[:lower:]')
+mongo_compose() { docker compose -p "$mongo_project" -f "$project_root/../compose.yaml" "$@"; }
+export APP_MONGO_HOST=127.0.0.1 APP_MONGO_PORT=0
+export APP_MONGO_DATABASE=applications APP_MONGO_USERNAME=applications
+export CATALOG_MONGO_DATABASE=app_center CATALOG_MONGO_USERNAME=app_center
+APP_MONGO_PASSWORD=$(openssl rand -hex 24)
+CATALOG_MONGO_PASSWORD=$(openssl rand -hex 24)
+export APP_MONGO_PASSWORD CATALOG_MONGO_PASSWORD
+mongo_compose up -d --wait mongodb
+published=$(mongo_compose port mongodb 27017)
+export APP_MONGO_PORT=${published##*:}
 if [ "$probe" = hotfix_watch_probe ]; then
     channel=develop
     mkdir -p "$server_root"

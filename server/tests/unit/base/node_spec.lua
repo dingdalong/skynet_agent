@@ -11,7 +11,7 @@ describe("node", function()
         watcher = { started = false, closed = false,
             start = function(self) self.started = true end,
             close = function(self)
-                assert.are.equal(5, #calls)
+                assert.are.equal(6, #calls)
                 self.closed = true
             end,
         }
@@ -66,7 +66,7 @@ describe("node", function()
             ["hotfix"] = { install_debug_command = function() debug_installed = true end },
             ["helper.hotfix_watch"] = { new = function(_, node_instance)
                 assert.are.equal(instance, node_instance)
-                assert.are.equal(5, #calls)
+                assert.are.equal(6, #calls)
                 return watcher
             end },
             ["skynet.manager"] = skynet, skynet = skynet,
@@ -107,13 +107,14 @@ describe("node", function()
 
     it("公共初始化先于业务回调，业务服务完成后节点就绪", function()
         start()
-        assert.same({ { "debug_console", "127.0.0.1", 18001 }, { "worker" }, { "worker" },
+        assert.same({ { "debug_console", "127.0.0.1", 18001 }, { "database" }, { "worker" }, { "worker" },
             { "coordinator" }, { "transport" }, { "entry" } }, launched)
-        assert.same({ workers = { 11, 12 } }, calls[3][3])
-        assert.same({ coordinators = { 13 }, transports = { 14 } }, calls[5][3])
+        assert.same({ workers = { 12, 13 } }, calls[4][3])
+        assert.same({ coordinators = { 14 }, transports = { 15 } }, calls[6][3])
         assert.are.equal(1, named[".main"])
-        assert.are.equal(11, named[".worker_1"])
-        assert.are.equal(15, named[".entry"])
+        assert.are.equal(11, named[".database"])
+        assert.are.equal(12, named[".worker_1"])
+        assert.are.equal(16, named[".entry"])
         assert.are.equal("ready", runtime.state)
         assert.are.equal(1, runtime.owner)
         assert.are.equal(0, runtime.active_commands)
@@ -125,7 +126,7 @@ describe("node", function()
         for _, call in ipairs(calls) do
             if call[2] == "close" then closed[#closed + 1] = call[1] end
         end
-        assert.same({ 15, 14, 13, 12, 11 }, closed)
+        assert.same({ 16, 15, 14, 13, 12, 11 }, closed)
         for _, service in ipairs(instance.services) do
             if service.name ~= "debug_console" then assert.is_true(service.closed) end
         end
@@ -148,14 +149,14 @@ describe("node", function()
             local callback = function(node_instance)
                 runs = runs + 1
                 assert.are.equal("initializing", runtime.state)
-                assert.same({ { "debug_console", "127.0.0.1", 18001 } }, launched)
+                assert.same({ { "debug_console", "127.0.0.1", 18001 }, { "database" } }, launched)
                 node_instance:launch(name, 1)
             end
             require("node").init(callback)
             start()
             assert.are.equal("ready", runtime.state)
             assert.are.equal(1, named[".main"])
-            assert.are.equal(11, named["." .. name .. "_1"])
+            assert.are.equal(12, named["." .. name .. "_1"])
             assert.are.equal(1, runs)
             assert.are.equal(codes.invalid_command, runtime:invoke({ source = 1 }, "init", callback))
             assert.are.equal(1, runs)
@@ -185,9 +186,9 @@ describe("node", function()
             node_instance:launch("another_worker", 1, { enabled = true }, ".worker")
         end
         start()
-        assert.are.equal(11, named[".worker_1"])
-        assert.are.equal(12, named[".worker"])
-        assert.same({ 12, "init", { enabled = true } }, calls[2])
+        assert.are.equal(12, named[".worker_1"])
+        assert.are.equal(13, named[".worker"])
+        assert.same({ 13, "init", { enabled = true } }, calls[3])
         assert.are.equal("ready", runtime.state)
     end)
     it("节点业务启动回调必须可调用", function()
@@ -197,30 +198,30 @@ describe("node", function()
     end)
     it("部分初始化失败记录错误并回收已创建服务后退出", function()
         package.loaded["etc.cfg"].channel = "develop"
-        failure = 13
+        failure = 14
         start()
         assert.is_false(watcher.started)
         assert.matches("^%[main%] init 失败 error=.*初始化服务失败: %.coordinator_1", logs[1])
-        assert.is_true(instance.services[4].closed)
-        assert.are.equal(4, #launched)
+        assert.is_true(instance.services[5].closed)
+        assert.are.equal(5, #launched)
         local closed = {}
         for _, call in ipairs(calls) do
             if call[2] == "close" then closed[#closed + 1] = call[1] end
         end
-        assert.same({ 13, 12, 11 }, closed)
+        assert.same({ 14, 13, 12, 11 }, closed)
         assert.same({ 1 }, exits)
     end)
     it("启动清理失败继续回收其余服务并退出失败码", function()
-        failure = 13
+        failure = 14
         local original_call = package.loaded["rpc"].call_no_timeout
         package.loaded["rpc"].call_no_timeout = function(address, command, ...)
-            if command == "close" and address == 13 then return codes.call_fail end
+            if command == "close" and address == 14 then return codes.call_fail end
             return original_call(address, command, ...)
         end
         start()
         assert.is_false(instance.close_succeeded)
         assert.is_true(instance.services[2].closed)
-        assert.is_false(instance.services[4].closed)
+        assert.is_false(instance.services[5].closed)
         assert.same({ 1 }, exits)
     end)
     it("慢初始化和慢清理都等待实际完成", function()
@@ -231,8 +232,8 @@ describe("node", function()
         end
         start()
         assert.is_true(instance:close())
-        assert.are.equal(40000, now)
-        assert.are.equal(10, #calls)
+        assert.are.equal(48000, now)
+        assert.are.equal(12, #calls)
         assert.same({}, exits)
     end)
     it("状态查询汇总业务服务，区分失败和无响应", function()
@@ -253,23 +254,23 @@ describe("node", function()
             }
         end
         dispatch(1, 9, "status")
-        assert.same({ { 11, "lua", "status", n = 3 }, { 12, "lua", "status", n = 3 },
-            { 13, "lua", "status", n = 3 }, { 14, "lua", "status", n = 3 },
-            { 15, "lua", "status", n = 3 } }, requests)
+        assert.same({ { 11, "lua", "status", n = 3 }, { 12, "lua", "status", n = 3 }, { 13, "lua", "status", n = 3 },
+            { 14, "lua", "status", n = 3 }, { 15, "lua", "status", n = 3 },
+            { 16, "lua", "status", n = 3 } }, requests)
         assert.same(table.pack(codes.succ, table.concat({
-            ".worker_1 11 ready", ".worker_2 12 failed", ".coordinator_1 13 failed",
-            ".transport_1 14 unavailable", ".entry 15 unavailable",
+            ".database 11 ready", ".worker_1 12 failed", ".worker_2 13 failed", ".coordinator_1 14 unavailable",
+            ".transport_1 15 unavailable", ".entry 16 unavailable",
         }, "\n")), result)
     end)
     it("关闭异常继续清理其余服务并报告失败", function()
         start()
         local original_call = package.loaded["rpc"].call_no_timeout
         package.loaded["rpc"].call_no_timeout = function(address, command, ...)
-            if address == 15 then return codes.call_fail end
+            if address == 16 then return codes.call_fail end
             return original_call(address, command, ...)
         end
         assert.is_false(instance:close())
-        assert.is_false(instance.services[6].closed)
+        assert.is_false(instance.services[7].closed)
         assert.is_true(instance.services[2].closed)
     end)
     it("关服在 fork 前防重入并按清理结果退出", function()
@@ -293,7 +294,7 @@ describe("node", function()
         assert.are.equal(1, #forks)
         forks[1]()
         assert.same({ 1 }, exits)
-        assert.are.equal(5, #calls)
+        assert.are.equal(6, #calls)
     end)
     it("启动等待期间报告初始化状态且仅允许显式强制退出", function()
         package.loaded["etc.cfg"].channel = "develop"
@@ -339,7 +340,7 @@ describe("node", function()
         start()
         local original_call = package.loaded["rpc"].call_no_timeout
         package.loaded["rpc"].call_no_timeout = function(...)
-            if not instance.services[6].closed then coroutine.yield() end
+            if not instance.services[7].closed then coroutine.yield() end
             return original_call(...)
         end
         local first, second

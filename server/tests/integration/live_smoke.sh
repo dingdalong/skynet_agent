@@ -14,6 +14,9 @@ while len(sockets)<4:
 print(*(sock.getsockname()[1] for sock in sockets))')
 set -- $ports
 export GATEWAY_PORT=$1 APP_CENTER_PORT=$2 GATEWAY_CLUSTER_PORT=$3 APP_MONGO_PORT=$4
+APP_MONGO_PASSWORD=$(openssl rand -hex 24)
+CATALOG_MONGO_PASSWORD=$(openssl rand -hex 24)
+export APP_MONGO_HOST=127.0.0.1 APP_MONGO_PASSWORD CATALOG_MONGO_PASSWORD
 env_file=${SKYNET_ENV_FILE:-"$server_root/.env"}
 compose() { docker compose --env-file "$env_file" "$@"; }
 

@@ -23,19 +23,20 @@ COPY common/enum ../common/enum
 COPY server/etc ./etc
 COPY server/src/lualib ./src/lualib
 COPY server/src/clusteragent.lua ./src/
+COPY server/src/service/database ./src/service/database
 COPY server/src/service/init.lua ./src/service/init.lua
 ENTRYPOINT ["./3rd/skynet/skynet"]
 
 FROM runtime AS app-center
-RUN apt-get update && apt-get install -y --no-install-recommends python3-pymongo && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 COPY common/proto/common.proto ../common/proto/
 COPY common/proto/app_center ../common/proto/app_center
 RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lua,target=/tmp/lua \
     --mount=type=bind,source=server/deploy/check_protocol.lua,target=/tmp/check_protocol.lua \
     /tmp/lua /tmp/check_protocol.lua app-center app_center/catalog.proto
-COPY server/src/center_main.lua server/src/submit_app.lua server/src/catalog_store.lua ./src/
+COPY server/src/center_main.lua server/src/submit_app.lua ./src/
 COPY server/src/service/app/app_center ./src/service/app/app_center
-COPY server/deploy/container.py server/deploy/catalog.py ./deploy/
+COPY server/deploy/container.py ./deploy/
 CMD ["etc/config.center"]
 
 FROM runtime AS gateway

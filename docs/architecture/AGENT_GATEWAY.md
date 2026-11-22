@@ -50,6 +50,7 @@ flowchart LR
 ## 服务生命周期
 
 每个 Skynet 容器内的 `main` 持有该节点的协议和服务地址。Compose 等 MongoDB 就绪后启动 App Center，其注册接口就绪后启动 Gateway。
+节点在业务服务之前启动本机唯一的 `.database`，通过 Skynet 原生 MongoDB 驱动建立连接。各服务通过本机 RPC 读写集合，关服时在业务服务退出后断开连接。
 App Center 从 MongoDB 加载审批和期望启停状态，按批准的镜像 ID 管理 Docker 容器。Gateway 只持有登录协议，由 `app_routes` 接收应用目录并建立本机代理。
 正常关服时，App Center 冻结应用变更并等最后的通知和工具回执交付，然后关闭各应用。Gateway 的连接保持到排空结束。
 应用注册和网关获取目录有就绪期限，失败的应用按退避间隔重试。正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；
@@ -61,6 +62,7 @@ App Center 从 MongoDB 加载审批和期望启停状态，按批准的镜像 ID
 | `service/init.lua`                              | 根据 loader 提供的服务名加载业务主体                        |
 | `main.lua`                                      | 加载登录协议，按依赖顺序启动网关服务 |
 | `base/node.lua` / `main`                        | 公共初始化、服务登记、启动失败回收、状态汇总、进程关闭      |
+| `service/database/database.lua` / `.database` | 读取 `config.database`，持有节点连接，提供 `find`、`find_one`、`insert`、`replace_one` |
 | `base/rpc.lua`                                  | 固定 Lua 协议、有超时与无超时调用、状态码、完整多返回值     |
 | `helper/`                                       | Protobuf 加载与接入、服务池轮询与固定路由、开发渠道热修监听 |
 | `service/gateway/gateway.lua` / `gateway`       | 单例监听和新连接分发                                        |

@@ -74,7 +74,7 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 ./server/control.sh force-stop
 ```
 
-`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。App Center 从 `app_center.apps` 读取业务应用目录。空库启动后可以登录并打开应用中心。
+`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。每个 Skynet 节点启动本机的 `.database`。App Center 通过它读取目录库的 `apps` 集合。空库启动后可以登录并打开应用中心。
 
 首次部署 Agent 时，在部署机执行：
 

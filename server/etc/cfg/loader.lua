@@ -10,6 +10,7 @@ local Loader = {}
 ---@field channel string
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
+---@field database { host: string, port: integer, name: string?, authdb: string?, username: string?, password: string? }
 ---@field application { id: string?, schema: string?, instances: integer, key: string? }
 ---@field app_center server.AppCenterConfig
 ---@field agent_gateway server.AgentGatewayConfig
@@ -97,6 +98,14 @@ end
 local function validate(config)
     integer_field(config.worker_thread, "worker_thread", 1, 32)
     string_field(config.channel, "channel")
+    local database = table_field(config.database, "database")
+    string_field(database.host, "database.host")
+    integer_field(database.port, "database.port", 1, 65535)
+    if database.password then
+        for _, key in ipairs({ "name", "authdb", "username", "password" }) do
+            string_field(database[key], "database." .. key)
+        end
+    end
     local runtime = table_field(config.runtime, "runtime")
     integer_field(runtime.control_port, "runtime.control_port", 1, 65535)
     local protocol = table_field(config.protocol, "protocol")

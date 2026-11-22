@@ -18,6 +18,7 @@ local function common_config()
     return {
         worker_thread = 8,
         application = {},
+        database = { host = "localhost", port = 27017 },
         runtime = {
             control_port = 18000,
         },
@@ -211,6 +212,15 @@ describe("etc.cfg", function()
         assert_build_error(loader.build, function(_, channel)
             channel.agent_gateway.instance.websocket = 1.5
         end, "agent_gateway.instance.websocket")
+    end)
+
+    it("拒绝无效的数据库端口和不完整的认证配置", function()
+        assert_build_error(loader.build, function(common)
+            common.database.port = 65536
+        end, "database.port")
+        assert_build_error(loader.build, function(common)
+            common.database.password = "test-password"
+        end, "database.name")
     end)
 
     it("拒绝无效的监听配置", function()

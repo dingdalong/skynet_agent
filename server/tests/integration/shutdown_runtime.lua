@@ -49,7 +49,8 @@ else
             require("helper.protobuf").load("../common/proto", "login.proto")
             local codec = require("network.protocol"):new()
             codec:init("login")
-            local logind = instance:launch("logind", 1, { client_services = { instance.services[2].address } })[1]
+            local workers = { skynet.localname(".shutdown_worker_1") }
+            local logind = instance:launch("logind", 1, { client_services = workers })[1]
             skynet.fork(function()
                 local code, handled = rpc.call(
                     logind, "handle_request", "login", 1, "login",
@@ -69,7 +70,7 @@ else
                 return
             end
             assert(instance:close() == (mode ~= "failure"))
-            assert(instance.services[2].closed)
+            assert(instance.services[2].closed and instance.services[3].closed)
             if mode == "login" then
                 assert(login_completed, "关闭必须等待在途登录完成")
             end

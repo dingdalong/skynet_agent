@@ -41,7 +41,10 @@ const environment = {
     COMPOSE_PROJECT_NAME: project,
     GATEWAY_PORT: String(gatewayPort),
     APP_CENTER_PORT: String(centerPort),
+    APP_MONGO_HOST: "127.0.0.1",
     APP_MONGO_PORT: String(mongoPort),
+    APP_MONGO_PASSWORD: randomUUID(),
+    CATALOG_MONGO_PASSWORD: randomUUID(),
     SKYNET_ENV_FILE: "/dev/null",
     GATEWAY_CLUSTER_PORT: String(clusterPort),
     DEEPSEEK_API_KEY: "docker-fixture",
@@ -126,6 +129,19 @@ try {
         );
     }
     await compose("up", "-d", "gateway");
+    await assert.rejects(
+        compose(
+            "run",
+            "--rm",
+            "--no-deps",
+            "-T",
+            "-e",
+            "CATALOG_MONGO_PASSWORD=invalid-test-password",
+            "app-center",
+        ),
+        (error) =>
+            /初始化服务失败: \.database/.test(error.stdout + error.stderr),
+    );
     const connect = async () => {
         const origin = `127.0.0.1:${gatewayPort}`;
         return until(async () => {
@@ -340,6 +356,10 @@ try {
             ),
         "回程通知",
     );
+    // 写入超时后数据库仍可能提交。重试同一个请求确认期望状态，再恢复运行。
+    await set("echo", false);
+    assert.equal(await enabled("echo"), false);
+    await set("echo", true);
     const agentBoot = () =>
         docker(
             "inspect",

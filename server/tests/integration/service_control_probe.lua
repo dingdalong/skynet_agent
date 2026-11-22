@@ -27,12 +27,31 @@ function M.run(config)
     local ok, failure = xpcall(function()
         local output = support.control(config, "status", 500)
         for _, name in ipairs({
-            "client_1", "client_2", "logind_1", "logind_2", "websocket_1", "websocket_2", "gateway",
+            "database", "client_1", "client_2", "logind_1", "logind_2", "websocket_1", "websocket_2", "gateway",
         }) do
             assert(output:match("%." .. name .. " :[%da-f]+ ready"), output)
         end
         support.contains(output, "<CMD OK>")
-        local initial = agents(support.console(18003, 'call .main "status"'))
+        local app_status = support.console(18003, 'call .main "status"')
+        assert(app_status:match("%.database :[%da-f]+ ready"), app_status)
+        local center_status = support.console(18004, 'call .main "status"')
+        assert(center_status:match("%.database :[%da-f]+ ready"), center_status)
+        -- 使用与驱动字段同名的集合，验证节点间共享、条件更新和连接复用。
+        local function database(port, args)
+            return support.console(port, 'call .database ' .. args)
+        end
+        local gateway_port = config.control_port
+        local insert = '"insert", "name", { _id = "shared", version = 1 }'
+        support.contains(database(gateway_port, insert), "2\t1")
+        support.contains(database(18003, '"find_one", "name", { _id = "shared" }'), "version:1")
+        local replace = '"replace_one", "name", { _id = "shared", version = 1 }, { _id = "shared", version = 2 }'
+        support.contains(database(18003, replace), "2\t1")
+        support.contains(database(18003, replace), "2\t0")
+        support.contains(database(gateway_port, '"find_one", "name", { _id = "shared" }'), "version:2")
+        local catalog_read = database(18004, '"find_one", "name", { _id = "shared" }')
+        support.contains(catalog_read, "1\t1")
+        support.excludes(catalog_read, "version:")
+        local initial = agents(app_status)
         support.equal(#initial, 2)
         local idle = connect()
         support.equal(idle:request("LoginReq", { username = "control-stream" }).ret, 1)
