@@ -1,13 +1,22 @@
 local skynet = require("skynet")
 local json = require("cjson")
+local config = require("etc.cfg")
+local Frame = require("network.frame")
 local rpc = require("rpc")
 local codes = require("enum.error_code")
 local log = require("log")
 local Deployment = {}
 
-function Deployment.manage(app, action)
+local function container_process(app, action, mode)
+    assert(Frame.valid_app(app.app_id), "应用 ID 无效")
+    assert(type(app.image) == "string" and #app.image <= 255 and app.image:match("^[%w][%w./_:@%-]*$"),
+        "镜像名称无效")
     local command = string.format("python3 deploy/container.py %s '%s' '%s'", action, app.app_id, app.image)
-    local process = assert(io.popen(command, "r"))
+    return assert(io.popen(command, mode))
+end
+
+function Deployment.manage(app, action)
+    local process = container_process(app, action, "r")
     local output = process:read("a")
     assert(process:close(), "容器操作失败 " .. app.app_id .. "/" .. action)
     return json.decode(output)
@@ -35,8 +44,16 @@ function Deployment.collect(center, app)
 end
 
 function Deployment.start(center, app)
-    local started = Deployment.manage(app, "start")
-    app.key, app.outdated = assert(started.key), started.outdated
+    local database = center.documents[app.app_id].database
+    assert(database and database.state == "ready", "应用专属数据库未就绪")
+    -- 密码只经过管道；容器注册密钥单独从受信任的 inspect 响应读取。
+    local process = container_process(app, "start", "w")
+    process:write(json.encode({ name = database.name, username = database.username, password = database.password,
+        authdb = config.database_admin.user_authdb }))
+    local ok, reason, status = process:close()
+    app.outdated = reason == "exit" and status == 3
+    assert(ok or app.outdated, "启动应用容器失败")
+    app.key = assert(Deployment.manage(app, "inspect").key)
     local deadline = skynet.now() + 1500
     while not app.address do
         assert(not center.freezing and skynet.now() < deadline, "等待应用注册超时")

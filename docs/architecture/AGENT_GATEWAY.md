@@ -51,6 +51,7 @@ flowchart LR
 
 每个 Skynet 容器内的 `main` 持有该节点的协议和服务地址。Compose 等 MongoDB 就绪后启动 App Center，其注册接口就绪后启动 Gateway。
 节点在业务服务之前启动本机唯一的 `.database`，通过 Skynet 原生 MongoDB 驱动建立连接。各服务通过本机 RPC 读写集合，关服时在业务服务退出后断开连接。
+首次批准时，App Center 在 `database_request` 保存私有重试种子和审批上下文。本机 `.database` 创建并验证专属账号，用该账号在目标库创建空集合。成功后，App Center 一次写入 `database` 和批准版本，同时清除重试信息。若写回前重启，同一申请会复用原账号完成审批。启动时 App Center 通过标准输入将凭据交给部署脚本，业务节点从 `config.database` 获取连接参数。Gateway 使用独立的基础账号。
 App Center 从 MongoDB 加载审批和期望启停状态，按批准的镜像 ID 管理 Docker 容器。Gateway 只持有登录协议，由 `app_routes` 接收应用目录并建立本机代理。
 正常关服时，App Center 冻结应用变更并等最后的通知和工具回执交付，然后关闭各应用。Gateway 的连接保持到排空结束。
 应用注册和网关获取目录有就绪期限，失败的应用按退避间隔重试。正常关闭保留服务 VM 至进程结束。清理成功退出 0，清理失败退出 1；

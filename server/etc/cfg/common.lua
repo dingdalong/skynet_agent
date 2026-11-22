@@ -5,7 +5,9 @@ if api_key == "" then
     api_key = nil
 end
 
-local database_prefix = skynet.getenv("start") == "center_main" and "APP_CENTER_MONGO_" or "APP_MONGO_"
+local entry = skynet.getenv("start")
+local database_prefix = entry == "center_main" and "APP_CENTER_MONGO_"
+    or entry == "main" and "GATEWAY_MONGO_" or "APP_MONGO_"
 local database_name = os.getenv(database_prefix .. "DATABASE")
 
 return {
@@ -17,6 +19,13 @@ return {
         username = os.getenv(database_prefix .. "USERNAME"),
         password = os.getenv(database_prefix .. "PASSWORD"),
     },
+    database_admin = entry == "center_main" and {
+        password = os.getenv("APP_CENTER_MONGO_PROVISION_PASSWORD"),
+        user_authdb = "app_credentials",
+        legacy_database = os.getenv("LEGACY_MONGO_DATABASE") or "applications",
+        legacy_authdb = os.getenv("LEGACY_MONGO_AUTH_DB") or "applications",
+        legacy_username = os.getenv("LEGACY_MONGO_USERNAME") or "applications",
+    } or nil,
     worker_thread = tonumber(skynet.getenv("thread")),
     runtime = {
         control_port = 18000,

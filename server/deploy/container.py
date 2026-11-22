@@ -44,10 +44,11 @@ def operate(action, app, image):
     if record and not labels.items() <= record["Config"]["Labels"].items():
         raise ValueError("Container name belongs to a different application")
     if action == "start":
-        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL",
-               "APP_MONGO_HOST", "APP_MONGO_PORT", "APP_MONGO_DATABASE", "APP_MONGO_AUTH_DB",
-               "APP_MONGO_USERNAME", "APP_MONGO_PASSWORD") if k in os.environ}
-        env.update(APP_ID=app, NODE_CONTROL_FILES="1")
+        database = json.load(sys.stdin)
+        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL", "APP_MONGO_HOST", "APP_MONGO_PORT")}
+        env.update(APP_ID=app, NODE_CONTROL_FILES="1", APP_MONGO_DATABASE=database["name"],
+                   APP_MONGO_AUTH_DB=database["authdb"], APP_MONGO_USERNAME=database["username"],
+                   APP_MONGO_PASSWORD=database["password"])
         host = {"NetworkMode": "host", "Init": True, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges:true"]}
         if app == "agent":
             env.update({k: os.environ[k] for k in ("APP_INSTANCES", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL",
@@ -62,16 +63,20 @@ def operate(action, app, image):
             outdated = False
         if not record:
             env["APP_REGISTRATION_KEY"] = secrets.token_hex(32)
+            labels["io.skynet.app-databases"] = "1"
             created = request("POST", "/containers/create?name=" + name,
                               {"Image": image, "Labels": labels, "Env": [k + "=" + v for k, v in env.items()],
                                "HostConfig": host})
             record = request("GET", "/containers/" + created["Id"] + "/json")
         if not record["State"]["Running"]:
             request("POST", "/containers/" + record["Id"] + "/start")
-        return {"outdated": outdated, "key": next(v.split("=", 1)[1] for v in record["Config"]["Env"]
-                            if v.startswith("APP_REGISTRATION_KEY="))}
+        return {"outdated": outdated}
     if action == "inspect":
-        return {"running": bool(record and record["State"]["Running"])}
+        if not record or not record["State"]["Running"]:
+            return {"running": False}
+        key = next(value.split("=", 1)[1] for value in record["Config"]["Env"]
+                   if value.startswith("APP_REGISTRATION_KEY="))
+        return {"running": True, "key": key}
     if action not in ("wait", "stop", "remove"):
         raise ValueError("Unknown container action")
     if not record:
@@ -91,4 +96,7 @@ def operate(action, app, image):
 
 
 if __name__ == "__main__":
-    print(json.dumps(operate(*sys.argv[1:])))
+    result = operate(*sys.argv[1:])
+    if sys.argv[1] == "start":
+        sys.exit(3 if result["outdated"] else 0)
+    print(json.dumps(result))

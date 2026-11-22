@@ -2,7 +2,8 @@
 set -eu
 umask 077
 : "${APP_CENTER_MONGO_PASSWORD:?请在 server/.env 中设置 APP_CENTER_MONGO_PASSWORD}"
-: "${APP_MONGO_PASSWORD:?请在 server/.env 中设置 APP_MONGO_PASSWORD}"
+: "${GATEWAY_MONGO_PASSWORD:?请在 server/.env 中设置 GATEWAY_MONGO_PASSWORD}"
+: "${APP_CENTER_MONGO_PROVISION_PASSWORD:?请配置应用数据库管理密码}"
 secret=/data/db/.bootstrap-password
 if [ ! -s "$secret" ]; then
     openssl rand -hex 32 > "$secret.tmp"

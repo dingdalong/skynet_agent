@@ -43,7 +43,17 @@ const environment = {
     APP_CENTER_PORT: String(centerPort),
     APP_MONGO_HOST: "127.0.0.1",
     APP_MONGO_PORT: String(mongoPort),
-    APP_MONGO_PASSWORD: randomUUID(),
+    APP_MONGO_DATABASE: "applications",
+    APP_MONGO_AUTH_DB: "applications",
+    APP_MONGO_USERNAME: "applications",
+    GATEWAY_MONGO_DATABASE: "gateway",
+    GATEWAY_MONGO_AUTH_DB: "gateway",
+    GATEWAY_MONGO_USERNAME: "gateway",
+    GATEWAY_MONGO_PASSWORD: randomUUID(),
+    APP_CENTER_MONGO_DATABASE: "app_center",
+    APP_CENTER_MONGO_AUTH_DB: "app_center",
+    APP_CENTER_MONGO_USERNAME: "app_center",
+    APP_CENTER_MONGO_PROVISION_PASSWORD: randomUUID(),
     APP_CENTER_MONGO_PASSWORD: randomUUID(),
     SKYNET_ENV_FILE: "/dev/null",
     GATEWAY_CLUSTER_PORT: String(clusterPort),
@@ -60,6 +70,49 @@ const compose = (...args) =>
     );
 const docker = (...args) => run("docker", args, options);
 const container = (id) => `${project}-app-${id}`;
+const mongo = async (script) =>
+    (
+        await compose(
+            "exec",
+            "-T",
+            "mongodb",
+            "mongosh",
+            "--quiet",
+            "--eval",
+            `
+        const admin = db.getSiblingDB("admin");
+        if (!admin.auth("bootstrap", require("fs").readFileSync("/data/db/.bootstrap-password", "utf8").trim()).ok)
+            throw Error("测试管理员登录失败");
+        const apps = db.getSiblingDB("app_center").apps;
+        const users = db.getSiblingDB("app_credentials");
+        const legacy = db.getSiblingDB("applications");
+        const fixture = db.getSiblingDB("isolation_fixture");
+        ${script}
+    `,
+        )
+    ).stdout.trim();
+async function probeDatabase(id, other, action) {
+    for (const file of [
+        "app_database_probe.lua",
+        "app_database_probe.config",
+    ]) {
+        await docker(
+            "cp",
+            `server/tests/integration/${file}`,
+            `${container(id)}:/tmp/${file}`,
+        );
+    }
+    await docker(
+        "exec",
+        "-e",
+        `PROBE_OTHER_DB=${other}`,
+        "-e",
+        `PROBE_ACTION=${action}`,
+        container(id),
+        "./3rd/skynet/skynet",
+        "/tmp/app_database_probe.config",
+    );
+}
 const appRunning = async (id) =>
     (
         await docker("inspect", "-f", "{{.State.Running}}", container(id))
@@ -128,6 +181,24 @@ try {
             ".",
         );
     }
+    await compose("up", "-d", "--wait", "mongodb");
+    const agentImage = (
+        await docker(
+            "image",
+            "inspect",
+            "-f",
+            "{{.Id}}",
+            `${project}-agent:test`,
+        )
+    ).stdout.trim();
+    await mongo(`
+        legacy.createUser({user: "applications", pwd: "retired-fixture", roles: ["readWrite"]});
+        legacy.data.insertOne({_id: "preserved"});
+        apps.insertOne({_id: "legacy", revision: 1, desired: false,
+            approved: {name: "旧应用", request_id: "legacy", image: "legacy", image_id: "legacy"}});
+        apps.insertOne({_id: "agent", revision: 1, desired: true,
+            approved: {name: "Agent", request_id: "legacy-agent", image: "${project}-agent:test", image_id: "${agentImage}"}});
+    `);
     await compose("up", "-d", "gateway");
     await assert.rejects(
         compose(
@@ -156,11 +227,15 @@ try {
         }, "网关");
     };
     const messages = [];
+    const directoryFrames = new WeakMap();
     const listen = async () => {
         socket = await connect();
-        socket.on("message", (data) =>
-            messages.push(codec.decodePacket(data.toString("base64"))),
-        );
+        socket.on("message", (data) => {
+            const packet = codec.decodePacket(data.toString("base64"));
+            if (packet.name === "AppCenterListRes")
+                directoryFrames.set(packet, data);
+            messages.push(packet);
+        });
     };
     await listen();
     let sequence = 0;
@@ -215,6 +290,32 @@ try {
         assert.equal(result.stdout.trim(), "");
         assert.equal((await request("AgentSnapshotReq")).name, "RoutingError");
     };
+    await mongo(`
+        const old = apps.findOne({_id: "legacy"});
+        if (old.database.state !== "ready" || old.desired || !users.getUser(old.database.username) ||
+            legacy.getUser("applications") || !legacy.data.findOne({_id: "preserved"}))
+            throw Error("旧应用数据库切换失败");
+    `);
+    assert.equal(
+        (await request("AppCenterRemoveReq", { app_id: "legacy" })).body.ret,
+        1,
+    );
+    await until(() => enabled("agent"), "切换后恢复启用的旧应用");
+    assert.notEqual(
+        (
+            await docker(
+                "exec",
+                container("agent"),
+                "printenv",
+                "APP_MONGO_DATABASE",
+            )
+        ).stdout.trim(),
+        "applications",
+    );
+    assert.equal(
+        (await request("AppCenterRemoveReq", { app_id: "agent" })).body.ret,
+        1,
+    );
     assert.deepEqual(
         (await list()).map((app) => [app.app_id, app.can_set_enabled]),
         [["app-center", false]],
@@ -293,12 +394,52 @@ try {
     const approvedRequest = await submit("echo", "Echo");
     assert.notEqual(approvedRequest, firstRequest);
     await docker("create", "--name", container("echo"), `${project}-echo:test`);
-    assert.equal((await review("echo", approvedRequest, true)).ret, 1);
-    assert.equal((await echoService()).can_set_enabled, true);
-    assert.equal((await review("echo", approvedRequest, true)).ret, 1);
-    assert.notEqual((await review("echo", firstRequest, true)).ret, 1);
+    await mongo(
+        'admin.revokeRolesFromUser("app_provisioner", ["app_database_accounts"])',
+    );
+    const interrupted = await review("echo", approvedRequest, true);
+    assert.notEqual(interrupted.ret, 1);
+    assert.ok(interrupted.error.retryable);
+    assert.equal((await echoService()).can_set_enabled, false);
+    const retrySeed = await mongo(`
+        const doc = apps.findOne({_id: "echo"});
+        const intent = doc.database_request;
+        if ("database" in doc || doc.approved || intent.request_id !== doc.pending.request_id ||
+            ["name", "username", "password"].some(field => field in intent))
+            throw Error("账号创建失败后应只保留待审申请");
+        // 让建库成功，仅拒绝发布正式的应用记录。
+        const res = apps.getDB().runCommand({collMod: "apps", validator: {
+            $or: [{_id: {$ne: "echo"}}, {database: {$exists: false}}]
+        }});
+        if (!res.ok) throw Error("未能设置测试校验器");
+        admin.grantRolesToUser("app_provisioner", ["app_database_accounts"]);
+        print(intent.seed);
+    `);
+    assert.ok(/^[0-9a-f]{64}$/.test(retrySeed));
+    assert.ok(
+        !directoryFrames
+            .get(await request("AppCenterListReq"))
+            .includes(retrySeed),
+    );
+    const unpublished = await review("echo", approvedRequest, true);
+    assert.notEqual(unpublished.ret, 1);
+    assert.ok(unpublished.error.retryable);
     await compose("kill", "app-center");
-    await docker("rm", container("echo"));
+    await mongo(`
+        const doc = apps.findOne({_id: "echo"});
+        const agent = apps.findOne({_id: "agent"}).database;
+        const others = users.runCommand({usersInfo: 1}).users.filter(user => user.user !== agent.username);
+        if (doc.database || doc.approved || others.length !== 1) throw Error("建库成功后写回失败的状态错误");
+        const [user] = others;
+        const business = db.getSiblingDB(user.roles[0].db);
+        if (!business.getCollectionInfos({name: "_app_center", type: "collection"}).length)
+            throw Error("审批写回前应已实际建库");
+        fixture.accounts.insertOne({_id: "echo", name: business.getName(), username: user.user, userId: user.userId});
+        // 临时把测试空集合替换为同名视图，使重启后的建库命令失败。
+        business.getCollection("_app_center").drop();
+        business.createView("_app_center", "fixture_source", []);
+        if (!apps.getDB().runCommand({collMod: "apps", validator: {}}).ok) throw Error("恢复校验器失败");
+    `);
     await compose("start", "app-center");
     await until(
         async () =>
@@ -309,7 +450,51 @@ try {
             ).body.ret === 1,
         "恢复审批记录",
     );
+    const failedCreate = await review("echo", approvedRequest, true);
+    assert.notEqual(failedCreate.ret, 1);
+    assert.ok(failedCreate.error.retryable);
+    assert.equal(await appRunning("echo"), false);
+    await mongo(`
+        const doc = apps.findOne({_id: "echo"});
+        if ("database" in doc || doc.approved || !doc.pending) throw Error("建库失败却写入了正式记录");
+        const business = db.getSiblingDB(fixture.accounts.findOne({_id: "echo"}).name);
+        business.getCollection("_app_center").drop();
+        business.createCollection("_app_center");
+    `);
+    assert.equal((await review("echo", approvedRequest, true)).ret, 1);
+    assert.equal((await echoService()).can_set_enabled, true);
+    assert.notEqual((await review("echo", firstRequest, true)).ret, 1);
+    await docker("rm", container("echo"));
     await until(() => enabled("echo"), "Echo 自动启动");
+    const accounts = JSON.parse(
+        await mongo(`
+        const doc = apps.findOne({_id: "echo"});
+        const echo = doc.database;
+        const saved = fixture.accounts.findOne({_id: "echo"});
+        const user = users.getUser(echo.username);
+        if (doc.database_request || doc.pending || !doc.approved || echo.state !== "ready" ||
+            echo.name !== saved.name || !user.userId.equals(saved.userId))
+            throw Error("恢复后的分配与首次审批不符");
+        fixture.accounts.updateOne({_id: "echo"}, {$set: {password: echo.password}});
+        print(JSON.stringify([apps.findOne({_id: "agent"}).database, echo]));
+    `),
+    );
+    const [agentDb, echoDb] = accounts;
+    assert.notEqual(agentDb.name, echoDb.name);
+    await probeDatabase("agent", echoDb.name, "insert");
+    await probeDatabase("echo", agentDb.name, "insert");
+    for (const token of ["invalid", environment.APP_CENTER_ADMIN_TOKEN]) {
+        await request("AppCenterUnlockReq", { token });
+        const packet = await request("AppCenterListReq");
+        assert.equal(Boolean(packet.body.administrator), token !== "invalid");
+        const frame = directoryFrames.get(packet);
+        for (const account of accounts)
+            for (const field of ["name", "username", "password"])
+                assert.ok(
+                    !frame.includes(account[field]),
+                    "目录响应包含私有数据库信息",
+                );
+    }
     for (const [messages, expected] of [
         ["message Item {} message Item {}", /already defined/],
         ["message Xptdms6 {} message X1hls4ac {}", /消息哈希冲突/],
@@ -551,6 +736,7 @@ try {
         oldImage,
     );
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    await probeDatabase("echo", agentDb.name, "read");
     await docker("tag", oldImage, `${project}-echo:test`);
     const rollback = await submit("echo", "Echo");
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
@@ -565,6 +751,22 @@ try {
         return image?.stdout.trim() === oldImage && (await enabled("echo"));
     }, "批准后更新运行中的镜像");
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    await probeDatabase("echo", agentDb.name, "read");
+    for (const id of ["mongodb", "app-center", "gateway", "agent", "echo"]) {
+        const { stdout, stderr } = ["agent", "echo"].includes(id)
+            ? await docker("logs", container(id))
+            : await compose("logs", id);
+        assert.ok(
+            !(stdout + stderr).includes(retrySeed),
+            "日志包含私有重试种子",
+        );
+        assert.ok(
+            accounts.every(
+                (account) => !(stdout + stderr).includes(account.password),
+            ),
+            "日志包含数据库密码",
+        );
+    }
     assert.equal(
         (await request("AppCenterRemoveReq", { app_id: "echo" })).body.ret,
         1,
@@ -589,6 +791,22 @@ try {
         `name=^/${container("echo")}$`,
     );
     assert.equal(remaining.stdout.trim(), "");
+    await mongo(`
+        const doc = apps.findOne({_id: "echo"});
+        const old = fixture.accounts.findOne({_id: "echo"});
+        if (doc.database || !doc.archived_databases.includes(old.name) || users.getUser(old.username) ||
+            db.getSiblingDB(old.name).isolation_probe.findOne({_id: "same-id"})?.owner !== "echo")
+            throw Error("旧库归档或账号撤销失败");
+        const auth = new Mongo("mongodb://127.0.0.1:27017").getDB("app_credentials");
+        let denied;
+        try {
+            denied = auth.auth(old.username, old.password).code === 18;
+        } catch (err) {
+            if (err.code !== 18) throw err;
+            denied = true;
+        }
+        if (!denied) throw Error("旧账号未返回预期认证失败");
+    `);
     const relisted = await submit("echo", "Echo 新名称");
     const pendingRelist = await echoService();
     assert.equal(pendingRelist.name, "Echo 新名称");
@@ -601,12 +819,17 @@ try {
     assert.equal((await request("EchoRepeatReq")).name, "RoutingError");
     assert.equal((await review("echo", relisted, true)).ret, 1);
     await until(() => enabled("echo"), "重新上架后的路由就绪");
+    assert.notEqual(
+        await mongo('print(apps.findOne({_id: "echo"}).database.name)'),
+        echoDb.name,
+    );
+    await probeDatabase("echo", agentDb.name, "insert");
     assert.ok(
         (await request("AppCenterListReq")).body.names.includes("Echo 新名称"),
     );
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
     console.log(
-        "Docker 应用接入、同名类型、通知、沙盒、容器启停和故障恢复通过",
+        "Docker 应用接入、数据库隔离与归档、审批恢复、通知、沙盒和容器启停通过",
     );
 } catch (error) {
     console.error(

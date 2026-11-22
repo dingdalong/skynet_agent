@@ -36,18 +36,19 @@ function M.run(config)
         assert(app_status:match("%.database :[%da-f]+ ready"), app_status)
         local center_status = support.console(18004, 'call .main "status"')
         assert(center_status:match("%.database :[%da-f]+ ready"), center_status)
-        -- 使用与驱动字段同名的集合，验证节点间共享、条件更新和连接复用。
+        -- 使用与驱动字段同名的集合，验证节点隔离、条件更新和连接复用。
         local function database(port, args)
             return support.console(port, 'call .database ' .. args)
         end
         local gateway_port = config.control_port
         local insert = '"insert", "name", { _id = "shared", version = 1 }'
         support.contains(database(gateway_port, insert), "2\t1")
-        support.contains(database(18003, '"find_one", "name", { _id = "shared" }'), "version:1")
+        support.excludes(database(18003, '"find_one", "name", { _id = "shared" }'), "version:")
+        support.contains(database(18003, insert), "2\t1")
         local replace = '"replace_one", "name", { _id = "shared", version = 1 }, { _id = "shared", version = 2 }'
         support.contains(database(18003, replace), "2\t1")
         support.contains(database(18003, replace), "2\t0")
-        support.contains(database(gateway_port, '"find_one", "name", { _id = "shared" }'), "version:2")
+        support.contains(database(gateway_port, '"find_one", "name", { _id = "shared" }'), "version:1")
         local app_center_read = database(18004, '"find_one", "name", { _id = "shared" }')
         support.contains(app_center_read, "1\t1")
         support.excludes(app_center_read, "version:")

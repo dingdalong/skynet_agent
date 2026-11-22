@@ -25,12 +25,18 @@ def running():
         return False
 
 
+if action == "start":
+    database = json.load(sys.stdin)
 if action == "start" and not running():
     key = secrets.token_hex(32)
     with (root / "app.log").open("ab") as output:
         child = subprocess.Popen(["3rd/skynet/skynet", "etc/config.app"], stdin=subprocess.DEVNULL,
                                  stdout=output, stderr=output, start_new_session=True,
-                                 env=dict(os.environ, APP_ID=app, APP_REGISTRATION_KEY=key,
+                                 env=dict({k: v for k, v in os.environ.items()
+                                           if not k.startswith(("APP_CENTER_MONGO_", "GATEWAY_MONGO_"))},
+                                          APP_ID=app, APP_REGISTRATION_KEY=key, APP_MONGO_DATABASE=database["name"],
+                                          APP_MONGO_AUTH_DB=database["authdb"], APP_MONGO_USERNAME=database["username"],
+                                          APP_MONGO_PASSWORD=database["password"],
                                           APP_SCHEMA="agent/schema.proto"))
     record = {"key": key, "pid": child.pid}
     state.write_text(json.dumps(record))
@@ -41,4 +47,5 @@ if action in ("stop", "wait"):
     while running():
         assert time.monotonic() < deadline
         time.sleep(0.1)
-print(json.dumps(dict(record, running=running(), exit_code=0, image_id="fixture")))
+if action != "start":
+    print(json.dumps(dict(record, running=running(), exit_code=0, image_id="fixture")))

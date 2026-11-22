@@ -74,7 +74,7 @@ Node.js 与 pnpm 仅用于客户端开发，服务端构建与 Lua 测试独立�
 ./server/control.sh force-stop
 ```
 
-`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。每个 Skynet 节点启动本机的 `.database`。App Center 通过它读取App Center 数据库的 `apps` 集合。空库启动后可以登录并打开应用中心。
+`./server/start.sh` 构建 Agent 镜像，依次启动 MongoDB、App Center 和 Gateway。每个 Skynet 节点启动本机的 `.database`。App Center 通过它读取应用记录并管理专属数据库账号。空库启动后可以登录并打开应用中心。
 
 首次部署 Agent 时，在部署机执行：
 
@@ -102,7 +102,7 @@ docker build -f server/Dockerfile --target echo-fixture -t skynet-echo:local .
 ./server/appctl submit --app-id echo --name Echo --image skynet-echo:local
 ```
 
-命令返回申请编号。打开「应用中心 → 服务管理」，用管理令牌解锁，核对镜像及其 ID 后批准或拒绝。首次批准默认启用。已批准应用的更新也要提交，审批期间原版本继续服务，批准后按之前的启停选择部署。下架结束在途任务并移除容器，保留工作卷。仅 App Center 挂载 Docker socket。
+命令返回申请编号。打开「应用中心 → 服务管理」，用管理令牌解锁，核对镜像及其 ID 后批准或拒绝。首次批准会分配专属库和账号，默认启用。已批准应用的更新也要提交，审批期间原版本继续服务，批准后沿用原库和之前的启停选择。下架结束在途任务，移除容器并撤销账号，旧库和工作卷保留。相同应用再次获批时从新的空库开始。仅 App Center 挂载 Docker socket。
 
 App Center 按已批准的镜像 ID 启动容器，并注入 `APP_ID` 和注册凭据。应用加载协议与 Actor 后在本机回环地址监听随机端口，向 App Center 的 Cluster 端口报到。握手通过后 Gateway 安装路由。已在运行的应用直接与 Gateway 通信。
 

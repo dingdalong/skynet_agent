@@ -52,8 +52,12 @@ function Center:_reconcile(id)
     if self.freezing then return end
     AppCatalog.refresh(self, id)
     local doc = self.documents[id]
+    if doc and doc.database_request then
+        AppCatalog.finish_allocation(self, id)
+        doc = self.documents[id]
+    end
     if not doc or not doc.approved then return end
-    if doc.removed and self.retired[id] then return end
+    if doc.removed and not doc.database and self.retired[id] then return end
     local app = self.apps[id]
     if not app then
         app = { app_id = id, image = doc.approved.image_id, count = 0, enabled = false }
@@ -65,6 +69,7 @@ function Center:_reconcile(id)
         local stopped = self:_change(app, false)
         if stopped.ret ~= codes.succ then return stopped end
         Deployment.manage(app, "remove")
+        AppCatalog.archive_database(self, id)
         self.retired[id], self.apps[id] = true, nil
         self:_sync()
         return
@@ -195,7 +200,9 @@ function Center:_manage(id, operation, ...)
     if not ok then
         log.failure("app_center", "manage " .. id, result)
         local message = tostring(result):match("([^\n]+)") or "应用管理失败"
-        return failure(message:gsub("^.-:%d+: ", ""), self.uncertain[id] == true)
+        local doc = self.documents[id]
+        local changing = doc and (doc.database_request ~= nil or (doc.database and doc.database.state ~= "ready"))
+        return failure(message:gsub("^.-:%d+: ", ""), self.uncertain[id] == true or changing == true)
     end
     return type(result) == "table" and result or { ret = codes.succ, request_id = result }
 end

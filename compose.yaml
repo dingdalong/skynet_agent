@@ -2,16 +2,22 @@ name: skynet-agent
 x-app-database: &app-database
   APP_MONGO_HOST: ${APP_MONGO_HOST:-127.0.0.1}
   APP_MONGO_PORT: ${APP_MONGO_PORT:-18083}
-  APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-applications}
-  APP_MONGO_AUTH_DB: ${APP_MONGO_AUTH_DB:-${APP_MONGO_DATABASE:-applications}}
-  APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-applications}
-  APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
+x-gateway-database: &gateway-database
+  GATEWAY_MONGO_DATABASE: ${GATEWAY_MONGO_DATABASE:-gateway}
+  GATEWAY_MONGO_AUTH_DB: ${GATEWAY_MONGO_AUTH_DB:-${GATEWAY_MONGO_DATABASE:-gateway}}
+  GATEWAY_MONGO_USERNAME: ${GATEWAY_MONGO_USERNAME:-gateway}
+  GATEWAY_MONGO_PASSWORD: ${GATEWAY_MONGO_PASSWORD:-}
 x-app-center-database: &app-center-database
+  APP_CENTER_MONGO_PROVISION_PASSWORD: ${APP_CENTER_MONGO_PROVISION_PASSWORD:-}
+  LEGACY_MONGO_DATABASE: ${APP_MONGO_DATABASE:-applications}
+  LEGACY_MONGO_AUTH_DB: ${APP_MONGO_AUTH_DB:-${APP_MONGO_DATABASE:-applications}}
+  LEGACY_MONGO_USERNAME: ${APP_MONGO_USERNAME:-applications}
   APP_CENTER_MONGO_DATABASE: ${APP_CENTER_MONGO_DATABASE:-app_center}
   APP_CENTER_MONGO_AUTH_DB: ${APP_CENTER_MONGO_AUTH_DB:-${APP_CENTER_MONGO_DATABASE:-app_center}}
   APP_CENTER_MONGO_USERNAME: ${APP_CENTER_MONGO_USERNAME:-app_center}
   APP_CENTER_MONGO_PASSWORD: ${APP_CENTER_MONGO_PASSWORD:-}
 x-node: &node
+  labels: { io.skynet.app-databases: "1" }
   network_mode: host
   init: true
   environment: &cluster
@@ -27,7 +33,7 @@ services:
     network_mode: bridge
     ports: ["127.0.0.1:${APP_MONGO_PORT:-18083}:27017"]
     environment:
-      <<: [*app-database, *app-center-database]
+      <<: [*gateway-database, *app-center-database]
     entrypoint: ["/bin/bash", "/mongo-start.sh"]
     volumes:
       - mongo-data:/data/db
@@ -66,7 +72,7 @@ services:
     depends_on:
       app-center: { condition: service_healthy }
     environment:
-      <<: *cluster
+      <<: [*cluster, *gateway-database]
       GATEWAY_PORT: ${GATEWAY_PORT:-18787}
     volumes:
       - cluster-key:/cluster:ro

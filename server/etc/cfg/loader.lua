@@ -11,10 +11,18 @@ local Loader = {}
 ---@field worker_thread integer
 ---@field protocol { agent_gateway_schema_dir: string }
 ---@field database { host: string, port: integer, name: string?, authdb: string?, username: string?, password: string? }
+---@field database_admin server.DatabaseAdminConfig?
 ---@field application { id: string?, schema: string?, instances: integer, key: string? }
 ---@field app_center server.AppCenterConfig
 ---@field agent_gateway server.AgentGatewayConfig
 ---@field agent server.AgentConfig
+
+---@class server.DatabaseAdminConfig
+---@field password string?
+---@field user_authdb string
+---@field legacy_database string
+---@field legacy_authdb string
+---@field legacy_username string
 
 ---@class server.AppCenterConfig
 ---@field port integer

@@ -5,7 +5,7 @@
 
 ## 环境文件
 
-将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key、App Center 数据库密码和业务库密码。该文件使用 shell 兼容语法，
+将 `server/.env.example` 复制为 `server/.env`，填写模型 API Key，并分别设置 Gateway、App Center 和应用账号管理员的密码。该文件使用 shell 兼容语法，
 由 `server/start.sh` 加载；只保存本机密钥和环境选择，不提交真实密钥。可用环境变量如下：
 
 | 变量                   | 用途与可用值                                                                             |
@@ -20,8 +20,9 @@
 | `GATEWAY_PORT` | 主机回环端口，默认 18787 |
 | `APP_CENTER_PORT`、`GATEWAY_CLUSTER_PORT` | 两个基础节点的本机 Cluster 端口，默认分别为 18081、18082。每套部署须使用独立的可用端口。 |
 | `APP_MONGO_HOST`、`APP_MONGO_PORT` | 节点连接的 MongoDB 主机和端口。Compose 将本机回环端口映射到 MongoDB 容器。 |
-| `APP_MONGO_DATABASE`、`APP_MONGO_AUTH_DB`、`APP_MONGO_USERNAME`、`APP_MONGO_PASSWORD` | Gateway 和业务应用使用的业务库、认证库、账号及密码。 |
+| `GATEWAY_MONGO_DATABASE`、`GATEWAY_MONGO_AUTH_DB`、`GATEWAY_MONGO_USERNAME`、`GATEWAY_MONGO_PASSWORD` | Gateway 专用的数据库、认证库、账号及密码。默认库名和账号均为 `gateway`。 |
 | `APP_CENTER_MONGO_DATABASE`、`APP_CENTER_MONGO_AUTH_DB`、`APP_CENTER_MONGO_USERNAME`、`APP_CENTER_MONGO_PASSWORD` | App Center 专用的数据库、认证库、账号及密码。 |
+| `APP_CENTER_MONGO_PROVISION_PASSWORD` | App Center 管理专属账号时，以 `app_provisioner` 向 `admin` 认证所用的密码。 |
 | `APP_ID`、`APP_SCHEMA`、`APP_INSTANCES` | 应用容器的稳定标识、独立协议入口和 Actor 数量，数量范围 1–32 |
 | `AGENT_TOOL_TCP_PORTS` | 容器内默认沙盒工具可连接的 TCP 端口，逗号分隔，默认 `53,80,443`。预留节点控制与 Cluster 端口 `18000,18081,18082`。 |
 
@@ -53,7 +54,13 @@ Skynet 线程与启动配置位于 `server/etc/config`。各工作池的实例�
 | `agent_gateway.instance.websocket`  | 1–32 的整数                          |
 | `agent_gateway.login_timeout_ticks` | 正整数；未完成登录连接的存活时间     |
 
-Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。启动脚本为缺少的账号创建对应库的读写权限。已有账号改密时需同步更新 MongoDB 和环境文件。App Center 数据库的 `apps` 集合保存申请、审批结果和期望启停状态。`cluster-key` 卷供 App Center 和 Gateway 使用。操作见[服务管理](DEVELOPMENT.md#服务管理)。
+Agent 的工作目录 `/work` 使用项目专属的 `<项目名>_agent-work` 卷。MongoDB 使用 `mongo-data` 卷持久保存数据和账号。调整基础账号密码时需同步更新 MongoDB 和环境文件。`cluster-key` 卷供 App Center 和 Gateway 使用。
+
+首次批准时，App Center 创建专属账号，核对权限，再用该账号登录并在目标库创建空集合 `_app_center`。成功后，App Center 在同一次写入中确认审批，并将库名、用户名、密码和状态保存到 `app_center.apps` 的顶层 `database` 字段。创建失败时申请保持待审。创建期间的私有字段 `database_request` 用于重试，成功后清除。
+
+创建容器时，App Center 注入 `APP_MONGO_DATABASE`、`APP_MONGO_AUTH_DB`、`APP_MONGO_USERNAME` 和 `APP_MONGO_PASSWORD`。该账号在 `app_credentials` 认证，仅有自己数据库的 `readWrite` 权限。停用、重启和升级复用该记录。下架后旧库名保存在 `archived_databases`，再次批准会分配空库。
+
+从共享库切换时，保留原有 App Center 配置，在 `server/.env` 补齐 Gateway 密码和应用账号管理密码，再执行 `./server/start.sh`。如曾自定义共享库和账号，保留旧的 `APP_MONGO_DATABASE`、`APP_MONGO_AUTH_DB`、`APP_MONGO_USERNAME` 以定位待撤销的账号，默认均为 `applications`。启动入口停止旧容器，App Center 为仍上架的应用分配新库，撤销共享账号，再恢复原启停状态。旧共享库的数据保留供人工查阅。操作见[服务管理](DEVELOPMENT.md#服务管理)。
 
 ### 模型与会话
 
