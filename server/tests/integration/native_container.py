@@ -34,9 +34,7 @@ if action == "start" and not running():
                                  stdout=output, stderr=output, start_new_session=True,
                                  env=dict({k: v for k, v in os.environ.items()
                                            if not k.startswith(("APP_CENTER_MONGO_", "GATEWAY_MONGO_"))},
-                                          APP_ID=app, APP_REGISTRATION_KEY=key, APP_MONGO_DATABASE=database["name"],
-                                          APP_MONGO_AUTH_DB=database["authdb"], APP_MONGO_USERNAME=database["username"],
-                                          APP_MONGO_PASSWORD=database["password"],
+                                          APP_ID=app, APP_REGISTRATION_KEY=key, APP_DATABASE_CONFIG=json.dumps(database),
                                           APP_SCHEMA="agent/schema.proto"))
     record = {"key": key, "pid": child.pid}
     state.write_text(json.dumps(record))

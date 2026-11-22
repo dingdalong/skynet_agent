@@ -98,7 +98,6 @@ function AppCatalog.open(center)
             AppCatalog.finish_allocation(center, doc._id)
         end
     end
-    assert(rpc.call_no_timeout(".database", "retire_shared_user") == codes.succ, "旧业务库账号撤销失败")
 end
 
 local function same(left, right)

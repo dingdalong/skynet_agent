@@ -45,10 +45,8 @@ def operate(action, app, image):
         raise ValueError("Container name belongs to a different application")
     if action == "start":
         database = json.load(sys.stdin)
-        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL", "APP_MONGO_HOST", "APP_MONGO_PORT")}
-        env.update(APP_ID=app, NODE_CONTROL_FILES="1", APP_MONGO_DATABASE=database["name"],
-                   APP_MONGO_AUTH_DB=database["authdb"], APP_MONGO_USERNAME=database["username"],
-                   APP_MONGO_PASSWORD=database["password"])
+        env = {k: os.environ[k] for k in ("APP_CENTER_PORT", "SKYNET_CFG_CHANNEL")}
+        env.update(APP_ID=app, NODE_CONTROL_FILES="1", APP_DATABASE_CONFIG=json.dumps(database, sort_keys=True))
         host = {"NetworkMode": "host", "Init": True, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges:true"]}
         if app == "agent":
             env.update({k: os.environ[k] for k in ("APP_INSTANCES", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL",
@@ -63,7 +61,6 @@ def operate(action, app, image):
             outdated = False
         if not record:
             env["APP_REGISTRATION_KEY"] = secrets.token_hex(32)
-            labels["io.skynet.app-databases"] = "1"
             created = request("POST", "/containers/create?name=" + name,
                               {"Image": image, "Labels": labels, "Env": [k + "=" + v for k, v in env.items()],
                                "HostConfig": host})

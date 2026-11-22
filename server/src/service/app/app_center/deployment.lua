@@ -48,7 +48,8 @@ function Deployment.start(center, app)
     assert(database and database.state == "ready", "应用专属数据库未就绪")
     -- 密码只经过管道；容器注册密钥单独从受信任的 inspect 响应读取。
     local process = container_process(app, "start", "w")
-    process:write(json.encode({ name = database.name, username = database.username, password = database.password,
+    process:write(json.encode({ host = config.database.host, port = config.database.port,
+        name = database.name, username = database.username, password = database.password,
         authdb = config.database_admin.user_authdb }))
     local ok, reason, status = process:close()
     app.outdated = reason == "exit" and status == 3

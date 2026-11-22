@@ -41,11 +41,9 @@ const environment = {
     COMPOSE_PROJECT_NAME: project,
     GATEWAY_PORT: String(gatewayPort),
     APP_CENTER_PORT: String(centerPort),
-    APP_MONGO_HOST: "127.0.0.1",
-    APP_MONGO_PORT: String(mongoPort),
-    APP_MONGO_DATABASE: "applications",
-    APP_MONGO_AUTH_DB: "applications",
-    APP_MONGO_USERNAME: "applications",
+    MONGO_HOST: "127.0.0.1",
+    MONGO_PORT: String(mongoPort),
+    MONGO_BOOTSTRAP_PASSWORD: randomUUID(),
     GATEWAY_MONGO_DATABASE: "gateway",
     GATEWAY_MONGO_AUTH_DB: "gateway",
     GATEWAY_MONGO_USERNAME: "gateway",
@@ -81,11 +79,10 @@ const mongo = async (script) =>
             "--eval",
             `
         const admin = db.getSiblingDB("admin");
-        if (!admin.auth("bootstrap", require("fs").readFileSync("/data/db/.bootstrap-password", "utf8").trim()).ok)
+        if (!admin.auth("bootstrap", process.env.MONGO_INITDB_ROOT_PASSWORD).ok)
             throw Error("测试管理员登录失败");
         const apps = db.getSiblingDB("app_center").apps;
         const users = db.getSiblingDB("app_credentials");
-        const legacy = db.getSiblingDB("applications");
         const fixture = db.getSiblingDB("isolation_fixture");
         ${script}
     `,
@@ -192,8 +189,9 @@ try {
         )
     ).stdout.trim();
     await mongo(`
-        legacy.createUser({user: "applications", pwd: "retired-fixture", roles: ["readWrite"]});
-        legacy.data.insertOne({_id: "preserved"});
+        const privileges = admin.getRole("app_database_accounts", {showPrivileges: true}).inheritedPrivileges;
+        if (privileges.some(p => p.actions.includes("dropUser") && p.resource.db !== "app_credentials"))
+            throw Error("应用账号管理范围超出专属认证库");
         apps.insertOne({_id: "legacy", revision: 1, desired: false,
             approved: {name: "旧应用", request_id: "legacy", image: "legacy", image_id: "legacy"}});
         apps.insertOne({_id: "agent", revision: 1, desired: true,
@@ -292,25 +290,23 @@ try {
     };
     await mongo(`
         const old = apps.findOne({_id: "legacy"});
-        if (old.database.state !== "ready" || old.desired || !users.getUser(old.database.username) ||
-            legacy.getUser("applications") || !legacy.data.findOne({_id: "preserved"}))
-            throw Error("旧应用数据库切换失败");
+        if (old.database.state !== "ready" || old.desired || !users.getUser(old.database.username))
+            throw Error("已批准的停用应用未获得专属库");
     `);
     assert.equal(
         (await request("AppCenterRemoveReq", { app_id: "legacy" })).body.ret,
         1,
     );
     await until(() => enabled("agent"), "切换后恢复启用的旧应用");
-    assert.notEqual(
-        (
-            await docker(
-                "exec",
-                container("agent"),
-                "printenv",
-                "APP_MONGO_DATABASE",
-            )
-        ).stdout.trim(),
-        "applications",
+    const assignedDb = await mongo(
+        'print(apps.findOne({_id: "agent"}).database.name)',
+    );
+    const agentLogs = await docker("logs", container("agent"));
+    assert.ok(
+        (agentLogs.stdout + agentLogs.stderr).includes(
+            `database=${assignedDb}`,
+        ),
+        "运行中的 Agent 必须由本机数据库服务连接已分配的库",
     );
     assert.equal(
         (await request("AppCenterRemoveReq", { app_id: "agent" })).body.ret,

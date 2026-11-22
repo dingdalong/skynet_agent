@@ -57,7 +57,9 @@ cp "$project_root/tests/integration/native_container.py" "$server_root/deploy/co
 mongo_project="skynet-native-${temp_dir##*.}-$$"
 mongo_project=$(printf '%s' "$mongo_project" | tr '[:upper:]' '[:lower:]')
 mongo_compose() { docker compose -p "$mongo_project" -f "$project_root/../compose.yaml" "$@"; }
-export APP_MONGO_HOST=127.0.0.1 APP_MONGO_PORT=0
+export MONGO_HOST=127.0.0.1 MONGO_PORT=0
+MONGO_BOOTSTRAP_PASSWORD=$(openssl rand -hex 24)
+export MONGO_BOOTSTRAP_PASSWORD
 export GATEWAY_MONGO_DATABASE=gateway GATEWAY_MONGO_USERNAME=gateway
 export APP_CENTER_MONGO_DATABASE=app_center APP_CENTER_MONGO_USERNAME=app_center
 APP_CENTER_MONGO_PROVISION_PASSWORD=$(openssl rand -hex 24)
@@ -66,8 +68,9 @@ GATEWAY_MONGO_PASSWORD=$(openssl rand -hex 24)
 APP_CENTER_MONGO_PASSWORD=$(openssl rand -hex 24)
 export GATEWAY_MONGO_PASSWORD APP_CENTER_MONGO_PASSWORD
 mongo_compose up -d --wait mongodb
+unset MONGO_BOOTSTRAP_PASSWORD
 published=$(mongo_compose port mongodb 27017)
-export APP_MONGO_PORT=${published##*:}
+export MONGO_PORT=${published##*:}
 if [ "$probe" = hotfix_watch_probe ]; then
     channel=develop
     mkdir -p "$server_root"

@@ -6,25 +6,31 @@ if api_key == "" then
 end
 
 local entry = skynet.getenv("start")
-local database_prefix = entry == "center_main" and "APP_CENTER_MONGO_"
-    or entry == "main" and "GATEWAY_MONGO_" or "APP_MONGO_"
-local database_name = os.getenv(database_prefix .. "DATABASE")
+local database = {
+    host = os.getenv("MONGO_HOST") or "127.0.0.1",
+    port = tonumber(os.getenv("MONGO_PORT") or "18083"),
+}
+local prefix = entry == "center_main" and "APP_CENTER_MONGO_" or entry == "main" and "GATEWAY_MONGO_"
+if prefix then
+    database.name = os.getenv(prefix .. "DATABASE")
+    database.authdb = os.getenv(prefix .. "AUTH_DB") or database.name
+    database.username = os.getenv(prefix .. "USERNAME")
+    database.password = os.getenv(prefix .. "PASSWORD")
+else
+    local settings = os.getenv("APP_DATABASE_CONFIG")
+    if settings then
+        local ok, assigned = pcall(require("cjson").decode, settings)
+        assert(ok and type(assigned) == "table", "应用数据库连接配置无效")
+        assigned.port = math.tointeger(assigned.port)
+        database = assigned
+    end
+end
 
 return {
-    database = {
-        host = os.getenv("APP_MONGO_HOST") or "127.0.0.1",
-        port = tonumber(os.getenv("APP_MONGO_PORT") or "18083"),
-        name = database_name,
-        authdb = os.getenv(database_prefix .. "AUTH_DB") or database_name,
-        username = os.getenv(database_prefix .. "USERNAME"),
-        password = os.getenv(database_prefix .. "PASSWORD"),
-    },
+    database = database,
     database_admin = entry == "center_main" and {
         password = os.getenv("APP_CENTER_MONGO_PROVISION_PASSWORD"),
         user_authdb = "app_credentials",
-        legacy_database = os.getenv("LEGACY_MONGO_DATABASE") or "applications",
-        legacy_authdb = os.getenv("LEGACY_MONGO_AUTH_DB") or "applications",
-        legacy_username = os.getenv("LEGACY_MONGO_USERNAME") or "applications",
     } or nil,
     worker_thread = tonumber(skynet.getenv("thread")),
     runtime = {

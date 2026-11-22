@@ -8,6 +8,7 @@ local mongo = require("skynet.db.mongo")
 -- 在实际业务容器中使用该容器的环境启动独立探针，不影响正在处理请求的节点。
 local function check()
     assert(not config.database_admin and not os.getenv("APP_CENTER_MONGO_PASSWORD"))
+    assert(not os.getenv("MONGO_BOOTSTRAP_PASSWORD") and not os.getenv("MONGO_INITDB_ROOT_PASSWORD"))
     assert(not os.getenv("APP_CENTER_MONGO_PROVISION_PASSWORD") and not os.getenv("GATEWAY_MONGO_PASSWORD"))
     skynet.name(".database", skynet.newservice("database"))
     local function call(command, ...)

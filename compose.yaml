@@ -1,7 +1,7 @@
 name: skynet-agent
-x-app-database: &app-database
-  APP_MONGO_HOST: ${APP_MONGO_HOST:-127.0.0.1}
-  APP_MONGO_PORT: ${APP_MONGO_PORT:-18083}
+x-mongo-endpoint: &mongo-endpoint
+  MONGO_HOST: ${MONGO_HOST:-127.0.0.1}
+  MONGO_PORT: ${MONGO_PORT:-18083}
 x-gateway-database: &gateway-database
   GATEWAY_MONGO_DATABASE: ${GATEWAY_MONGO_DATABASE:-gateway}
   GATEWAY_MONGO_AUTH_DB: ${GATEWAY_MONGO_AUTH_DB:-${GATEWAY_MONGO_DATABASE:-gateway}}
@@ -9,19 +9,15 @@ x-gateway-database: &gateway-database
   GATEWAY_MONGO_PASSWORD: ${GATEWAY_MONGO_PASSWORD:-}
 x-app-center-database: &app-center-database
   APP_CENTER_MONGO_PROVISION_PASSWORD: ${APP_CENTER_MONGO_PROVISION_PASSWORD:-}
-  LEGACY_MONGO_DATABASE: ${APP_MONGO_DATABASE:-applications}
-  LEGACY_MONGO_AUTH_DB: ${APP_MONGO_AUTH_DB:-${APP_MONGO_DATABASE:-applications}}
-  LEGACY_MONGO_USERNAME: ${APP_MONGO_USERNAME:-applications}
   APP_CENTER_MONGO_DATABASE: ${APP_CENTER_MONGO_DATABASE:-app_center}
   APP_CENTER_MONGO_AUTH_DB: ${APP_CENTER_MONGO_AUTH_DB:-${APP_CENTER_MONGO_DATABASE:-app_center}}
   APP_CENTER_MONGO_USERNAME: ${APP_CENTER_MONGO_USERNAME:-app_center}
   APP_CENTER_MONGO_PASSWORD: ${APP_CENTER_MONGO_PASSWORD:-}
 x-node: &node
-  labels: { io.skynet.app-databases: "1" }
   network_mode: host
   init: true
   environment: &cluster
-    <<: *app-database
+    <<: *mongo-endpoint
     APP_CENTER_PORT: ${APP_CENTER_PORT:-18081}
     GATEWAY_CLUSTER_PORT: ${GATEWAY_CLUSTER_PORT:-18082}
     CLUSTER_KEY_FILE: /cluster/gateway.key
@@ -31,9 +27,11 @@ services:
   mongodb:
     image: mongo:8.0
     network_mode: bridge
-    ports: ["127.0.0.1:${APP_MONGO_PORT:-18083}:27017"]
+    ports: ["127.0.0.1:${MONGO_PORT:-18083}:27017"]
     environment:
       <<: [*gateway-database, *app-center-database]
+      MONGO_INITDB_ROOT_USERNAME: bootstrap
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_BOOTSTRAP_PASSWORD:-}
     entrypoint: ["/bin/bash", "/mongo-start.sh"]
     volumes:
       - mongo-data:/data/db

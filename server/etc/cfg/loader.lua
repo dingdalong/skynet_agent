@@ -20,9 +20,6 @@ local Loader = {}
 ---@class server.DatabaseAdminConfig
 ---@field password string?
 ---@field user_authdb string
----@field legacy_database string
----@field legacy_authdb string
----@field legacy_username string
 
 ---@class server.AppCenterConfig
 ---@field port integer

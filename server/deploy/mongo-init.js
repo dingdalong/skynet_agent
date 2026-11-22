@@ -1,16 +1,15 @@
 // 启动入口复用此脚本，为已有数据卷补齐新节点使用的账号。
 const admin = db.getSiblingDB("admin");
-const password = require("fs").readFileSync("/data/db/.bootstrap-password", "utf8").trim();
-if (!admin.auth("bootstrap", password).ok) throw Error("MongoDB 管理员认证失败");
-
 const env = process.env;
-const protectedDatabases = [env.APP_CENTER_MONGO_DATABASE, env.GATEWAY_MONGO_DATABASE, env.LEGACY_MONGO_DATABASE,
+if (!admin.auth("bootstrap", env.MONGO_INITDB_ROOT_PASSWORD).ok) throw Error("MongoDB 管理员认证失败");
+
+const protectedDatabases = [env.APP_CENTER_MONGO_DATABASE, env.GATEWAY_MONGO_DATABASE,
     "admin", "config", "local", "app_credentials"];
 if (new Set(protectedDatabases).size !== protectedDatabases.length ||
     protectedDatabases.some(name => /^app_[a-f0-9]{32}$/.test(name))) throw Error("基础数据库名称冲突");
 
 const accounts = new Set(["admin/bootstrap", "admin/app_provisioner"]);
-for (const prefix of ["APP_CENTER_MONGO_", "GATEWAY_MONGO_", "LEGACY_MONGO_"]) {
+for (const prefix of ["APP_CENTER_MONGO_", "GATEWAY_MONGO_"]) {
     const source = env[prefix + "AUTH_DB"];
     const identity = source + "/" + env[prefix + "USERNAME"];
     if (accounts.has(identity) || source === "app_credentials") throw Error(prefix + "账号冲突");
@@ -33,7 +32,6 @@ for (const prefix of ["APP_CENTER_MONGO_", "GATEWAY_MONGO_"]) {
 const role = "app_database_accounts";
 const privileges = [
     { resource: { db: "app_credentials", collection: "" }, actions: ["createUser", "dropUser", "viewUser"] },
-    { resource: { db: env.LEGACY_MONGO_AUTH_DB, collection: "" }, actions: ["dropUser", "viewUser"] },
     { resource: { db: "", collection: "" }, actions: ["grantRole"] },
 ];
 if (admin.getRole(role)) admin.updateRole(role, { privileges, roles: [] });

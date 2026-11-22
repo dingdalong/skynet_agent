@@ -13,7 +13,7 @@ local log = require("log")
 local Database = class()
 
 Database.commands = { find = "find", find_one = "find_one", insert = "insert", replace_one = "replace_one",
-    provision = "provision", revoke = "revoke", retire_shared_user = "retire_shared_user" }
+    provision = "provision", revoke = "revoke" }
 
 function Database:ctor()
     self.admin = nil
@@ -21,11 +21,18 @@ function Database:ctor()
     self.db = nil
 end
 
+-- 重复创建同定义的空集合是幂等的。只有实际能写入分配的库，业务节点才就绪。
+local function confirm_app_database(db)
+    local reply = db:runCommand("create", "_app_center", "writeConcern", { w = 1, j = true })
+    assert(reply.ok == 1 and not reply.writeConcernError, "无法确认应用专属库的写权限")
+end
+
 function Database:init()
     local database = config.database
     assert(database.password and database.password ~= "", "数据库密码未配置")
     self.client = mongo.client(database)
     self.db = self.client:getDB(database.name)
+    if config.application.id then confirm_app_database(self.db) end
     if config.database_admin then
         local password = config.database_admin.password
         assert(password and password ~= "", "应用数据库管理密码未配置")
@@ -79,33 +86,21 @@ function Database:provision(context, seed)
     check_role(user, account.name)
     local connection = mongo.client({ host = config.database.host, port = config.database.port,
         username = account.username, password = account.password, authdb = config.database_admin.user_authdb })
-    -- MongoDB 在首次建集合时建库。用专属账号创建空集合，也验证了它在目标库的写权限。
-    local db = connection:getDB(account.name)
-    local ok, result = pcall(db.runCommand, db, "create", "_app_center", "writeConcern", { w = 1, j = true })
+    local ok = pcall(confirm_app_database, connection:getDB(account.name))
     connection:disconnect()
-    assert(ok and result.ok == 1 and not result.writeConcernError, "未能创建应用数据库")
+    assert(ok, "未能创建应用数据库")
     return account
 end
 
-local function drop_user(users, username, database)
-    local user = user_info(users, username)
+function Database:revoke(context, account)
+    local users = app_users(self, context, account)
+    local user = user_info(users, account.username)
     if user then
-        check_role(user, database)
-        local result = users:runCommand("dropUser", username, "writeConcern", { w = 1, j = true })
+        check_role(user, account.name)
+        local result = users:runCommand("dropUser", account.username, "writeConcern", { w = 1, j = true })
         assert(result.ok == 1 and not result.writeConcernError, "撤销数据库账号失败")
     end
     return true
-end
-
-function Database:revoke(context, account)
-    return drop_user(app_users(self, context, account), account.username, account.name)
-end
-
-function Database:retire_shared_user(context)
-    local admin = administration(self, context)
-    local legacy = config.database_admin
-    local users = admin:getDB(legacy.legacy_authdb)
-    return drop_user(users, legacy.legacy_username, legacy.legacy_database)
 end
 
 -- 驱动会用集合名回写 db。同名集合（例如 name）不能覆盖共享连接的字段。
