@@ -18,6 +18,7 @@ final class ResourceBroker {
         let token: UUID
         let task: URLSessionWebSocketTask
         let generation: Int
+        let gateway: GatewayTransport?
     }
     private let queue: DispatchQueue
     private let event: (String, [String: Any]) -> Void
@@ -42,7 +43,7 @@ final class ResourceBroker {
 
     func request(
         appId: String, generation: Int, kind: String, input: [String: Any],
-        origins: [String], completion: @escaping HostCore.Reply
+        origins: [String], loginLimit: ((String) throws -> Int?)? = nil, completion: @escaping HostCore.Reply
     ) throws {
         guard let key = input["key"] as? String, !key.isEmpty, key.count <= 64 else {
             throw failure("resource", "Resource key required")
@@ -81,8 +82,10 @@ final class ResourceBroker {
                 })
             else { throw failure("network", "Socket origin denied or resource limit exceeded") }
             let task = session.webSocketTask(with: url)
-            task.maximumMessageSize = 262_144
-            let connection = Connection(token: UUID(), task: task, generation: generation)
+            task.maximumMessageSize = loginLimit == nil ? 262_144 : GatewayTransport.chunk + 9
+            let connection = Connection(
+                token: UUID(), task: task, generation: generation,
+                gateway: loginLimit.map(GatewayTransport.init))
             connections[appId, default: [:]][key] = connection
             task.resume()
             receive(appId: appId, key: key, connection: connection)
@@ -94,6 +97,20 @@ final class ResourceBroker {
                     || input["connectionId"] as? String == connection.token.uuidString
             else {
                 throw failure("resource", "Missing or stale socket")
+            }
+            if let gateway = connection.gateway {
+                guard let raw = input["data"] as? String, input["text"] == nil,
+                    raw.utf8.count <= 4 * ((gateway.maximum + 2) / 3)
+                else { throw failure("size", "需要二进制业务消息，上限为 \(gateway.maximum) 字节") }
+                guard let data = Data(base64Encoded: raw) else { throw failure("protocol", "无效的二进制业务消息") }
+                try gateway.send(data, task: connection.task, queue: queue) { result in
+                    guard self.connections[appId]?[key]?.token == connection.token else {
+                        completion(.failure(failure("resource", "Socket closed before send completed")))
+                        return
+                    }
+                    completion(result.map { _ in ["connectionId": connection.token.uuidString] })
+                }
+                return
             }
             let message: URLSessionWebSocketTask.Message
             if let text = input["text"] as? String, input["data"] == nil, text.utf8.count <= 262_144 {
@@ -132,6 +149,24 @@ final class ResourceBroker {
                 switch result {
                 case .success(let message):
                     var event: [String: Any] = ["key": key, "connectionId": connection.token.uuidString]
+                    if let gateway = connection.gateway {
+                        do {
+                            guard case .data(let data) = message else {
+                                throw failure("protocol", "网关需要二进制消息")
+                            }
+                            if let packet = try gateway.receive(data) {
+                                event["data"] = packet.base64EncodedString()
+                                self.event(appId, event)
+                            }
+                            self.receive(appId: appId, key: key, connection: connection)
+                        } catch {
+                            self.connections[appId]?[key] = nil
+                            connection.task.cancel(with: .protocolError, reason: nil)
+                            event["error"] = String(describing: error)
+                            self.event(appId, event)
+                        }
+                        return
+                    }
                     switch message {
                     case .string(let value): event["text"] = value
                     case .data(let data): event["data"] = data.base64EncodedString()
@@ -145,7 +180,8 @@ final class ResourceBroker {
                         appId,
                         [
                             "key": key, "connectionId": connection.token.uuidString,
-                            "error": String(describing: error),
+                            "error": connection.task.closeReason.flatMap { String(data: $0, encoding: .utf8) }
+                                ?? String(describing: error),
                         ])
                 }
             }

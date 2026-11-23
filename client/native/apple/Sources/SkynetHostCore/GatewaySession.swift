@@ -13,6 +13,7 @@ final class GatewaySession {
     private lazy var broker = ResourceBroker(queue: queue) { [weak self] _, message in
         self?.receive(message)
     }
+    private(set) var maximum = GatewayTransport.chunk
     private(set) var user: [String: Any]?
 
     init(builtins: URL, queue: DispatchQueue, event: @escaping (String) -> Void) {
@@ -34,7 +35,7 @@ final class GatewaySession {
         nextId = 1
         try broker.request(
             appId: "host", generation: generation, kind: "socket.open",
-            input: ["key": "gateway", "url": url], origins: [origin]
+            input: ["key": "gateway", "url": url], origins: [origin], loginLimit: loginLimit
         ) { result in
             guard case .success = result else {
                 completion(result)
@@ -48,6 +49,7 @@ final class GatewaySession {
                         identity["username"] as? String == username, let id = identity["user_id"] as? String,
                         !id.isEmpty
                     else { throw failure("login", "服务器返回了无效的用户身份") }
+                    self.maximum = body["max_message_bytes"] as? Int ?? GatewayTransport.chunk
                     self.user = ["username": username, "userId": id, "url": url]
                     completion(.success(self.user!))
                 } catch {
@@ -94,6 +96,20 @@ final class GatewaySession {
         } catch { completion(.failure(error)) }
     }
 
+    func loginLimit(_ data: String) throws -> Int? {
+        guard let codec else { throw failure("protocol", "尚未加载登录协议") }
+        codec.exception = nil
+        guard
+            let packet = codec.objectForKeyedSubscript("GatewayProtocol")?
+                .invokeMethod("decodePacket", withArguments: [data])?.toDictionary(),
+            codec.exception == nil
+        else { throw failure("protocol", "登录前收到无效的网关消息") }
+        guard packet["name"] as? String == "LoginRes", let body = packet["body"] as? [String: Any],
+            body["ret"] as? Int == 1
+        else { return nil }
+        return body["max_message_bytes"] as? Int ?? 0
+    }
+
     private func receive(_ message: [String: Any]) {
         guard let data = message["data"] as? String, let codec else {
             close()
@@ -129,6 +145,7 @@ final class GatewaySession {
         let hadUser = user != nil
         generation += 1
         connected = false
+        maximum = GatewayTransport.chunk
         user = nil
         broker.close(appId: "host")
         let waiting = pending

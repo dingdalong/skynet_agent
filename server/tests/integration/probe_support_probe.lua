@@ -23,7 +23,8 @@ function M.run()
                     elseif payload.username == "corrupt" then
                         websocket.write(peer, "\0\1", "binary")
                     elseif payload.username == "reply" then
-                        websocket.write(peer, protocol:encode_msg(message_id, "LoginRes", { ret = 1 }), "binary")
+                        local body = { ret = 1, max_message_bytes = 300000 }
+                        websocket.write(peer, protocol:encode_msg(message_id, "LoginRes", body), "binary")
                     end
                 end,
                 close = function(peer) peers[peer] = nil end,

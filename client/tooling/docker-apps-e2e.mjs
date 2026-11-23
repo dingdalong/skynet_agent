@@ -1,3 +1,4 @@
+import { receiver, sendGateway } from "./gateway-wire.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomInt, randomUUID } from "node:crypto";
@@ -247,9 +248,14 @@ try {
     );
     const messages = [];
     const directoryFrames = new WeakMap();
+    let maximum;
     const listen = async () => {
+        maximum = 65_536;
+        const receive = receiver();
         socket = await connect();
-        socket.on("message", (data) => {
+        socket.on("message", (part) => {
+            const data = receive(part, maximum);
+            if (!data) return;
             const packet = codec.decodePacket(data.toString("base64"));
             if (packet.name === "AppCenterListRes")
                 directoryFrames.set(packet, data);
@@ -260,7 +266,11 @@ try {
     let sequence = 0;
     const request = async (name, body = {}) => {
         const id = ++sequence;
-        socket.send(Buffer.from(codec.encodePacket(name, id, body), "base64"));
+        sendGateway(
+            socket,
+            Buffer.from(codec.encodePacket(name, id, body), "base64"),
+            maximum,
+        );
         return until(() => messages.find((packet) => packet.id === id), name);
     };
     let loginId;
@@ -268,6 +278,7 @@ try {
         const login = (await request("LoginReq", { username: "docker-probe" }))
             .body;
         assert.equal(login.ret, 1);
+        maximum = login.max_message_bytes;
         loginId ??= login.identity.user_id;
         assert.equal(login.identity.user_id, loginId);
         await until(
@@ -609,6 +620,40 @@ try {
     }
     const payload = { item: { echo_value: "独立协议" } };
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    for (const size of [65_536, 65_537, 300 * 1024, maximum, maximum + 1]) {
+        let value = "x".repeat(size - 20);
+        const body = () => ({ item: { echo_value: value } });
+        const encoded = () =>
+            Buffer.from(
+                codec.encodePacket("EchoRepeatReq", 1, body()),
+                "base64",
+            );
+        const difference = size - encoded().length;
+        value =
+            difference < 0
+                ? value.slice(0, difference)
+                : value + "x".repeat(difference);
+        assert.equal(encoded().length, size);
+        if (size > maximum) {
+            await assert.rejects(
+                request("EchoRepeatReq", body()),
+                /exceeds negotiated limit/,
+            );
+        } else {
+            const result = await request("EchoRepeatReq", body());
+            assert.deepEqual(result.body, body());
+            await until(
+                () =>
+                    messages.find(
+                        (p) =>
+                            p.name === "EchoRepeatedNtf" &&
+                            p.body.item.echo_value === value,
+                    ),
+                "完整的大消息通知",
+            );
+            assert.equal(messages.filter((p) => p.id === result.id).length, 1);
+        }
+    }
     await compose("pause", "mongodb");
     try {
         const unconfirmed = request("AgentPreferenceSetReq", {
@@ -749,6 +794,7 @@ try {
                 result: JSON.stringify({
                     ok: true,
                     project: { workspace: "/project" },
+                    output: "a".repeat(1024 * 1024 - 128),
                 }),
             })
         ).body.ret,
@@ -935,6 +981,19 @@ try {
         (await request("AppCenterListReq")).body.names.includes("Echo 新名称"),
     );
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
+    // Replace only this project's test image, then log in to its new container.
+    const changedMaximum = 512 * 1024;
+    const gatewayImage = `${project}-gateway`;
+    const rebuild = docker("build", "-t", gatewayImage, "-");
+    rebuild.child.stdin.end(
+        `FROM ${gatewayImage}\nRUN sed -i 's/max_message_bytes = [^,]*,/max_message_bytes = ${changedMaximum},/' etc/cfg/common.lua\n`,
+    );
+    await rebuild;
+    await compose("up", "-d", "--no-deps", "--no-build", "gateway");
+    assert.equal(
+        (await loginOnce("docker-probe")).max_message_bytes,
+        changedMaximum,
+    );
     console.log(
         "Docker 应用接入、数据库隔离与归档、审批恢复、通知、沙盒和容器启停通过",
     );

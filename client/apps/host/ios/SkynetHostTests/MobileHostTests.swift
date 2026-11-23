@@ -245,6 +245,63 @@ final class MobileHostTests: XCTestCase {
         core.detach(reattached)
     }
 
+    func testLargeHistoryAfterReloginAndFollowup() async throws {
+        let core = HostServices.core
+        let environment = ProcessInfo.processInfo.environment
+        let endpoint = try XCTUnwrap(environment["SKYNET_TEST_SOCKET"])
+        let username = environment["SKYNET_TEST_HISTORY_USER"] ?? "fragment-history"
+        let id = "wire-history-fixture"
+        // Each login creates fresh physical sockets for both the shell and Agent.
+        for attempt in 0..<2 {
+            _ = try? await workspace(core, "logout")
+            _ = try await workspace(core, "login", ["url": "\(endpoint)/agent", "username": username])
+            _ = try await workspace(core, "open", ["appId": "agent"])
+            let lease = core.attach(appId: "agent") { _ in }
+            defer { core.detach(lease) }
+            func messages() async throws -> [[String: Any]] {
+                let snapshot = try await request(core, lease, "snapshot")
+                let state = object(snapshot["state"])
+                guard object(state["connection"])["status"] as? String == "online" else { return [] }
+                let chat = object(object(state["sessions"])[id])
+                return object(chat["session"])["messages"] as? [[String: Any]] ?? []
+            }
+            var history: [[String: Any]] = []
+            for _ in 0..<150 {
+                history = try await messages()
+                if !history.isEmpty { break }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            let blocks = history.flatMap { $0["reasoning"] as? [[String: Any]] ?? [] }
+            XCTAssertEqual(blocks.first?["text"].flatMap { $0 as? String }?.utf8.count, 1_200_000)
+            _ = try await request(core, lease, "command", ["name": "session.select", "payload": ["id": id]])
+            let scene = try await view("app-scene-agent")
+            var presentation: WKWebView?
+            try await eventually("历史展示未挂载") {
+                presentation = self.descendant(scene) { $0 as? WKWebView }
+                return presentation != nil
+            }
+            try await waitForWeb(try XCTUnwrap(presentation), "document.body.innerText.includes('已记住代号青舟17')")
+            if attempt == 1 {
+                _ = try await request(
+                    core, lease, "command",
+                    [
+                        "name": "chat.send",
+                        "payload": ["target": id, "text": "验收续聊，请只回答前面约定的代号，无需工具。"],
+                    ])
+                for _ in 0..<600 {
+                    let updated = try await messages()
+                    if updated.count > history.count, let last = updated.last, last["role"] as? Int == 2,
+                        last["status"] as? Int == 2, (last["content"] as? String)?.contains("青舟17") == true
+                    {
+                        return
+                    }
+                    try await Task.sleep(for: .milliseconds(150))
+                }
+                XCTFail("原会话没有收到包含约定代号的完整回复")
+            }
+        }
+    }
+
     func testMobileAuthorityAndAgentBootstrap() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let builtins = Bundle.main.resourceURL!.appendingPathComponent("builtins")

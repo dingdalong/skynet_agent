@@ -29,6 +29,7 @@ local function common_config()
             socket = {
                 host = "127.0.0.1",
                 path = "/agent",
+                max_message_bytes = 300000,
             },
             login_timeout_ticks = 1000,
         },

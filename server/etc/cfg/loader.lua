@@ -36,6 +36,7 @@ local Loader = {}
 ---@field host string
 ---@field port integer
 ---@field path string
+---@field max_message_bytes integer
 
 ---@class server.AgentGatewayConfig
 ---@field socket server.SocketConfig
@@ -128,6 +129,7 @@ local function validate(config)
     local socket = table_field(gateway.socket, "agent_gateway.socket")
     string_field(socket.host, "agent_gateway.socket.host")
     integer_field(socket.port, "agent_gateway.socket.port", 1, 65535)
+    integer_field(socket.max_message_bytes, "agent_gateway.socket.max_message_bytes", 65536, 0xffffffff)
     local socket_path = string_field(socket.path, "agent_gateway.socket.path")
     if socket_path:sub(1, 1) ~= "/" then
         error("服务器配置 agent_gateway.socket.path 必须以 / 开头")

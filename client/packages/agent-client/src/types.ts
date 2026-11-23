@@ -124,6 +124,7 @@ export interface AgentState {
         key: string;
         attempt: number;
         nextId: number;
+        maximum: number;
         opening: string;
         clock: string;
         clockMode: "watch" | "reconnect";

@@ -13,6 +13,11 @@
         private var output: Int32 = -1
         private var errors: Int32 = -1
         private var timer: DispatchSourceTimer?
+        private let io = DispatchGroup()
+        private var reader: DispatchSourceRead?
+        private var writer: DispatchSourceWrite?
+        private let maximumFrame: Int
+        private var scanned = 0
         private var incoming = Data()
         private var outgoing = Data()
         private var diagnostics = Data()
@@ -22,10 +27,16 @@
         var onFailure: ((Error) -> Void)?
         private var stopped = false
 
-        init(queue: DispatchQueue, launcher: URL, executable: URL, profile: URL, generation: Int) throws {
+        init(
+            queue: DispatchQueue, launcher: URL, executable: URL, profile: URL, generation: Int,
+            maximumFrame: Int = 1_048_576
+        ) throws {
+            self.maximumFrame = maximumFrame
             self.queue = queue
             self.generation = generation
-            let arguments = ["/usr/bin/sandbox-exec", "-f", profile.path, executable.path]
+            let arguments = [
+                "/usr/bin/sandbox-exec", "-f", profile.path, executable.path, String(maximumFrame),
+            ]
             let strings = arguments.map { strdup($0) } + [nil]
             let environment = [strdup("PATH=/usr/bin:/bin"), strdup("LANG=en_US.UTF-8"), nil]
             defer {
@@ -51,6 +62,12 @@
             var enabled: Int32 = 1
             setsockopt(
                 output, SOL_SOCKET, SO_NOSIGPIPE, &enabled, socklen_t(MemoryLayout.size(ofValue: enabled)))
+            let reader = DispatchSource.makeReadSource(fileDescriptor: output, queue: queue)
+            io.enter()
+            reader.setCancelHandler { [io] in io.leave() }
+            reader.setEventHandler { [weak self] in self?.readOutput() }
+            self.reader = reader
+            reader.resume()
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now(), repeating: .milliseconds(10))
             timer.setEventHandler { [weak self] in self?.poll() }
@@ -75,42 +92,53 @@
             frame["generation"] = generation
             do {
                 outgoing = try jsonData(frame)
-                guard outgoing.count < 1_048_576 else { throw failure("size", "Runtime input too large") }
+                guard outgoing.count < maximumFrame else { throw failure("size", "Runtime input too large") }
                 outgoing.append(10)
-                active = (id, Date().addingTimeInterval(2), completion)
+                active = (id, Date().addingTimeInterval(maximumFrame > 1_048_576 ? 15 : 2), completion)
+                flushInput()
             } catch {
                 completion(.failure(error))
                 next()
             }
         }
 
-        private func poll() {
-            guard !stopped, let process else { return }
-            if !outgoing.isEmpty {
-                let count = outgoing.withUnsafeBytes { Darwin.write(output, $0.baseAddress!, $0.count) }
-                if count > 0 {
-                    outgoing.removeFirst(count)
-                } else if count < 0, errno != EAGAIN, errno != EINTR {
-                    stop(failure("pipe", "Runtime input closed"))
-                    return
-                }
+        private func flushInput() {
+            guard !stopped, !outgoing.isEmpty else { return }
+            let count = outgoing.withUnsafeBytes { Darwin.write(output, $0.baseAddress!, $0.count) }
+            if count > 0 {
+                outgoing.removeFirst(count)
+            } else if count < 0, errno != EAGAIN, errno != EINTR {
+                stop(failure("pipe", "Runtime input closed"))
+                return
             }
+            if outgoing.isEmpty {
+                writer?.cancel()
+                writer = nil
+            } else if writer == nil {
+                let writer = DispatchSource.makeWriteSource(fileDescriptor: output, queue: queue)
+                io.enter()
+                writer.setCancelHandler { [io] in io.leave() }
+                writer.setEventHandler { [weak self] in self?.flushInput() }
+                self.writer = writer
+                writer.resume()
+            }
+        }
+
+        private func readOutput() {
+            guard !stopped else { return }
             var bytes = [UInt8](repeating: 0, count: 16_384)
             // Bound each poll so an app flooding stdout cannot monopolize HostCore.
             for _ in 0..<8 {
                 let count = Darwin.read(output, &bytes, bytes.count)
                 if count <= 0 { break }
                 incoming.append(contentsOf: bytes.prefix(count))
-                if incoming.count > 1_048_576 {
+                if incoming.count > maximumFrame {
                     stop(failure("size", "Runtime output exceeded limit"))
                     return
                 }
             }
-            let diagnosticCount = Darwin.read(errors, &bytes, bytes.count)
-            if diagnosticCount > 0, diagnostics.count < 8192 {
-                diagnostics.append(contentsOf: bytes.prefix(min(diagnosticCount, 8192 - diagnostics.count)))
-            }
-            while let newline = incoming.firstIndex(of: 10), !stopped {
+            while !stopped, let newline = incoming.dropFirst(scanned).firstIndex(of: 10) {
+                scanned = 0
                 let frame = incoming.prefix(upTo: newline)
                 incoming.removeSubrange(...newline)
                 do {
@@ -141,11 +169,18 @@
                     return
                 }
             }
-            // A reply callback may stop this process (for example an install probe).
-            // Never poll a handle already transferred to the asynchronous reaper.
-            guard !stopped else { return }
+            scanned = incoming.count
+        }
+
+        private func poll() {
+            guard !stopped, let process else { return }
+            var bytes = [UInt8](repeating: 0, count: 8192)
+            let diagnosticCount = Darwin.read(errors, &bytes, bytes.count)
+            if diagnosticCount > 0, diagnostics.count < 8192 {
+                diagnostics.append(contentsOf: bytes.prefix(min(diagnosticCount, 8192 - diagnostics.count)))
+            }
             if let active, active.deadline < Date() {
-                stop(failure("timeout", "App runtime exceeded its 2 second deadline"))
+                stop(failure("timeout", "App runtime exceeded its deadline"))
                 return
             }
             if pid > 0, skynet_resident_memory(Int32(pid)) > 268_435_456 {
@@ -165,8 +200,14 @@
             timer?.cancel()
             timer = nil
             if output >= 0 {
-                Darwin.close(output)
+                reader?.cancel()
+                writer?.cancel()
+                reader = nil
+                writer = nil
+                let fd = output
                 output = -1
+                // Both dispatch sources must release the descriptor before it can be reused.
+                io.notify(queue: queue) { Darwin.close(fd) }
             }
             if errors >= 0 {
                 Darwin.close(errors)

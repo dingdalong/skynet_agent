@@ -98,7 +98,7 @@ WebKit 与业务初始化并行，SDK 等待初始化状态提交后发送 `view
 内置 Agent 独占 `agent.context`、`agent.execute` 及原生目录授权入口；
 即使普通包声明相似权限，也不能获得这些能力。目录、设备与工具进程由原生宿主管理。
 `socket.send` 在 `text` 与 base64 `data` 之间二选一，收包使用相同字段区分帧类型；
-可以绑定 `connectionId` 拒绝旧连接发送。消息上限为 256 KiB。
+可以绑定 `connectionId` 拒绝旧连接发送。第三方 WebSocket 消息上限为 256 KiB。宿主和内置 Agent 的网关连接按各自登录响应的上限收发业务消息，由原生宿主统一分包与重组。
 `timer.wait` 由宿主执行，按应用和 key 管理，替换同 key 时旧任务收到失败；退出应用时清理。
 计时范围和并发数量有硬限制，不能在 reducer 或 Web 页面持有业务重连计时器。
 网络权限需要 manifest 声明并得到安装授权；仅允许精确 `wss` 来源及显式回环 `ws`。

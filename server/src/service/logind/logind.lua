@@ -1,6 +1,7 @@
 local username = require("helper.username")
 local class = require("class")
 local Protocol = require("network.protocol")
+local config = require("etc.cfg").agent_gateway
 local Frame = require("network.frame")
 local pool = require("helper.service_pool")
 local rpc = require("rpc")
@@ -100,6 +101,7 @@ function Login:handle_request(context, id, message_id, app_id, body)
     local response = self.codec:encode_body("LoginRes", {
         ret = error_code.succ,
         identity = identity,
+        max_message_bytes = config.socket.max_message_bytes,
     })
     return self:_call_websocket(websocket_address, "send_response", id, message_id, "login", Frame.response, response)
 end

@@ -52,6 +52,7 @@ return {
     },
     agent_gateway = {
         socket = {
+            max_message_bytes = 4 * 1024 * 1024,
             host = os.getenv("GATEWAY_HOST") or "127.0.0.1",
             path = "/agent",
         },

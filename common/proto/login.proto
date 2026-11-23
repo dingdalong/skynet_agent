@@ -17,4 +17,5 @@ message LoginRes {
   int32 ret = 2;
   ErrorInfo error = 3;
   UserIdentity identity = 4;
+  uint32 max_message_bytes = 5;
 }

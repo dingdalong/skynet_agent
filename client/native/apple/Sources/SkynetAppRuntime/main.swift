@@ -51,7 +51,8 @@ context.evaluateScript(
     """)
 let invoke = context.objectForKeyedSubscript("__invokeJSON")!
 var buffer = Data()
-let maximumFrame = 1_048_576
+let maximumFrame = CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? 1_048_576
+var scanned = 0
 while true {
     // FileHandle's length-based read can wait to fill the requested capacity on
     // a duplex socket. POSIX read returns the available protocol bytes.
@@ -61,7 +62,8 @@ while true {
     if count <= 0 { break }
     buffer.append(contentsOf: bytes.prefix(count))
     if buffer.count > maximumFrame { exit(65) }
-    while let newline = buffer.firstIndex(of: 10) {
+    while let newline = buffer.dropFirst(scanned).firstIndex(of: 10) {
+        scanned = 0
         let frame = buffer.prefix(upTo: newline)
         buffer.removeSubrange(...newline)
         // This command-line process has no AppKit run loop to drain temporary
@@ -81,7 +83,7 @@ while true {
                         code, withSourceURL: URL(string: "skynet-runtime://app/runtime.js"))
                     if let exception { throw RuntimeError.script(exception) }
                 }
-                let json = String(data: try JSONSerialization.data(withJSONObject: message), encoding: .utf8)!
+                let json = String(decoding: frame, as: UTF8.self)
                 // Data stays an argument; do not compile a new script containing
                 // the entire state for every token or timer update.
                 let value = invoke.call(withArguments: [json])?.toString()
@@ -110,6 +112,7 @@ while true {
             }
         }
     }
+    scanned = buffer.count
 }
 
 enum RuntimeError: Error {

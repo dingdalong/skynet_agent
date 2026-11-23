@@ -28,7 +28,9 @@ describe("websocket", function()
         scope = Scope.new({
             ["skynet.crypt"] = { randomkey = function() return "salt" end, hexencode = tostring },
             ["websocket"] = false, ["log"] = false,
-            ["etc.cfg"] = { agent_gateway = { socket = { path = "/agent" }, login_timeout_ticks = 1000 } },
+            ["etc.cfg"] = { agent_gateway = {
+                socket = { path = "/agent", max_message_bytes = 200000 }, login_timeout_ticks = 1000,
+            } },
             skynet = {
                 error = function() end, self = function() return 10 end,
                 genid = function() next_id = next_id + 1; return next_id end,
@@ -75,6 +77,52 @@ describe("websocket", function()
         message(1, 2, "AgentChatReq")
         assert.same({ 30, "handle_request", connection.id, 2, "agent", codec:encode_body("AgentChatReq", {}) }, sent[1])
         assert.are.equal(1, #sent)
+    end)
+    it("分片收齐后只路由一次，断线和错序不会交付半包", function()
+        local fragments = require("network.fragments")
+        local frame = require("network.frame")
+        local body = string.rep("z", 150000)
+        local packet = frame.pack(frame.request, 1, "echo", body)
+        local parts = {}
+        fragments.write(packet, 200000, function(part) parts[#parts + 1] = part end)
+        accept(1)
+        handles[1].message(1, parts[1], "binary")
+        assert.are.equal(1009, closed[1][2])
+        local old = accept(2)
+        instance:bind_client({}, old.id, 30)
+        handles[2].message(2, parts[1], "binary")
+        assert.same({}, sent)
+        handles[2].close()
+        assert.same({}, old.fragments)
+        local other = accept(2)
+        instance:bind_client({}, other.id, 30)
+        handles[2].message(2, parts[2], "binary")
+        assert.are.equal(1007, closed[2][2])
+        local current = accept(2)
+        instance:bind_client({}, current.id, 30)
+        handles[2].message(2, string.pack(">BI4I4", 5, #packet, 0) .. packet:sub(1, 11), "binary")
+        for offset = 11, #packet - 1, fragments.size do
+            local part = string.pack(">BI4I4", 5, #packet, offset) .. packet:sub(offset + 1, offset + fragments.size)
+            handles[2].message(2, part, "binary")
+        end
+        assert.same({ 30, "handle_request", current.id, 1, "echo", body }, sent[3])
+        assert.are.equal(3, #sent)
+    end)
+    it("双向整包超限时返回明确错误，不交付截断数据", function()
+        local frame = require("network.frame")
+        local maximum = 4 * 1024 * 1024
+        package.loaded["etc.cfg"].agent_gateway.socket.max_message_bytes = maximum
+        local connection = accept(1)
+        instance:bind_client({}, connection.id, 30)
+        local body = string.rep("x", maximum - 6 - #"echo" + 1)
+        assert.is_true(instance:send_response({ source = 30 }, connection.id, 7, "echo", frame.response, body))
+        assert.are.equal(1, #writes)
+        local kind, id, app, error_body = frame.unpack(writes[1][2])
+        assert.same({ frame.routing_error, 7, "echo" }, { kind, id, app })
+        assert.matches(tostring(maximum), error_body)
+        handles[1].message(1, string.pack(">BI4I4", 5, maximum + 1, 0) .. "x", "binary")
+        assert.are.equal(1009, closed[1][2])
+        assert.same({ { 30, "disconnect", connection.id } }, sent)
     end)
     it("同步等待只阻塞当前连接，回调可绑定并写响应", function()
         local connection = accept(1)

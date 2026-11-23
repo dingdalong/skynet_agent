@@ -1,5 +1,5 @@
 import protobuf from "protobufjs/light.js";
-export const maximumPacketSize = 262_144;
+export const gatewayChunkBytes = 65_536;
 
 export function hash(name: string): number {
     let value = 0x811c9dc5;
@@ -10,11 +10,19 @@ export function hash(name: string): number {
 export function toBase64(bytes: Uint8Array): string {
     return protobuf.util.base64.encode(bytes, 0, bytes.length);
 }
-export function fromBase64(text: string): Uint8Array {
-    if (text.length > 349_528 || !protobuf.util.base64.test(text))
+export function fromBase64(text: string, maximum = 0xffff_ffff): Uint8Array {
+    // Validate padding without a repeated-group regexp over multi-megabyte strings.
+    const padding = text.endsWith("==") ? 2 : text.endsWith("=") ? 1 : 0;
+    const length = (text.length / 4) * 3 - padding;
+    if (
+        text.length % 4 ||
+        length > maximum ||
+        (padding && text.indexOf("=") !== text.length - padding)
+    )
         throw Error("无效或过大的二进制消息");
-    const bytes = new Uint8Array(protobuf.util.base64.length(text));
-    protobuf.util.base64.decode(text, bytes, 0);
+    const bytes = new Uint8Array(length);
+    if (protobuf.util.base64.decode(text, bytes, 0) !== length)
+        throw Error("无效的二进制消息");
     return bytes;
 }
 export interface Packet {
@@ -31,14 +39,10 @@ export interface AppProtocol {
 const validApp = (id: string) =>
     id.length <= 63 && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id);
 
-export function readFrame(data: string) {
-    const bytes = fromBase64(data);
+export function readFrame(data: string, maximum = 0xffff_ffff) {
+    const bytes = fromBase64(data, maximum);
     const offset = 6 + bytes[5];
-    if (
-        bytes.length < 7 ||
-        bytes.length > maximumPacketSize ||
-        offset > bytes.length
-    )
+    if (bytes.length < 7 || bytes.length > maximum || offset > bytes.length)
         throw Error("不支持的协议帧");
     const app = String.fromCharCode(...bytes.subarray(6, offset));
     const kind = bytes[0];
@@ -97,6 +101,7 @@ export function createCodec(applications: AppProtocol[]) {
         id: number,
         payload: object,
         app = ownerOf(name),
+        maximum = 0xffff_ffff,
     ): string {
         const type = app && scopes.get(app)?.names.get(name);
         if (!type) throw Error("未知应用消息");
@@ -114,8 +119,8 @@ export function createCodec(applications: AppProtocol[]) {
         if (error) throw Error(`协议输入无效：${error}`);
         const body = type.encode(type.create(payload)).finish();
         const offset = 6 + app.length;
-        if (body.length + offset + 4 > maximumPacketSize)
-            throw Error("消息超过 256 KiB");
+        if (body.length + offset + 4 > maximum)
+            throw Error(`业务消息超过网关上限 ${maximum} 字节`);
         const bytes = new Uint8Array(offset + 4 + body.length);
         const view = new DataView(bytes.buffer);
         bytes[0] = kind;
@@ -127,8 +132,8 @@ export function createCodec(applications: AppProtocol[]) {
         bytes.set(body, offset + 4);
         return toBase64(bytes);
     }
-    function decodePacket(data: string): Packet {
-        const { app, id, kind, payload } = readFrame(data);
+    function decodePacket(data: string, maximum = 0xffff_ffff): Packet {
+        const { app, id, kind, payload } = readFrame(data, maximum);
         if (kind === 4 && payload.length)
             return {
                 app,

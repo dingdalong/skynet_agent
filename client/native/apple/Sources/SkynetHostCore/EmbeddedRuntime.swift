@@ -9,15 +9,17 @@ final class EmbeddedRuntime: BusinessRuntime {
     var onFailure: ((Error) -> Void)?
     private let owner: DispatchQueue
     private let execution: DispatchQueue
+    private let maximumFrame: Int
     private let deadline: TimeInterval
     private var context: JSContext?
     private var scriptError: String?
     private var stopped = false
     private var active: (UUID, HostCore.Reply)?
 
-    init(queue: DispatchQueue, generation: Int, deadline: TimeInterval = 2) {
+    init(queue: DispatchQueue, generation: Int, maximumFrame: Int = 1_048_576, deadline: TimeInterval = 2) {
         owner = queue
-        self.deadline = deadline
+        self.maximumFrame = maximumFrame
+        self.deadline = maximumFrame > 1_048_576 ? max(deadline, 15) : deadline
         execution = DispatchQueue(label: "app.skynet.builtin.\(generation).\(UUID())", qos: .userInitiated)
     }
 
@@ -29,7 +31,7 @@ final class EmbeddedRuntime: BusinessRuntime {
         let id = UUID()
         do {
             let data = try jsonData(message)
-            guard data.count < 1_048_576 else { throw failure("size", "Runtime input too large") }
+            guard data.count < maximumFrame else { throw failure("size", "Runtime input too large") }
             let json = String(decoding: data, as: UTF8.self)
             active = (id, completion)
             owner.asyncAfter(deadline: .now() + deadline) { [weak self] in
@@ -64,7 +66,7 @@ final class EmbeddedRuntime: BusinessRuntime {
                         let value = context.objectForKeyedSubscript("__invokeJSON")?
                             .call(withArguments: [json])?.toString()
                         if let error = self.scriptError { throw failure("app", error) }
-                        guard let value, value.utf8.count < 1_048_576 else {
+                        guard let value, value.utf8.count < self.maximumFrame else {
                             throw failure("size", "Runtime result missing or too large")
                         }
                         return try jsonObject(Data(value.utf8))

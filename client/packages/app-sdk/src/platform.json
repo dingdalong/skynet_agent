@@ -108,6 +108,7 @@
                   "fields": {
                     "error": { "id": 3, "type": "ErrorInfo" },
                     "identity": { "id": 4, "type": "UserIdentity" },
+                    "max_message_bytes": { "id": 5, "type": "uint32" },
                     "ret": { "id": 2, "type": "int32" }
                   }
                 },

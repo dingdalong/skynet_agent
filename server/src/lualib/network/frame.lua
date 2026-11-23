@@ -1,4 +1,4 @@
-local Frame = { request = 1, response = 2, notification = 3, routing_error = 4, maximum = 262144 }
+local Frame = { request = 1, response = 2, notification = 3, routing_error = 4 }
 
 function Frame.valid_app(id)
     return type(id) == "string" and #id <= 63 and id:match("^[a-z][a-z0-9%-]*$") ~= nil
@@ -14,12 +14,11 @@ end
 
 function Frame.pack(kind, id, app, data)
     validate(kind, id, app)
-    assert(#data + #app + 6 <= Frame.maximum, "帧过大")
     return string.pack(">BI4s1", kind, id, app) .. data
 end
 
 function Frame.unpack(data)
-    assert(type(data) == "string" and #data <= Frame.maximum, "无效消息帧")
+    assert(type(data) == "string", "无效消息帧")
     local kind, id, app, pos = string.unpack(">BI4s1", data)
     validate(kind, id, app)
     return kind, id, app, data:sub(pos)

@@ -101,9 +101,9 @@ final class DocumentStore {
         guard FileManager.default.fileExists(atPath: file.path) else { return nil }
         return try jsonObject(Data(contentsOf: file))
     }
-    func write(_ key: String, _ value: [String: Any]) throws {
+    func write(_ key: String, _ value: [String: Any], maximum: Int = 1_048_576) throws {
         let data = try jsonData(value)
-        guard data.count < 1_048_576 else { throw failure("storage", "App state exceeds 1 MiB") }
+        guard data.count < maximum else { throw failure("storage", "App state exceeds \(maximum) bytes") }
         try data.write(to: root.appendingPathComponent("\(key).json"), options: [.atomic])
     }
 }

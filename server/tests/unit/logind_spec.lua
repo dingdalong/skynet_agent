@@ -11,6 +11,7 @@ describe("logind", function()
         calls, fail = {}, {}
         open_callback, write_callback = nil, nil
         scope = Scope.new({
+            ["etc.cfg"] = { agent_gateway = { socket = { max_message_bytes = 500000 } } },
             ["logind"] = false, ["log"] = false,
             skynet = { error = function() end },
             ["rpc"] = {

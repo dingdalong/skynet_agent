@@ -117,7 +117,11 @@ class Client {
     restore(sessions: ChatSession[] = []) {
         this.resource(
             "LoginRes",
-            { ret: 1, identity: { user_id: "u1", username: "alice" } },
+            {
+                ret: 1,
+                max_message_bytes: 2_000_000,
+                identity: { user_id: "u1", username: "alice" },
+            },
             this.pending("LoginReq"),
         );
         expect(this.state.connection.status).toBe("restoring");
@@ -192,7 +196,11 @@ describe("native Agent development", () => {
         client.connect();
         client.resource(
             "LoginRes",
-            { ret: 1, identity: { username: "alice", user_id: "u1" } },
+            {
+                ret: 1,
+                max_message_bytes: 2_000_000,
+                identity: { username: "alice", user_id: "u1" },
+            },
             client.pending("LoginReq"),
         );
         client.resource(
@@ -279,8 +287,10 @@ describe("native Agent development", () => {
             (effect) => effect.kind === "agent.execute",
         )!;
         expect(effect.input.request_id).toBe("call-1");
+        const output = "x".repeat(1024 * 1024 - 128);
         client.effect(effect.id, {
             ok: true,
+            output,
             project: { workspace: "/project" },
         });
         expect(client.pending("AgentExecutionResultReq")).toBeGreaterThan(0);
@@ -288,6 +298,9 @@ describe("native Agent development", () => {
             (effect) => effect.kind === "socket.send",
         )!;
         expect(packet.input.connectionId).toBe("physical1");
+        expect(fromBase64(String(packet.input.data)).length).toBeGreaterThan(
+            output.length,
+        );
     });
     it("starts native context once per business process and ignores results after disconnect", () => {
         const initial = startAgent(initialAgentState(), true);
@@ -355,7 +368,11 @@ describe("native Agent development", () => {
         client.connect();
         client.resource(
             "LoginRes",
-            { ret: 1, identity: { username: "alice", user_id: "other" } },
+            {
+                ret: 1,
+                max_message_bytes: 2_000_000,
+                identity: { username: "alice", user_id: "other" },
+            },
             client.pending("LoginReq"),
         );
         expect(client.state.error).toContain("身份不匹配");
@@ -403,8 +420,14 @@ describe("public protobuf protocol", () => {
         expect(() => decodePacket("bad")).toThrow();
         expect(() => encodePacket("LoginReq", 0x1_0000_0000, {})).toThrow();
         expect(() =>
-            encodePacket("AgentChatReq", 1, { text: "x".repeat(262_144) }),
-        ).toThrow("256");
+            encodePacket(
+                "AgentChatReq",
+                1,
+                { text: "x".repeat(300_000) },
+                undefined,
+                300_000,
+            ),
+        ).toThrow("300000");
     });
 });
 

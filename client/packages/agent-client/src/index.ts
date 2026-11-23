@@ -1,5 +1,11 @@
 import type { Command, Effect, Json, Transition } from "@skynet/contracts";
-import { decodePacket, encodePacket, ownerOf, type Packet } from "./protocol";
+import {
+    gatewayChunkBytes,
+    decodePacket,
+    encodePacket,
+    ownerOf,
+    type Packet,
+} from "./protocol";
 import type {
     AgentState,
     ChatSession,
@@ -28,6 +34,7 @@ export function initialAgentState(): AgentState {
             key: "",
             attempt: 0,
             nextId: 1,
+            maximum: gatewayChunkBytes,
             opening: "",
             clock: "",
             clockMode: "watch",
@@ -92,6 +99,7 @@ class Turn {
         connection.opening = "";
         connection.clock = "";
         connection.nextId = 1;
+        connection.maximum = gatewayChunkBytes;
         connection.pending = {};
         connection.status = "connecting";
         this.state.buffered = [];
@@ -158,7 +166,13 @@ class Turn {
         }
         const id = connection.nextId;
         // Encoding must succeed before registering the request or its timer.
-        const data = encodePacket(name, id, body);
+        const data = encodePacket(
+            name,
+            id,
+            body,
+            undefined,
+            connection.maximum,
+        );
         connection.nextId++;
         connection.pending[String(id)] = {
             name,
@@ -418,6 +432,10 @@ class Turn {
                     identity.username !== this.state.configuration.username
                 )
                     throw Error("服务器登录身份不匹配");
+                const maximum = Number(packet.body.max_message_bytes);
+                if (!Number.isInteger(maximum) || maximum < gatewayChunkBytes)
+                    throw Error("登录响应中的业务消息上限无效");
+                connection.maximum = maximum;
                 this.request("AgentSnapshotReq", {}, identity.user_id);
                 break;
             }
@@ -622,7 +640,10 @@ export function reduceAgent(
                     break;
                 if (body.error) turn.lost(`连接中断：${String(body.error)}`);
                 else if (typeof body.data === "string") {
-                    const packet = decodePacket(body.data);
+                    const packet = decodePacket(
+                        body.data,
+                        state.connection.maximum,
+                    );
                     if (packet.id === 0) turn.notification(packet);
                     else turn.response(packet);
                 } else throw Error("服务器应发送二进制 protobuf 消息");

@@ -1,3 +1,4 @@
+import { receiver, sendGateway } from "./gateway-wire.mjs";
 import { WebSocketServer } from "ws";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -21,6 +22,7 @@ const names = [
     "AppCenterUnlockReq",
     "AppCenterSetReq",
     "AgentSnapshotReq",
+    "AgentDesktopRegisterReq",
     "AgentChatReq",
     "AgentSessionModelSetReq",
 ];
@@ -40,7 +42,7 @@ const send = (socket, name, id, body) => {
     packet.writeUInt32BE(id, 1);
     packet.writeUInt32BE(messageHash(name), offset);
     packet.set(payload, offset + 4);
-    socket.send(packet);
+    sendGateway(socket, packet, 3 * 1024 * 1024);
 };
 
 const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -48,7 +50,15 @@ await new Promise((resolve, reject) => {
     server.once("listening", resolve);
     server.once("error", reject);
 });
-server.on("connection", (socket) => {
+server.on("connection", (socket, upgrade) => {
+    const receive = receiver();
+    if (upgrade.url === "/gateway-wire") {
+        socket.on("message", (part) => {
+            const packet = receive(part, 3 * 1024 * 1024);
+            if (packet) sendGateway(socket, packet, 3 * 1024 * 1024);
+        });
+        return;
+    }
     let administrator = false;
     let agentEnabled = true;
     const id = randomUUID();
@@ -67,6 +77,10 @@ server.on("connection", (socket) => {
             socket.send(id);
             return;
         }
+        if (data[0] === 5) {
+            data = receive(data, 3 * 1024 * 1024);
+            if (!data) return;
+        }
         const name =
             data.length >= 10 + data[5] &&
             names.find(
@@ -82,7 +96,33 @@ server.on("connection", (socket) => {
             .decode(data.subarray(10 + data[5]));
         if (name === "LoginReq") {
             snapshot.username = request.username;
+            if (request.username === "fragment-history") {
+                snapshot.chat_sessions.push({
+                    model_id: "fixture",
+                    session: {
+                        id: "wire-history-fixture",
+                        title: "大消息验收",
+                        revision: 1,
+                        messages: [
+                            {
+                                id: "a",
+                                role: 2,
+                                status: 2,
+                                content: "已记住代号青舟17。",
+                                reasoning: [
+                                    {
+                                        id: "block",
+                                        status: "completed",
+                                        text: "x".repeat(1_200_000),
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                });
+            }
             send(socket, "LoginRes", requestId, {
+                max_message_bytes: 3 * 1024 * 1024,
                 ret: 1,
                 identity: {
                     username: request.username,
@@ -146,6 +186,26 @@ server.on("connection", (socket) => {
             send(socket, "AgentSessionModelSetRes", requestId, {
                 ret: 1,
                 chat_session: session,
+            });
+            return;
+        }
+        if (
+            name === "AgentChatReq" &&
+            snapshot.username === "fragment-history"
+        ) {
+            const chat = snapshot.chat_sessions.find(
+                (item) => item.session.id === request.session_id,
+            );
+            chat.session.messages.push({
+                id: "followup",
+                role: 2,
+                status: 2,
+                content: "青舟17",
+            });
+            chat.session.revision++;
+            send(socket, "AgentChatRes", requestId, {
+                ret: 1,
+                chat_session: chat,
             });
             return;
         }

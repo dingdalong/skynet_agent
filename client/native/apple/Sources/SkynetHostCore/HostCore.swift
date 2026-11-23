@@ -12,7 +12,7 @@ public final class HostCore {
     let appCatalog: AppCatalog
     private let store: DocumentStore
     private let documentURL: URL
-    private let makeRuntime: (DispatchQueue, Int) throws -> BusinessRuntime
+    private let makeRuntime: (DispatchQueue, Int, Int) throws -> BusinessRuntime
     private let agentServices: AgentServices
     private var suspended = false
     private var suspendedApps: [String] = []
@@ -46,6 +46,7 @@ public final class HostCore {
     private final class AppActor {
         let entry: AppCatalog.Entry
         let generation: Int
+        var maximumFrame = 1_048_576
         var runtime: BusinessRuntime?
         var state: Any = NSNull()
         var revision = 0
@@ -72,11 +73,12 @@ public final class HostCore {
             let profile = dataRoot.appendingPathComponent("runtime.sb")
             self.makeRuntime = {
                 try RuntimeProcess(
-                    queue: $0, launcher: launcher, executable: executable, profile: profile, generation: $1)
+                    queue: $0, launcher: launcher, executable: executable, profile: profile, generation: $1,
+                    maximumFrame: $2)
             }
         #else
             self.agentServices = try AgentServices(root: dataRoot)
-            self.makeRuntime = { EmbeddedRuntime(queue: $0, generation: $1) }
+            self.makeRuntime = { EmbeddedRuntime(queue: $0, generation: $1, maximumFrame: $2) }
         #endif
         self.store = try DocumentStore(root: dataRoot.appendingPathComponent("state"))
         self.documentURL = dataRoot.appendingPathComponent("host.json")
@@ -351,7 +353,11 @@ public final class HostCore {
             actor.tasks = Dictionary(uniqueKeysWithValues: actor.interrupted.map { ($0, UUID()) })
         }
         let code = try String(contentsOf: entry.root.appendingPathComponent("runtime.js"), encoding: .utf8)
-        let runtime = try makeRuntime(queue, generation)
+        if entry.builtin && id == "agent" {
+            // A turn can carry the previous JSON state alongside a Base64 event and escaped tool text.
+            actor.maximumFrame += max(gateway.maximum * 8, try jsonData(["state": actor.state]).count * 2)
+        }
+        let runtime = try makeRuntime(queue, generation, actor.maximumFrame)
         actor.runtime = runtime
         apps[id] = actor
         runtime.onFailure = { [weak self, weak actor] error in
@@ -473,7 +479,8 @@ public final class HostCore {
         let pending = tasks ?? actor.tasks
         try store.write(
             stateKey(actor.entry.manifest.id),
-            ["state": state, "revision": next, "pendingTasks": Array(pending.keys)])
+            ["state": state, "revision": next, "pendingTasks": Array(pending.keys)],
+            maximum: actor.maximumFrame)
         actor.state = state
         actor.revision = next
         actor.tasks = pending
@@ -514,7 +521,8 @@ public final class HostCore {
                     else { throw failure("network", "Agent 必须使用宿主登录的服务器") }
                     try resources.request(
                         appId: appId, generation: actor.generation,
-                        kind: kind, input: input, origins: [try ServerOrigin.parse(url)], completion: complete
+                        kind: kind, input: input, origins: [try ServerOrigin.parse(url)],
+                        loginLimit: gateway.loginLimit, completion: complete
                     )
                 } else {
                     try resources.request(
@@ -696,7 +704,7 @@ public final class HostCore {
                 let saved = try self.store.read(self.stateKey(manifest.id))?["state"] ?? NSNull()
                 let code = try String(
                     contentsOf: staging.appendingPathComponent("runtime.js"), encoding: .utf8)
-                let probe = try self.makeRuntime(self.queue, generation)
+                let probe = try self.makeRuntime(self.queue, generation, 1_048_576)
                 probe.request(["type": "load", "code": code, "state": saved]) { result in
                     defer {
                         probe.stop()

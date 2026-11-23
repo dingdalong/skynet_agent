@@ -263,6 +263,38 @@ final class WebViewTests: XCTestCase {
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
     }
 
+    func testLargeHistoryCanOpenAndContinueInTheMacRuntime() async throws {
+        _ = NSApplication.shared
+        let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let core = try HostCore(
+            dataRoot: data,
+            builtins: native.deletingLastPathComponent().appendingPathComponent("dist/builtins"),
+            launcher: native.appendingPathComponent(".build/c-core/process_launcher"),
+            executable: native.appendingPathComponent(".build/out/Products/Debug/SkynetAppRuntime"))
+        defer {
+            core.shutdown()
+            try? FileManager.default.removeItem(at: data)
+        }
+        _ = try await login(
+            core, url: XCTUnwrap(ProcessInfo.processInfo.environment["SKYNET_TEST_SOCKET"]),
+            username: "fragment-history")
+        let harness = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
+        defer { harness.close() }
+        try await harness.untilToolbar("connection", labelContaining: "已连接")
+        try await harness.activateToolbar("session:wire-history-fixture")
+        try await harness.until("document.body.innerText.includes('已记住代号青舟17。')")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{ const e=document.querySelector('#agent-message [contenteditable]');
+            e.textContent='请回复约定的代号'; e.dispatchEvent(new Event('input',{bubbles:true})); })()
+            """)
+        try await harness.until("!document.querySelector('button[aria-label=发送]').disabled")
+        try await harness.click("发送")
+        try await harness.until("document.body.innerText.split('青舟17').length >= 3")
+    }
+
     func testAppCenterCoversAndResponsiveAppCatalog() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

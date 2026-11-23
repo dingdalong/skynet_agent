@@ -3,6 +3,7 @@ local skynet = require("skynet")
 local queue = require("skynet.queue")
 local socket = require("skynet.socket")
 local websocket = require("http.websocket")
+local Fragments = require("network.fragments")
 local Frame = require("network.frame")
 local crypt = require("skynet.crypt")
 local rpc = require("rpc")
@@ -17,6 +18,7 @@ local config = require("etc.cfg").agent_gateway
 ---@field client_address integer?
 ---@field last_message_id integer
 ---@field write_queue function
+---@field fragments table
 
 ---@class websocket.Websocket
 ---@field new fun(self: websocket.Websocket): websocket.Websocket
@@ -53,6 +55,7 @@ function Websocket:_detach(connection)
     end
     self.connections[connection.id] = nil
     self.fds[connection.fd] = nil
+    connection.fragments = {}
     if connection.client_address then
         rpc.send(connection.client_address, "disconnect", connection.id)
     end
@@ -111,9 +114,12 @@ function Websocket:_write(connection, payload)
         if self.connections[connection.id] ~= connection then
             return false
         end
-        local ok, err = pcall(websocket.write, connection.fd, payload, "binary")
+        local ok, err = pcall(Fragments.write, payload, config.socket.max_message_bytes, function(part)
+            websocket.write(connection.fd, part, "binary")
+        end)
         if not ok then
             log.failure("websocket", "write connection=" .. connection.id, err)
+            self:_close(connection, error_code.websocket_internal_error, "业务消息发送失败")
             return false
         end
         return self.connections[connection.id] == connection
@@ -133,6 +139,14 @@ function Websocket:send_response(context, id, message_id, app_id, kind, body)
         return false
     end
     if context.source ~= connection.client_address and context.source ~= connection.logind then return false end
+    if #body + #app_id + 6 > config.socket.max_message_bytes then
+        local reason = "业务消息超过网关上限 " .. config.socket.max_message_bytes .. " 字节"
+        if kind ~= Frame.response then
+            self:_close(connection, 1009, reason)
+            return false
+        end
+        kind, body = Frame.routing_error, string.char(error_code.invalid_param) .. reason
+    end
     local encoded, payload = pcall(Frame.pack, kind, message_id, app_id, body)
     if not encoded then
         log.failure("websocket", "encode connection=" .. id .. " app=" .. app_id, payload)
@@ -156,7 +170,19 @@ function Websocket:_handle_message(connection, message, message_type)
         self:_close(connection, error_code.websocket_unsupported_data, "仅支持二进制帧")
         return
     end
-    local decoded, kind, id, app_id, body = pcall(Frame.unpack, message)
+    local maximum = connection.client_address and config.socket.max_message_bytes or Fragments.size
+    local valid, packet, oversized = pcall(Fragments.receive, connection.fragments, message, maximum)
+    if oversized then
+        self:_close(connection, 1009, oversized)
+        return
+    end
+    if not valid then
+        log.failure("websocket", "fragment connection=" .. connection.id, packet)
+        self:_close(connection, error_code.websocket_invalid_payload_data, "无效的业务消息分片")
+        return
+    end
+    if not packet then return end
+    local decoded, kind, id, app_id, body = pcall(Frame.unpack, packet)
     if not decoded then
         log.failure("websocket", "decode connection=" .. connection.id, kind)
         self:_close(connection, error_code.websocket_invalid_payload_data, "无效公共帧")
@@ -204,6 +230,7 @@ function Websocket:accept(_, fd, addr, logind_address)
         logind = logind_address,
         last_message_id = 0,
         write_queue = queue(),
+        fragments = {},
     }
     self.connections[connection.id] = connection
     self.fds[fd] = connection.id

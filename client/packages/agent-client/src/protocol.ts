@@ -5,7 +5,7 @@ export {
     fromBase64,
     toBase64,
     hash,
-    maximumPacketSize,
+    gatewayChunkBytes,
     type Packet,
 } from "@skynet/app-sdk/protocol";
 export const { encodePacket, decodePacket, ownerOf } = createCodec([

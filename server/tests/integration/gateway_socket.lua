@@ -1,3 +1,4 @@
+local Fragments = require("network.fragments")
 local class = require("class")
 local skynet = require("skynet")
 local websocket = require("http.websocket")
@@ -18,6 +19,7 @@ local support = require("integration.support")
 local AgentSocket = class()
 
 function AgentSocket:ctor(url)
+    self.maximum = Fragments.size
     self.url = url
     self.id = nil
     self.protocol = Protocol:new()
@@ -30,6 +32,7 @@ function AgentSocket:ctor(url)
 end
 
 function AgentSocket:_read()
+    local state = {}
     local ok, failure = xpcall(function()
         while not self.closed do
             local data, close_payload = websocket.read(self.id)
@@ -38,8 +41,13 @@ function AgentSocket:_read()
                 self.closed = true
                 return
             end
-            local message_id, name, payload = self.protocol:decode_msg(data)
-            self.events[#self.events + 1] = { name = name, message_id = message_id, payload = payload }
+            local packet, oversized = Fragments.receive(state, data, self.maximum)
+            assert(not oversized, oversized)
+            if packet then
+                local message_id, name, payload = self.protocol:decode_msg(packet)
+                if name == "LoginRes" and payload.ret == 1 then self.maximum = payload.max_message_bytes end
+                self.events[#self.events + 1] = { name = name, message_id = message_id, payload = payload }
+            end
         end
     end, debug.traceback)
     if not ok and not self.closed then
@@ -69,7 +77,9 @@ function AgentSocket:send_frame(data, format)
 end
 
 function AgentSocket:send_request(id, name, args)
-    self:send_frame(self.protocol:encode_msg(id, name, args or {}))
+    Fragments.write(self.protocol:encode_msg(id, name, args or {}), self.maximum, function(part)
+        self:send_frame(part)
+    end)
 end
 
 function AgentSocket:wait_for(predicate, timeout_ticks)
