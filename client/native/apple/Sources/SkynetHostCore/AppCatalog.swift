@@ -13,6 +13,7 @@ public struct AppManifest: Codable {
     public let id: String
     public let name: String
     public let version: String
+    public private(set) var build: String?
     public let stateVersion: Int
     public let minimumHostVersion: Int
     public let permissions: [String]
@@ -20,9 +21,14 @@ public struct AppManifest: Codable {
     public let actions: [String: Action]
     public let files: [String: String]
 
+    mutating func identify(_ data: Data) {
+        build = SHA256.hash(data: data).prefix(6).map { String(format: "%02x", $0) }.joined()
+    }
+
     public var summary: [String: Any] {
         [
-            "id": id, "name": name, "version": version, "permissions": permissions,
+            "id": id, "name": name, "version": version, "build": build as Any? ?? NSNull(),
+            "permissions": permissions,
             "actions": actions.mapValues {
                 ["title": $0.title, "input": $0.input.value, "output": $0.output.value]
             },
@@ -150,7 +156,8 @@ public final class AppCatalog {
         }
         let manifestData = try Data(contentsOf: manifestFile)
         guard manifestData.count <= 65_536 else { throw failure("size", "Manifest too large") }
-        let manifest = try JSONDecoder().decode(AppManifest.self, from: manifestData)
+        var manifest = try JSONDecoder().decode(AppManifest.self, from: manifestData)
+        manifest.identify(manifestData)
         guard manifest.schemaVersion == 1, manifest.minimumHostVersion == 1,
             manifest.stateVersion == 1,
             manifest.id.range(of: "^[a-z][a-z0-9.-]{2,63}$", options: .regularExpression) != nil,

@@ -105,7 +105,8 @@ function Center:init()
     cluster.register("center")
     self.codec:init("app-center")
     AppCatalog.open(self)
-    self.apps["app-center"] = { app_id = "app-center", generation = self.epoch, enabled = true }
+    self.apps["app-center"] = { app_id = "app-center", generation = self.epoch, enabled = true,
+        version = require("helper.node_version").read("app/app_center") }
     self:_sync()
     skynet.fork(function()
         while not self.closed do
@@ -166,9 +167,10 @@ function Center:register(_, id, key, port, generation)
     local endpoint = "127.0.0.1:" .. port
     if app.address and app.generation == generation and app.endpoint == endpoint then return true end
     local address = nodes.application(id, endpoint)
-    local code, actual, instance, count, cursor = rpc.call(address, "hello", key)
+    local code, actual, instance, count, cursor, version = rpc.call(address, "hello", key)
     if code ~= codes.succ or actual ~= id or instance ~= generation or count < 1 or app.key ~= key
         or self.freezing or not self:_desired(app) or app.transition == "disabling" then return false end
+    app.version = version
     if app.generation ~= generation then app.cursor = cursor end
     app.address, app.endpoint, app.generation, app.count = address, endpoint, generation, count
     if app.enabled then self:_sync() end
@@ -221,6 +223,7 @@ function Center:handle_request(context, identity, id, name, args)
     assert(connection.username == identity.username, "连接身份无效")
     if name == "AppCenterListReq" then
         local names, services = { "应用中心" }, {}
+        local online = { { app_id = "app-center", name = names[1], version = self.apps["app-center"].version } }
         if connection.admin then
             services[1] = { app_id = "app-center", name = names[1],
                 instances = 1, enabled = true, can_set_enabled = false }
@@ -228,7 +231,10 @@ function Center:handle_request(context, identity, id, name, args)
         for app_id, doc in pairs(self.documents) do
             local app = self.apps[app_id]
             local approved = not doc.removed and doc.approved or nil
-            if approved and app and app.enabled then names[#names + 1] = approved.name end
+            if approved and app and app.enabled then
+                names[#names + 1] = approved.name
+                online[#online + 1] = { app_id = app_id, name = approved.name, version = app.version }
+            end
             if connection.admin and (not doc.removed or doc.pending or app) then
                 local version = approved or doc.pending or doc.approved or doc.last
                 services[#services + 1] = { app_id = app_id, name = version.name,
@@ -239,8 +245,10 @@ function Center:handle_request(context, identity, id, name, args)
             end
         end
         table.sort(names)
+        table.sort(online, function(left, right) return left.app_id < right.app_id end)
         table.sort(services, function(left, right) return left.app_id < right.app_id end)
-        return { ret = codes.succ, names = names, services = services, administrator = connection.admin }
+        return { ret = codes.succ, names = names, online = online,
+            services = services, administrator = connection.admin }
     end
     if name == "AppCenterUnlockReq" then
         local token = config.app_center.admin_token

@@ -5,8 +5,6 @@ skill
 mcp
 上下文压缩
 把服务器、客户端版本号做好，避免出现版本对不上的问题
-服务器消息合批下发客户端
-通讯自动分包
 lua、proto代码格式化脚本
 几个tools只剩下描述了
 ---@field extensions table? 当前 Agent 轮次的工具快照，这个注释写的不好，不应该写table这种，要写详细的class

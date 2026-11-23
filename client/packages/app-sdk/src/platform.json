@@ -18,12 +18,24 @@
                     "administrator": { "id": 5, "type": "bool" },
                     "error": { "id": 2, "type": "ErrorInfo" },
                     "names": { "id": 3, "rule": "repeated", "type": "string" },
+                    "online": {
+                      "id": 6,
+                      "rule": "repeated",
+                      "type": "AppCenterOnlineNode"
+                    },
                     "ret": { "id": 1, "type": "int32" },
                     "services": {
                       "id": 4,
                       "rule": "repeated",
                       "type": "AppCenterService"
                     }
+                  }
+                },
+                "AppCenterOnlineNode": {
+                  "fields": {
+                    "app_id": { "id": 1, "type": "string" },
+                    "name": { "id": 2, "type": "string" },
+                    "version": { "id": 3, "type": "string" }
                   }
                 },
                 "AppCenterRemoveReq": {
@@ -107,6 +119,7 @@
                 "LoginRes": {
                   "fields": {
                     "error": { "id": 3, "type": "ErrorInfo" },
+                    "gateway_version": { "id": 6, "type": "string" },
                     "identity": { "id": 4, "type": "UserIdentity" },
                     "max_message_bytes": { "id": 5, "type": "uint32" },
                     "ret": { "id": 2, "type": "int32" }

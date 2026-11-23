@@ -61,6 +61,67 @@ async function buildPresentation(source, output) {
     );
 }
 
+// Stable relative paths make identical inputs produce the same build number on every checkout.
+async function fileHashes(folder, ignore = () => false) {
+    const hashes = {};
+    async function walk(relative) {
+        const entries = await readdir(path.join(folder, relative), {
+            withFileTypes: true,
+        });
+        for (const entry of entries.sort((a, b) =>
+            a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+        )) {
+            if (ignore(entry.name)) continue;
+            const file = path.join(relative, entry.name);
+            if (entry.isDirectory()) await walk(file);
+            else if (entry.isFile())
+                hashes[file] = createHash("sha256")
+                    .update(await readFile(path.join(folder, file)))
+                    .digest("hex");
+        }
+    }
+    await walk("");
+    return hashes;
+}
+
+async function hostVersion() {
+    const { version } = JSON.parse(
+        await readFile(path.join(root, "apps/host/package.json"), "utf8"),
+    );
+    const hash = createHash("sha256");
+    for (const folder of [
+        "dist/workspace",
+        "apps/host/apple",
+        "apps/host/macos",
+        "apps/host/ios",
+        "native/apple/Sources",
+        "native/core",
+        "../common/native/agent_runtime",
+    ]) {
+        const files = await fileHashes(
+            path.join(root, folder),
+            (name) =>
+                name.startsWith(".") ||
+                [
+                    "build",
+                    "DerivedData",
+                    "xcuserdata",
+                    "Tests",
+                    "tests",
+                ].includes(name),
+        );
+        hash.update(JSON.stringify([folder, files]));
+    }
+    for (const file of ["dist/builtins/gateway.js", "native/Package.swift"]) {
+        hash.update(await readFile(path.join(root, file)));
+    }
+    const build = hash.digest("hex").slice(0, 12);
+    await writeFile(
+        path.join(root, "dist/host-version.xcconfig"),
+        `MARKETING_VERSION = ${version}\nSKYNET_BUILD_ID = ${build}\n`,
+    );
+}
+
 export async function packageApp(source, output) {
     const manifest = JSON.parse(
         await readFile(path.join(source, "manifest.json"), "utf8"),
@@ -80,19 +141,7 @@ export async function packageApp(source, output) {
         alias: aliases,
         footer: { js: "globalThis.SkynetApp = SkynetRuntime.default;" },
     });
-    const files = {};
-    async function walk(folder, prefix = "") {
-        for (const entry of await readdir(folder, { withFileTypes: true })) {
-            const relative = `${prefix}${entry.name}`;
-            if (entry.isDirectory())
-                await walk(path.join(folder, entry.name), `${relative}/`);
-            else
-                files[relative] = createHash("sha256")
-                    .update(await readFile(path.join(folder, entry.name)))
-                    .digest("hex");
-        }
-    }
-    await walk(output);
+    const files = await fileHashes(output);
     await writeFile(
         path.join(output, "manifest.json"),
         `${JSON.stringify({ ...manifest, files }, null, 2)}\n`,
@@ -123,6 +172,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             target: "es2020",
             inject: [`${root}packages/app-runtime/src/text-codec.ts`],
         });
+        await hostVersion();
         for (const name of ["settings", "agent", "app-center"]) {
             await packageApp(
                 `${root}builtins/${name}`,

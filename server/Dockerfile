@@ -37,6 +37,8 @@ RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lu
 COPY server/src/center_main.lua server/src/submit_app.lua ./src/
 COPY server/src/service/app/app_center ./src/service/app/app_center
 COPY server/deploy/container.py ./deploy/
+RUN --mount=type=bind,source=server/deploy/stamp-version.sh,target=/tmp/stamp-version.sh \
+    sh /tmp/stamp-version.sh src/service/app/app_center/VERSION
 CMD ["etc/config.center"]
 
 FROM runtime AS gateway
@@ -50,6 +52,8 @@ COPY server/src/service/gateway ./src/service/gateway
 COPY server/src/service/logind ./src/service/logind
 COPY server/src/service/client ./src/service/client
 COPY server/src/service/websocket ./src/service/websocket
+RUN --mount=type=bind,source=server/deploy/stamp-version.sh,target=/tmp/stamp-version.sh \
+    sh /tmp/stamp-version.sh src/service/gateway/VERSION
 CMD ["etc/config"]
 
 FROM runtime AS app
@@ -71,10 +75,14 @@ COPY common/proto/common.proto ../common/proto/
 COPY common/proto/agent ../common/proto/agent
 COPY server/src/service/app/agent ./src/service/app/agent
 RUN bin/lua deploy/check_protocol.lua agent agent/schema.proto
+RUN --mount=type=bind,source=server/deploy/stamp-version.sh,target=/tmp/stamp-version.sh \
+    sh /tmp/stamp-version.sh src/service/app/agent/VERSION
 USER 65532:65532
 
 FROM app AS echo-fixture
 ENV APP_SCHEMA=echo.proto APP_INSTANCES=1
 COPY server/tests/fixtures/echo/echo.proto ../common/proto/
-COPY server/tests/fixtures/echo/init.lua ./src/service/app/echo/init.lua
+COPY server/tests/fixtures/echo/init.lua server/tests/fixtures/echo/VERSION ./src/service/app/echo/
 RUN bin/lua deploy/check_protocol.lua echo echo.proto
+RUN --mount=type=bind,source=server/deploy/stamp-version.sh,target=/tmp/stamp-version.sh \
+    sh /tmp/stamp-version.sh src/service/app/echo/VERSION

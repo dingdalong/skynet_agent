@@ -9,6 +9,7 @@ local rpc = require("rpc")
 local codes = require("enum.error_code")
 ---@class app_endpoint.Service
 ---@field app string
+---@field version string?
 ---@field generation string
 ---@field workers helper.ServicePool
 ---@field codec network.Protocol
@@ -26,6 +27,7 @@ Endpoint.commands = {
 
 function Endpoint:ctor()
     self.app = nil
+    self.version = nil
     self.generation = nil
     self.workers = nil
     self.codec = Protocol:new()
@@ -38,6 +40,7 @@ end
 
 function Endpoint:init(params)
     self.app = params.app
+    self.version = require("helper.node_version").read("app/" .. self.app:gsub("-", "_"))
     self.generation = crypt.hexencode(crypt.randomkey() .. crypt.randomkey())
     self.workers = Pool:new(params.workers)
     self.codec:init(self.app)
@@ -57,7 +60,7 @@ function Endpoint:announce(context, port)
 end
 
 function Endpoint:hello()
-    return self.app, self.generation, #self.workers.addresses, self.first - 1
+    return self.app, self.generation, #self.workers.addresses, self.first - 1, self.version
 end
 
 function Endpoint:request(_, generation, identity, connection, body, draining)

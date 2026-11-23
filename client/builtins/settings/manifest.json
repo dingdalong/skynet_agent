@@ -4,7 +4,7 @@
   "stateVersion": 1,
   "id": "settings",
   "name": "设置",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "permissions": ["host.preferences", "host.apps"],
   "networkOrigins": [],
   "actions": {
@@ -15,7 +15,7 @@
         "properties": {
           "section": {
             "type": "string",
-            "enum": ["appearance", "wallpaper", "motion", "apps"]
+            "enum": ["appearance", "wallpaper", "motion", "apps", "about"]
           }
         },
         "required": ["section"],

@@ -13,6 +13,7 @@ final class GatewaySession {
     private lazy var broker = ResourceBroker(queue: queue) { [weak self] _, message in
         self?.receive(message)
     }
+    private(set) var version: String?
     private(set) var maximum = GatewayTransport.chunk
     private(set) var user: [String: Any]?
 
@@ -49,6 +50,7 @@ final class GatewaySession {
                         identity["username"] as? String == username, let id = identity["user_id"] as? String,
                         !id.isEmpty
                     else { throw failure("login", "服务器返回了无效的用户身份") }
+                    self.version = body["gateway_version"] as? String
                     self.maximum = body["max_message_bytes"] as? Int ?? GatewayTransport.chunk
                     self.user = ["username": username, "userId": id, "url": url]
                     completion(.success(self.user!))
@@ -146,6 +148,7 @@ final class GatewaySession {
         generation += 1
         connected = false
         maximum = GatewayTransport.chunk
+        version = nil
         user = nil
         broker.close(appId: "host")
         let waiting = pending

@@ -18,4 +18,5 @@ message LoginRes {
   ErrorInfo error = 3;
   UserIdentity identity = 4;
   uint32 max_message_bytes = 5;
+  string gateway_version = 6;
 }

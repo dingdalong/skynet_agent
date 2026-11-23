@@ -23,6 +23,7 @@ import {
     usePaneToolbar,
 } from "@skynet/app-sdk/react";
 import type { AppSummary } from "@skynet/contracts";
+import { About } from "./About";
 import type { State } from "./runtime";
 import "../../../packages/tokens/theme.css";
 
@@ -31,6 +32,7 @@ const sections = [
     ["wallpaper", "壁纸"],
     ["motion", "动态效果"],
     ["apps", "应用管理"],
+    ["about", "关于"],
 ] as const;
 const modes = [
     ["light", "浅色"],
@@ -191,6 +193,7 @@ function Settings() {
                                 }
                             />
                         )}
+                        {section === "about" && <About snapshot={snapshot} />}
                         {section === "apps" && (
                             <VStack gap={4}>
                                 <HStack

@@ -26,12 +26,18 @@ message AppCenterService {
   bool desired = 10;
   bool can_set_enabled = 11;
 }
+message AppCenterOnlineNode {
+  string app_id = 1;
+  string name = 2;
+  string version = 3;
+}
 message AppCenterListRes {
   int32 ret = 1;
   ErrorInfo error = 2;
   repeated string names = 3;
   repeated AppCenterService services = 4;
   bool administrator = 5;
+  repeated AppCenterOnlineNode online = 6;
 }
 message AppCenterUnlockReq { string token = 1; }
 message AppCenterUnlockRes { int32 ret = 1; ErrorInfo error = 2; }

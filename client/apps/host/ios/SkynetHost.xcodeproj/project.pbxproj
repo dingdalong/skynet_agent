@@ -40,6 +40,7 @@
 		DA531631E127C5AEADF4FE4B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E8B9043CAFCD9D69B564A1C3 /* SkynetHostTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SkynetHostTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F75751119864FBF025218EE5 /* AppSurface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppSurface.swift; sourceTree = "<group>"; };
+		AD1000000000000000000001 /* host-version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ../../../dist/host-version.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -295,6 +296,7 @@
 		};
 		551117FBAE0739915872E5D4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD1000000000000000000001 /* host-version.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -310,7 +312,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -407,6 +408,7 @@
 		};
 		C3BA2C9FA4933099C8688A6B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AD1000000000000000000001 /* host-version.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -422,7 +424,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

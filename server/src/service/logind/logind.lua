@@ -11,12 +11,14 @@ local error_code = require("enum.error_code")
 ---@class logind.Service
 ---@field new fun(self: logind.Service): logind.Service
 ---@field client_services helper.ServicePool?
+---@field version string?
 ---@field codec network.Protocol
 local Login = class()
 
 Login.commands = { handle_request = "handle_request" }
 
 function Login:ctor()
+    self.version = nil
     self.client_services = nil
     self.codec = Protocol:new()
 end
@@ -25,6 +27,7 @@ end
 function Login:init(params)
     self.client_services = pool:new(params.client_services)
     self.codec:init("login")
+    self.version = require("helper.node_version").read("gateway")
 end
 
 ---@param websocket_address integer
@@ -101,6 +104,7 @@ function Login:handle_request(context, id, message_id, app_id, body)
     local response = self.codec:encode_body("LoginRes", {
         ret = error_code.succ,
         identity = identity,
+        gateway_version = self.version,
         max_message_bytes = config.socket.max_message_bytes,
     })
     return self:_call_websocket(websocket_address, "send_response", id, message_id, "login", Frame.response, response)

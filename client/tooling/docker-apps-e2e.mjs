@@ -273,11 +273,22 @@ try {
         );
         return until(() => messages.find((packet) => packet.id === id), name);
     };
+    const packagedGateway = (
+        await compose(
+            "exec",
+            "-T",
+            "gateway",
+            "cat",
+            "src/service/gateway/VERSION",
+        )
+    ).stdout.trim();
     let loginId;
     const loginAdmin = async () => {
         const login = (await request("LoginReq", { username: "docker-probe" }))
             .body;
         assert.equal(login.ret, 1);
+        assert.match(login.gateway_version, /^\d+\.\d+\.\d+\+[0-9a-f]{12}$/);
+        assert.equal(login.gateway_version, packagedGateway);
         maximum = login.max_message_bytes;
         loginId ??= login.identity.user_id;
         assert.equal(login.identity.user_id, loginId);
@@ -528,6 +539,33 @@ try {
     );
     const publicDirectory = (await request("AppCenterListReq")).body;
     assert.deepEqual(publicDirectory.services, []);
+    assert.ok(!publicDirectory.online.some((node) => node.app_id === "echo"));
+    const packagedCenter = await compose(
+        "exec",
+        "-T",
+        "app-center",
+        "cat",
+        "src/service/app/app_center/VERSION",
+    );
+    const packagedAgent = await docker(
+        "exec",
+        container("agent"),
+        "cat",
+        "src/service/app/agent/VERSION",
+    );
+    for (const [id, packaged] of [
+        ["app-center", packagedCenter],
+        ["agent", packagedAgent],
+    ]) {
+        const node = publicDirectory.online.find((node) => node.app_id === id);
+        assert.equal(node.version, packaged.stdout.trim());
+        assert.match(node.version, /^\d+\.\d+\.\d+\+[0-9a-f]{12}$/);
+        assert.deepEqual(Object.keys(node).sort(), [
+            "app_id",
+            "name",
+            "version",
+        ]);
+    }
     assert.ok(!publicDirectory.names.includes("Echo"));
     assert.notEqual((await review("echo", firstRequest, true)).ret, 1);
     assert.notEqual(
@@ -986,6 +1024,12 @@ try {
             services.some((app) => app.app_id === "agent" && !app.enabled)
         );
     }, "应用中心从数据库恢复停用状态和下架结果");
+    assert.deepEqual(
+        (await request("AppCenterListReq")).body.online.map(
+            (node) => node.app_id,
+        ),
+        ["app-center"],
+    );
     const remaining = await docker(
         "ps",
         "-a",

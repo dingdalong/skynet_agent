@@ -1,11 +1,11 @@
 import { defineApp } from "@skynet/app-runtime";
 import type { Json } from "@skynet/contracts";
 
-export type Section = "appearance" | "wallpaper" | "motion" | "apps";
+export type Section = "appearance" | "wallpaper" | "motion" | "apps" | "about";
 export interface State {
     section: Section;
 }
-const sections = ["appearance", "wallpaper", "motion", "apps"];
+const sections = ["appearance", "wallpaper", "motion", "apps", "about"];
 function navigate(state: State, input: Json) {
     const section = (input as { section?: Section } | null)?.section;
     if (!section || !sections.includes(section))

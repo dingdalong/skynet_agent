@@ -13,6 +13,7 @@ export interface AppSummary {
     id: string;
     name: string;
     version: string;
+    build?: string;
     builtin: boolean;
     permissions: string[];
     status: "stopped" | "starting" | "running" | "failed";
@@ -81,6 +82,12 @@ export type WorkspaceCommandName =
     | "restart";
 
 export interface AppSnapshot<State = Json> {
+    about?: {
+        clientVersion: string;
+        build: string;
+        gatewayVersion: string;
+        catalogRevision: number;
+    };
     user?: HostUser | null;
     appId: string;
     generation: number;

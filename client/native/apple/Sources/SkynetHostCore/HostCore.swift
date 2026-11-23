@@ -27,14 +27,18 @@ public final class HostCore {
     private let logger = Logger(subsystem: "app.skynet.agent", category: "HostCore")
     private var stopped = false
     private let builtins: URL
+    private var catalogRevision = 0
     private var loggingIn = false
     private lazy var gateway = GatewaySession(builtins: builtins, queue: queue) { [weak self] event in
         guard let self else { return }
         if event == "logout" {
             for id in Array(self.apps.keys) { self.stopApp(id) }
             if !self.suspended { self.leases.removeAll() }
-        } else if event == "AppCenterChangedNtf", self.apps["app-center"] != nil {
-            self.enqueue("app-center", type: "command", name: "$appCatalog", payload: [:]) { _ in }
+        } else if event == "AppCenterChangedNtf" {
+            self.catalogRevision += 1
+            if self.apps["app-center"] != nil {
+                self.enqueue("app-center", type: "command", name: "$appCatalog", payload: [:]) { _ in }
+            }
         }
         self.publish()
     }
@@ -183,6 +187,13 @@ public final class HostCore {
                 }
                 switch kind {
                 case "snapshot": reply(.success(self.appSnapshot(appId)))
+                case "settings.onlineVersions":
+                    guard appId == "settings", self.appCatalog.entries[appId]?.builtin == true else {
+                        throw failure("permission", "需要内置设置应用")
+                    }
+                    self.gateway.request("AppCenterListReq", input: [:]) { result in
+                        reply(result.map { ["online": $0["online"] ?? []] })
+                    }
                 case "app-center.list", "app-center.unlock", "app-center.set", "app-center.review",
                     "app-center.remove":
                     guard appId == "app-center", self.appCatalog.entries[appId]?.builtin == true,
@@ -621,7 +632,7 @@ public final class HostCore {
         return result
     }
     private func appSnapshot(_ id: String) -> [String: Any] {
-        [
+        var value: [String: Any] = [
             "appId": id, "generation": apps[id]?.generation ?? 0, "revision": apps[id]?.revision ?? 0,
             "state": apps[id]?.state ?? NSNull(), "preferences": preferences(),
             "apps": appCatalog.entries.values.sorted { $0.manifest.id < $1.manifest.id }.map(summary),
@@ -629,6 +640,17 @@ public final class HostCore {
             "user": (try? require(id, "user.identity")) != nil ? gateway.user as Any? ?? NSNull() : NSNull(),
             "error": apps[id]?.error as Any? ?? NSNull(),
         ]
+        if id == "settings" {
+            let info = Bundle.main.infoDictionary ?? [:]
+            value["about"] =
+                [
+                    "clientVersion": info["CFBundleShortVersionString"] as? String ?? "",
+                    "build": info["SkynetBuildID"] as? String ?? "",
+                    "gatewayVersion": gateway.version ?? "",
+                    "catalogRevision": catalogRevision,
+                ] as [String: Any]
+        }
+        return value
     }
     private func snapshot() -> [String: Any] {
         [
