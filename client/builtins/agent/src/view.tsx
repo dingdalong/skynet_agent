@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     AppShell,
@@ -57,6 +57,51 @@ function Agent() {
             right.session.id.localeCompare(left.session.id),
     );
     const session = state?.sessions?.[state.selectedId];
+    const scroll = useRef<HTMLDivElement>(null);
+    const anchor = useRef<{
+        element: HTMLElement;
+        offset: number;
+        start: number;
+    } | null>(null);
+    const previousTop = useRef(0);
+    const start = session?.session.message_start ?? 0;
+    const loading = Object.values(state?.connection.pending ?? {}).some(
+        (request) =>
+            request.name === "AgentSessionHistoryReq" &&
+            request.target === state?.selectedId,
+    );
+    const loadHistory = () => {
+        if (!session || loading || state?.connection.status !== "online")
+            return;
+        const element = scroll.current?.querySelector<HTMLElement>(
+            "[data-history-message]",
+        );
+        if (element && scroll.current)
+            anchor.current = {
+                element,
+                offset:
+                    element.getBoundingClientRect().top +
+                    scroll.current.scrollTop,
+                start,
+            };
+        void send("history.load", { target: session.session.id });
+    };
+    useLayoutEffect(() => {
+        const saved = anchor.current;
+        if (
+            saved &&
+            saved.start > start &&
+            saved.element.isConnected &&
+            scroll.current
+        ) {
+            scroll.current.scrollTop +=
+                saved.element.getBoundingClientRect().top +
+                scroll.current.scrollTop -
+                saved.offset;
+        }
+        anchor.current = null;
+        previousTop.current = scroll.current?.scrollTop ?? 0;
+    }, [state?.selectedId, start]);
     usePaneToolbar(
         state?.version === 1
             ? [
@@ -156,6 +201,13 @@ function Agent() {
             >
                 <ChatLayout
                     key={state.selectedId}
+                    ref={scroll}
+                    onScroll={(event) => {
+                        const top = event.currentTarget.scrollTop;
+                        if (top < previousTop.current && top <= 64 && start > 0)
+                            loadHistory();
+                        previousTop.current = top;
+                    }}
                     className="agent-chat"
                     aria-label="消息记录"
                     density={wide ? "spacious" : "compact"}
@@ -211,8 +263,26 @@ function Agent() {
                         />
                     }
                 >
-                    {messages.length ? (
+                    {session ? (
                         <ChatMessageList isStreaming={last?.status === 1}>
+                            {loading && !messages.length ? (
+                                <Spinner label="正在加载历史消息…" />
+                            ) : (
+                                (start > 0 || (!messages.length && error)) && (
+                                    <Button
+                                        label={
+                                            loading
+                                                ? "正在加载…"
+                                                : messages.length
+                                                  ? "加载更早消息"
+                                                  : "重新加载历史"
+                                        }
+                                        variant="secondary"
+                                        isDisabled={!online || loading}
+                                        onClick={loadHistory}
+                                    />
+                                )
+                            )}
                             {messages.map((message) => (
                                 <MessageRow
                                     key={message.id}

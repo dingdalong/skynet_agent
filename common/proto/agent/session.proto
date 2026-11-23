@@ -13,6 +13,18 @@ message AgentSnapshotRes {
   AgentSnapshot snapshot = 4;
 }
 
+// before is the exclusive zero-based message offset. Zero requests the latest page.
+message AgentSessionHistoryReq {
+  string session_id = 1;
+  uint32 before = 2;
+}
+
+message AgentSessionHistoryRes {
+  int32 ret = 2;
+  ErrorInfo error = 3;
+  ChatSession chat_session = 4;
+}
+
 message AgentSessionModelSetReq {
   string session_id = 1;
   string model_id = 2;

@@ -285,6 +285,16 @@ final class WebViewTests: XCTestCase {
         try await harness.untilToolbar("connection", labelContaining: "已连接")
         try await harness.activateToolbar("session:wire-history-fixture")
         try await harness.until("document.body.innerText.includes('已记住代号青舟17。')")
+        try await harness.until("document.querySelectorAll('[data-history-message]').length === 20")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{ const chat=document.querySelector('.agent-chat');
+            chat.dispatchEvent(new WheelEvent('wheel',{deltaY:-300,bubbles:true}));
+            chat.scrollTop=0; chat.dispatchEvent(new Event('scroll')); })()
+            """)
+        try await harness.until("document.querySelectorAll('[data-history-message]').length === 30")
+        try await harness.until("document.querySelector('.agent-chat').scrollTop > 100")
+
         _ = try await harness.web.evaluateJavaScript(
             """
             (()=>{ const e=document.querySelector('#agent-message [contenteditable]');

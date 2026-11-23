@@ -265,6 +265,17 @@ final class MobileHostTests: XCTestCase {
                 let chat = object(object(state["sessions"])[id])
                 return object(chat["session"])["messages"] as? [[String: Any]] ?? []
             }
+            for _ in 0..<150 {
+                let snapshot = try await request(core, lease, "snapshot")
+                let state = object(snapshot["state"])
+                if object(state["connection"])["status"] as? String == "online",
+                    object(state["sessions"])[id] != nil
+                {
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            _ = try await request(core, lease, "command", ["name": "session.select", "payload": ["id": id]])
             var history: [[String: Any]] = []
             for _ in 0..<150 {
                 history = try await messages()
@@ -273,7 +284,6 @@ final class MobileHostTests: XCTestCase {
             }
             let blocks = history.flatMap { $0["reasoning"] as? [[String: Any]] ?? [] }
             XCTAssertEqual(blocks.first?["text"].flatMap { $0 as? String }?.utf8.count, 1_200_000)
-            _ = try await request(core, lease, "command", ["name": "session.select", "payload": ["id": id]])
             let scene = try await view("app-scene-agent")
             var presentation: WKWebView?
             try await eventually("历史展示未挂载") {

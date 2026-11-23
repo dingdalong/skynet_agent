@@ -119,7 +119,11 @@ function AgentSession.valid_text(text)
 end
 
 ---@return table
-function AgentSession:snapshot()
+function AgentSession:snapshot(start, finish)
+    finish = finish or #self.messages
+    start = start or math.max(0, finish - 2)
+    local messages = {}
+    for i = start + 1, finish do messages[#messages + 1] = table.deep_copy(self.messages[i]) end
     local notice = self.recovery_notice
     if not notice and not pcall(models.resolve, config, self.model_id) then
         notice = "原模型不可用，请重新选择"
@@ -128,7 +132,7 @@ function AgentSession:snapshot()
     return {
         needs_workspace = self.needs_workspace, session = {
             id = self.id, title = self.title, updated_at = self.updated_at, revision = self.revision,
-            messages = table.deep_copy(self.messages), run_id = self.run and self.run.id or "",
+            message_start = start, messages = messages, run_id = self.run and self.run.id or "",
             cancelling = self.run and self.run.cancelled or false,
         },
         recovery_notice = notice, read_only = self.read_only or self.storage_failed,
@@ -136,6 +140,23 @@ function AgentSession:snapshot()
         model_id = self.model_id,
         permission_model_id = config.permission.model_id or self.model_id,
     }
+end
+
+-- A large individual message occupies a page of its own.
+function AgentSession:history(before)
+    local finish = before == 0 and #self.messages or before
+    if finish > #self.messages then
+        return failure(codes.invalid_param, "历史位置已变化，请重新打开会话")
+    end
+    local start, bytes = finish, 0
+    local protobuf = require("helper.protobuf")
+    protobuf.attach()
+    while start > 0 and finish - start < 20 do
+        local size = #protobuf.encode("skynet.agent.v1.ChatMessage", self.messages[start]) + 6
+        if start < finish and bytes + size > 128 * 1024 then break end
+        bytes, start = bytes + size, start - 1
+    end
+    return { ret = codes.succ, chat_session = self:snapshot(start, finish) }
 end
 
 function AgentSession:_publish()

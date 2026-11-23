@@ -71,6 +71,8 @@ message SessionState {
   repeated ChatMessage messages = 5;
   string run_id = 6;
   bool cancelling = 7;
+  // Zero-based offset of messages[0] within this session.
+  uint32 message_start = 8;
 }
 
 message ChatSession {

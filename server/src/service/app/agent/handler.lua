@@ -3,7 +3,17 @@ local log = require("log")
 local REQUEST = {}
 
 function REQUEST:AgentSnapshotReq()
+    -- A timed-out first write may have created no session. Confirm it before listing it again.
+    for _, session in pairs(self.chat.sessions) do
+        if session.storage_failed and not session.run then require("agent.persistence").reload(self, session) end
+    end
     return { ret = codes.succ, snapshot = self:snapshot() }
+end
+
+function REQUEST:AgentSessionHistoryReq(args)
+    local session = self.chat.sessions[args.session_id]
+    if not session then return { ret = codes.fail, error = { message = "会话不存在" } } end
+    return session:history(args.before or 0)
 end
 
 function REQUEST:AgentChatReq(args, connection)

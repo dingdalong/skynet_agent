@@ -30,7 +30,7 @@ end
 function Chat:snapshot()
     local sessions = {}
     for _, id in ipairs(self.session_order) do
-        sessions[#sessions + 1] = self.sessions[id]:snapshot()
+        sessions[#sessions + 1] = self.sessions[id]:snapshot(0, 0)
     end
     return sessions
 end

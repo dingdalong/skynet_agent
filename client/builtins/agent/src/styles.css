@@ -1,6 +1,7 @@
 .agent-chat {
     height: 100%;
     min-height: 0;
+    overflow-anchor: none;
 }
 .user-message {
     white-space: pre-wrap;

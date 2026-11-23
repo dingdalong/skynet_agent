@@ -398,6 +398,13 @@ try {
         for (const id of ["legacy","unknown","gap","no-result","has-result","conflict","corrupt","display"]) {
             add(id, 1, "ask", ask, id === "legacy" ? null : 1);
         }
+        for (let i = 1; i <= 72; i++) {
+            add("pages", i, "ask", {...ask, run:"r"+i, message:"m"+i, user_message:"q"+i});
+        }
+        for (let i = 0; i < 2; i++) {
+            add("sized", i*2+1, "ask", {...ask, run:"size"+i, user_message:"user"+i, message:"reply"+i});
+            add("sized", i*2+2, "block", {id:"b"+i, run:"size"+i, text:"x".repeat(140*1024)});
+        }
         add("foreign", 1, "ask", ask, 1, other);
         add("unknown", 2, "future", {}, 20);
         add("gap", 3, "block", {run:"r", id:"b", text:"缺口后的正文"});
@@ -423,6 +430,46 @@ try {
         restoredSnapshot.chat_sessions.map((item) => [item.session.id, item]),
     );
     assert.ok(!sessions.foreign);
+    for (const [id, summary] of Object.entries(sessions)) {
+        assert.deepEqual(summary.session.messages, []);
+        const response = await request("AgentSessionHistoryReq", {
+            session_id: id,
+        });
+        assert.equal(response.body.ret, 1);
+        sessions[id] = response.body.chat_session;
+    }
+    assert.notEqual(
+        (await request("AgentSessionHistoryReq", { session_id: "foreign" }))
+            .body.ret,
+        1,
+    );
+    assert.deepEqual(
+        sessions.sized.session.messages.map((m) => m.id),
+        ["reply1"],
+    );
+    assert.equal(sessions.sized.session.message_start, 3);
+    const messageIds = [];
+    let page = sessions.pages.session;
+    for (;;) {
+        messageIds.unshift(...page.messages.map((item) => item.id));
+        assert.ok(page.messages.length <= 20);
+        if (!page.message_start) break;
+        const end = page.message_start;
+        page = (
+            await request("AgentSessionHistoryReq", {
+                session_id: "pages",
+                before: end,
+            })
+        ).body.chat_session.session;
+        assert.equal(page.message_start + page.messages.length, end);
+    }
+    assert.deepEqual(
+        messageIds,
+        Array.from({ length: 72 }, (_, i) => [
+            "q" + (i + 1),
+            "m" + (i + 1),
+        ]).flat(),
+    );
     assert.equal(sessions.legacy.session.title, "恢复检查");
     assert.ok(!sessions.legacy.read_only && !sessions.display.read_only);
     assert.ok(sessions.unknown.read_only && sessions.gap.read_only);
@@ -440,10 +487,13 @@ try {
         assert.equal(tool(id).status, "interrupted");
         assert.ok(sessions[id].read_only);
     }
-    assert.deepEqual(
-        (await request("AgentSnapshotReq")).body.snapshot,
-        restoredSnapshot,
-    );
+    for (const [id, session] of Object.entries(sessions)) {
+        assert.deepEqual(
+            (await request("AgentSessionHistoryReq", { session_id: id })).body
+                .chat_session,
+            session,
+        );
+    }
     assert.notEqual(
         (await request("AgentChatReq", { session_id: "unknown", text: "续聊" }))
             .body.ret,

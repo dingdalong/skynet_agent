@@ -166,6 +166,7 @@ export function MessageRow({ message }: { message: Message }) {
     );
     return (
         <ChatMessage
+            data-history-message={message.id}
             sender={user ? "user" : "assistant"}
             avatar={user ? undefined : <Avatar name="Agent" size="md" />}
             metadata={!message.content && metadata}

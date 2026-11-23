@@ -90,10 +90,24 @@ class Client {
         return {
             username: "alice",
             user_id: "u1",
-            chat_sessions: sessions,
+            chat_sessions: sessions.map((chat) => ({
+                ...chat,
+                session: { ...chat.session, messages: [] },
+            })),
             models: [{ id: "model1", name: "模型一", model: "model1" }],
             default_model_id: "model1",
         };
+    }
+    history(chat: ChatSession) {
+        this.resource(
+            "AgentSessionHistoryRes",
+            { ret: 1, chat_session: chat },
+            this.pending("AgentSessionHistoryReq"),
+        );
+    }
+    open(chat = session()) {
+        this.command("session.select", { id: chat.session.id });
+        this.history(chat);
     }
     connect() {
         let result = this.command("$user", {
@@ -439,15 +453,66 @@ describe("Agent actor", () => {
         newer.session.messages[0].content = "已完成";
         client.resource("AgentSessionUpdatedNtf", { chat_session: newer });
         client.restore([session(1)]);
+        expect(client.state.sessions.s1.session.messages).toEqual([]);
+        client.open(newer);
         expect(client.state.sessions.s1.session.messages[0].content).toBe(
             "已完成",
         );
         client.resource("AgentSessionUpdatedNtf", { chat_session: session(2) });
         expect(client.state.sessions.s1.session.revision).toBe(3);
     });
+    it("loads only the selected session, prepends once, and drops a page after switching", () => {
+        const client = new Client();
+        const page = session();
+        page.session.message_start = 2;
+        const other = session();
+        other.session.id = "s2";
+        client.login([page, other]);
+        expect(client.pending("AgentSessionHistoryReq")).toBeNaN();
+        client.open(page);
+        client.command("history.load", { target: "s1" });
+        const pending = client.pending("AgentSessionHistoryReq");
+        expect(client.state.connection.pending[pending].before).toBe(2);
+        expect(
+            client.command("history.load", { target: "s1" }).effects,
+        ).toEqual([]);
+        const older = session();
+        older.session.message_start = 1;
+        older.session.messages[0].id = "older";
+        client.resource("AgentMessageDeltaNtf", {
+            session_id: "s1",
+            message_id: "m1",
+            run_id: "r1",
+            revision: 2,
+            delta: "live",
+        });
+        older.session.revision = 10;
+        client.history(older);
+        expect(client.state.sessions.s1.session.revision).toBe(2);
+        expect(
+            client.state.sessions.s1.session.messages.map((m) => [
+                m.id,
+                m.content,
+            ]),
+        ).toEqual([
+            ["older", ""],
+            ["m1", "live"],
+        ]);
+        client.command("history.load", { target: "s1" });
+        const late = client.pending("AgentSessionHistoryReq");
+        client.command("session.select", { id: "s2" });
+        client.resource(
+            "AgentSessionHistoryRes",
+            { ret: 1, chat_session: older },
+            late,
+        );
+        expect(client.state.sessions.s1.session.messages).toEqual([]);
+        expect(client.state.selectedId).toBe("s2");
+    });
     it("repairs revision gaps and ignores duplicates, including pushes racing a snapshot", () => {
         const client = new Client();
         client.login([session()]);
+        client.open();
         client.resource("AgentMessageDeltaNtf", {
             session_id: "s1",
             run_id: "r1",
@@ -465,6 +530,7 @@ describe("Agent actor", () => {
             { ret: 1, snapshot: client.snapshot([session(3)]) },
             id,
         );
+        client.history(newer);
         expect(client.state.syncing).toBe(false);
         expect(client.state.sessions.s1.session.revision).toBe(4);
         expect(client.state.sessions.s1.session.messages[0].content).toBe(
@@ -484,6 +550,7 @@ describe("Agent actor", () => {
     it("merges reasoning, tools and empty terminal reasoning blocks without changing answer text", () => {
         const client = new Client();
         client.login([session()]);
+        client.open();
         client.resource("AgentReasoningDeltaNtf", {
             session_id: "s1",
             message_id: "m1",
@@ -558,6 +625,7 @@ describe("Agent actor", () => {
     it("accepts background process tool updates after the model turn has completed", () => {
         const client = new Client();
         client.login([session(1, 2)]);
+        client.open(session(1, 2));
         client.resource("AgentToolUpdatedNtf", {
             session_id: "s1",
             message_id: "m1",
@@ -579,7 +647,7 @@ describe("Agent actor", () => {
     it("does not mistake cancel acknowledgment for run completion or replay sends after restart", () => {
         const client = new Client();
         client.login([session()]);
-        client.command("session.select", { id: "s1" });
+        client.open();
         client.command("chat.cancel", { target: "s1", runId: "r1" });
         const cancelled = client.pending("AgentMessageCancelReq");
         client.resource("AgentMessageCancelRes", { ret: 1 }, cancelled);
@@ -599,7 +667,7 @@ describe("Agent actor", () => {
     it("binds cancel and retry to the displayed run and preserves prepared input", () => {
         const client = new Client();
         client.login([session()]);
-        client.command("session.select", { id: "s1" });
+        client.open();
         client.command("chat.cancel", { target: "s1", runId: "expired" });
         expect(client.pending("AgentMessageCancelReq")).toBeNaN();
         const failed = session(2, 4);

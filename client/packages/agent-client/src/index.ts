@@ -155,7 +155,13 @@ class Turn {
                 ? "error"
                 : "offline";
     }
-    request(name: string, body: object, target = "", text = "") {
+    request(
+        name: string,
+        body: object,
+        target = "",
+        text = "",
+        before?: number,
+    ) {
         const { connection } = this.state;
         if (!connection.id) throw Error("请先连接服务器");
         if (Object.keys(connection.pending).length >= 16)
@@ -178,6 +184,7 @@ class Turn {
             name,
             target,
             text,
+            before,
             draftVersion: this.state.draftVersion,
             age: 0,
         };
@@ -199,12 +206,78 @@ class Turn {
             this.request("AgentSnapshotReq", {});
         }
     }
-    full(session: ChatSession) {
-        const id = session?.session?.id;
-        if (!id) throw Error("服务器返回了无效会话");
-        const existing = this.state.sessions[id];
-        if (!existing || session.session.revision > existing.session.revision)
-            this.state.sessions[id] = session;
+    history(before = 0) {
+        const id = this.state.selectedId;
+        if (
+            !id ||
+            !this.state.connection.id ||
+            this.state.connection.status === "unavailable"
+        )
+            return;
+        const pending = Object.values(this.state.connection.pending);
+        if (
+            pending.some(
+                (p) =>
+                    p.name === "AgentSessionHistoryReq" &&
+                    p.target === id &&
+                    p.before === before,
+            )
+        )
+            return;
+        this.request(
+            "AgentSessionHistoryReq",
+            { session_id: id, before },
+            id,
+            "",
+            before,
+        );
+    }
+    discardHistoryRequests() {
+        const pending = this.state.connection.pending;
+        for (const [id, request] of Object.entries(pending)) {
+            if (request.name === "AgentSessionHistoryReq") delete pending[id];
+        }
+    }
+    select(id: string) {
+        if (id !== this.state.selectedId) {
+            this.discardHistoryRequests();
+            const previous = this.state.sessions[this.state.selectedId];
+            if (previous) previous.session.messages = [];
+            this.state.selectedId = id;
+        }
+        this.state.error = "";
+        if (
+            this.state.connection.status === "online" &&
+            id &&
+            !this.state.sessions[id].session.messages.length
+        )
+            this.history();
+    }
+    updateSession(
+        chat: ChatSession,
+        keepMessages = chat.session.id === this.state.selectedId,
+    ) {
+        const next = chat.session;
+        if (!next.id) throw Error("服务器返回了无效会话");
+        const existing = this.state.sessions[next.id];
+        const old = existing?.session;
+        if (old && next.revision < old.revision) return;
+        if (!keepMessages) {
+            next.messages = [];
+        } else if (old?.messages.length) {
+            const start = next.message_start ?? 0;
+            const previous = old.message_start ?? 0;
+            if (start > previous + old.messages.length) {
+                this.history();
+            } else if (start > previous) {
+                next.messages = [
+                    ...old.messages.slice(0, start - previous),
+                    ...next.messages,
+                ];
+                next.message_start = previous;
+            }
+        }
+        this.state.sessions[next.id] = chat;
     }
     snapshot(snapshot: AgentSnapshot, login: boolean) {
         if (
@@ -212,18 +285,10 @@ class Turn {
             snapshot.username !== this.state.configuration.username
         )
             throw Error("服务器快照身份不匹配");
-        const previous = this.state.sessions;
+        this.discardHistoryRequests();
         this.state.sessions = {};
-        for (const session of snapshot.chat_sessions) {
-            const existing = previous[session.session.id];
-            this.full(
-                !login &&
-                    existing &&
-                    existing.session.revision > session.session.revision
-                    ? existing
-                    : session,
-            );
-        }
+        for (const chat of snapshot.chat_sessions)
+            this.updateSession(chat, false);
         this.state.models = snapshot.models;
         this.state.defaultModelId = snapshot.default_model_id;
         this.state.desktops = snapshot.desktops ?? [];
@@ -242,6 +307,7 @@ class Turn {
             if (this.state.local) this.register();
         }
         this.state.syncing = false;
+        if (this.state.selectedId) this.history();
         const buffered = this.state.buffered;
         this.state.buffered = [];
         for (const packet of buffered) this.notification(packet);
@@ -300,8 +366,25 @@ class Turn {
             return;
         }
         const body = packet.body;
+        if (
+            packet.name !== "AgentExecutionActionNtf" &&
+            (body.session_id === this.state.selectedId ||
+                (body.chat_session as ChatSession | undefined)?.session.id ===
+                    this.state.selectedId) &&
+            Object.values(connection.pending).some(
+                (p) =>
+                    p.name === "AgentSessionHistoryReq" &&
+                    p.before === 0 &&
+                    p.target === this.state.selectedId,
+            )
+        ) {
+            if (this.state.buffered.length >= 128)
+                this.lost("会话更新积压，正在重连");
+            else this.state.buffered.push(packet);
+            return;
+        }
         if (packet.name === "AgentSessionUpdatedNtf") {
-            this.full(body.chat_session as ChatSession);
+            this.updateSession(body.chat_session as ChatSession);
             return;
         }
         if (packet.name === "AgentDesktopUpdatedNtf") {
@@ -322,6 +405,7 @@ class Turn {
             return;
         }
         const session = this.state.sessions[String(body.session_id)];
+        if (body.session_id !== this.state.selectedId) return;
         const revision = Number(body.revision);
         if (session && revision <= session.session.revision) return;
         if (
@@ -417,7 +501,17 @@ class Turn {
             )
                 this.unavailable();
             else if (pending.name === "AgentSnapshotReq") this.lost(message);
-            else this.state.error = message;
+            else if (
+                pending.name !== "AgentSessionHistoryReq" ||
+                pending.target === this.state.selectedId
+            ) {
+                this.state.error = message;
+                if (
+                    pending.name === "AgentSessionHistoryReq" &&
+                    !pending.before
+                )
+                    this.state.buffered = [];
+            }
             return;
         }
         switch (pending.name) {
@@ -446,9 +540,37 @@ class Turn {
                 this.snapshot(snapshot, Boolean(pending.target));
                 break;
             }
+            case "AgentSessionHistoryReq": {
+                if (pending.target !== this.state.selectedId) break;
+                const page = packet.body.chat_session as ChatSession;
+                if (page?.session.id !== pending.target)
+                    throw Error("历史响应会话不匹配");
+                if (pending.before) {
+                    const current = this.state.sessions[pending.target].session;
+                    const start = page.session.message_start ?? 0;
+                    if (
+                        start + page.session.messages.length !==
+                            pending.before ||
+                        start >= pending.before
+                    )
+                        throw Error("历史响应位置无效");
+                    if (current.message_start === pending.before) {
+                        current.messages = [
+                            ...page.session.messages,
+                            ...current.messages,
+                        ];
+                        current.message_start = start;
+                    }
+                    break;
+                }
+                this.updateSession(page);
+                const buffered = this.state.buffered;
+                this.state.buffered = [];
+                for (const update of buffered) this.notification(update);
+                break;
+            }
             case "AgentChatReq": {
                 const session = packet.body.chat_session as ChatSession;
-                this.full(session);
                 const remaining =
                     (this.state.drafts[pending.target] ?? "") === pending.text
                         ? ""
@@ -465,13 +587,19 @@ class Turn {
                         pending.draftVersion === this.state.draftVersion)
                 )
                     this.state.selectedId = session.session.id;
+                this.updateSession(session);
+                if (
+                    !pending.target &&
+                    this.state.selectedId === session.session.id
+                )
+                    this.history();
                 if (!pending.target) this.state.draftVersion++;
                 this.state.notice = "";
                 break;
             }
             case "AgentSessionModelSetReq":
             case "AgentSessionExecutionSetReq":
-                this.full(packet.body.chat_session as ChatSession);
+                this.updateSession(packet.body.chat_session as ChatSession);
                 break;
             case "AgentPreferenceSetReq": {
                 if (packet.body.set_target)
@@ -655,6 +783,7 @@ export function reduceAgent(
                 if (!url || !username || !userId)
                     throw Error("宿主登录信息无效");
                 const changedUser =
+                    userId !== state.configuration.userId ||
                     username !== state.configuration.username ||
                     url !== state.configuration.url;
                 state.configuration = { url, username, userId, enabled: true };
@@ -727,15 +856,29 @@ export function reduceAgent(
                 turn.lost("", false);
                 break;
             case "session.new":
-                state.selectedId = "";
-                state.error = "";
+                turn.select("");
                 break;
             case "session.select":
                 if (typeof body.id !== "string" || !state.sessions[body.id])
                     throw Error("会话不存在");
-                state.selectedId = body.id;
-                state.error = "";
+                turn.select(body.id);
                 break;
+            case "history.load": {
+                if (
+                    body.target !== state.selectedId ||
+                    state.connection.status !== "online"
+                )
+                    break;
+                const session = state.sessions[state.selectedId]?.session;
+                if (!session) break;
+                if (!session.messages.length || session.message_start) {
+                    state.error = "";
+                    turn.history(
+                        session.messages.length ? session.message_start : 0,
+                    );
+                }
+                break;
+            }
             case "draft.set":
                 if (typeof body.text !== "string" || body.text.length > 32_000)
                     throw Error("输入不能超过 32000 字符");

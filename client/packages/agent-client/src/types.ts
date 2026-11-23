@@ -47,6 +47,7 @@ export interface ChatSession {
         title: string;
         updated_at: number;
         revision: number;
+        message_start?: number;
         messages: ChatMessage[];
         run_id: string;
         cancelling: boolean;
@@ -99,6 +100,7 @@ export interface PendingRequest {
     target: string;
     draftVersion: number;
     text: string;
+    before?: number;
     age: number;
 }
 export interface AgentState {

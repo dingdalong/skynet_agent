@@ -124,6 +124,19 @@
                     "ret": { "id": 1, "type": "int32" }
                   }
                 },
+                "AgentSessionHistoryReq": {
+                  "fields": {
+                    "before": { "id": 2, "type": "uint32" },
+                    "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "AgentSessionHistoryRes": {
+                  "fields": {
+                    "chat_session": { "id": 4, "type": "ChatSession" },
+                    "error": { "id": 3, "type": "ErrorInfo" },
+                    "ret": { "id": 2, "type": "int32" }
+                  }
+                },
                 "AgentSessionModelSetReq": {
                   "fields": {
                     "model_id": { "id": 2, "type": "string" },
@@ -273,6 +286,7 @@
                   "fields": {
                     "cancelling": { "id": 7, "type": "bool" },
                     "id": { "id": 1, "type": "string" },
+                    "message_start": { "id": 8, "type": "uint32" },
                     "messages": {
                       "id": 5,
                       "rule": "repeated",

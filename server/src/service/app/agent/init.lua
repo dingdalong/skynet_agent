@@ -67,14 +67,10 @@ function AgentService:_handle(context, identity, id, name, args, draining)
         end
         self.users[identity.username] = app
     end
-    if name == "AgentSnapshotReq" then
-        for _, session in pairs(app.chat.sessions) do
-            if session.storage_failed and not session.run then
-                if not pcall(Store.reload, app, session) then
-                    return { ret = codes.call_fail,
-                        error = { message = "会话同步失败，请重试", retryable = true } }
-                end
-            end
+    local session = app.chat.sessions[args.session_id]
+    if session and (session.unloaded or session.storage_failed and not session.run) then
+        if not pcall(Store.reload, app, session) then
+            return { ret = codes.call_fail, error = { message = "会话读取失败，请重试", retryable = true } }
         end
     end
     local ok, result = pcall(app.handle_request, app, id, name, args)

@@ -260,22 +260,24 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 | 请求                                                   | 成功内容                           |
 | ------------------------------------------------------ | ---------------------------------- |
 | `LoginReq(username)`                                   | `identity` 中的用户名和用户 ID |
-| `AgentSnapshotReq`                                     | 完整 Agent 快照，用于启动及重新建立同步基线 |
+| `AgentSnapshotReq`                                     | 用户设置、设备和会话摘要 |
+| `AgentSessionHistoryReq(session_id, before?)` | 按时间从早到晚排列的一页消息 |
 | `AgentChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
 | `AgentMessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
 | `AgentSessionModelSetReq(session_id, model_id)`             | 更新后的 `ChatSession`             |
 
 `AgentSnapshot.chat_sessions` 是 `ChatSession` 列表，允许为空。每项的 `session` 为 `SessionState`，
-包含会话身份、标题、消息、revision 和运行状态；`model_id`、`permission_model_id` 为该会话的实际模型 ID。
+包含会话身份、标题、revision 和运行状态，摘要的消息列表为空；`model_id`、`permission_model_id` 为该会话的实际模型 ID。
 快照的 `models` 提供公开模型清单，`default_model_id` 用于新草稿；快照中的 `permission_model_id`
 为空时表示权限模型跟随会话选择，否则使用指定模型。
 
 `AgentChatReq.session_id` 缺省或空串时，先校验文本、模型和重试参数，再创建会话并发送首条消息。
 无会话 ID 不能重试；非空但不存在的 ID 返回失败，不创建会话。`model_id` 仅在首次创建时生效。
-`AgentChatRes`、`AgentSessionModelSetRes` 与 `AgentSessionUpdatedNtf` 统一通过 `chat_session` 返回完整包装。
-`AgentSessionUpdatedNtf` 在开始生成、模型切换、取消请求和最终完成时携带完整会话包装；
+`AgentChatRes`、`AgentSessionModelSetRes` 与 `AgentSessionUpdatedNtf` 统一通过 `chat_session` 返回会话元数据和最近两条消息。
+`AgentSessionUpdatedNtf` 在开始生成、模型切换、取消请求和最终完成时更新会话状态。
 `AgentMessageDeltaNtf` 携带会话、任务、消息 ID、增量和递增会话版本。
-快照包含消息状态、部分回答和活动任务。消息状态分为生成中、完成、停止和失败。
+历史请求省略 `before` 或传 0 时返回最近一页。下一次传回本页的 `message_start`，读到 0 即达开头。
+每页最多 20 条，按编码大小以 128 KiB 为目标，较大的单条消息独占一页。消息状态分为生成中、完成、停止和失败。
 时间为毫秒时间戳，业务 ID 为不透明字符串；`run_id` 跨连接稳定，与线路请求编号分离。
 
 网关只接受二进制请求帧。文本帧以 1003 关闭，无效公共帧以 1007 关闭，错误帧方向以 1008 关闭。
@@ -290,7 +292,7 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 
 服务端请求按线路消息编号配对，业务 run_id 跨连接稳定。通知可以先于请求响应到达，
 客户端接入时须按真实会话与任务编号合并，不按文本猜测请求归属。
-会话快照包含版本、部分回答和任务状态；增量出现版本缺口时须重新获取完整快照。
+会话快照包含版本、部分回答和任务状态；增量出现版本缺口时重新获取会话摘要和当前会话最近一页。
 
 每个会话最多一个生成，不同会话可以并发。生成任务由该用户的 Agent 服务持有，全部连接离线后仍继续执行。
 停止按会话和任务 ID 定位，确认不表示资源已释放，任务退出后广播停止终态。
@@ -345,7 +347,7 @@ macOS 使用 Seatbelt，Linux 使用 bubblewrap，默认只写本会话目录且
 
 `ChatMessage.tool_calls` 保存工具记录，`AgentToolUpdatedNtf` 更新单条记录并推进会话 revision。
 工具更新可能来自已结束回答的后台进程，因此按消息和工具 ID 定位，不依赖当前生成任务。
-Web 与原生核心均检查版本连续性，出现缺口获取完整快照，重复或迟到通知不覆盖新状态。
+Web 与原生核心均检查版本连续性，出现缺口重新获取当前会话基线，重复或迟到通知不覆盖新状态。
 
 ## 会话模型与思考流
 
@@ -358,7 +360,7 @@ Agent 在自己的 Lua VM 内安装 `service/app/agent/llm/openai/` 中的传输
 
 助手消息与工具记录分别保存主模型和权限模型的思考块。`AgentReasoningDeltaNtf.block.text` 为新增文本，
 终态通知可携带空文本；客户端按块身份追加，沿用会话 revision 去重和缺口恢复。
-完整快照包含累计内容；取消和失败保留部分思考，重试建立新块并保留原尝试。
+历史页中的消息包含累计内容；取消和失败保留部分思考，重试建立新块并保留原尝试。
 模型原始输出用于上下文续接，工具权限思考不混入主模型工具结果。
 
 公共提示和工具定义保持稳定，会话环境位于公共前缀之后，历史与工具结果只追加。

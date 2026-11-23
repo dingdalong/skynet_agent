@@ -22,6 +22,7 @@ const names = [
     "AppCenterUnlockReq",
     "AppCenterSetReq",
     "AgentSnapshotReq",
+    "AgentSessionHistoryReq",
     "AgentDesktopRegisterReq",
     "AgentChatReq",
     "AgentSessionModelSetReq",
@@ -104,6 +105,12 @@ server.on("connection", (socket, upgrade) => {
                         title: "大消息验收",
                         revision: 1,
                         messages: [
+                            ...Array.from({ length: 29 }, (_, i) => ({
+                                id: "history-" + i,
+                                role: 1,
+                                status: 2,
+                                content: "历史记录 " + i,
+                            })),
                             {
                                 id: "a",
                                 role: 2,
@@ -173,6 +180,36 @@ server.on("connection", (socket, upgrade) => {
             if (allowed) agentEnabled = request.enabled;
             send(socket, "AppCenterSetRes", requestId, {
                 ret: allowed ? 1 : 0,
+            });
+            return;
+        }
+        if (name === "AgentSnapshotReq") {
+            const summaries = snapshot.chat_sessions.map((chat) => ({
+                ...chat,
+                session: { ...chat.session, messages: [] },
+            }));
+            send(socket, "AgentSnapshotRes", requestId, {
+                ret: 1,
+                snapshot: { ...snapshot, chat_sessions: summaries },
+            });
+            return;
+        }
+        if (name === "AgentSessionHistoryReq") {
+            const chat = snapshot.chat_sessions.find(
+                (item) => item.session.id === request.session_id,
+            );
+            const end = request.before || chat.session.messages.length;
+            const start = Math.max(0, end - 20);
+            send(socket, "AgentSessionHistoryRes", requestId, {
+                ret: 1,
+                chat_session: {
+                    ...chat,
+                    session: {
+                        ...chat.session,
+                        message_start: start,
+                        messages: chat.session.messages.slice(start, end),
+                    },
+                },
             });
             return;
         }

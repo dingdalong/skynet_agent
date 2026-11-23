@@ -112,6 +112,12 @@ function AgentSocket:request(name, args)
     end).payload
 end
 
+function AgentSocket:history(id)
+    local result = self:request("AgentSessionHistoryReq", { session_id = id })
+    support.equal(result.ret, 1)
+    return result.chat_session.session
+end
+
 function AgentSocket:wait_run(run_id, timeout_ticks)
     return self:wait_for(function(event)
         if event.name ~= "AgentSessionUpdatedNtf" then return false end

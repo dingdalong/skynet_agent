@@ -25,6 +25,8 @@ function Store.append(session, kind, data)
     local seq = session.sequence + 1
     local doc = { _id = user .. "/" .. session.id .. "/" .. seq, user_id = user, session_id = session.id,
         seq = seq, schema_version = 1, kind = kind, payload = json.encode(data) }
+    if kind == "ask" then doc.summary = json.encode({ title = data.title, time = data.time }) end
+    if kind == "ask" or kind == "finish" then doc.updated_at = data.time end
     session.sequence = seq
     if seq == 1 then doc.session_schema_version = 1 end
     local ok, n = pcall(database, "append_once", "history", doc)
@@ -278,7 +280,16 @@ end
 function Store.restore(app)
     local user = app.identity.user_id
     local settings = database("find", "settings", { user_id = user })
-    local history = database("find", "history", { user_id = user })
+    -- Only the latest question can supply a legacy title; larger response/tool payloads stay in MongoDB.
+    local history = database("aggregate", "history", {
+        { ["$match"] = { user_id = user } },
+        { ["$project"] = { session_id = 1, seq = 1, updated_at = 1,
+            ask = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } }, "$seq", 0 } },
+            question = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } },
+                { ["$ifNull"] = { "$summary", "$payload" } }, "" } } } },
+        { ["$group"] = { _id = "$session_id", updated_at = { ["$max"] = "$updated_at" },
+            question = { ["$top"] = { sortBy = { ask = -1 }, output = "$question" } } } },
+    })
     for _, doc in ipairs(settings) do
         if doc.user_id == user and type(doc._id) == "string" and doc._id:sub(1, #user + 1) == user .. "/" then
             local key = doc._id:sub(#user + 2)
@@ -296,22 +307,19 @@ function Store.restore(app)
             end
         end
     end
-    local groups, damaged = {}, {}
-    for _, doc in ipairs(history) do
-        local id = doc.session_id
-        if doc.user_id == user and type(id) == "string" and #id <= 128 and id:match("^[%w_-]+$") then
-            groups[id] = groups[id] or {}
-            if math.type(doc.seq) == "integer" and doc.seq > 0 and doc.seq < 0xffffffff then
-                table.insert(groups[id], doc)
-            else
-                damaged[id] = true
-            end
+    for _, row in ipairs(history) do
+        local id = row._id
+        if type(id) == "string" and #id <= 128 and id:match("^[%w_-]+$") then
+            local session = Session:new(app.chat, config.default_model_id, nil, id)
+            local ok, ask = pcall(json.decode, row.question)
+            if not ok or type(ask) ~= "table" then ask = {} end
+            session.title = type(ask.title) == "string" and ask.title
+                or type(ask.text) == "string" and ask.text:match("^[^\n]+") or "会话"
+            session.updated_at = tonumber(row.updated_at) or tonumber(ask.time) or 0
+            session.unloaded = true
+            app.chat.sessions[id] = session
+            table.insert(app.chat.session_order, id)
         end
-    end
-    for id, rows in pairs(groups) do
-        app.chat.sessions[id] = restore_session(app.chat, id, rows)
-        table.insert(app.chat.session_order, id)
-        if damaged[id] then warn(app.chat.sessions[id], "部分历史未能恢复", true) end
     end
     table.sort(app.chat.session_order, function(a, b)
         local x, y = app.chat.sessions[a].updated_at, app.chat.sessions[b].updated_at
@@ -321,22 +329,29 @@ end
 
 ---写入超时后从库中重建该会话，其他会话的活动任务继续使用原对象。
 function Store.reload(app, old)
-    local rows = database("find", "history", { user_id = app.identity.user_id, session_id = old.id })
-    local chat = app.chat
-    if #rows == 0 then
+    local user, chat = app.identity.user_id, app.chat
+    local filter = { user_id = user, session_id = old.id }
+    local valid, damaged, after = {}, false, nil
+    repeat
+        local page = database("find_page", "history", filter, after)
+        for _, row in ipairs(page.rows) do
+            if row.user_id == user and row.session_id == old.id then
+                if math.type(row.seq) == "integer" and row.seq > 0 and row.seq < 0xffffffff then
+                    table.insert(valid, row)
+                else
+                    damaged = true
+                end
+            end
+        end
+        after = page.after
+    until after == nil
+    if #valid == 0 and not damaged then
         old:close()
         chat.sessions[old.id] = nil
         for i, id in ipairs(chat.session_order) do
             if id == old.id then table.remove(chat.session_order, i); break end
         end
         return
-    end
-    local valid, damaged = {}, false
-    for _, row in ipairs(rows) do
-        if row.user_id == app.identity.user_id and row.session_id == old.id then
-            if math.type(row.seq) == "integer" and row.seq > 0 then table.insert(valid, row)
-            else damaged = true end
-        end
     end
     local restored = restore_session(chat, old.id, valid)
     if damaged then warn(restored, "部分历史未能恢复", true) end

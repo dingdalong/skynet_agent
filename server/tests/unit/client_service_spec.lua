@@ -74,7 +74,9 @@ describe("用户与客户端服务", function()
                 error = function() end, sleep = function() coroutine.yield("sleep") end },
             ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
             log = { info = function() end, failure = function() end },
-            rpc = { call_timeout = function(_, _, cmd) return codes.succ, cmd == "find" and {} or 1 end,
+            rpc = { call_timeout = function(_, _, cmd)
+                return codes.succ, (cmd == "find" or cmd == "aggregate") and {} or 1
+            end,
                 call = function(address, command, _, identity, id, body, draining)
                 if command == "subscribe" then
                     return codes.succ, { revision = 1, apps = { { app_id = "agent", address = 1,
@@ -474,14 +476,15 @@ describe("用户与客户端服务", function()
     it("离线任务继续完成，快照与模型上下文均恢复", function()
         open("a", 100, "alice")
         local created = first()
-        local running = apps.alice:snapshot()
+        assert.are.equal(status.streaming, created.messages[2].status)
         service:disconnect({ source = 20 }, "a")
         assert.is_true(coroutine.resume(tasks[1]))
         local restored = open("b", 200, "alice")
-        assert.are.equal(status.streaming, running.chat_sessions[1].session.messages[2].status)
-        assert.are.equal(status.completed, restored.chat_sessions[1].session.messages[2].status)
-        assert.same({ "问题" }, apps.alice.chat.sessions[created.id].agent.messages)
-        assert.are.equal("回答", restored.chat_sessions[1].session.messages[2].content)
+        assert.same({}, restored.chat_sessions[1].session.messages)
+        local session = apps.alice.chat.sessions[created.id]
+        assert.same({ "问题" }, session.agent.messages)
+        assert.are.equal(status.completed, session.messages[2].status)
+        assert.are.equal("回答", session.messages[2].content)
     end)
 
     it("只向同用户广播，拒绝伪造来源与跨用户操作", function()

@@ -11,7 +11,8 @@ local log = require("log")
 ---@field db table? 当前业务库
 local Database = class()
 
-Database.commands = { find = "find", find_one = "find_one", insert = "insert", replace_one = "replace_one",
+Database.commands = { aggregate = "aggregate", find = "find", find_one = "find_one", insert = "insert",
+    find_page = "find_page", replace_one = "replace_one",
     store_fields = "store_fields", append_once = "append_once",
     user_identity = "user_identity", provision = "provision", revoke = "revoke" }
 
@@ -121,13 +122,36 @@ local function get_collection(db, name)
     return collection
 end
 
----@param collection string 集合名
----@param filter table? 查询条件
-function Database:find(_, collection, filter)
-    local cursor = get_collection(self.db, collection):find(filter)
+local function collect(cursor)
     local documents = {}
     while cursor:hasNext() do documents[#documents + 1] = cursor:next() end
     return documents
+end
+
+function Database:find(_, collection, filter)
+    return collect(get_collection(self.db, collection):find(filter))
+end
+
+function Database:aggregate(_, collection, pipeline)
+    return collect(get_collection(self.db, collection):aggregate(pipeline))
+end
+
+---按 _id 续读，限制一次节点 RPC 携带的文档数量和大小。
+function Database:find_page(_, collection, filter, after)
+    if after ~= nil then filter["$expr"] = { ["$gt"] = { "$_id", { ["$literal"] = after } } } end
+    local cursor = get_collection(self.db, collection):find(filter):sort({ _id = 1 }):limit(64)
+    local rows, bytes = {}, 0
+    while cursor:hasNext() do
+        local row = cursor:next()
+        local size = #bson.encode(row)
+        if #rows > 0 and bytes + size > 1024 * 1024 then
+            cursor:close()
+            return { rows = rows, after = rows[#rows]._id }
+        end
+        rows[#rows + 1], bytes = row, bytes + size
+    end
+    if #rows == 64 then return { rows = rows, after = rows[#rows]._id } end
+    return { rows = rows }
 end
 
 function Database:find_one(_, collection, filter)

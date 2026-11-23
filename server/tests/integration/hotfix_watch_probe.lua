@@ -94,10 +94,10 @@ function M.run(config)
         support.same(updated_files(save_batch({ { ws_path, ws_v2 }, { client_path, client_v2 } })),
             { client_path, ws_path })
         for _, connection in ipairs(connections) do
-            local selected = connection.client:request("AgentSnapshotReq", { session_id = connection.session_id })
+            local selected = connection.client:request("AgentSessionHistoryReq", { session_id = connection.session_id })
             support.equal(selected.ret, 1)
-            support.equal(#selected.snapshot.chat_sessions[1].session.messages, 2)
-            support.equal(selected.snapshot.chat_sessions[1].session.messages[2].content, "E2E 历史已保存")
+            support.equal(#selected.chat_session.session.messages, 2)
+            support.equal(selected.chat_session.session.messages[2].content, "E2E 历史已保存")
             local session = connection.client:send_message(connection.session_id, "[e2e:history-check]")
             support.equal(session.messages[#session.messages].content, "E2E 历史通过")
         end
@@ -121,8 +121,8 @@ function M.run(config)
         support.same(updated_files(recovered), { protocol_path, client_path, ws_path })
         start = offset()
         for _, connection in ipairs(connections) do
-            local snapshot = connection.client:request("AgentSnapshotReq").snapshot
-            support.equal(#snapshot.chat_sessions[1].session.messages, 4)
+            local page = connection.client:request("AgentSessionHistoryReq", { session_id = connection.session_id })
+            support.equal(#page.chat_session.session.messages, 4)
         end
         markers(start, { AUTO_WS_V3 = 2, AUTO_PROTOCOL_V2 = 2, AUTO_CLIENT_V3 = 2 },
             "修正语法后未重试完整批次")
@@ -179,12 +179,13 @@ function M.run(config)
         snapshots()
         markers(start, { AUTO_NODE_V2 = 1, AUTO_RPC_V3 = 4 }, "主节点和共享基础模块未自动更新")
 
-        local before = {}
+        local before, histories = {}, {}
         for _, connection in ipairs(connections) do
             local snapshot = connection.client:request("AgentSnapshotReq").snapshot
             support.equal(snapshot.user_id, connection.user_id)
             support.equal(snapshot.chat_sessions[1].session.id, connection.session_id)
             before[connection] = snapshot
+            histories[connection] = connection.client:history(connection.session_id)
         end
         local chat_path = "src/service/app/agent/handler.lua"
         local chat_source = source(chat_path)
@@ -222,7 +223,8 @@ function M.run(config)
             support.equal(response.snapshot.user_id, connection.user_id)
             support.same(response.snapshot, before[connection])
             local session = client:send_message(connection.session_id, "[e2e:history-check]")
-            local previous = before[connection].chat_sessions[1].session
+            local previous = histories[connection]
+            session = client:history(session.id)
             support.equal(session.id, connection.session_id)
             support.equal(#session.messages, #previous.messages + 2)
             for index, message in ipairs(previous.messages) do support.same(session.messages[index], message) end
