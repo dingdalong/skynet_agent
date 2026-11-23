@@ -334,6 +334,12 @@ describe("native Agent development", () => {
         client.command("execution.select", { workspaceId: "forged" });
         expect(client.state.error).toContain("尚未授权");
         client.command("execution.select", { workspaceId: "work-1" });
+        expect(client.state.draftTarget).toBeNull();
+        client.resource(
+            "AgentPreferenceSetRes",
+            { ret: 1, set_target: true, target: nativeContext.workspaces[0] },
+            client.pending("AgentPreferenceSetReq"),
+        );
         expect(client.state.draftTarget?.workspace_id).toBe("work-1");
         const result = client.command("chat.send", {
             target: "",

@@ -41,6 +41,15 @@ function Execution:register(args, connection)
         and args.authorization_id:match("^[%w_-]+$"), "执行授权标识无效")
     assert(not connection.device_id or connection.device_id == args.device_id, "连接已绑定其他设备")
     local device = self.devices[args.device_id]
+    local key = "device/" .. args.device_id
+    if not self.app.blocked_settings[key]
+        and (not device or device.name ~= args.name or device.remote_enabled ~= (args.remote_enabled == true)) then
+        local ok = pcall(require("agent.persistence").settings, self.app, key,
+            { name = args.name, remote_enabled = args.remote_enabled == true })
+        if not ok then
+            return { ret = codes.call_fail, error = { message = "设备设置保存未确认", retryable = true } }
+        end
+    end
     if not device then
         device = { id = args.device_id }
         self.devices[device.id] = device
@@ -57,7 +66,7 @@ function Execution:register(args, connection)
         end
     end
     self:publish(device)
-    return { ret = codes.succ }
+    return { ret = codes.succ, target = self.app.targets[device.id] }
 end
 
 function Execution:available(target, source_device)

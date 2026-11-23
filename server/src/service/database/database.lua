@@ -12,6 +12,7 @@ local log = require("log")
 local Database = class()
 
 Database.commands = { find = "find", find_one = "find_one", insert = "insert", replace_one = "replace_one",
+    store_fields = "store_fields", append_once = "append_once",
     user_identity = "user_identity", provision = "provision", revoke = "revoke" }
 
 function Database:ctor()
@@ -148,6 +149,18 @@ end
 
 function Database:replace_one(_, collection, filter, document)
     return write(self.db, "update", collection, "updates", { q = filter, u = document, multi = false })
+end
+
+---更新已知版本的字段。版本或归属不符时唯一主键会拒绝插入。
+function Database:store_fields(_, collection, key, fields)
+    return write(self.db, "update", collection, "updates",
+        { q = key, u = { ["$set"] = fields }, upsert = true })
+end
+
+---同一条记录可以重试，内容冲突由唯一主键拒绝。
+function Database:append_once(_, collection, document)
+    return write(self.db, "update", collection, "updates",
+        { q = document, u = { ["$setOnInsert"] = { schema_version = document.schema_version } }, upsert = true })
 end
 
 return Database

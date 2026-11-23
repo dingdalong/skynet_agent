@@ -35,7 +35,8 @@ function WorkspaceSelector({
             item.name === "AgentSessionExecutionSetReq" &&
             item.target === state.selectedId,
     );
-    if (!state.supportsLocal && !target?.device_id) return null;
+    if (!state.supportsLocal && !target?.device_id && !session?.needs_workspace)
+        return null;
     const select = async (id: string) => {
         setError("");
         try {
@@ -67,10 +68,21 @@ function WorkspaceSelector({
                         ? local
                             ? target.workspace_id
                             : "remote"
-                        : "server"
+                        : session?.needs_workspace
+                          ? "missing"
+                          : "server"
                 }
                 onChange={(id) => void select(id)}
                 options={[
+                    ...(session?.needs_workspace
+                        ? [
+                              {
+                                  value: "missing",
+                                  label: "原目录不可用",
+                                  disabled: true,
+                              },
+                          ]
+                        : []),
                     { value: "server", label: "服务器工作目录" },
                     ...workspaces.map((item) => ({
                         value: item.workspace_id,
@@ -126,7 +138,13 @@ export function Composer({ state, send }: Props) {
     );
     const online = state.connection.status === "online";
     const canSend =
-        online && !state.syncing && !sending && !active && !!draft.trim();
+        online &&
+        !session?.read_only &&
+        !session?.needs_workspace &&
+        !state.syncing &&
+        !sending &&
+        !active &&
+        !!draft.trim();
     function submit() {
         if (canSend)
             void send("chat.send", { target: state.selectedId, text: draft });
@@ -211,10 +229,10 @@ export function Composer({ state, send }: Props) {
                             value={
                                 changingModel?.text ||
                                 session?.model_id ||
-                                state.draftModelId ||
                                 state.defaultModelId
                             }
                             isDisabled={
+                                !!session?.read_only ||
                                 !!changingModel ||
                                 !state.models.length ||
                                 !online
@@ -224,7 +242,12 @@ export function Composer({ state, send }: Props) {
                         <WorkspaceSelector
                             state={state}
                             send={send}
-                            disabled={active || sending}
+                            disabled={
+                                !!session?.read_only ||
+                                active ||
+                                sending ||
+                                !online
+                            }
                         />
                     </HStack>
                 }

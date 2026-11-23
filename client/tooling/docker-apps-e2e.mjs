@@ -361,8 +361,84 @@ try {
     await listen();
     await loginAdmin();
     await until(agentReady, "单独重启网关后以原用户 ID 访问运行中的 Agent");
+    const initialSnapshot = (await request("AgentSnapshotReq")).body.snapshot;
+    const preferred = initialSnapshot.models.at(-1).id;
+    assert.equal(
+        (await request("AgentPreferenceSetReq", { model_id: preferred })).body
+            .ret,
+        1,
+    );
+    const historyCollection =
+        'db.getSiblingDB(apps.findOne({_id:"agent"}).database.name).history';
+    const fixtureSource = `const history = ${historyCollection};`;
+    await mongo(`${fixtureSource}
+        const user = ${JSON.stringify(loginId)};
+        const other = ${JSON.stringify(simultaneous[0].identity.user_id)};
+        const model_id = ${JSON.stringify(preferred)};
+        function add(id, seq, kind, data, version = 1, owner = user) {
+            const doc = {_id: owner+"/"+id+"/"+seq, user_id:owner, session_id:id, seq:NumberInt(seq),
+                kind, payload:JSON.stringify(data)};
+            if (version !== null) doc.schema_version = version;
+            history.insertOne(doc);
+        }
+        const ask = {run:"r", message:"m", user_message:"q", text:"恢复检查", model_id, time:1000};
+        const call = {type:"function_call", call_id:"tool", name:"exec_command", arguments:"{}"};
+        const response = {run:"r", text:"", items:[{role:"user",content:ask.text}, call], calls:[call]};
+        for (const id of ["legacy","unknown","gap","no-result","has-result","conflict","corrupt","display"]) {
+            add(id, 1, "ask", ask, id === "legacy" ? null : 1);
+        }
+        add("foreign", 1, "ask", ask, 1, other);
+        add("unknown", 2, "future", {}, 20);
+        add("gap", 3, "block", {run:"r", id:"b", text:"缺口后的正文"});
+        add("display", 2, "block", {run:"r", id:"b", text:42});
+        for (const id of ["no-result","has-result","conflict","corrupt"]) add(id, 2, "response", response);
+        const result = {run:"r", id:"tool", result:{ok:true,output:"已完成"},
+            tool:{id:"tool", name:call.name, arguments:"{}", output:"已完成",status:"completed"}};
+        add("has-result", 3, "result", result);
+        add("conflict", 3, "result", result);
+        add("conflict", 4, "result", {...result, result:{ok:false,error:"冲突"}});
+        add("corrupt", 3, "result", {id:"tool", run:"r", result:{}});
+    `);
+    const originalHistory = () =>
+        mongo(
+            `${fixtureSource} print(EJSON.stringify(history.find().sort({_id:1}).toArray()))`,
+        );
+    const originalRows = await originalHistory();
     await restartStack();
     await until(agentReady, "整套服务重启后恢复已启用的 Agent");
+    const restoredSnapshot = (await request("AgentSnapshotReq")).body.snapshot;
+    assert.equal(restoredSnapshot.default_model_id, preferred);
+    const sessions = Object.fromEntries(
+        restoredSnapshot.chat_sessions.map((item) => [item.session.id, item]),
+    );
+    assert.ok(!sessions.foreign);
+    assert.equal(sessions.legacy.session.title, "恢复检查");
+    assert.ok(!sessions.legacy.read_only && !sessions.display.read_only);
+    assert.ok(sessions.unknown.read_only && sessions.gap.read_only);
+    assert.match(
+        sessions.gap.session.messages.map((item) => item.content).join(""),
+        /缺口后的正文/,
+    );
+    const tool = (id) =>
+        sessions[id].session.messages.find(
+            (message) => message.tool_calls.length,
+        ).tool_calls[0];
+    assert.equal(tool("no-result").status, "interrupted");
+    assert.equal(tool("has-result").output, "已完成");
+    for (const id of ["conflict", "corrupt"]) {
+        assert.equal(tool(id).status, "interrupted");
+        assert.ok(sessions[id].read_only);
+    }
+    assert.deepEqual(
+        (await request("AgentSnapshotReq")).body.snapshot,
+        restoredSnapshot,
+    );
+    assert.notEqual(
+        (await request("AgentChatReq", { session_id: "unknown", text: "续聊" }))
+            .body.ret,
+        1,
+    );
+    assert.equal(await originalHistory(), originalRows);
     const restoredAgent = (await list()).find((app) => app.app_id === "agent");
     assert.equal(restoredAgent.approved.request_id, resubmission);
     assert.equal(restoredAgent.desired, true);
@@ -535,6 +611,9 @@ try {
     assert.deepEqual((await request("EchoRepeatReq", payload)).body, payload);
     await compose("pause", "mongodb");
     try {
+        const unconfirmed = request("AgentPreferenceSetReq", {
+            model_id: preferred,
+        });
         const failedLogin = await loginOnce("docker-probe");
         assert.notEqual(failedLogin.ret, 1);
         assert.equal(failedLogin.error.retryable, true);
@@ -546,6 +625,9 @@ try {
             (await request("EchoRepeatReq", payload)).body,
             payload,
         );
+        const settings = (await unconfirmed).body;
+        assert.notEqual(settings.ret, 1);
+        assert.equal(settings.error.retryable, true);
         const result = (await unavailable).body;
         assert.notEqual(result.ret, 1);
         assert.equal(result.error.retryable, true);
@@ -561,6 +643,11 @@ try {
             ),
         "回程通知",
     );
+    const retried = await request("AgentPreferenceSetReq", {
+        model_id: preferred,
+    });
+    assert.equal(retried.body.ret, 1);
+    assert.equal(retried.body.model_id, preferred);
     // 写入超时后数据库仍可能提交。重试同一个请求确认期望状态，再恢复运行。
     await set("echo", false);
     assert.equal(await enabled("echo"), false);

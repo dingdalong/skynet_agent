@@ -19,6 +19,10 @@ function App:ctor(identity, router, templates)
     self.identity = identity
     self.router = router
     self.connections = {}
+    self.default_model = config.default_model_id
+    self.blocked_settings = {}
+    self.legacy_settings = {}
+    self.targets = {}
     self.pending_runs = {}
     self.execution = Execution:new(self)
     self.chat = Chat:new(self, templates, self.pending_runs)
@@ -28,7 +32,7 @@ function App:snapshot()
     return {
         user_id = self.identity.user_id, username = self.identity.username,
         desktops = self.execution:snapshot(), chat_sessions = self.chat:snapshot(),
-        models = models.public(config), default_model_id = config.default_model_id,
+        models = models.public(config), default_model_id = self.default_model,
         permission_model_id = config.permission.model_id or "",
     }
 end

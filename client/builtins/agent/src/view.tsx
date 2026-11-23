@@ -112,6 +112,17 @@ function Agent() {
                 padding={0}
                 header={
                     <LayoutHeader padding={0}>
+                        {session?.recovery_notice && (
+                            <Banner
+                                status="warning"
+                                title={session.recovery_notice}
+                                description={
+                                    session.read_only
+                                        ? "可阅读已恢复的消息，请另开会话继续。"
+                                        : undefined
+                                }
+                            />
+                        )}
                         {(error || state.notice) && (
                             <Banner
                                 status={error ? "error" : "warning"}

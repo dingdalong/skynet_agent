@@ -39,7 +39,6 @@ export function initialAgentState(): AgentState {
         selectedId: "",
         drafts: { "": "" },
         draftVersion: 0,
-        draftModelId: "",
         buffered: [],
         syncing: false,
         error: "",
@@ -456,7 +455,18 @@ class Turn {
             case "AgentSessionExecutionSetReq":
                 this.full(packet.body.chat_session as ChatSession);
                 break;
+            case "AgentPreferenceSetReq": {
+                if (packet.body.set_target)
+                    this.state.draftTarget =
+                        (packet.body
+                            .target as ChatSession["execution_target"]) ?? null;
+                else this.state.defaultModelId = String(packet.body.model_id);
+                break;
+            }
             case "AgentDesktopRegisterReq": {
+                this.state.draftTarget =
+                    (packet.body.target as ChatSession["execution_target"]) ??
+                    null;
                 connection.status = "online";
                 const buffered = this.state.buffered;
                 this.state.buffered = [];
@@ -633,7 +643,7 @@ export function reduceAgent(
                     state.defaultModelId = "";
                     state.selectedId = "";
                     state.drafts = { "": "" };
-                    state.draftModelId = "";
+                    state.draftTarget = null;
                     state.draftVersion++;
                     state.notice = "";
                 }
@@ -650,8 +660,14 @@ export function reduceAgent(
                     : null;
                 if (id && !target) throw Error("此本地目录尚未授权");
                 const session = state.sessions[state.selectedId];
-                if (!session) state.draftTarget = target ?? null;
-                else {
+                if (!session) {
+                    if (state.connection.status !== "online")
+                        throw Error("请先连接服务器");
+                    turn.request("AgentPreferenceSetReq", {
+                        set_target: true,
+                        target: target ?? {},
+                    });
+                } else {
                     if (state.connection.status !== "online" || state.syncing)
                         throw Error("请等待连接和会话恢复");
                     if (session.session.run_id)
@@ -665,7 +681,10 @@ export function reduceAgent(
                     );
                     if (changing?.text === id) break;
                     if (changing) throw Error("工作目录切换正在进行");
-                    if ((session.execution_target?.workspace_id ?? "") === id)
+                    if (
+                        !session.needs_workspace &&
+                        (session.execution_target?.workspace_id ?? "") === id
+                    )
                         break;
                     turn.request(
                         "AgentSessionExecutionSetReq",
@@ -708,8 +727,13 @@ export function reduceAgent(
                 if (!state.models.some((model) => model.id === modelId))
                     throw Error("模型不存在");
                 state.error = "";
-                if (!state.selectedId) state.draftModelId = modelId;
-                else {
+                if (!state.selectedId) {
+                    if (state.connection.status !== "online")
+                        throw Error("请先连接服务器");
+                    turn.request("AgentPreferenceSetReq", {
+                        model_id: modelId,
+                    });
+                } else {
                     if (state.connection.status !== "online")
                         throw Error("请先连接服务器");
                     const changing = Object.values(
@@ -739,10 +763,28 @@ export function reduceAgent(
                 if (isSending(state, state.selectedId))
                     throw Error("消息正在发送");
                 const session = state.sessions[state.selectedId];
+                if (session?.read_only)
+                    throw Error("此会话仅可阅读，请另开会话");
+                if (
+                    Object.values(state.connection.pending).some(
+                        (item) => item.name === "AgentPreferenceSetReq",
+                    )
+                )
+                    throw Error("请等待设置保存完成");
                 if (session?.session.run_id) throw Error("请等待当前任务结束");
                 const target = session
                     ? session.execution_target
                     : state.draftTarget;
+                if (
+                    target &&
+                    target.device_id === state.local?.deviceId &&
+                    !state.local.workspaces.some(
+                        (item) =>
+                            item.workspace_id === target.workspace_id &&
+                            item.directory === target.directory,
+                    )
+                )
+                    throw Error("原目录尚未授权，请重新选择工作目录");
                 if (
                     target?.device_id &&
                     !state.desktops.some(
@@ -766,10 +808,7 @@ export function reduceAgent(
                         : (state.drafts[state.selectedId] ?? "");
                 if (text.length > 32_000)
                     throw Error("输入不能超过 32000 字符");
-                const modelId =
-                    session?.model_id ||
-                    state.draftModelId ||
-                    state.defaultModelId;
+                const modelId = session?.model_id || state.defaultModelId;
                 const last = session?.session.messages.at(-1);
                 const retry = command.type === "chat.retry";
                 if (

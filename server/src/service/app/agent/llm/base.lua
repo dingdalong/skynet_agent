@@ -191,7 +191,7 @@ end
 ---@return string|nil
 ---@return string|nil
 ---@return llm.Response|nil
-local function stream_responses(client, input, on_text_delta, request, options, on_reasoning)
+local function stream_responses(client, input, on_text_delta, request, options, on_reasoning, on_block)
     assert(type(client) == "table", "LLM 响应客户端必须是 table")
     assert(type(input) == "table", "LLM 输入必须是消息数组")
     assert(type(on_text_delta) == "function", "LLM 文本回调必须是函数")
@@ -203,9 +203,16 @@ local function stream_responses(client, input, on_text_delta, request, options, 
     local completed_response
     local output_items = {}
     local request_terminal_error
-    local reasoning = {}
+    local reasoning, finished = {}, {}
+    local function complete_text(text, index, part)
+        local key = index .. ":" .. part .. ":text"
+        if type(text) == "string" and text ~= "" and not finished[key] then
+            finished[key] = true
+            if on_block then on_block(text, key) end
+        end
+    end
     local function reasoning_text(text, key, complete)
-        if type(text) ~= "string" or text == "" then return end
+        if finished[key] or type(text) ~= "string" or text == "" then return end
         local previous = reasoning[key] or ""
         local delta = text
         if complete then
@@ -213,7 +220,8 @@ local function stream_responses(client, input, on_text_delta, request, options, 
             delta = text:sub(#previous + 1)
         end
         reasoning[key] = previous .. delta
-        if delta ~= "" and on_reasoning then on_reasoning(delta, key) end
+        if complete then finished[key] = true end
+        if on_reasoning and (delta ~= "" or complete) then on_reasoning(delta, key, complete) end
     end
 
     ---@param event agent.llm.openai.sse.Event
@@ -229,7 +237,12 @@ local function stream_responses(client, input, on_text_delta, request, options, 
                 text_parts[#text_parts + 1] = delta
                 on_text_delta(delta)
             end
+        elseif event.type == "response.output_text.done" then
+            complete_text(event.text, event.output_index or 0, event.content_index or 0)
         elseif event.type == "response.output_item.done" then
+            for n, part in ipairs(event.item and event.item.content or {}) do
+                if part.type == "output_text" then complete_text(part.text, event.output_index or 0, n - 1) end
+            end
             output_items[(event.output_index or #output_items) + 1] = event.item
         elseif event.type == "response.completed" then
             completed_response = event.response
@@ -270,8 +283,9 @@ local function stream_responses(client, input, on_text_delta, request, options, 
     local assistant_text = table.concat(text_parts)
     local output = completed_response.output or {}
     if #output == 0 then output = output_items end
-    local calls = {}
+    local calls, has_message = {}, false
     for index, item in ipairs(output) do
+        if item.role == "assistant" then has_message = true end
         if item.type == "reasoning" then
             for part_index, part in ipairs(item.content or {}) do
                 reasoning_text(part.text, (index - 1) .. ":" .. (part_index - 1) .. "text", true)
@@ -282,11 +296,14 @@ local function stream_responses(client, input, on_text_delta, request, options, 
         end
         if item.type == "function_call" then
             if type(item.call_id) ~= "string" or item.call_id == "" or type(item.name) ~= "string"
-                or #item.call_id > 128 or #item.name > 64
+                or #item.call_id > 128 or item.name == "" or #item.name > 64
                 or type(item.arguments) ~= "string" or (item.status and item.status ~= "completed") then
                 return nil, "模型工具调用不完整"
             end
             if #item.arguments > 262144 then return nil, "模型工具参数过长" end
+            if not item.arguments:match("^%s*{") or not pcall(require("cjson").decode, item.arguments) then
+                return nil, "模型工具参数不完整"
+            end
             calls[#calls + 1] = item
         end
     end
@@ -301,7 +318,9 @@ local function stream_responses(client, input, on_text_delta, request, options, 
         if assistant_text ~= "" then on_text_delta(assistant_text) end
     end
     if assistant_text == "" and #calls == 0 then return nil, "流式响应中没有文本内容" end
-    if #output == 0 then output = { { role = "assistant", content = assistant_text } } end
+    if assistant_text ~= "" and not has_message then
+        output[#output + 1] = { role = "assistant", content = assistant_text }
+    end
     return assistant_text, nil, { output = output, calls = calls,
         usage = completed_response.usage, model = completed_response.model }
 end
@@ -331,7 +350,7 @@ function Base:stream(input, on_text, run, options, tool)
     target.reasoning = target.reasoning or {}
     local blocks = {}
     local ok, text, err, response = pcall(stream_responses, client, input, on_text, request, options,
-        function(delta, key)
+        function(delta, key, complete)
             local block = blocks[key]
             if not block then
                 block = { id = trace .. ":" .. key, run_id = run.id or "", model_id = config.id or config.model,
@@ -340,11 +359,26 @@ function Base:stream(input, on_text, run, options, tool)
                 target.reasoning[#target.reasoning + 1] = block
             end
             block.text = block.text .. delta
+            if complete and run.owner then
+                block.status = "completed"
+                run.owner:record("block", { run = run.id, id = block.id, model_id = block.model_id,
+                    reasoning = true, text = block.text, tool = tool and tool.id })
+            end
             run:on_reasoning(block, delta, tool and tool.id)
+        end, function(value, key)
+            if run.owner and not tool then
+                run.owner:record("block", { run = run.id, id = trace .. ":" .. key, text = value })
+            end
         end)
     if run[field] == request then run[field] = nil end
     for _, block in pairs(blocks) do
-        block.status = run.cancelled and "cancelled" or ok and text ~= nil and "completed" or "failed"
+        if block.status ~= "completed" then
+            block.status = run.cancelled and "cancelled" or ok and text ~= nil and "completed" or "failed"
+            if block.status == "completed" and run.owner then
+                run.owner:record("block", { run = run.id, id = block.id, model_id = block.model_id,
+                    reasoning = true, text = block.text, tool = tool and tool.id })
+            end
+        end
         run:on_reasoning(block, "", tool and tool.id)
     end
     if response and response.usage then

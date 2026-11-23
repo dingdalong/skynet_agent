@@ -39,6 +39,9 @@ export interface ChatMessage {
     reasoning: ReasoningBlock[];
 }
 export interface ChatSession {
+    recovery_notice?: string;
+    read_only?: boolean;
+    needs_workspace?: boolean;
     session: {
         id: string;
         title: string;
@@ -132,7 +135,6 @@ export interface AgentState {
     selectedId: string;
     drafts: Record<string, string>;
     draftVersion: number;
-    draftModelId: string;
     buffered: import("./protocol").Packet[];
     syncing: boolean;
     error: string;

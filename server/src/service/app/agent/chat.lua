@@ -56,7 +56,7 @@ function Chat:chat(args, connection)
         return failure(codes.invalid_param, "消息格式无效或内容过长")
     end
     local model_id = args.model_id
-    if not model_id or model_id == "" then model_id = config.default_model_id end
+    if not model_id or model_id == "" then model_id = self.app.default_model end
     if not pcall(models.resolve, config, model_id) then
         return failure(codes.invalid_param, "模型不在可选清单中")
     end

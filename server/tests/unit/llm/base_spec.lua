@@ -136,16 +136,41 @@ describe("agent.llm.base", function()
         } })
         local thinking = {}
         local run = require("agent.run"):new()
-        run.owner = { _on_reasoning = function(_, _, _, delta) thinking[#thinking + 1] = delta end }
+        local writes = {}
+        run.owner = { _on_reasoning = function(_, _, _, delta) thinking[#thinking + 1] = delta end,
+            record = function(_, _, block) writes[#writes + 1] = block.text end }
         local text, err, response = stream(new_model(fake), {}, function() end, run)
         assert.is_nil(err)
         assert.are.equal("回答", text)
         assert.are.equal("先核对再执行", table.concat(thinking))
+        assert.same({ "先核对再执行" }, writes)
         assert.are.same(item, response.output[1])
         assert.are.same(usage, response.usage)
         assert.are.equal("先核对再执行", run.assistant.reasoning[1].text)
         assert.are.equal("completed", run.assistant.reasoning[1].status)
         assert.is_nil(run.llm_request)
+    end)
+
+    it("超过 32 KiB 的正文只有在完成事件后写入一次", function()
+        local text = string.rep("A", 33000)
+        local writes = {}
+        local run = require("agent.run"):new()
+        run.owner = { record = function(_, kind, block)
+            assert.equal("block", kind)
+            writes[#writes + 1] = block.text
+        end }
+        local chunks = { event({ type = "response.output_text.delta", delta = text }) }
+        local function check()
+            return stream(new_model(FakeHttp.new({ chunks = chunks })), {}, function() end, run)
+        end
+        assert.is_nil(check())
+        assert.same({}, writes)
+        chunks[2] = event({ type = "response.output_text.done", text = text })
+        chunks[3] = event({ type = "response.output_item.done", output_index = 0,
+            item = { role = "assistant", content = { { type = "output_text", text = text } } } })
+        chunks[4] = completed_event()
+        assert.equal(text, check())
+        assert.same({ text }, writes)
     end)
 
     it("流中断之前的思考仍通过回调保留", function()
@@ -502,8 +527,9 @@ describe("agent.llm.base", function()
         local run = require("agent.run"):new()
         run.id = "permission-run"
         local tool = { id = "tool-1", reasoning = {} }
-        local notifications = {}
-        run.owner = { _on_reasoning = function(_, _, block, delta, tool_id)
+        local notifications, saved = {}, {}
+        run.owner = { record = function(_, _, block) saved[#saved + 1] = block end,
+            _on_reasoning = function(_, _, block, delta, tool_id)
             assert.are.equal("tool-1", tool_id)
             assert.are.equal("judge", block.model_id)
             notifications[#notifications + 1] = delta
@@ -521,6 +547,9 @@ describe("agent.llm.base", function()
         assert.are.equal("completed", tool.reasoning[2].status)
         assert.are_not.equal(tool.reasoning[1].id, tool.reasoning[2].id)
         assert.are.same({ "核对权限", "", "核对权限", "" }, notifications)
+        assert.equal(1, #saved)
+        assert.equal(tool.reasoning[2].id, saved[1].id)
+        assert.equal("tool-1", saved[1].tool)
     end)
 
 end)

@@ -74,6 +74,9 @@ message SessionState {
 }
 
 message ChatSession {
+  string recovery_notice = 5;
+  bool read_only = 6;
+  bool needs_workspace = 7;
   ExecutionTarget execution_target = 4;
   SessionState session = 1;
   string model_id = 2;

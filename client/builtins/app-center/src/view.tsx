@@ -342,7 +342,7 @@ function AppCenter() {
                 <AlertDialog
                     isOpen
                     title={`停用${pending.name}？`}
-                    description="应用将结束所有用户的在途任务并停止容器。内存中的会话会清空，工作目录里的文件会保留。"
+                    description="应用将结束所有用户的在途任务并停止容器。已写入应用数据库的数据和工作目录里的文件会保留。"
                     actionLabel="停用"
                     cancelLabel="取消"
                     actionVariant="destructive"

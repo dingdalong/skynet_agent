@@ -121,7 +121,10 @@ local function app_center_flow(login, config)
     assert(current:find(".agent_2", 1, true))
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
     support.same(agent_addresses(), current)
-    support.equal(#reader:request("AgentSnapshotReq").snapshot.chat_sessions, 0)
+    local restored = reader:request("AgentSnapshotReq").snapshot.chat_sessions[1]
+    support.equal(restored.session.id, active.id)
+    support.equal(last(restored.session).status, status.cancelled)
+    support.equal(last(reader:send_message(active.id, "[e2e:success]")).status, status.completed)
     support.equal(last(reader:send_message(nil, "[e2e:success]")).status, status.completed)
     change.enabled = false
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
@@ -237,22 +240,32 @@ function M.run(config)
         end
         if config.mode == "live" then
             local client, snapshot, username = login()
-            local session = client:send_message(nil, config.live_prompt, 12000)
+            local marker = crypt.hexencode(crypt.randomkey())
+            local prompt = config.live_prompt .. "\n请记住本轮验收代号 " .. marker
+            local session = client:send_message(nil, prompt, 12000)
             local result = last(session)
             support.equal(result.status, status.completed, "真实模型未成功完成")
             support.equal(result.ret, 0, "成功消息不应携带错误码")
             assert(result.content ~= "", "真实模型未返回内容")
+            local token = assert(os.getenv("APP_CENTER_ADMIN_TOKEN"))
+            support.equal(client:request("AppCenterUnlockReq", { token = token }).ret, 1)
+            support.equal(client:request("AppCenterSetReq", { app_id = "agent", enabled = false }).ret, 1)
+            support.equal(client:request("AppCenterSetReq", { app_id = "agent", enabled = true }).ret, 1)
             client:close()
-            local _, restored = login(username)
+            local next_client, restored = login(username)
             support.equal(restored.user_id, snapshot.user_id)
             support.equal(restored.chat_sessions[1].session.id, session.id)
             support.equal(last(restored.chat_sessions[1].session).content, result.content)
+            local recall = "请只回复我上一轮给出的验收代号。"
+            local follow = next_client:send_message(session.id, recall, 12000)
+            support.equal(last(follow).status, status.completed)
+            assert(last(follow).content:find(marker, 1, true), "原会话模型上下文没有恢复")
             local other, independent = login()
             support.equal(#independent.chat_sessions, 0)
             support.equal(other:request("AgentMessageCancelReq", {
                 session_id = session.id, run_id = result.run_id,
             }).ret, 2)
-            print(result.content)
+            print("真实模型通过 Agent 重启前后两轮上下文验证")
             return
         end
         protocol_flow(connect)

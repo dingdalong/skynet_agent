@@ -69,6 +69,18 @@ describe("Agent 工具循环检查点", function()
         assert.are.equal(40, #request.assistant.tool_calls)
     end)
 
+    for _, boundary in ipairs({ "response", "result" }) do
+        it("写入未确认时停在 " .. boundary, function()
+            model = function() return tool_response() end
+            request.owner = { record = function(_, kind)
+                if kind == boundary then error("数据库断连") end
+            end }
+            assert.is_nil(agent:chat("检查", function() end, request))
+            assert.equal(boundary == "response" and 0 or 1, effects)
+            assert.equal(1, calls)
+        end)
+    end
+
     it("请求中切换配置，当前客户端完成后下一次模型调用使用新配置", function()
         local created, seen = 0, {}
         fake_llm.response_handler = function(client)

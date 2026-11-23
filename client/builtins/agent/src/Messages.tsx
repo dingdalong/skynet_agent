@@ -61,6 +61,7 @@ function Reasoning({
     );
 }
 const toolStatus: Record<string, string> = {
+    interrupted: "执行中断",
     pending: "等待执行",
     judging: "检查权限",
     running: "执行中",

@@ -30,13 +30,24 @@ function Workspace.mkdir(path)
     assert(ok or lfs.attributes(path, "mode") == "directory", err)
 end
 
-function Workspace.create(root, username, session_id)
+local function session_directory(root, username, session_id)
     assert(session_id:match("^[%w_-]+$"), "会话目录身份无效")
     local encoded = username:gsub(".", function(byte) return string.format("%02x", byte:byte()) end)
     root = Workspace.resolve(root)
     local path = root .. "/" .. encoded .. "/" .. session_id
+    assert(Workspace.resolve(path) == path, "会话目录已变更")
+    return path
+end
+
+function Workspace.existing(root, username, session_id)
+    local path = session_directory(root, username, session_id)
+    assert(lfs.attributes(path, "mode") == "directory", "原工作目录不可用，请重新选择")
+    return path
+end
+
+function Workspace.create(root, username, session_id)
+    local path = session_directory(root, username, session_id)
     Workspace.mkdir(path)
-    assert(Workspace.inside(Workspace.resolve(path), root), "会话目录越界")
     Workspace.mkdir(path .. "/.agent-tmp")
     Workspace.mkdir(path .. "/.agent-home")
     return path

@@ -5,10 +5,10 @@ describe("桌面执行设备与路由", function()
     local scope, user, execution, events
     before_each(function()
         events = {}
-        scope = Scope.new({ ["agent.execution"] = false,
+        scope = Scope.new({ ["agent.execution"] = false, ["agent.persistence"] = { settings = function() end },
             skynet = {}, ["skynet.crypt"] = {},
             log = { info = function() end, failure = function() end } })
-        user = { chat = { sessions = {} }, publish = function(_, name, args)
+        user = { targets = {}, blocked_settings = {}, chat = { sessions = {} }, publish = function(_, name, args)
             events[#events + 1] = { name = name, args = args }
         end }
         execution = require("agent.execution"):new(user)

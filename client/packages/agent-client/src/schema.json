@@ -33,7 +33,8 @@
                 "AgentDesktopRegisterRes": {
                   "fields": {
                     "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
+                    "ret": { "id": 1, "type": "int32" },
+                    "target": { "id": 3, "type": "ExecutionTarget" }
                   }
                 },
                 "AgentDesktopUpdatedNtf": {
@@ -83,6 +84,22 @@
                     "revision": { "id": 5, "type": "uint32" },
                     "run_id": { "id": 2, "type": "string" },
                     "session_id": { "id": 1, "type": "string" }
+                  }
+                },
+                "AgentPreferenceSetReq": {
+                  "fields": {
+                    "model_id": { "id": 1, "type": "string" },
+                    "set_target": { "id": 2, "type": "bool" },
+                    "target": { "id": 3, "type": "ExecutionTarget" }
+                  }
+                },
+                "AgentPreferenceSetRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "model_id": { "id": 3, "type": "string" },
+                    "ret": { "id": 1, "type": "int32" },
+                    "set_target": { "id": 4, "type": "bool" },
+                    "target": { "id": 5, "type": "ExecutionTarget" }
                   }
                 },
                 "AgentReasoningDeltaNtf": {
@@ -190,7 +207,10 @@
                   "fields": {
                     "execution_target": { "id": 4, "type": "ExecutionTarget" },
                     "model_id": { "id": 2, "type": "string" },
+                    "needs_workspace": { "id": 7, "type": "bool" },
                     "permission_model_id": { "id": 3, "type": "string" },
+                    "read_only": { "id": 6, "type": "bool" },
+                    "recovery_notice": { "id": 5, "type": "string" },
                     "session": { "id": 1, "type": "SessionState" }
                   }
                 },

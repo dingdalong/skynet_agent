@@ -10,6 +10,8 @@ local codes = require("enum.error_code")
 ---@field templates agent.PromptTemplates?
 ---@field available boolean
 local AgentService = class()
+local Store = require("agent.persistence")
+local queue = require("skynet.queue")
 
 AgentService.commands = {
     handle_request = "handle_request", disconnect = "disconnect", drain = "drain",
@@ -18,6 +20,7 @@ AgentService.closing_commands = { disconnect = true, handle_request = true }
 
 function AgentService:ctor()
     self.users = {}
+    self.locks = {}
     self.templates = nil
     self.available = true
 end
@@ -39,15 +42,46 @@ end
 
 function AgentService:handle_request(context, identity, id, name, args, draining)
     local app = self:_user(identity, context.source)
+    -- 桌面回执可能正是持锁请求等待的结果。
+    if name == "AgentExecutionResultReq" and app and app.connections[id] then
+        return app:handle_request(id, name, args)
+    end
+    local key = identity.user_id
+    self.locks[key] = self.locks[key] or queue()
+    return self.locks[key](self._handle, self, context, identity, id, name, args, draining)
+end
+
+function AgentService:_handle(context, identity, id, name, args, draining)
+    local app = self:_user(identity, context.source)
     local receipt = name == "AgentExecutionResultReq" and app and app.connections[id]
     if (draining or not self.available) and not receipt then
         return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
     end
     if not app then
         app = App:new(identity, context.source, self.templates)
+        if not pcall(Store.restore, app) then
+            return { ret = codes.call_fail, error = { message = "历史读取失败，请重试", retryable = true } }
+        end
+        if not self.available then
+            return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
+        end
         self.users[identity.username] = app
     end
-    return app:handle_request(id, name, args)
+    if name == "AgentSnapshotReq" then
+        for _, session in pairs(app.chat.sessions) do
+            if session.storage_failed and not session.run then
+                if not pcall(Store.reload, app, session) then
+                    return { ret = codes.call_fail,
+                        error = { message = "会话同步失败，请重试", retryable = true } }
+                end
+            end
+        end
+    end
+    local ok, result = pcall(app.handle_request, app, id, name, args)
+    if ok then return result end
+    log.info("agent", "request", "请求未确认 name=%s", name)
+    return { ret = codes.call_fail,
+        error = { message = "操作未确认，请重新同步并重试", retryable = true } }
 end
 
 function AgentService:disconnect(context, identity, id)

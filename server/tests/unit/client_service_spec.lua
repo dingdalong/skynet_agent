@@ -51,6 +51,8 @@ describe("用户与客户端服务", function()
                 hexencode = function(value) return value end,
             },
             ["agent.agent"] = Agent,
+            ["agent.persistence"] = false, ["agent.execution"] = false,
+            ["skynet.queue"] = function() return function(f, ...) return f(...) end end,
             ["agent.prompts"] = { load_templates = function()
                 template_loads = template_loads + 1
                 return templates
@@ -72,7 +74,8 @@ describe("用户与客户端服务", function()
                 error = function() end, sleep = function() coroutine.yield("sleep") end },
             ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
             log = { info = function() end, failure = function() end },
-            rpc = { call = function(address, command, _, identity, id, body, draining)
+            rpc = { call_timeout = function(_, _, cmd) return codes.succ, cmd == "find" and {} or 1 end,
+                call = function(address, command, _, identity, id, body, draining)
                 if command == "subscribe" then
                     return codes.succ, { revision = 1, apps = { { app_id = "agent", address = 1,
                         generation = "generation", enabled = true } } }
@@ -146,6 +149,27 @@ describe("用户与客户端服务", function()
     local function first(text, extra)
         return send(nil, text or "问题", nil, extra).chat_session.session
     end
+
+    it("读库失败不缓存空用户，数据库恢复后同一连接可重试", function()
+        local database = require("rpc")
+        local original = database.call_timeout
+        local attempts = 0
+        database.call_timeout = function(_, _, command)
+            assert.equal("find", command)
+            attempts = attempts + 1
+            return codes.timeout
+        end
+        local function snapshot()
+            return instances[1]:handle_request({ source = 10 }, stored_identity("alice"), "a", "AgentSnapshotReq", {})
+        end
+        local failed = snapshot()
+        assert.is_true(failed.error.retryable)
+        assert.is_nil(failed.snapshot)
+        assert.is_nil(apps.alice)
+        assert.equal(2, attempts)
+        database.call_timeout = original
+        assert.equal(codes.succ, snapshot().ret)
+    end)
 
     it("登录只绑定身份；同名连接与重连按用户名选择同一常驻实例", function()
         instances[2] = require("agent"):new()

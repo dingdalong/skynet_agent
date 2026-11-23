@@ -60,9 +60,17 @@ end
 
 ---@param owner agent.Chat
 ---@param model_id string
-function AgentSession:ctor(owner, model_id, target)
+function AgentSession:ctor(owner, model_id, target, existing_id)
     self.owner = owner
-    self.id = make_id("session")
+    self.id = existing_id or make_id("session")
+    self.sequence = 0
+    self.restored = existing_id ~= nil
+    self.write_lock = require("skynet.queue")()
+    self.recovery_notice = nil
+    self.read_only = false
+    self.saved_context = {}
+    self.background_tools = {}
+    self.storage_failed = false
     self.title = "新的会话"
     self.updated_at = now_ms()
     self.revision = 0
@@ -72,15 +80,36 @@ function AgentSession:ctor(owner, model_id, target)
     self.pending_runs = owner.pending_runs
     self.agent = nil
     self.execution_target = target
-    local workspace =
-        target and target.directory or require("agent.workspace").create(
-            config.tools.workspace_root, owner.app.identity.username, self.id)
+    if not existing_id then self:open_agent() end
+end
+
+function AgentSession:open_agent()
+    local target, owner, model_id = self.execution_target, self.owner, self.model_id
+    local directories = require("agent.workspace")
+    local workspace = target and target.directory or (self.restored and directories.existing or directories.create)(
+        config.tools.workspace_root, owner.app.identity.username, self.id)
     self.agent = Agent:new(models.resolve(config, model_id), owner.prompt_templates, {
         execution_target = target, workspace = workspace, tools = config.tools,
         project_instructions_max_bytes = config.project_instructions_max_bytes,
         permission_llm = models.resolve(config, config.permission.model_id or model_id),
         permission = config.permission, owner = self, session_id = self.id,
     })
+    self.agent.project_instructions = self.saved_project
+    for _, item in ipairs(self.saved_context) do self.agent.messages[#self.agent.messages + 1] = item end
+end
+
+function AgentSession:record(kind, data)
+    if type(data.tool) == "table" then
+        -- 执行器仍会更新同一条工具记录，先冻结本次已完成的部分。
+        local tool = table.copy(data.tool)
+        tool.reasoning = {}
+        for _, block in ipairs(data.tool.reasoning or {}) do
+            if block.status == "completed" then table.insert(tool.reasoning, table.copy(block)) end
+        end
+        data.tool = tool
+        if kind == "result" and tool.status == "running" then self.background_tools[tool.id] = true end
+    end
+    return self.write_lock(require("agent.persistence").append, self, kind, data)
 end
 
 ---@param text any
@@ -91,12 +120,18 @@ end
 
 ---@return table
 function AgentSession:snapshot()
+    local notice = self.recovery_notice
+    if not notice and not pcall(models.resolve, config, self.model_id) then
+        notice = "原模型不可用，请重新选择"
+    end
+    if not notice and self.needs_workspace then notice = "原工作目录不可用，请重新选择工作目录" end
     return {
-        session = {
+        needs_workspace = self.needs_workspace, session = {
             id = self.id, title = self.title, updated_at = self.updated_at, revision = self.revision,
             messages = table.deep_copy(self.messages), run_id = self.run and self.run.id or "",
             cancelling = self.run and self.run.cancelled or false,
         },
+        recovery_notice = notice, read_only = self.read_only or self.storage_failed,
         execution_target = self.execution_target,
         model_id = self.model_id,
         permission_model_id = config.permission.model_id or self.model_id,
@@ -115,7 +150,9 @@ function AgentSession:set_model(model_id)
         return models.resolve(config, model_id), models.resolve(config, config.permission.model_id or model_id)
     end)
     if not ok then return failure(codes.invalid_param, "模型不在可选清单中") end
-    self.agent:set_llm(main, permission)
+    if self.read_only or self.storage_failed then return failure(codes.fail, "会话仅可阅读") end
+    self:record("model", { model_id = model_id })
+    if self.agent then self.agent:set_llm(main, permission) end
     self.model_id = model_id
     self:_publish()
     return { ret = codes.succ, chat_session = self:snapshot() }
@@ -132,6 +169,10 @@ end
 ---@param args table
 ---@return table
 function AgentSession:send_message(args, connection)
+    if self.read_only or self.storage_failed then return failure(codes.fail, "历史不完整，请另开会话") end
+    if self.needs_workspace or not self.agent and not pcall(self.open_agent, self) then
+        return failure(codes.fail, "请重新选择可用的模型或工作目录")
+    end
     local text = args.text
     if self.run then return failure(codes.server_busy, "该会话仍在生成", true) end
     if self.execution_target then
@@ -177,6 +218,14 @@ function AgentSession:send_message(args, connection)
     self.updated_at = now_ms()
     self.run = run
     self.pending_runs[run] = true
+    local saved = pcall(self.record, self, "ask", { run = run.id, message = run.message_id, text = text,
+        user_message = self.messages[#self.messages - 1].id, time = self.updated_at,
+        model_id = self.model_id, target = self.execution_target, title = self.title, retry = run.retry })
+    if not saved then
+        self.run = nil
+        self.pending_runs[run] = nil
+        return failure(codes.call_fail, "提问未确认，请重新同步会话", true)
+    end
     self:_publish()
     local response = { ret = codes.succ, chat_session = self:snapshot() }
     skynet.fork(function() self:_run_request(run, text) end)
@@ -198,6 +247,10 @@ end
 ---@param message_id string
 ---@param record table
 function AgentSession:_on_tool_update(message_id, record)
+    if self.background_tools[record.id] and record.status ~= "running" then
+        self.background_tools[record.id] = nil
+        self:record("tool_end", { run = record.run_id, id = record.id, tool = record })
+    end
     self.revision = self.revision + 1
     self.owner:publish("AgentToolUpdatedNtf", { session_id = self.id, message_id = message_id,
         tool = table.deep_copy(record), revision = self.revision })
@@ -206,18 +259,15 @@ end
 ---@param run agent.Run
 ---@param text string
 function AgentSession:_run_request(run, text)
-    local ok, result, err = xpcall(function()
+    local ok, result = xpcall(function()
         return self.agent:chat(text, function(delta) self:_on_delta(run, delta) end, run)
     end, debug.traceback)
     -- 终态先释放占用，广播后到达的新请求才能立即开始下一轮。
-    self.run = nil
-    self.pending_runs[run] = nil
     local assistant = run.assistant
     if run.cancelled then
         assistant.status = status.cancelled
     elseif not ok or not result then
-        skynet.error("[agent.session] _run_request session=" .. self.id .. " run=" .. run.id .. " error="
-            .. tostring(ok and err or result))
+        log.info("agent.session", "run", "session=%s run=%s 请求失败", self.id, run.id)
         assistant.status = status.failed
         assistant.ret = codes.call_fail
         assistant.error = { message = "对话请求失败，请稍后重试", retryable = true }
@@ -226,6 +276,15 @@ function AgentSession:_run_request(run, text)
         assistant.content = result
     end
     self.updated_at = now_ms()
+    local saved = pcall(self.record, self, "finish", { status = assistant.status, run = run.id,
+        time = self.updated_at, content = assistant.status == status.completed and assistant.content or nil,
+        error = assistant.error })
+    self.run = nil
+    self.pending_runs[run] = nil
+    if not saved then
+        assistant.status = status.failed
+        assistant.error = { message = "保存结果未确认，请重新同步", retryable = false }
+    end
     self:_publish()
 end
 
@@ -246,13 +305,14 @@ end
 
 function AgentSession:stop_remote()
     if self.run and self.run.source_device ~= self.execution_target.device_id then self.run:cancel() end
-    local executor = self.agent.executor
+    local executor = self.agent and self.agent.executor
     if executor and executor.remote then executor.processes:stop_remote(self.execution_target.device_id) end
 end
 
 function AgentSession:set_execution(target, connection)
     assert(not self.run, "请先停止当前任务再切换执行目标")
-    local executor = self.agent.executor
+    assert(not self.read_only and not self.storage_failed, "会话仅可阅读")
+    local executor = self.agent and self.agent.executor
     if executor then
         if executor.remote then assert(not executor.processes:has_active(), "请先停止后台进程")
         else
@@ -264,6 +324,17 @@ function AgentSession:set_execution(target, connection)
     target = self.owner.app.execution:validate_target(target, connection)
     local workspace = target and target.directory or require("agent.workspace").create(
         config.tools.workspace_root, self.owner.app.identity.username, self.id)
+    if not pcall(self.record, self, "target", { target = target, workspace = workspace }) then
+        return failure(codes.call_fail, "工作目录保存未确认，请重新同步", true)
+    end
+    self.needs_workspace = false
+    if not self.agent then
+        self.execution_target = target
+        table.insert(self.saved_context, { role = "developer", source = "environment",
+            content = "执行环境已切换到 " .. workspace })
+        self:_publish()
+        return { ret = codes.succ, chat_session = self:snapshot() }
+    end
     if executor then executor:close() end
     self.agent.executor = nil
     self.agent.options.workspace, self.agent.options.execution_target = workspace, target
@@ -280,6 +351,7 @@ function AgentSession:set_execution(target, connection)
 end
 
 function AgentSession:close()
+    if not self.agent then return end
     self.agent:close()
     self.agent.executor = nil
 end

@@ -10,7 +10,5 @@ mcp
 lua、proto代码格式化脚本
 几个tools只剩下描述了
 ---@field extensions table? 当前 Agent 轮次的工具快照，这个注释写的不好，不应该写table这种，要写详细的class
-再检查一下服务端和客户端其它模块，看看是否也有过度复杂的故障恢复、不必要的状态、重复错误处理或只为测试保留的业务代码，按同样原则继续简化。
 子应用开发
-只在service中用到的文件，不要放到lublib目录中
 app_id用uuid，保证唯一

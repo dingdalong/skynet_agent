@@ -108,11 +108,20 @@ function Agent:_chat(user_input, on_text_delta, run)
             return nil, "用户已取消生成"
         end
         response = response or { output = { { role = "assistant", content = text } }, calls = {} }
+        local start = run.context_count or #self.messages
         turn.text[#turn.text + 1] = text
         for _, item in ipairs(response.output) do
             item = table.copy(item)
             item.source = "model"
             turn.messages[#turn.messages + 1] = item
+        end
+        if run.owner then
+            -- 每次完整模型响应只追加本轮新增的上下文。
+            local items = {}
+            for i = start + 1, #turn.messages do items[#items + 1] = turn.messages[i] end
+            run.owner:record("response", { run = run.id, items = items, text = text, calls = response.calls,
+                project = turn.project_instructions })
+            run.context_count = #turn.messages
         end
         if #response.calls == 0 then
             self.messages, self.project_instructions, self.turn = turn.messages, turn.project_instructions, nil
@@ -139,8 +148,14 @@ function Agent:_chat(user_input, on_text_delta, run)
                     history = turn.messages }, run, record)
                 turn.results[call.call_id] = { name = call.name, arguments = call.arguments, result = result }
             end
+            if run.owner and not saved then
+                local records = run.assistant.tool_calls or {}
+                run.owner:record("result", { run = run.id, id = call.call_id, result = result,
+                    tool = records[#records] and records[#records].id == call.call_id and records[#records] or nil })
+            end
             turn.messages[#turn.messages + 1] = { type = "function_call_output", call_id = call.call_id,
                 output = cjson.encode(result), source = "tool" }
+            run.context_count = #turn.messages
         end
         if run.cancelled then self.turn = nil; return nil, "用户已取消生成" end
     end

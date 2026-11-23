@@ -1,4 +1,5 @@
-local cjson = require("cjson")
+local cjson = require("cjson").new()
+cjson.decode_array_with_array_mt(true)
 local class = require("class")
 
 ---@class agent.llm.openai.sse.Event
