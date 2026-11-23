@@ -44,7 +44,7 @@ macOS 可通过 Homebrew 安装 OpenSSL；服务端默认从 Homebrew 查找，�
 修改公共 C 核心后重新构建并重启；Lua 的兼容方法修复可使用下文热更新。
 
 `make client-build PLATFORM=macos` 构建 macOS App，`make build` 同时构建服务端。
-`make client-dev PLATFORM=macos` 是统一的开发入口；不指定 PLATFORM 时根据当前操作系统选择。
+`make dev PLATFORM=macos` 是统一的开发入口；不指定 PLATFORM 时根据当前操作系统选择。
 `make client-platforms` 查询可构建状态，`make client-doctor` 查询锁定版本与构建主机。
 未接入的平台会在产生构建副作用前明确失败，不会回退到 macOS。
 `make client-core-test` 在具备 CMake、Node 和 C++17 编译器的主机上独立验证公共内核。
@@ -53,7 +53,7 @@ macOS 可通过 Homebrew 安装 OpenSSL；服务端默认从 Homebrew 查找，�
 本机构建使用 ad-hoc 签名，不启用要求 Team ID 的 Hardened Runtime 库校验。
 正式分发需配置同一开发者身份签名宿主与嵌入引擎、启用 Hardened Runtime 并公证。
 
-iPhone/iPad 使用 `make install PLATFORM=ios`、`make client-dev PLATFORM=ios`；
+iPhone/iPad 使用 `make install PLATFORM=ios`、`make dev PLATFORM=ios`；
 `SKYNET_IOS_DEVICE` 可指定模拟器名字或 UDID。`make client-build PLATFORM=ios`
 输出通用模拟器包，`make client-archive PLATFORM=ios` 输出默认未签名真机归档。
 签名、发行边界与移动端资源生命周期见平台接入文档。iOS 不安装动态包或执行手机本地开发工具。
@@ -106,6 +106,14 @@ docker build -f server/Dockerfile --target echo-fixture -t skynet-echo:local .
 
 App Center 按已批准的镜像 ID 启动容器，并注入 `APP_ID` 和注册凭据。应用加载协议与 Actor 后在本机回环地址监听随机端口，向 App Center 的 Cluster 端口报到。握手通过后 Gateway 安装路由。已在运行的应用直接与 Gateway 通信。
 
+Agent 更新后运行 `make -C server test-live`。它构建当前工作区的 Agent，连接当前 Compose 项目正在使用的 Gateway，列出本次构建、已批准、运行中的镜像 ID，以及待审申请编号和对应的镜像 ID。版本一致后，用 `local-agent-e2e` 用户打开会话、读取最近一页并请求更早的消息。首次没有历史时会用真实模型创建一轮样本，后续复用同一用户的数据。测试结束后服务继续运行。
+
+完成 Agent 端到端验收还需执行 `make macos-test-app`，通过 Computer Use 打开测试客户端，登录上一步输出的 Gateway 地址并操作本次改动涉及的功能。例如验收历史分页时，选择有多页历史的专用测试账号，打开会话，确认首屏显示最近的消息，再向上翻到开头，核对更早的消息和分页终点。记录实际看到的结果。
+
+要专门验证 Agent 重启前后的真实模型续聊，在仓库根目录执行 `server/tests/integration/live_smoke.sh`。该脚本使用独立的 Compose 项目。
+
+若本次镜像尚未提交，使用上面的 `appctl submit` 命令。若待审申请指向本次镜像，在应用中心批准它。若待审的是其他镜像，先核对那条申请的用途，再决定是否驳回。
+
 运行 `node client/tooling/docker-apps-e2e.mjs` 可在随机项目和端口复验在线登记、请求与通知、协议冲突、停用及故障恢复。脚本结束时回收该测试项目的容器和卷。
 
 ## 热更新
@@ -141,7 +149,7 @@ dbgcmd .client_1 HOTFIX client client.user
 | `make client-test` | 实际 JSC 子进程、权限、更新、故障、任务与本地 WebSocket 生命周期 |
 | `make client-test PLATFORM=ios` | 模拟器内独立 JSC VM、移动权限、前后台恢复与真实 WebKit 触控布局 |
 | `make check-full` | 基础回归、服务端集成、客户端原生集成与 Docker 跨应用验收 |
-| `make -C server test-live` | 服务端真实模型网关探针 |
+| `make -C server test-live` | 本机接口检查，核对 Agent 镜像、登录和历史分页；界面步骤通过 Computer Use 执行 |
 | `make build` | 服务端与最新 macOS Release 构建 |
 
 服务端集成覆盖 Protobuf 跨 VM、生命周期、RPC、管理命令、热修、工具进程与假模型网关。

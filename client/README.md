@@ -23,7 +23,7 @@ tooling/           构建、打包、架构检查、原生验收与应用模板
 `make client-build` 的产物位于 `client/dist/macos/Skynet Agent.app`，当前为本机架构和本地签名；
 公证、发布签名另行接入。
 
-使用 `make install PLATFORM=ios` 安装 iOS 工程依赖，`make client-dev PLATFORM=ios`
+使用 `make install PLATFORM=ios` 安装 iOS 工程依赖，`make dev PLATFORM=ios`
 运行 iPhone 模拟器；可用 `SKYNET_IOS_DEVICE` 指定 iPad 的名称或 UDID。
 `make client-build PLATFORM=ios` 生成通用模拟器包，
 `make client-archive PLATFORM=ios` 生成默认未签名的真机归档。

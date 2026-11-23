@@ -9,7 +9,7 @@ XCODE_DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 PLATFORM ?= $(shell node -p '({darwin:"macos",win32:"windows",linux:"linux"})[process.platform] || "unknown"')
 
 .NOTPARALLEL:
-.PHONY: help install dev build check check-full client-check client-build client-archive client-test macos-test-app client-dev client-core-test client-platforms client-doctor client-preflight
+.PHONY: help install dev build check check-full client-check client-build client-archive client-test macos-test-app client-core-test client-platforms client-doctor client-preflight
 
 help:
 	@printf '%s\n' \
@@ -25,7 +25,6 @@ help:
 		"  make macos-test-app 构建固定的 skynet agent test 客户端，供本机界面验收" \
 		"  make client-build   构建客户端；PLATFORM=ios 生成通用模拟器 App" \
 		"  make client-archive PLATFORM=ios 生成 iPhone/iPad 真机归档" \
-		"  make client-dev     按 PLATFORM 构建并启动客户端" \
 		"  make client-platforms 查看真实平台支持状态" \
 		"  make client-doctor  查看平台状态与锁定依赖版本" \
 		"  make client-core-test 独立验证共享 C++ 核心" \
@@ -37,7 +36,8 @@ install: client-preflight
 	@cd "$(CLIENT_DIR)" && "$(PNPM)" install --frozen-lockfile
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs install --platform "$(PLATFORM)"
 
-dev: client-dev
+dev:
+	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs dev --platform "$(PLATFORM)"
 
 macos-test-app:
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/macos.mjs test-app
@@ -73,9 +73,6 @@ client-build:
 
 client-archive:
 	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs archive --platform "$(PLATFORM)"
-
-client-dev:
-	@DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" node client/tooling/build.mjs dev --platform "$(PLATFORM)"
 
 client-preflight:
 	@node client/tooling/build.mjs build --platform "$(PLATFORM)" --preflight

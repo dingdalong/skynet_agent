@@ -112,8 +112,8 @@ function AgentSocket:request(name, args)
     end).payload
 end
 
-function AgentSocket:history(id)
-    local result = self:request("AgentSessionHistoryReq", { session_id = id })
+function AgentSocket:history(id, before)
+    local result = self:request("AgentSessionHistoryReq", { session_id = id, before = before })
     support.equal(result.ret, 1)
     return result.chat_session.session
 end

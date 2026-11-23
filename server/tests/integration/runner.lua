@@ -3,6 +3,7 @@ local config = require("integration.config")
 
 local probes = {
     agent_gateway_probe = true,
+    local_agent_probe = true,
     fake_llm_server = true,
     hotfix_watch_probe = true,
     service_control_probe = true,

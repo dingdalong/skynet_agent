@@ -12,5 +12,4 @@ lua、proto代码格式化脚本
 ---@field extensions table? 当前 Agent 轮次的工具快照，这个注释写的不好，不应该写table这种，要写详细的class
 子应用开发
 app_id用uuid，保证唯一
-把历史记录改成按会话分页拉取吧。登录时先拉会话列表，打开会话时加载最近的消息，往上翻再加载更早的。
 图片和大文件走 HTTP

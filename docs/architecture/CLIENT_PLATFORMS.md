@@ -42,7 +42,7 @@ C++ 核心当前只迁入工作区状态转换。原生 HostCore 仍持有连接
 `make client-core-test` 使用 CMake/CTest 独立验证公共 C++ 内核和 C ABI。
 CI 的 `client-core.yml` 提供 macOS、Linux、Windows 编译测试矩阵；未实际运行的 CI 不计作验证。
 
-完整客户端使用 `make client-build PLATFORM=macos`，开发入口为 `make client-dev PLATFORM=macos`。
+完整客户端使用 `make client-build PLATFORM=macos`，开发入口为 `make dev PLATFORM=macos`。
 其他平台完成宿主与资源适配、构建及实际验收后，才登记为 supported。
 本机入口封装平台工具链；未来全平台发布由各操作系统构建执行器汇总产物，
 不承诺一台 macOS 主机原生构建所有桌面平台。
@@ -50,7 +50,7 @@ CI 的 `client-core.yml` 提供 macOS、Linux、Windows 编译测试矩阵；未
 ### iPhone 与 iPad
 
 `make install PLATFORM=ios` 安装锁定的依赖。Xcode 工程随仓库维护。
-`make client-dev PLATFORM=ios` 构建并启动模拟器；`SKYNET_IOS_DEVICE` 可指定设备名称或 UDID。
+`make dev PLATFORM=ios` 构建并启动模拟器；`SKYNET_IOS_DEVICE` 可指定设备名称或 UDID。
 `make client-build PLATFORM=ios` 生成 `client/dist/ios-simulator/Skynet Agent.app`，
 同一包支持 iPhone 与 iPad。`make client-test PLATFORM=ios` 运行当前模拟器的原生集成测试。
 实际交互使用 Computer Use 验收。

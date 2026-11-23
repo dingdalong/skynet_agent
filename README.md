@@ -35,7 +35,7 @@ cp server/.env.example server/.env
 服务管理使用 `./server/control.sh status|stop|force-stop`。客户端通过系统菜单或 `⌘Q` 退出。
 连接配置、权限范围与恢复规则见 [Agent 客户端](docs/architecture/CLIENT_AGENT.md)。
 `make build` 构建服务端及正式 macOS 客户端，更多入口见 `make help`。
-运行 iOS 使用 `make install PLATFORM=ios`、`make client-dev PLATFORM=ios`；
+运行 iOS 使用 `make install PLATFORM=ios`、`make dev PLATFORM=ios`；
 指定 iPad、归档及能力边界见[平台接入](docs/architecture/CLIENT_PLATFORMS.md)。
 
 ## 文档

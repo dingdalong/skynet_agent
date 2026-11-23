@@ -87,7 +87,7 @@ help:
 		"  make test-agent-gateway    运行假模型与网关聊天测试" \
 		"  make test-service-runtime  验证服务命令、RPC 超时与热修" \
 		"  make test-service-control  验证状态查询和进程关闭" \
-		"  make test-live  通过网关调用真实 DeepSeek" \
+		"  make test-live  核对日常使用的 Agent 镜像并通过本机网关验证历史分页" \
 		"  make check      格式检查、单元测试与集成测试" \
 		"" \
 		"清理:" \
@@ -208,8 +208,8 @@ test-agent-gateway:
 test-probe-support:
 	@"$(PROJECT_ROOT)/tests/integration/run_probe.sh" probe_support_probe
 
-test-live: build
-	@"$(PROJECT_ROOT)/tests/integration/live_smoke.sh"
+test-live:
+	@sh "$(PROJECT_ROOT)/tests/integration/local_agent_smoke.sh"
 
 check-format:
 	@"$(PROJECT_ROOT)/tools/check_format.sh"

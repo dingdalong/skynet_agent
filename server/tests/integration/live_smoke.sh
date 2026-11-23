@@ -2,6 +2,7 @@
 set -eu
 
 server_root=$(CDPATH= cd -P "$(dirname "$0")/../.." && pwd)
+make -C "$server_root" build
 cd "$server_root/.."
 export COMPOSE_PROJECT_NAME="skynet-live-$(date +%s)-$$"
 ports=$(python3 -c 'import random,socket
