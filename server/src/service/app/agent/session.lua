@@ -214,7 +214,7 @@ function AgentSession:send_message(args, connection)
     local text = args.text
     if self.run then return failure(codes.server_busy, "该会话仍在生成", true) end
     if self.execution_target then
-        local ok, err = pcall(self.owner.app.execution.available, self.owner.app.execution,
+        local ok, err = pcall(self.owner.app.desktop_connections.available, self.owner.app.desktop_connections,
             self.execution_target, connection and connection.device_id)
         if not ok then return failure(codes.fail, tostring(err), true) end
     end
@@ -371,7 +371,7 @@ function AgentSession:set_execution(target, connection)
     assert(not self.read_only and not self.storage_failed, "会话仅可阅读")
     local tools = self.agent and self.agent.tools
     assert(not tools or not tools:has_active(), "请先停止后台进程")
-    target = self.owner.app.execution:validate_target(target, connection)
+    target = self.owner.app.desktop_connections:validate_target(target, connection)
     local workspace = target and target.directory or require("agent.workspace").create(
         config.tools.workspace_root, self.owner.app.identity.username, self.id)
     if not pcall(self.record, self, "target", { target = target, workspace = workspace }) then

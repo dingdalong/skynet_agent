@@ -367,7 +367,11 @@ function Store.restore(app)
                 app.default_model = doc.model_id
             elseif key:sub(1, 7) == "device/" and type(doc.name) == "string" then
                 local id = key:sub(8)
-                app.execution.devices[id] = { id = id, name = doc.name, remote_enabled = doc.remote_enabled == true }
+                app.desktop_connections.devices[id] = {
+                    id = id,
+                    name = doc.name,
+                    remote_enabled = doc.remote_enabled == true,
+                }
                 if valid_target(doc.target) and doc.target.device_id == id then app.targets[id] = doc.target end
             end
         end

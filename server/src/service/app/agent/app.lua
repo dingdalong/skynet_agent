@@ -1,7 +1,10 @@
 local class = require("class")
 local rpc = require("rpc")
 local Chat = require("agent.chat")
-local Execution = require("agent.execution")
+local DesktopConnections = require("agent.desktop_connections")
+local Client = require("agent.tools.runtime.client")
+local log = require("log")
+local codes = require("enum.error_code")
 local handler = require("agent.handler")
 local models = require("agent.models")
 local config = require("etc.cfg").agent
@@ -13,7 +16,8 @@ local config = require("etc.cfg").agent
 ---@field connections table<string, table>
 ---@field pending_runs table<agent.Run, boolean>
 ---@field chat agent.Chat
----@field execution agent.Execution
+---@field desktop_connections agent.DesktopConnections
+---@field pending_client_requests table<string, agent.ClientRequest>
 local App = class()
 
 function App:ctor(identity, router, templates, tool_registry)
@@ -26,7 +30,8 @@ function App:ctor(identity, router, templates, tool_registry)
     self.legacy_settings = {}
     self.targets = {}
     self.pending_runs = {}
-    self.execution = Execution:new(self)
+    self.desktop_connections = DesktopConnections:new(self)
+    self.pending_client_requests = {}
     self.chat = Chat:new(self, templates, self.pending_runs)
 end
 
@@ -34,7 +39,7 @@ function App:snapshot()
     return {
         user_id = self.identity.user_id,
         username = self.identity.username,
-        desktops = self.execution:snapshot(),
+        desktops = self.desktop_connections:snapshot(),
         chat_sessions = self.chat:snapshot(),
         models = models.public(config),
         default_model_id = self.default_model,
@@ -56,11 +61,38 @@ function App:handle_request(id, name, args)
     return method(self, args, connection)
 end
 
+function App:register_desktop(args, connection)
+    local device, failure = self.desktop_connections:register(args, connection)
+    if not device then return failure end
+    if not device.remote_enabled then
+        for _, session in pairs(self.chat.sessions) do
+            if session.execution_target and session.execution_target.device_id == device.id then
+                session:stop_other_device_runs()
+            end
+        end
+    end
+    self.desktop_connections:publish(device)
+    return { ret = codes.succ, target = self.targets[device.id] }
+end
+
+function App:disconnect_desktop(connection)
+    local device = self.desktop_connections:disconnect(connection)
+    if not device then return end
+    Client.fail_connection(self.pending_client_requests, connection)
+    for _, session in pairs(self.chat.sessions) do
+        if session.execution_target and session.execution_target.device_id == device.id and session.run then
+            log.info("execution", "disconnect", "device=%s session=%s", device.id, session.id)
+            session.run:cancel()
+        end
+    end
+    self.desktop_connections:publish(device)
+end
+
 function App:disconnect(id)
     local connection = self.connections[id]
     if connection then
         self.connections[id] = nil
-        self.execution:disconnect(connection)
+        self:disconnect_desktop(connection)
     end
 end
 

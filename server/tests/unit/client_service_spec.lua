@@ -68,7 +68,8 @@ describe("用户与客户端服务", function()
             ["agent.agent"] = Agent,
             ["agent.tools"] = { discover = function() return { specs = {}, by_name = {} } end },
             ["agent.persistence"] = false,
-            ["agent.execution"] = false,
+            ["agent.desktop_connections"] = false,
+            ["agent.tools.runtime.client"] = false,
             ["skynet.queue"] = function() return function(f, ...) return f(...) end end,
             ["agent.prompts"] = {
                 load_templates = function()
@@ -606,7 +607,7 @@ describe("用户与客户端服务", function()
         device.name = "Bob"
         assert.are.equal(codes.succ, request(2, "AgentDesktopRegisterReq", device, "b", 200).ret)
         local pending = { connection = apps.alice.connections.a }
-        apps.alice.execution.pending.call = pending
+        apps.alice.pending_client_requests.call = pending
         request(3, "AgentExecutionResultReq", { request_id = "call", result = "{}" }, "b", 200)
         assert.is_nil(pending.result)
         service:disconnect({ source = 200 }, "b")

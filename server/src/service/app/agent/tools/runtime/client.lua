@@ -1,9 +1,18 @@
 local class = require("class")
 local skynet = require("skynet")
+local crypt = require("skynet.crypt")
+local codes = require("enum.error_code")
+local cjson = require("cjson")
+
+---@class agent.ClientRequest
+---@field connection table
+---@field result table?
+---@field error string?
+
 ---@class agent.tools.runtime.Client
 ---@field target table
 ---@field owner agent.session.AgentSession
----@field controller agent.Execution
+---@field app agent.App
 ---@field records table<string, table>
 ---@field runs table<string, table>
 ---@field closed boolean
@@ -13,7 +22,7 @@ local Client = class()
 function Client:ctor(options)
     self.target = options.execution_target
     self.owner = options.owner
-    self.controller = self.owner.owner.app.execution
+    self.app = self.owner.owner.app
     self.records = {}
     self.runs = {}
     self.closed = false
@@ -24,9 +33,73 @@ function Client:ctor(options)
     }
 end
 
-function Client:invoke(operation, args, run, id)
-    return self.controller:invoke(self.target, operation, args, run, id,
-        run.source_device)
+function Client:invoke(operation, args, run, call_id)
+    local target, source_device = self.target, run.source_device
+    local control = operation == "cancel" or operation == "status"
+    local connection, authorization_id = self.app.desktop_connections:available(target,
+        control and target.device_id or source_device)
+    local id = crypt.hexencode(crypt.randomkey()) .. "-" .. tostring(skynet.genid())
+    local pending = { connection = connection }
+    local message = {
+        request_id = id,
+        session_id = run.session_id or "",
+        run_id = run.id or "",
+        tool_call_id = call_id or "",
+        operation = operation,
+        arguments = cjson.encode(args),
+        workspace_id = target.workspace_id,
+        remote = source_device ~= target.device_id,
+        authorization_id = authorization_id
+    }
+    local requests = self.app.pending_client_requests
+    requests[id] = pending
+    local sent, code = pcall(self.app.publish, self.app, "AgentExecutionActionNtf", message, connection.id)
+    if not sent or code ~= codes.succ then
+        requests[id] = nil
+        error("桌面执行请求发送失败")
+    end
+    local timeout = operation == "execute" and args.name == "apply_patch"
+        and args.limits and args.limits.timeout_ms or 30000
+    local deadline = skynet.now() + math.ceil(timeout / 10) + 1000
+    while not pending.result and not pending.error and skynet.now() < deadline do
+        skynet.sleep(1)
+    end
+    requests[id] = nil
+    assert(pending.result, pending.error or "桌面执行中断，执行结果未确认；不会自动重放")
+    return pending.result
+end
+
+---同一用户的会话共享回执入口，只有发出请求时绑定的连接可以完成请求。
+---@param requests table<string, agent.ClientRequest>
+function Client.receive_result(requests, args, connection)
+    local pending = requests[args.request_id]
+    if not pending then return { ret = codes.succ } end
+    if pending.connection ~= connection then return { ret = codes.fail } end
+    if pending.result or pending.error then return { ret = codes.succ } end
+    assert(type(args.result) == "string" and #args.result <= 1048576, "执行结果过大")
+    local value = cjson.decode(args.result)
+    assert(type(value) == "table", "执行结果无效")
+    local function normalize(item)
+        for key, field in pairs(item) do
+            if field == cjson.null then
+                item[key] = nil
+            elseif type(field) == "table" then
+                normalize(field)
+            end
+        end
+    end
+    normalize(value)
+    pending.result = value
+    return { ret = codes.succ }
+end
+
+---@param requests table<string, agent.ClientRequest>
+function Client.fail_connection(requests, connection)
+    for _, pending in pairs(requests) do
+        if pending.connection == connection and not pending.result then
+            pending.error = "目标桌面离线，执行结果未确认"
+        end
+    end
 end
 
 function Client:project(run, max_bytes)

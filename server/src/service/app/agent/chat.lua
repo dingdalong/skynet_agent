@@ -63,7 +63,7 @@ function Chat:chat(args, connection)
     if type(config.llm.api_key) ~= "string" or config.llm.api_key == "" then
         return failure(codes.call_fail, "模型配置未加载", true)
     end
-    local valid, target = pcall(self.app.execution.validate_target, self.app.execution,
+    local valid, target = pcall(self.app.desktop_connections.validate_target, self.app.desktop_connections,
         args.execution_target, connection)
     if not valid then return failure(codes.invalid_param, tostring(target)) end
     local ok, session = pcall(AgentSession.new, AgentSession, self, model_id, target)

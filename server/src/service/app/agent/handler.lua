@@ -1,5 +1,6 @@
 local codes = require("enum.error_code")
 local log = require("log")
+local Client = require("agent.tools.runtime.client")
 local REQUEST = {}
 
 function REQUEST:AgentSnapshotReq()
@@ -32,7 +33,8 @@ function REQUEST:AgentPreferenceSetReq(args, connection)
     local store = require("agent.persistence")
     if args.set_target then
         if not connection.device_id then return { ret = codes.invalid_param } end
-        local ok, target = pcall(self.execution.validate_target, self.execution, args.target, connection)
+        local ok, target = pcall(self.desktop_connections.validate_target, self.desktop_connections, args.target,
+            connection)
         if not ok then return { ret = codes.invalid_param, error = { message = "工作目录无效" } } end
         store.settings(self, "device/" .. connection.device_id, { target = target or {} })
         self.targets[connection.device_id] = target
@@ -46,18 +48,18 @@ function REQUEST:AgentPreferenceSetReq(args, connection)
     return { ret = codes.succ, model_id = args.model_id }
 end
 
-local function attempt(method, self, args, connection)
-    local ok, result = pcall(method, self.execution, args, connection)
+local function attempt(method, owner, args, connection)
+    local ok, result = pcall(method, owner, args, connection)
     if ok then return result end
     log.failure("execution", "request", result)
     return { ret = codes.invalid_param, error = { message = tostring(result):match("[^\n]+$"), retryable = false } }
 end
 function REQUEST:AgentDesktopRegisterReq(args, connection)
-    return attempt(self.execution.register, self, args, connection)
+    return attempt(self.register_desktop, self, args, connection)
 end
 
 function REQUEST:AgentExecutionResultReq(args, connection)
-    return attempt(self.execution.result, self, args, connection)
+    return attempt(Client.receive_result, self.pending_client_requests, args, connection)
 end
 
 function REQUEST:AgentSessionExecutionSetReq(args, connection)
