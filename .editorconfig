@@ -9,6 +9,10 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
+[*.lua]
+# 这是 Lua 格式化器的扩展选项，关闭换行自动识别后，已有的 CRLF 也会按 end_of_line = lf 转成 LF。
+detect_end_of_line = false
+
 [*.md]
 trim_trailing_whitespace = false
 

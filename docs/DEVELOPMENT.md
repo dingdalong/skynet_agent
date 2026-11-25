@@ -162,6 +162,7 @@ dbgcmd .client_1 HOTFIX client client.user
 | --- | --- |
 | `make format` | 单独格式化本次新增、修改或重命名的自有 Lua 和 proto 文件（含未跟踪文件），结果写入工作区，暂存由开发者处理 |
 | `make format SCOPE=all` | 格式化全部自有 Lua 和 proto，包括未改动及新建未被忽略的文件，跳过第三方库及构建产物 |
+| `make -C server check-format` | 检查文件换行和行尾空白，其中 Lua 和 proto 与 `make format SCOPE=all` 共用同一份文件清单 |
 | `make check` | 自动格式化本次改动的 Lua 和 proto，再运行服务端格式检查、单元测试（含公共协议和固定二进制向量）和客户端基础检查 |
 | `make -C server check` | 服务端格式、单元测试及全部服务端集成 |
 | `make client-check` | 格式、TypeScript、令牌、导入边界、几何逻辑与原生进程集成 |

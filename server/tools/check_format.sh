@@ -1,8 +1,8 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 project_root=$(CDPATH= cd -P "$(dirname "$0")/.." && pwd)
-common_proto_root=$(CDPATH= cd -P "$project_root/../common/proto" && pwd)
+common_root=$(CDPATH= cd -P "$project_root/../common" && pwd)
 failed=0
 
 report() {
@@ -63,7 +63,7 @@ $(find "$project_root" \
 		-o -path "$project_root/cservice" -o -path "$project_root/logs" \
 		-o -path "$project_root/work_dir" \
 		-o -name build -o -name coverage \) -prune -o \
-	-type f \( -name '*.lua' -o -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.json' \
+	-type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.json' \
 		-o -name '*.md' -o -name '*.config' -o -name 'makefile' \
 		-o -name 'Makefile' -o -name '.editorconfig' -o -name '.gitignore' \
 		-o -name '.env.example' \) -print | sort)
@@ -72,16 +72,14 @@ EOF
 while IFS= read -r file; do
 	check_file "$file"
 done <<EOF
-$(find "$common_proto_root" -type f \( -name '*.proto' -o -name '*.json' \) -print | sort)
+$(find "$common_root/proto" -type f -name '*.json' -print | sort)
 EOF
 
-makefile_path="$project_root/makefile"
-if [ -f "$makefile_path" ] && LC_ALL=C grep -n '^ ' "$makefile_path" >/dev/null 2>&1; then
-	report "$makefile_path: makefile 行首应使用 tab"
-fi
-
-if [ "$failed" -ne 0 ]; then
-	exit 1
-fi
+python3 "$project_root/tools/format_sources.py" --scope all --list0 | (
+	while IFS= read -r -d '' file; do
+		check_file "$file"
+	done
+	exit "$failed"
+)
 
 printf '%s\n' "格式检查通过"

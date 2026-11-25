@@ -10,25 +10,19 @@ import sys
 
 
 def source_files(root, scope):
-    paths = set()
-    patterns = [
-        "--", "*.lua", "*.proto",
-        ":(exclude)server/3rd/**",
-        ":(exclude)client/vendor/**",
-        ":(exclude,glob)**/node_modules/**",
-        ":(exclude,glob)**/Pods/**",
-        ":(exclude).build/**",
-    ]
-    if scope == "all":
-        queries = [["ls-files", "--cached", "--others", "--exclude-standard"]]
-    else:
-        queries = [
-            ["diff", "--cached", "--name-only", "--no-renames", "--diff-filter=AMT"],
-            ["ls-files", "--modified", "--others", "--exclude-standard"],
-        ]
-    for args in queries:
+    patterns = ["--", "*.lua", "*.proto", ":(exclude,glob)server/3rd/**", ":(exclude,glob).agents/skills/**"]
+
+    def git_paths(*args):
         output = subprocess.check_output(["git", *args, "-z", *patterns], cwd=root)
-        paths.update(root / os.fsdecode(name) for name in output.split(b"\0") if name)
+        return {root / os.fsdecode(name) for name in output.split(b"\0") if name}
+
+    if scope == "all":
+        paths = git_paths("ls-files", "--cached", "--others", "--exclude-standard")
+    else:
+        paths = git_paths("diff", "--cached", "--name-only", "--no-renames", "--diff-filter=AMT")
+        paths.update(git_paths("ls-files", "--modified", "--others", "--exclude-standard"))
+    # 已跟踪文件只按项目的 .gitignore 排除，个人忽略配置不能遮住项目源码。
+    paths.difference_update(git_paths("ls-files", "--cached", "--ignored", "--exclude-per-directory=.gitignore"))
     return sorted(path for path in paths if path.is_file() and path.resolve() == path)
 
 
@@ -72,9 +66,14 @@ def proto_command():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("changed", "all"), default="changed")
+    parser.add_argument("--list0", action="store_true", help="仅列出文件路径，以 NUL 分隔")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     paths = source_files(root, args.scope)
+    if args.list0:
+        for path in paths:
+            sys.stdout.buffer.write(os.fsencode(path) + b"\0")
+        return
     server = lua_server() if any(path.suffix == ".lua" for path in paths) else None
     proto = proto_command() if any(path.suffix == ".proto" for path in paths) else None
     for path in paths:

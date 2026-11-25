@@ -1,10 +1,4 @@
-.env
-*.log
-*.pid
-*.dSYM/
-cservice/
-logs/
-luaclib/
-bin/
-work_dir/
-build/
+/logs/
+/luaclib/
+/bin/
+/work_dir/
