@@ -3,7 +3,7 @@ local class = require("class")
 local cjson = require("cjson")
 local Arguments = require("agent.tools.arguments")
 local lfs = require("lfs")
-local Processes = require("agent.process")
+local Runtime = require("agent.tools.runtime")
 local Judge = require("agent.permission.llm_judge")
 local rules = require("agent.permission.rules")
 local log = require("log")
@@ -50,8 +50,7 @@ local log = require("log")
 ---@field permission agent.PermissionConfig
 ---@field owner agent.session.AgentSession?
 ---@field session_id string
----@field remote boolean
----@field processes agent.Processes|agent.Remote
+---@field runtime agent.ToolRuntime
 ---@field judge agent.PermissionJudge
 local Tools = class()
 
@@ -61,9 +60,7 @@ function Tools:ctor(options, llm_config)
     self.registry = options.tool_registry
     self.root, self.config, self.permission = options.workspace, options.tools, options.permission
     self.owner, self.session_id = options.owner, options.session_id
-    self.remote = options.execution_target ~= nil
-    self.processes = self.remote and require("agent.remote"):new(options)
-        or Processes:new(self.root, self.config, self.owner, self.session_id)
+    self.runtime = Runtime.new(options)
     self.judge = Judge:new(llm_config, self.permission, options.prompt_templates)
 end
 
@@ -111,17 +108,10 @@ end
 ---@return table
 function Tools:execute(call, context, run, record)
     local ok, result = xpcall(function()
-        if self.remote then
-            self.processes.current_run, self.processes.current_call_id = run, call.call_id
-        end
         local args = cjson.decode(call.arguments)
         local tool = assert(self.registry.by_name[call.name], "未知工具: " .. tostring(call.name))
         local action = Arguments.prepare(tool, args, self.root, self.config)
-        if self.remote then
-            action = self.processes:prepare(call.name, args)
-        else
-            tool.prepare(action, self.processes)
-        end
+        action = self.runtime:prepare(tool, action, run, record)
         action.arguments = call.arguments
         record.working_directory = action.cwd or self.root
         record.permission_mode = action.mode
@@ -137,8 +127,7 @@ function Tools:execute(call, context, run, record)
             return { ok = false, error = reason }
         end
         record.permission_mode = action.mode
-        if self.remote then return self.processes:execute(call.name, args, action, run, record) end
-        return tool.execute(action, self.processes, run, record)
+        return self.runtime:execute(tool, action, run, record)
     end, debug.traceback)
     if not ok then
         local detail = tostring(result):match("^[^\n]+") or "未知错误"
@@ -152,15 +141,11 @@ function Tools:execute(call, context, run, record)
 end
 
 function Tools:has_active()
-    return self.processes:has_active()
-end
-
-function Tools:stop_remote(device_id)
-    if self.remote then self.processes:stop_remote(device_id) end
+    return self.runtime:has_active()
 end
 
 function Tools:close()
-    self.processes:close()
+    self.runtime:close()
 end
 
 return Tools

@@ -44,7 +44,7 @@ describe("桌面执行设备与路由", function()
         local stopped = 0
         user.chat.sessions.s1 = {
             execution_target = { device_id = "desktop" },
-            stop_remote = function() stopped = stopped + 1 end
+            stop_other_device_runs = function() stopped = stopped + 1 end
         }
         local first, second = { id = "first" }, { id = "second" }
         execution:register({
@@ -97,10 +97,50 @@ describe("桌面终端续写状态", function()
     local scope
     after_each(function() if scope then scope:restore() end end)
 
+    it("同一工作目录按每次调用的来源授权，撤销跨设备访问只取消对应进程", function()
+        local requests = {}
+        scope = Scope.new({
+            ["agent.tools.runtime.client"] = false,
+            skynet = { fork = function() end },
+        })
+        local controller = {
+            invoke = function(_, _, operation, args, run, call_id, source)
+                requests[#requests + 1] = { operation, run.id, call_id, source }
+                if operation == "project" then return { ok = true, project = { workspace = "/project" } } end
+                if operation == "prepare" then return { ok = true, action = { cwd = "/project" } } end
+                if operation == "execute" then
+                    assert.are.same({ cmd = "pwd" }, args.args)
+                    return { session_id = run.id .. "-process" }
+                end
+                return { ok = true }
+            end
+        }
+        local runtime = require("agent.tools.runtime").new({
+            tools = {}, execution_target = { device_id = "mac" }, owner = { owner = { app = { execution = controller } } },
+        })
+        local command = { spec = { name = "exec_command" } }
+        local function launch(id, source)
+            local run = { id = id, source_device = source, executions = {} }
+            local record = { id = id .. "-call" }
+            runtime:project(run, 1024)
+            local action = runtime:prepare(command, { args = { cmd = "pwd" } }, run, record)
+            runtime:execute(command, action, run, record)
+        end
+        launch("local", "mac")
+        launch("other", nil)
+        runtime:stop_other_device_runs()
+        assert.are.same({
+            { "project", "local", nil,          "mac" }, { "prepare", "local", "local-call", "mac" },
+            { "execute", "local", "local-call", "mac" }, { "project", "other" },
+            { "prepare", "other", "other-call" }, { "execute", "other", "other-call" },
+            { "cancel",  "other", "other-call" },
+        }, requests)
+    end)
+
     it("续写复用原进程跟踪并更新两条工具记录", function()
         local watchers, updates = {}, {}
         scope = Scope.new({
-            ["agent.remote"] = false,
+            ["agent.tools.runtime.client"] = false,
             skynet = {
                 fork = function(callback) watchers[#watchers + 1] = callback end,
                 sleep = function() end,
@@ -112,7 +152,7 @@ describe("桌面终端续写状态", function()
                 return { done = true, output = "final", exit_code = 0 }
             end
         }
-        local remote = require("agent.remote"):new({
+        local runtime = require("agent.tools.runtime").new({
             tools = {},
             execution_target = {},
             owner = {
@@ -120,14 +160,14 @@ describe("桌面终端续写状态", function()
                 _on_tool_update = function(_, _, record) updates[#updates + 1] = record end,
             }
         })
-        local run = { id = "run", processes = {}, message_id = "message", source_device = "desktop" }
+        local run = { id = "run", executions = {}, message_id = "message", source_device = "desktop" }
         local original, continuation = { id = "first" }, { id = "second" }
-        remote:execute("exec_command", {}, {}, run, original)
-        remote:execute("write_stdin", {}, {}, run, continuation)
+        runtime:execute({ spec = { name = "exec_command" } }, { args = {} }, run, original)
+        runtime:execute({ spec = { name = "write_stdin" } }, { args = {} }, run, continuation)
         assert.are.equal(1, #watchers)
-        assert.is_true(remote:has_active())
+        assert.is_true(runtime:has_active())
         watchers[1]()
-        assert.is_false(remote:has_active())
+        assert.is_false(runtime:has_active())
         assert.are.equal("completed", original.status)
         assert.are.equal("completed", continuation.status)
         assert.are.equal("final", original.output)

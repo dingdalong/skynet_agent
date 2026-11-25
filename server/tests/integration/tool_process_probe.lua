@@ -4,7 +4,7 @@ local workspace = require("agent.workspace")
 local cjson = require("cjson")
 local lfs = require("lfs")
 local skynet = require("skynet")
-local Processes = require("agent.process")
+local Runtime = require("agent.tools.runtime")
 local Run = require("agent.run")
 
 skynet.start(function()
@@ -15,11 +15,12 @@ skynet.start(function()
         local directory = workspace.create(root, "probe", "session-probe")
         local server = assert(filesystem.realpath("."))
 
-        local processes = Processes:new(directory, {
+        local config = {
             max_processes = 8,
             timeout_ms = 300000,
             max_output_bytes = 1048576
-        }, nil, "probe")
+        }
+        local processes = Runtime.new({ workspace = directory, tools = config, session_id = "probe" })
         local function run(argv, mode, tty, input, dependencies, extra_env)
             local request = Run:new()
             request.message_id = "probe-message"
@@ -62,7 +63,11 @@ skynet.start(function()
             false, "use_default", 5000, timed_run, { output = "" })
         assert(not pcall(processes.start, processes, { "/bin/bash", "-c", "printf never" }, directory,
             false, "use_default", 5000, timed_run, { output = "" }), "运行进程数量限制失效")
-        local other = Processes:new(workspace.create(root, "probe", "session-other"), processes.config, nil, "other")
+        local other = Runtime.new({
+            workspace = workspace.create(root, "probe", "session-other"),
+            tools = config,
+            session_id = "other"
+        })
         assert(processes:has_active() and not other:has_active(), "后台进程状态跨会话混用")
         assert(not pcall(other.get, other, limit_process.id), "其他会话能访问本会话的进程")
         other:close()

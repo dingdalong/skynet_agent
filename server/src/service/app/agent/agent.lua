@@ -90,9 +90,8 @@ function Agent:_chat(user_input, on_text_delta, run)
     if not turn then
         -- 新任务读取失败时也不能误复用上一次失败任务的轮次。
         self.turn = nil
-        local instructions = self.options and (self.options.execution_target
-            and self.tools.processes:project(run, self.options.project_instructions_max_bytes or 32768)
-            or project.load(self.options.workspace, self.options.project_instructions_max_bytes or 32768)) or nil
+        local instructions = self.tools and
+            self.tools.runtime:project(run, self.options.project_instructions_max_bytes or 32768)
         turn = {
             messages = table.copy(self.messages),
             text = {},

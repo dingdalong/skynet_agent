@@ -70,7 +70,7 @@ function Execution:register(args, connection)
     if not device.remote_enabled then
         for _, session in pairs(self.app.chat.sessions) do
             if session.execution_target and session.execution_target.device_id == device.id then
-                session:stop_remote()
+                session:stop_other_device_runs()
             end
         end
     end

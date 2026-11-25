@@ -360,10 +360,10 @@ function AgentSession:cancel_run(args)
     return { ret = codes.succ }
 end
 
-function AgentSession:stop_remote()
+function AgentSession:stop_other_device_runs()
     if self.run and self.run.source_device ~= self.execution_target.device_id then self.run:cancel() end
     local tools = self.agent and self.agent.tools
-    if tools then tools:stop_remote(self.execution_target.device_id) end
+    if tools then tools.runtime:stop_other_device_runs() end
 end
 
 function AgentSession:set_execution(target, connection)

@@ -4,20 +4,43 @@ local filesystem = require("agent_filesystem")
 local skynet = require("skynet")
 local socket = require("skynet.socket")
 local sandbox = require("agent.sandbox")
+local project = require("agent.prompts.project")
 local log = require("log")
 
----@class agent.Processes
-local Processes = class()
+---@class agent.tools.runtime.Server
+---@field root string
+---@field config agent.ToolConfig
+---@field owner agent.session.AgentSession?
+---@field session_id string
+---@field processes table<string, table>
+---@field sequence integer
+---@field closed boolean
+---@field launcher string
+local Server = class()
 
-function Processes:ctor(root, config, owner, session_id)
-    self.root, self.config, self.owner, self.session_id = root, config, owner, session_id
+function Server:ctor(options)
+    self.root, self.config = options.workspace, options.tools
+    self.owner, self.session_id = options.owner, options.session_id
     self.processes, self.sequence, self.closed = {}, 0, false
     self.launcher = assert(filesystem.realpath("bin/process_launcher"))
-    log.info("agent.process", "init", "session=%s sandbox=%s max_processes=%d timeout_ms=%d",
-        session_id, sandbox.platform(), config.max_processes, config.timeout_ms)
+    log.info("agent.tools.runtime.server", "init", "session=%s sandbox=%s max_processes=%d timeout_ms=%d",
+        self.session_id, sandbox.platform(), self.config.max_processes, self.config.timeout_ms)
 end
 
-function Processes:publish(process)
+function Server:project(_, max_bytes)
+    return project.load(self.root, max_bytes)
+end
+
+function Server:prepare(tool, action)
+    tool.prepare(action, self)
+    return action
+end
+
+function Server:execute(tool, action, run, record)
+    return tool.execute(action, self, run, record)
+end
+
+function Server:publish(process)
     if self.owner then self.owner:_on_tool_update(process.message_id, process.record) end
 end
 
@@ -35,7 +58,7 @@ local function text_bytes(bytes, final)
     return table.concat(output):gsub("[%z\1-\8\11\12\14-\31\127]", ""), bytes:sub(index)
 end
 
-function Processes:_append(process, bytes)
+function Server:_append(process, bytes)
     process.dirty = true
     local cap = self.config.max_output_bytes
     process.pending = process.pending .. bytes
@@ -53,7 +76,7 @@ function Processes:_append(process, bytes)
     end
 end
 
-function Processes:_read(process, id)
+function Server:_read(process, id)
     local pending = ""
     local ok, err = pcall(function()
         while true do
@@ -65,13 +88,13 @@ function Processes:_read(process, id)
         end
         if pending ~= "" then self:_append(process, text_bytes(pending, true)) end
     end)
-    if not ok then log.failure("agent.process", "read session=" .. process.id, err) end
+    if not ok then log.failure("agent.tools.runtime.server", "read session=" .. process.id, err) end
     local closed, close_error = pcall(socket.close, id)
-    if not closed then log.failure("agent.process", "close fd=" .. tostring(id), close_error) end
+    if not closed then log.failure("agent.tools.runtime.server", "close fd=" .. tostring(id), close_error) end
     process.readers = process.readers - 1
 end
 
-function Processes:_watch(process)
+function Server:_watch(process)
     while process.exit_code == nil do
         if skynet.now() >= process.deadline and not process.stopping then
             process.record.error, process.timed_out = "命令执行超时", true
@@ -90,7 +113,7 @@ function Processes:_watch(process)
     process.record.status = (process.timed_out or process.start_failed) and "failed" or process.stopping and "cancelled"
         or process.exit_code == 0 and "completed" or "failed"
     if process.exit_code ~= 0 then
-        log.info("agent.process", "exit", "process=%s mode=%s code=%d status=%s",
+        log.info("agent.tools.runtime.server", "exit", "process=%s mode=%s code=%d status=%s",
             process.id, process.mode or "use_default", process.exit_code, process.record.status)
     end
     process.handle:close()
@@ -98,7 +121,7 @@ function Processes:_watch(process)
     self:publish(process)
 end
 
-function Processes:start(argv, cwd, tty, mode, timeout, run, record, dependencies, extra_env)
+function Server:start(argv, cwd, tty, mode, timeout, run, record, dependencies, extra_env)
     assert(not self.closed, "工具执行器已经关闭")
     local active, count = 0, 0
     for id, process in pairs(self.processes) do
@@ -130,7 +153,7 @@ function Processes:start(argv, cwd, tty, mode, timeout, run, record, dependencie
         readers = 0
     }
     self.processes[id] = process
-    run.processes[id] = self
+    run.executions[id] = self
     record.process_id, record.status = id, "running"
     local attached, attach_error = pcall(function()
         process.output_id = socket.bind(output)
@@ -152,11 +175,11 @@ function Processes:start(argv, cwd, tty, mode, timeout, run, record, dependencie
     return process
 end
 
-function Processes:get(id)
+function Server:get(id)
     return assert(self.processes[id], "执行会话不存在或不属于当前聊天会话")
 end
 
-function Processes:collect(process, duration, max_tokens, input)
+function Server:collect(process, duration, max_tokens, input)
     if input and input ~= "" then
         assert(not process.done and process.tty, "执行会话输入已关闭，交互命令请使用 tty=true")
         assert(socket.write(process.output_id, input), "写入终端失败")
@@ -182,31 +205,31 @@ function Processes:collect(process, duration, max_tokens, input)
     }
 end
 
-function Processes:collect_result(process, action, record)
+function Server:collect_result(process, action, record)
     local response = self:collect(process, action.wait_ms, action.max_tokens, action.args.chars)
     record.status = response.session_id and "running" or process.record.status
     record.exit_code, record.output = response.exit_code, response.output
     return response
 end
 
-function Processes:terminate(id)
+function Server:terminate(id)
     local process = self.processes[id]
     if process and not process.done then
         process.stopping = true; process.handle:terminate()
     end
 end
 
-function Processes:has_active()
+function Server:has_active()
     for _, process in pairs(self.processes) do
         if not process.done then return true end
     end
     return false
 end
 
-function Processes:close()
+function Server:close()
     self.closed = true
     for id in pairs(self.processes) do self:terminate(id) end
     for _, process in pairs(self.processes) do while not process.done do skynet.sleep(1) end end
 end
 
-return Processes
+return Server

@@ -4,7 +4,7 @@ local class = require("class")
 ---@field cancelled boolean
 ---@field llm_request llm.Request?
 ---@field permission_request llm.Request?
----@field processes table<string, agent.Processes|agent.Remote>
+---@field executions table<string, agent.ToolRuntime> 按运行或进程 ID 取消调用
 ---@field id string
 ---@field session_id string?
 ---@field owner agent.session.AgentSession?
@@ -16,7 +16,7 @@ local class = require("class")
 local Run = class()
 
 function Run:ctor()
-    self.cancelled, self.processes = false, {}
+    self.cancelled, self.executions = false, {}
     self.llm_request = nil
     self.permission_request = nil
     self.close_error = nil
@@ -38,7 +38,7 @@ function Run:cancel()
     local main, permission = self.llm_request, self.permission_request
     local ok = not main or main:cancel()
     if permission and not permission:cancel() then ok = false end
-    for id, processes in pairs(self.processes) do processes:terminate(id) end
+    for id, runtime in pairs(self.executions) do runtime:terminate(id) end
     self.close_error = main and main.close_error or permission and permission.close_error
     return ok
 end

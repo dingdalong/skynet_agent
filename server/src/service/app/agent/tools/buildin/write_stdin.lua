@@ -26,7 +26,7 @@ end
 
 function Stdin.execute(action, processes, run, record)
     local process = processes:get(action.args.session_id)
-    run.processes[process.id] = processes
+    run.executions[process.id] = processes
     record.process_id, record.status = process.id, "running"
     return processes:collect_result(process, action, record)
 end

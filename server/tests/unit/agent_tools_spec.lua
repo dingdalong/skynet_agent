@@ -51,7 +51,10 @@ describe("Agent 工作区与内置工具", function()
             end
             scope = Scope.new({
                 ["agent.tools"] = false,
-                ["agent.process"] = { new = function() return {} end },
+                skynet = {},
+                ["agent.tools.runtime.server"] = false,
+                ["agent.sandbox"] = { platform = function() return "test" end },
+                ["skynet.socket"] = {},
                 ["agent.permission.llm_judge"] = {
                     new = function()
                         return { decide = function() return true end }
@@ -134,7 +137,9 @@ describe("Agent 权限判断", function()
             local scope = Scope.new({
                 ["agent.tools"] = false,
                 log = { info = function() end, failure = function() end },
-                ["agent.process"] = { new = function() return {} end },
+                ["agent.tools.runtime.server"] = false,
+                ["agent.sandbox"] = { platform = function() return "test" end },
+                ["skynet.socket"] = {},
                 ["agent.permission.llm_judge"] = {
                     new = function(_, _, _, prompt_templates)
                         assert.are.equal(templates, prompt_templates)
@@ -170,7 +175,9 @@ describe("Agent 权限判断", function()
         local scope = Scope.new({
             ["agent.tools"] = false,
             log = { info = function() end, failure = function() end },
-            ["agent.process"] = { new = function() return {} end },
+            ["agent.tools.runtime.server"] = false,
+            ["agent.sandbox"] = { platform = function() return "test" end },
+            ["skynet.socket"] = {},
             ["agent.permission.llm_judge"] = {
                 new = function()
                     return { decide = function() error("规则阻止后不能调用模型") end }

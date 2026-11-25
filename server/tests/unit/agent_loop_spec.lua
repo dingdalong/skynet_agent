@@ -1,5 +1,4 @@
 local FakeLlm = require("tests.support.fake_llm")
-local project = require("agent.prompts.project")
 local templates = { base = "system", tools = "工具", permissions = "权限", permission_judge = "判断" }
 
 describe("Agent 工具循环检查点", function()
@@ -9,7 +8,15 @@ describe("Agent 工具循环检查点", function()
         effects, calls = 0, 0
         instructions, loads, load_error = { workspace = "/test" }, 0, nil
         local Tools = require("class")()
-        function Tools:ctor() end
+        function Tools:ctor()
+            self.runtime = {
+                project = function()
+                    loads = loads + 1
+                    if load_error then error(load_error, 0) end
+                    return table.deep_copy(instructions)
+                end
+            }
+        end
 
         function Tools:execute()
             effects = effects + 1
@@ -20,14 +27,6 @@ describe("Agent 工具循环检查点", function()
             ["agent.agent"] = false,
             ["agent.tools"] = Tools,
             ["agent.sandbox"] = { platform = function() return "macos" end },
-            ["agent.prompts.project"] = {
-                update = project.update,
-                load = function()
-                    loads = loads + 1
-                    if load_error then error(load_error, 0) end
-                    return table.deep_copy(instructions)
-                end,
-            }
         })
         fake_llm.response_handler = function(_, input)
             calls = calls + 1
