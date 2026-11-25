@@ -63,7 +63,7 @@ BUSTED_CPATH := ./luaclib/?.so
 
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。
 .NOTPARALLEL:
-.PHONY: help build check check-format test test-integration test-probe-support test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
+.PHONY: help build format format-changed check check-basic check-format test test-integration test-probe-support test-protobuf-shared test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control test-tool-process test-live \
 	cjson protobuf lfs process filesystem native test-native linux macosx freebsd mingw check-openssl mingw-cjson mingw-protobuf mingw-lfs mingw-tls \
 	clean cleanall
 
@@ -88,7 +88,10 @@ help:
 		"  make test-service-runtime  验证服务命令、RPC 超时与热修" \
 		"  make test-service-control  验证状态查询和进程关闭" \
 		"  make test-live  核对日常使用的 Agent 镜像并通过本机网关验证历史分页" \
-		"  make check      格式检查、单元测试与集成测试" \
+		"  make format      格式化本次改动的 Lua 和 proto 文件" \
+		"  make format SCOPE=all 格式化全部自有 Lua 和 proto 文件" \
+		"  make check-basic 自动格式化、格式检查与单元测试" \
+		"  make check       基础检查与集成测试" \
 		"" \
 		"清理:" \
 		"  make clean      删除编译产物" \
@@ -211,6 +214,13 @@ test-probe-support:
 test-live:
 	@sh "$(PROJECT_ROOT)/tests/integration/local_agent_smoke.sh"
 
+format: SCOPE = changed
+format:
+	@python3 "$(PROJECT_ROOT)/tools/format_sources.py" --scope "$(SCOPE)"
+
+format-changed:
+	@python3 "$(PROJECT_ROOT)/tools/format_sources.py" --scope changed
+
 check-format:
 	@"$(PROJECT_ROOT)/tools/check_format.sh"
 
@@ -229,7 +239,9 @@ test-service-control:
 
 test-integration: build test-tool-process test-protobuf-shared test-probe-support test-agent-gateway test-hotfix-watch test-hotfix-runtime test-service-runtime test-service-control
 
-check: check-format test test-integration
+check-basic: format-changed check-format test
+
+check: check-basic test-integration
 
 clean:
 	@-$(MAKE) -C "$(SKYNET_DIR)" clean

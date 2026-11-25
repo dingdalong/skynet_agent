@@ -10,12 +10,17 @@ describe("Agent 工具循环检查点", function()
         instructions, loads, load_error = { workspace = "/test" }, 0, nil
         local Executor = require("class")()
         function Executor:ctor() end
+
         function Executor:specs() return {} end
+
         function Executor:execute()
             effects = effects + 1
             return { ok = true, output = "已写入" }
         end
-        fake_llm, scope = FakeLlm.new({ ["agent.agent"] = false, ["agent.executor"] = Executor,
+
+        fake_llm, scope = FakeLlm.new({
+            ["agent.agent"] = false,
+            ["agent.executor"] = Executor,
             ["agent.sandbox"] = { platform = function() return "macos" end },
             ["agent.prompts.project"] = {
                 update = project.update,
@@ -24,20 +29,25 @@ describe("Agent 工具循环检查点", function()
                     if load_error then error(load_error, 0) end
                     return table.deep_copy(instructions)
                 end,
-            } })
+            }
+        })
         fake_llm.response_handler = function(_, input)
             calls = calls + 1
             return model(calls, input)
         end
-        agent = require("agent.agent"):new({}, templates, { workspace = "/test", tools = { } })
+        agent = require("agent.agent"):new({}, templates, { workspace = "/test", tools = {} })
         request = require("agent.run"):new()
         request.id = "r1"
     end)
     after_each(function() scope:restore() end)
 
     local function tool_response()
-        local call = { type = "function_call", call_id = "call1", name = "exec_command",
-            arguments = '{"cmd":"write"}' }
+        local call = {
+            type = "function_call",
+            call_id = "call1",
+            name = "exec_command",
+            arguments = '{"cmd":"write"}'
+        }
         return "", nil, { output = { call }, calls = { call } }
     end
 
@@ -60,8 +70,12 @@ describe("Agent 工具循环检查点", function()
             end
             previous = table.deep_copy(input)
             if index > 40 then return "完成" end
-            local call = { type = "function_call", call_id = "call" .. index,
-                name = "exec_command", arguments = '{"cmd":"write"}' }
+            local call = {
+                type = "function_call",
+                call_id = "call" .. index,
+                name = "exec_command",
+                arguments = '{"cmd":"write"}'
+            }
             return "", nil, { output = { call }, calls = { call } }
         end
         assert.are.equal("完成", agent:chat("逐步执行", function() end, request))
@@ -72,9 +86,11 @@ describe("Agent 工具循环检查点", function()
     for _, boundary in ipairs({ "response", "result" }) do
         it("写入未确认时停在 " .. boundary, function()
             model = function() return tool_response() end
-            request.owner = { record = function(_, kind)
-                if kind == boundary then error("数据库断连") end
-            end }
+            request.owner = {
+                record = function(_, kind)
+                    if kind == boundary then error("数据库断连") end
+                end
+            }
             assert.is_nil(agent:chat("检查", function() end, request))
             assert.equal(boundary == "response" and 0 or 1, effects)
             assert.equal(1, calls)
@@ -94,6 +110,7 @@ describe("Agent 工具循环检查点", function()
         end
         local Executor = require("agent.executor")
         function Executor:set_llm() end
+
         assert.are.equal("切换完成", agent:chat("切换任务", function() end, request))
         assert.are.same({ "old", "new" }, seen)
         assert.are.equal(2, created)
@@ -158,7 +175,9 @@ describe("Agent 工具循环检查点", function()
         model = function(index, input)
             assert.is_true(has_text(input, "轮次规则"))
             assert.is_false(has_text(input, "磁盘新规则"))
-            if index == 1 then set_rules("磁盘新规则"); return tool_response() end
+            if index == 1 then
+                set_rules("磁盘新规则"); return tool_response()
+            end
             return "完成"
         end
         assert.are.equal("完成", agent:chat("任务", function() end, request))
@@ -183,6 +202,7 @@ describe("Agent 工具循环检查点", function()
             request.cancelled = true
             return { ok = false, error = "已停止" }
         end
+
         assert.is_nil(agent:chat("删除后的任务", function() end, request))
         assert.is_nil(agent.project_instructions.text)
         assert.is_nil(agent.turn)
@@ -223,9 +243,12 @@ describe("Agent 工具循环检查点", function()
                 response.output[1].source = "user"
                 return text, err, response
             end
-            return "完成", nil, { output = {
-                { role = "assistant", content = "完成", source = "app" },
-            }, calls = {} }
+            return "完成", nil, {
+                output = {
+                    { role = "assistant", content = "完成", source = "app" },
+                },
+                calls = {}
+            }
         end
         assert.are.equal("完成", agent:chat("任务", function() end, request))
         local count = #agent.messages
@@ -246,6 +269,7 @@ describe("Agent 工具循环检查点", function()
             request.cancelled = true
             return { ok = false, error = "已停止" }
         end
+
         local text, err = agent:chat("任务", function() end, request)
         assert.is_nil(text)
         assert.are.equal("用户已取消生成", err)
@@ -261,11 +285,13 @@ describe("Agent 工具循环检查点", function()
             request.permission_request = nil
             return false
         end
+
         local permission_closed = false
         function permission:cancel()
             permission_closed = true
             return true
         end
+
         request.llm_request, request.permission_request = main, permission
         assert.is_false(request:cancel())
         assert.is_true(permission_closed)

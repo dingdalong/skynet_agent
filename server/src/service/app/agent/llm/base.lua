@@ -321,8 +321,12 @@ local function stream_responses(client, input, on_text_delta, request, options, 
     if assistant_text ~= "" and not has_message then
         output[#output + 1] = { role = "assistant", content = assistant_text }
     end
-    return assistant_text, nil, { output = output, calls = calls,
-        usage = completed_response.usage, model = completed_response.model }
+    return assistant_text, nil, {
+        output = output,
+        calls = calls,
+        usage = completed_response.usage,
+        model = completed_response.model
+    }
 end
 
 ---@param input llm.Message[]
@@ -353,16 +357,27 @@ function Base:stream(input, on_text, run, options, tool)
         function(delta, key, complete)
             local block = blocks[key]
             if not block then
-                block = { id = trace .. ":" .. key, run_id = run.id or "", model_id = config.id or config.model,
-                    text = "", status = "streaming" }
+                block = {
+                    id = trace .. ":" .. key,
+                    run_id = run.id or "",
+                    model_id = config.id or config.model,
+                    text = "",
+                    status = "streaming"
+                }
                 blocks[key] = block
                 target.reasoning[#target.reasoning + 1] = block
             end
             block.text = block.text .. delta
             if complete and run.owner then
                 block.status = "completed"
-                run.owner:record("block", { run = run.id, id = block.id, model_id = block.model_id,
-                    reasoning = true, text = block.text, tool = tool and tool.id })
+                run.owner:record("block", {
+                    run = run.id,
+                    id = block.id,
+                    model_id = block.model_id,
+                    reasoning = true,
+                    text = block.text,
+                    tool = tool and tool.id
+                })
             end
             run:on_reasoning(block, delta, tool and tool.id)
         end, function(value, key)
@@ -375,8 +390,14 @@ function Base:stream(input, on_text, run, options, tool)
         if block.status ~= "completed" then
             block.status = run.cancelled and "cancelled" or ok and text ~= nil and "completed" or "failed"
             if block.status == "completed" and run.owner then
-                run.owner:record("block", { run = run.id, id = block.id, model_id = block.model_id,
-                    reasoning = true, text = block.text, tool = tool and tool.id })
+                run.owner:record("block", {
+                    run = run.id,
+                    id = block.id,
+                    model_id = block.model_id,
+                    reasoning = true,
+                    text = block.text,
+                    tool = tool and tool.id
+                })
             end
         end
         run:on_reasoning(block, "", tool and tool.id)

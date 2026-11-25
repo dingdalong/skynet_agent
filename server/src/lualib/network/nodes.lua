@@ -5,8 +5,10 @@ local config = require("etc.cfg")
 local Nodes = {}
 
 function Nodes.open(port)
-    cluster.reload({ center = "127.0.0.1:" .. config.app_center.port,
-        gateway = "127.0.0.1:" .. config.app_center.gateway_port })
+    cluster.reload({
+        center = "127.0.0.1:" .. config.app_center.port,
+        gateway = "127.0.0.1:" .. config.app_center.gateway_port
+    })
     return skynet.call(skynet.uniqueservice("clusterd"), "lua", "listen", "127.0.0.1", port)
 end
 

@@ -24,10 +24,13 @@ describe("用户与客户端服务", function()
             self.closed = false
             if model.create_fail then error("构造失败") end
         end
+
         function Agent:set_llm(main, permission)
             self.llm_config, self.permission_config = main, permission
         end
+
         function Agent:close() self.closed = true end
+
         function Agent:chat(text, on_delta, request)
             if model.yield then coroutine.yield("generating") end
             if request.cancelled then return nil, "cancelled" end
@@ -37,83 +40,127 @@ describe("用户与客户端服务", function()
             self.messages[#self.messages + 1] = text
             return model.text
         end
+
         scope = Scope.new({
-            ["skynet.cluster"] = {}, ["network.nodes"] = {},
-            ["app_center.deployment"] = {}, ["app_center.app_catalog"] = {},
-            client = false, ["client.user"] = false, ["agent.session"] = false,
-            agent = false, ["agent.app"] = false, ["agent.chat"] = false, ["agent.handler"] = false,
-            ["agent.workspace"] = { create = function(_, username, id)
-                workspaces[#workspaces + 1] = { username = username, id = id }
-                return "/test"
-            end },
+            ["skynet.cluster"] = {},
+            ["network.nodes"] = {},
+            ["app_center.deployment"] = {},
+            ["app_center.app_catalog"] = {},
+            client = false,
+            ["client.user"] = false,
+            ["agent.session"] = false,
+            agent = false,
+            ["agent.app"] = false,
+            ["agent.chat"] = false,
+            ["agent.handler"] = false,
+            ["agent.workspace"] = {
+                create = function(_, username, id)
+                    workspaces[#workspaces + 1] = { username = username, id = id }
+                    return "/test"
+                end
+            },
             ["skynet.crypt"] = {
-                randomkey = function() random_id = random_id + 1; return tostring(random_id) end,
+                randomkey = function()
+                    random_id = random_id + 1; return tostring(random_id)
+                end,
                 hexencode = function(value) return value end,
             },
             ["agent.agent"] = Agent,
-            ["agent.persistence"] = false, ["agent.execution"] = false,
+            ["agent.persistence"] = false,
+            ["agent.execution"] = false,
             ["skynet.queue"] = function() return function(f, ...) return f(...) end end,
-            ["agent.prompts"] = { load_templates = function()
-                template_loads = template_loads + 1
-                return templates
-            end },
-            ["etc.cfg"] = { agent_gateway = { instance = { client = 1, logind = 1, websocket = 3 } },
-                agent = { llm = { api_key = "test" }, project_instructions_max_bytes = 32768,
-                tools = { workspace_root = "/test" }, permission = {},
-                default_model_id = "test", models = {
-                    { id = "test", name = "测试", model = "test" },
-                    { id = "pro", name = "Pro", model = "pro" },
-                },
-                max_message_length = 100, session_title_length = 24 } },
-            skynet = { localname = function(name)
-                return ({ [".app_endpoint"] = 10, [".app_routes"] = 80, [".logind_1"] = 20,
-                    [".websocket_1"] = 100, [".websocket_2"] = 200,
-                    [".websocket_3"] = 300, [".client_1"] = 10, [".client_2"] = 11, [".shared"] = 77 })[name]
-            end, now = function() return 100 end, genid = function() next_id = next_id + 1; return next_id end,
+            ["agent.prompts"] = {
+                load_templates = function()
+                    template_loads = template_loads + 1
+                    return templates
+                end
+            },
+            ["etc.cfg"] = {
+                agent_gateway = { instance = { client = 1, logind = 1, websocket = 3 } },
+                agent = {
+                    llm = { api_key = "test" },
+                    project_instructions_max_bytes = 32768,
+                    tools = { workspace_root = "/test" },
+                    permission = {},
+                    default_model_id = "test",
+                    models = {
+                        { id = "test", name = "测试", model = "test" },
+                        { id = "pro", name = "Pro", model = "pro" },
+                    },
+                    max_message_length = 100,
+                    session_title_length = 24
+                }
+            },
+            skynet = {
+                localname = function(name)
+                    return ({ [".app_endpoint"] = 10, [".app_routes"] = 80, [".logind_1"] = 20,
+                        [".websocket_1"] = 100, [".websocket_2"] = 200,
+                        [".websocket_3"] = 300, [".client_1"] = 10, [".client_2"] = 11, [".shared"] = 77 })[name]
+                end,
+                now = function() return 100 end,
+                genid = function()
+                    next_id = next_id + 1; return next_id
+                end,
                 fork = function(callback) tasks[#tasks + 1] = coroutine.create(callback) end,
-                error = function() end, sleep = function() coroutine.yield("sleep") end },
-            ["skynet.debug"] = {}, ["skynet.codecache"] = { clear = function() end },
+                error = function() end,
+                sleep = function() coroutine.yield("sleep") end
+            },
+            ["skynet.debug"] = {},
+            ["skynet.codecache"] = { clear = function() end },
             log = { info = function() end, failure = function() end },
-            rpc = { call_timeout = function(_, _, cmd)
-                return codes.succ, (cmd == "find" or cmd == "aggregate") and {} or 1
-            end,
+            rpc = {
+                call_timeout = function(_, _, cmd)
+                    return codes.succ, (cmd == "find" or cmd == "aggregate") and {} or 1
+                end,
                 call = function(address, command, _, identity, id, body, draining)
-                if command == "subscribe" then
-                    return codes.succ, { revision = 1, apps = { { app_id = "agent", address = 1,
-                        generation = "generation", enabled = true } } }
-                end
-                local name, args = unpack_body(body)
-                local worker = address == 1 and Pool:new(agent_addresses):select(identity.username) or address
-                local result = instances[worker]:handle_request({ source = 10 }, identity, id, name, args, draining)
-                return codes.succ, pack(name:gsub("Req$", "Res"), result)
-            end, send = function(address, command, ...)
-                if command == "publish" then
-                    local username, name, args, id = ...
-                    next_id = next_id + 1
-                    service:publish({ source = 80 }, "agent", "generation", username, pack(name, args), id, next_id)
-                    return codes.succ
-                end
-                if command == "disconnect" then
-                    local _, identity, id = ...
-                    local worker = Pool:new(agent_addresses):select(identity.username)
-                    instances[worker]:disconnect({ source = 10 }, identity, id)
-                    return codes.succ
-                end
-                if command == "send_response" then
-                    local id, seq, _, kind, body = ...
-                    local name, args
-                    if kind == 4 then
-                        name, args = "RoutingError", { ret = body:byte(), error = { message = body:sub(2) } }
-                    else
-                        name, args = unpack_body(body)
+                    if command == "subscribe" then
+                        return codes.succ, {
+                            revision = 1,
+                            apps = { {
+                                app_id = "agent",
+                                address = 1,
+                                generation = "generation",
+                                enabled = true
+                            } }
+                        }
                     end
-                    events[#events + 1] = { address = address, command = command,
-                        args = table.pack(id, seq, name, args) }
+                    local name, args = unpack_body(body)
+                    local worker = address == 1 and Pool:new(agent_addresses):select(identity.username) or address
+                    local result = instances[worker]:handle_request({ source = 10 }, identity, id, name, args, draining)
+                    return codes.succ, pack(name:gsub("Req$", "Res"), result)
+                end,
+                send = function(address, command, ...)
+                    if command == "publish" then
+                        local username, name, args, id = ...
+                        next_id = next_id + 1
+                        service:publish({ source = 80 }, "agent", "generation", username, pack(name, args), id, next_id)
+                        return codes.succ
+                    end
+                    if command == "disconnect" then
+                        local _, identity, id = ...
+                        local worker = Pool:new(agent_addresses):select(identity.username)
+                        instances[worker]:disconnect({ source = 10 }, identity, id)
+                        return codes.succ
+                    end
+                    if command == "send_response" then
+                        local id, seq, _, kind, body = ...
+                        local name, args
+                        if kind == 4 then
+                            name, args = "RoutingError", { ret = body:byte(), error = { message = body:sub(2) } }
+                        else
+                            name, args = unpack_body(body)
+                        end
+                        events[#events + 1] = {
+                            address = address,
+                            command = command,
+                            args = table.pack(id, seq, name, args)
+                        }
+                        return codes.succ
+                    end
+                    events[#events + 1] = { address = address, command = command, args = table.pack(...) }
                     return codes.succ
                 end
-                events[#events + 1] = { address = address, command = command, args = table.pack(...) }
-                return codes.succ
-            end },
+            },
         })
         instances[1] = require("agent"):new()
         instances[1]:init()
@@ -238,14 +285,19 @@ describe("用户与客户端服务", function()
     it("公共服务跨用户共用地址，每个请求和推送仍绑定身份", function()
         service = require("client"):new()
         service:init()
-        service:sync_routes({ source = 80 }, { revision = 2, apps = {
-            { app_id = "common", enabled = true, address = 77, generation = "common" },
-        } })
+        service:sync_routes({ source = 80 }, {
+            revision = 2,
+            apps = {
+                { app_id = "common", enabled = true, address = 77, generation = "common" },
+            }
+        })
         local requests = {}
-        instances[77] = { handle_request = function(_, _, identity)
-            requests[#requests + 1] = identity.username
-            return { ret = codes.succ }
-        end }
+        instances[77] = {
+            handle_request = function(_, _, identity)
+                requests[#requests + 1] = identity.username
+                return { ret = codes.succ }
+            end
+        }
         for _, name in ipairs({ "alice", "bob" }) do
             service:open({ source = 20 }, name, 100, stored_identity(name))
             request(2, "CommonReq", {}, name)
@@ -290,9 +342,16 @@ describe("用户与客户端服务", function()
 
     it("服务变更整表替换，拒绝过期快照和未授权更新", function()
         open("a", 100, "alice")
-        local snapshot = { revision = 3, apps = { { app_id = "agent", address = 1, generation = "generation",
-            enabled = false,
-            notification = pack("AppCenterChangedNtf", {}) } } }
+        local snapshot = {
+            revision = 3,
+            apps = { {
+                app_id = "agent",
+                address = 1,
+                generation = "generation",
+                enabled = false,
+                notification = pack("AppCenterChangedNtf", {})
+            } }
+        }
         assert.has_error(function() service:sync_routes({ source = 100 }, snapshot) end, "应用目录来源无效")
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
         snapshot.revision = 2

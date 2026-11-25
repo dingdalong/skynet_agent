@@ -55,9 +55,11 @@ end
 function REQUEST:AgentDesktopRegisterReq(args, connection)
     return attempt(self.execution.register, self, args, connection)
 end
+
 function REQUEST:AgentExecutionResultReq(args, connection)
     return attempt(self.execution.result, self, args, connection)
 end
+
 function REQUEST:AgentSessionExecutionSetReq(args, connection)
     local session = self.chat.sessions[args.session_id]
     if not session then return { ret = codes.fail } end
@@ -66,4 +68,5 @@ function REQUEST:AgentSessionExecutionSetReq(args, connection)
     log.failure("execution", "set_execution", result)
     return { ret = codes.invalid_param, error = { message = tostring(result), retryable = false } }
 end
+
 return { REQUEST = REQUEST }

@@ -89,10 +89,14 @@ function AgentSession:open_agent()
     local workspace = target and target.directory or (self.restored and directories.existing or directories.create)(
         config.tools.workspace_root, owner.app.identity.username, self.id)
     self.agent = Agent:new(models.resolve(config, model_id), owner.prompt_templates, {
-        execution_target = target, workspace = workspace, tools = config.tools,
+        execution_target = target,
+        workspace = workspace,
+        tools = config.tools,
         project_instructions_max_bytes = config.project_instructions_max_bytes,
         permission_llm = models.resolve(config, config.permission.model_id or model_id),
-        permission = config.permission, owner = self, session_id = self.id,
+        permission = config.permission,
+        owner = self,
+        session_id = self.id,
     })
     self.agent.project_instructions = self.saved_project
     for _, item in ipairs(self.saved_context) do self.agent.messages[#self.agent.messages + 1] = item end
@@ -130,12 +134,19 @@ function AgentSession:snapshot(start, finish)
     end
     if not notice and self.needs_workspace then notice = "原工作目录不可用，请重新选择工作目录" end
     return {
-        needs_workspace = self.needs_workspace, session = {
-            id = self.id, title = self.title, updated_at = self.updated_at, revision = self.revision,
-            message_start = start, messages = messages, run_id = self.run and self.run.id or "",
+        needs_workspace = self.needs_workspace,
+        session = {
+            id = self.id,
+            title = self.title,
+            updated_at = self.updated_at,
+            revision = self.revision,
+            message_start = start,
+            messages = messages,
+            run_id = self.run and self.run.id or "",
             cancelling = self.run and self.run.cancelled or false,
         },
-        recovery_notice = notice, read_only = self.read_only or self.storage_failed,
+        recovery_notice = notice,
+        read_only = self.read_only or self.storage_failed,
         execution_target = self.execution_target,
         model_id = self.model_id,
         permission_model_id = config.permission.model_id or self.model_id,
@@ -183,8 +194,13 @@ function AgentSession:_on_reasoning(run, block, delta, tool_id)
     self.revision = self.revision + 1
     local update = table.copy(block)
     update.text = delta
-    self.owner:publish("AgentReasoningDeltaNtf", { session_id = self.id,
-        message_id = run.message_id, tool_call_id = tool_id or "", block = update, revision = self.revision })
+    self.owner:publish("AgentReasoningDeltaNtf", {
+        session_id = self.id,
+        message_id = run.message_id,
+        tool_call_id = tool_id or "",
+        block = update,
+        revision = self.revision
+    })
 end
 
 ---@param args table
@@ -239,9 +255,17 @@ function AgentSession:send_message(args, connection)
     self.updated_at = now_ms()
     self.run = run
     self.pending_runs[run] = true
-    local saved = pcall(self.record, self, "ask", { run = run.id, message = run.message_id, text = text,
-        user_message = self.messages[#self.messages - 1].id, time = self.updated_at,
-        model_id = self.model_id, target = self.execution_target, title = self.title, retry = run.retry })
+    local saved = pcall(self.record, self, "ask", {
+        run = run.id,
+        message = run.message_id,
+        text = text,
+        user_message = self.messages[#self.messages - 1].id,
+        time = self.updated_at,
+        model_id = self.model_id,
+        target = self.execution_target,
+        title = self.title,
+        retry = run.retry
+    })
     if not saved then
         self.run = nil
         self.pending_runs[run] = nil
@@ -260,8 +284,11 @@ function AgentSession:_on_delta(run, delta)
     run.assistant.content = run.assistant.content .. delta
     self.revision = self.revision + 1
     self.owner:publish("AgentMessageDeltaNtf", {
-        session_id = self.id, run_id = run.id, message_id = run.assistant.id,
-        delta = delta, revision = self.revision,
+        session_id = self.id,
+        run_id = run.id,
+        message_id = run.assistant.id,
+        delta = delta,
+        revision = self.revision,
     })
 end
 
@@ -273,8 +300,12 @@ function AgentSession:_on_tool_update(message_id, record)
         self:record("tool_end", { run = record.run_id, id = record.id, tool = record })
     end
     self.revision = self.revision + 1
-    self.owner:publish("AgentToolUpdatedNtf", { session_id = self.id, message_id = message_id,
-        tool = table.deep_copy(record), revision = self.revision })
+    self.owner:publish("AgentToolUpdatedNtf", {
+        session_id = self.id,
+        message_id = message_id,
+        tool = table.deep_copy(record),
+        revision = self.revision
+    })
 end
 
 ---@param run agent.Run
@@ -297,9 +328,13 @@ function AgentSession:_run_request(run, text)
         assistant.content = result
     end
     self.updated_at = now_ms()
-    local saved = pcall(self.record, self, "finish", { status = assistant.status, run = run.id,
-        time = self.updated_at, content = assistant.status == status.completed and assistant.content or nil,
-        error = assistant.error })
+    local saved = pcall(self.record, self, "finish", {
+        status = assistant.status,
+        run = run.id,
+        time = self.updated_at,
+        content = assistant.status == status.completed and assistant.content or nil,
+        error = assistant.error
+    })
     self.run = nil
     self.pending_runs[run] = nil
     if not saved then
@@ -335,7 +370,8 @@ function AgentSession:set_execution(target, connection)
     assert(not self.read_only and not self.storage_failed, "会话仅可阅读")
     local executor = self.agent and self.agent.executor
     if executor then
-        if executor.remote then assert(not executor.processes:has_active(), "请先停止后台进程")
+        if executor.remote then
+            assert(not executor.processes:has_active(), "请先停止后台进程")
         else
             for _, process in pairs(executor.processes.processes) do
                 assert(process.done, "请先停止后台进程")
@@ -351,8 +387,11 @@ function AgentSession:set_execution(target, connection)
     self.needs_workspace = false
     if not self.agent then
         self.execution_target = target
-        table.insert(self.saved_context, { role = "developer", source = "environment",
-            content = "执行环境已切换到 " .. workspace })
+        table.insert(self.saved_context, {
+            role = "developer",
+            source = "environment",
+            content = "执行环境已切换到 " .. workspace
+        })
         self:_publish()
         return { ret = codes.succ, chat_session = self:snapshot() }
     end
@@ -363,10 +402,13 @@ function AgentSession:set_execution(target, connection)
     self.agent.turn = nil
     local previous = self.messages[#self.messages]
     if previous and previous.error then previous.error.retryable = false end
-    self.agent.messages[#self.agent.messages + 1] = { role = "developer", source = "environment",
+    self.agent.messages[#self.agent.messages + 1] = {
+        role = "developer",
+        source = "environment",
         content = "执行环境已切换，后续工具仅作用于新目标；"
             .. "此前目录文件不会自动同步。工作目录: "
-            .. workspace .. "；操作系统: " .. (target and target.platform or require("agent.sandbox").platform()) }
+            .. workspace .. "；操作系统: " .. (target and target.platform or require("agent.sandbox").platform())
+    }
     self:_publish()
     return { ret = codes.succ, chat_session = self:snapshot() }
 end

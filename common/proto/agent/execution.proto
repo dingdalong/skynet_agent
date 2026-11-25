@@ -8,8 +8,16 @@ message AgentDesktopRegisterReq {
   bool remote_enabled = 3;
   string authorization_id = 4;
 }
-message AgentDesktopRegisterRes { int32 ret = 1; ErrorInfo error = 2; ExecutionTarget target = 3; }
-message AgentPreferenceSetReq { string model_id = 1; bool set_target = 2; ExecutionTarget target = 3; }
+message AgentDesktopRegisterRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+  ExecutionTarget target = 3;
+}
+message AgentPreferenceSetReq {
+  string model_id = 1;
+  bool set_target = 2;
+  ExecutionTarget target = 3;
+}
 message AgentPreferenceSetRes {
   int32 ret = 1;
   ErrorInfo error = 2;
@@ -17,9 +25,18 @@ message AgentPreferenceSetRes {
   bool set_target = 4;
   ExecutionTarget target = 5;
 }
-message AgentDesktopUpdatedNtf { DesktopDevice device = 1; }
-message AgentSessionExecutionSetReq { string session_id = 1; ExecutionTarget target = 2; }
-message AgentSessionExecutionSetRes { int32 ret = 1; ErrorInfo error = 2; ChatSession chat_session = 3; }
+message AgentDesktopUpdatedNtf {
+  DesktopDevice device = 1;
+}
+message AgentSessionExecutionSetReq {
+  string session_id = 1;
+  ExecutionTarget target = 2;
+}
+message AgentSessionExecutionSetRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+  ChatSession chat_session = 3;
+}
 message AgentExecutionActionNtf {
   string request_id = 1;
   string session_id = 2;
@@ -31,5 +48,11 @@ message AgentExecutionActionNtf {
   bool remote = 8;
   string authorization_id = 9;
 }
-message AgentExecutionResultReq { string request_id = 1; string result = 2; }
-message AgentExecutionResultRes { int32 ret = 1; ErrorInfo error = 2; }
+message AgentExecutionResultReq {
+  string request_id = 1;
+  string result = 2;
+}
+message AgentExecutionResultRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+}

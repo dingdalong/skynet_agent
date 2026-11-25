@@ -11,7 +11,10 @@ if entry == "center_main" or entry == "main" then
     database = {
         host = os.getenv("MONGO_HOST") or "127.0.0.1",
         port = tonumber(os.getenv("MONGO_PORT") or "18083"),
-        name = "skynet_agent", authdb = "admin", username = "root", password = os.getenv("MONGO_ROOT_PASSWORD"),
+        name = "skynet_agent",
+        authdb = "admin",
+        username = "root",
+        password = os.getenv("MONGO_ROOT_PASSWORD"),
         platform_collection = entry == "center_main" and "app_center" or "user",
     }
 else
@@ -73,8 +76,8 @@ return {
         session_title_length = 24,
         default_model_id = os.getenv("DEEPSEEK_MODEL") or "deepseek-flash",
         models = {
-            { id = "deepseek-flash", name = "DeepSeek Flash", model = "deepseek-flash" },
-            { id = "deepseek-v4-pro", name = "DeepSeek Pro", model = "deepseek-v4-pro" },
+            { id = "deepseek-flash",  name = "DeepSeek Flash", model = "deepseek-flash" },
+            { id = "deepseek-v4-pro", name = "DeepSeek Pro",   model = "deepseek-v4-pro" },
         },
         llm = {
             api_key = api_key,

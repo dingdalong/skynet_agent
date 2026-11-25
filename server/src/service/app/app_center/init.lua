@@ -32,8 +32,12 @@ local AppCatalog = require("app_center.app_catalog")
 local Center = class()
 
 Center.commands = {
-    directory = "directory", register = "register", submit = "submit", request = "request",
-    disconnect = "disconnect", freeze = "freeze",
+    directory = "directory",
+    register = "register",
+    submit = "submit",
+    request = "request",
+    disconnect = "disconnect",
+    freeze = "freeze",
 }
 
 function Center:ctor()
@@ -105,8 +109,12 @@ function Center:init()
     cluster.register("center")
     self.codec:init("app-center")
     AppCatalog.open(self)
-    self.apps["app-center"] = { app_id = "app-center", generation = self.epoch, enabled = true,
-        version = require("helper.node_version").read("app/app_center") }
+    self.apps["app-center"] = {
+        app_id = "app-center",
+        generation = self.epoch,
+        enabled = true,
+        version = require("helper.node_version").read("app/app_center")
+    }
     self:_sync()
     skynet.fork(function()
         while not self.closed do
@@ -120,10 +128,17 @@ end
 function Center:_snapshot()
     local apps = {}
     for _, app in pairs(self.apps) do
-        apps[#apps + 1] = { app_id = app.app_id, endpoint = app.endpoint, generation = app.generation, key = app.key,
-            enabled = app.enabled, transition = app.transition, notification = self.codec:encode_body(
+        apps[#apps + 1] = {
+            app_id = app.app_id,
+            endpoint = app.endpoint,
+            generation = app.generation,
+            key = app.key,
+            enabled = app.enabled,
+            transition = app.transition,
+            notification = self.codec:encode_body(
                 "AppCenterChangedNtf", { app_id = app.app_id, enabled = app.enabled }),
-            offline_notification = self.codec:encode_body("AppCenterChangedNtf", { app_id = app.app_id }) }
+            offline_notification = self.codec:encode_body("AppCenterChangedNtf", { app_id = app.app_id })
+        }
     end
     return { apps = apps, revision = self.revision, epoch = self.epoch }
 end
@@ -162,14 +177,18 @@ end
 function Center:register(_, id, key, port, generation)
     local app = self.apps[id]
     if not app or not app.key or app.key ~= key or not self:_desired(app)
-        or self.freezing or app.transition == "disabling" then return false end
+        or self.freezing or app.transition == "disabling" then
+        return false
+    end
     assert(math.type(port) == "integer" and port > 0 and port <= 65535 and type(generation) == "string")
     local endpoint = "127.0.0.1:" .. port
     if app.address and app.generation == generation and app.endpoint == endpoint then return true end
     local address = nodes.application(id, endpoint)
     local code, actual, instance, count, cursor, version = rpc.call(address, "hello", key)
     if code ~= codes.succ or actual ~= id or instance ~= generation or count < 1 or app.key ~= key
-        or self.freezing or not self:_desired(app) or app.transition == "disabling" then return false end
+        or self.freezing or not self:_desired(app) or app.transition == "disabling" then
+        return false
+    end
     app.version = version
     if app.generation ~= generation then app.cursor = cursor end
     app.address, app.endpoint, app.generation, app.count = address, endpoint, generation, count
@@ -225,8 +244,13 @@ function Center:handle_request(context, identity, id, name, args)
         local names, services = { "应用中心" }, {}
         local online = { { app_id = "app-center", name = names[1], version = self.apps["app-center"].version } }
         if connection.admin then
-            services[1] = { app_id = "app-center", name = names[1],
-                instances = 1, enabled = true, can_set_enabled = false }
+            services[1] = {
+                app_id = "app-center",
+                name = names[1],
+                instances = 1,
+                enabled = true,
+                can_set_enabled = false
+            }
         end
         for app_id, doc in pairs(self.documents) do
             local app = self.apps[app_id]
@@ -237,18 +261,30 @@ function Center:handle_request(context, identity, id, name, args)
             end
             if connection.admin and (not doc.removed or doc.pending or app) then
                 local version = approved or doc.pending or doc.approved or doc.last
-                services[#services + 1] = { app_id = app_id, name = version.name,
-                    approved = approved, pending = doc.pending, last = doc.last,
-                    instances = app and app.count or 0, enabled = app and app.enabled or false,
+                services[#services + 1] = {
+                    app_id = app_id,
+                    name = version.name,
+                    approved = approved,
+                    pending = doc.pending,
+                    last = doc.last,
+                    instances = app and app.count or 0,
+                    enabled = app and app.enabled or false,
                     can_set_enabled = AppCatalog.can_set_enabled(doc),
-                    desired = doc.desired, transition = app and app.transition }
+                    desired = doc.desired,
+                    transition = app and app.transition
+                }
             end
         end
         table.sort(names)
         table.sort(online, function(left, right) return left.app_id < right.app_id end)
         table.sort(services, function(left, right) return left.app_id < right.app_id end)
-        return { ret = codes.succ, names = names, online = online,
-            services = services, administrator = connection.admin }
+        return {
+            ret = codes.succ,
+            names = names,
+            online = online,
+            services = services,
+            administrator = connection.admin
+        }
     end
     if name == "AppCenterUnlockReq" then
         local token = config.app_center.admin_token

@@ -5,12 +5,21 @@ describe("桌面执行设备与路由", function()
     local scope, user, execution, events
     before_each(function()
         events = {}
-        scope = Scope.new({ ["agent.execution"] = false, ["agent.persistence"] = { settings = function() end },
-            skynet = {}, ["skynet.crypt"] = {},
-            log = { info = function() end, failure = function() end } })
-        user = { targets = {}, blocked_settings = {}, chat = { sessions = {} }, publish = function(_, name, args)
-            events[#events + 1] = { name = name, args = args }
-        end }
+        scope = Scope.new({
+            ["agent.execution"] = false,
+            ["agent.persistence"] = { settings = function() end },
+            skynet = {},
+            ["skynet.crypt"] = {},
+            log = { info = function() end, failure = function() end }
+        })
+        user = {
+            targets = {},
+            blocked_settings = {},
+            chat = { sessions = {} },
+            publish = function(_, name, args)
+                events[#events + 1] = { name = name, args = args }
+            end
+        }
         execution = require("agent.execution"):new(user)
     end)
     after_each(function() scope:restore() end)
@@ -21,25 +30,43 @@ describe("桌面执行设备与路由", function()
         local target = { device_id = "desktop" }
         assert.are.equal(connection, execution:available(target, "desktop"))
         assert.has_error(function() execution:available(target, "") end)
-        execution:register({ device_id = "desktop", name = "Mac", authorization_id = "auth-1",
-            remote_enabled = true }, connection)
+        execution:register({
+            device_id = "desktop",
+            name = "Mac",
+            authorization_id = "auth-1",
+            remote_enabled = true
+        }, connection)
         assert.are.equal(connection, execution:available(target, "phone"))
         assert.is_true(execution:snapshot()[1].remote_enabled)
     end)
 
     it("关闭远程停止对应桌面任务，旧连接不能覆盖新连接", function()
         local stopped = 0
-        user.chat.sessions.s1 = { execution_target = { device_id = "desktop" },
-            stop_remote = function() stopped = stopped + 1 end }
+        user.chat.sessions.s1 = {
+            execution_target = { device_id = "desktop" },
+            stop_remote = function() stopped = stopped + 1 end
+        }
         local first, second = { id = "first" }, { id = "second" }
-        execution:register({ device_id = "desktop", name = "Mac", authorization_id = "auth-1",
-            remote_enabled = true }, first)
-        execution:register({ device_id = "desktop", name = "Mac", authorization_id = "auth-1",
-            remote_enabled = true }, second)
+        execution:register({
+            device_id = "desktop",
+            name = "Mac",
+            authorization_id = "auth-1",
+            remote_enabled = true
+        }, first)
+        execution:register({
+            device_id = "desktop",
+            name = "Mac",
+            authorization_id = "auth-1",
+            remote_enabled = true
+        }, second)
         execution:disconnect(first)
         assert.are.equal(second, execution:available({ device_id = "desktop" }, "desktop"))
-        execution:register({ device_id = "desktop", name = "Mac", authorization_id = "auth-1",
-            remote_enabled = false }, second)
+        execution:register({
+            device_id = "desktop",
+            name = "Mac",
+            authorization_id = "auth-1",
+            remote_enabled = false
+        }, second)
         assert.are.equal(1, stopped)
         execution:disconnect(second)
         assert.has_error(function() execution:available({ device_id = "desktop" }, "desktop") end)
@@ -49,8 +76,10 @@ describe("桌面执行设备与路由", function()
         local connection = { id = "target" }
         execution.pending.call = { connection = connection }
         assert.are_not.equal(1, execution:result({ request_id = "call", result = "{}" }, {}).ret)
-        assert.are.equal(1, execution:result({ request_id = "call",
-            result = cjson.encode({ ok = true, session_id = cjson.null, error = cjson.null }) }, connection).ret)
+        assert.are.equal(1, execution:result({
+            request_id = "call",
+            result = cjson.encode({ ok = true, session_id = cjson.null, error = cjson.null })
+        }, connection).ret)
         assert.is_nil(execution.pending.call.result.session_id)
         assert.is_nil(execution.pending.call.result.error)
     end)
@@ -70,18 +99,27 @@ describe("桌面终端续写状态", function()
 
     it("续写复用原进程跟踪并更新两条工具记录", function()
         local watchers, updates = {}, {}
-        scope = Scope.new({ ["agent.remote"] = false, skynet = {
-            fork = function(callback) watchers[#watchers + 1] = callback end,
-            sleep = function() end,
-        } })
-        local controller = { invoke = function(_, _, operation)
-            if operation == "execute" then return { session_id = "process", output = "partial" } end
-            return { done = true, output = "final", exit_code = 0 }
-        end }
-        local remote = require("agent.remote"):new({ tools = {}, execution_target = {}, owner = {
-            owner = { app = { execution = controller } },
-            _on_tool_update = function(_, _, record) updates[#updates + 1] = record end,
-        } })
+        scope = Scope.new({
+            ["agent.remote"] = false,
+            skynet = {
+                fork = function(callback) watchers[#watchers + 1] = callback end,
+                sleep = function() end,
+            }
+        })
+        local controller = {
+            invoke = function(_, _, operation)
+                if operation == "execute" then return { session_id = "process", output = "partial" } end
+                return { done = true, output = "final", exit_code = 0 }
+            end
+        }
+        local remote = require("agent.remote"):new({
+            tools = {},
+            execution_target = {},
+            owner = {
+                owner = { app = { execution = controller } },
+                _on_tool_update = function(_, _, record) updates[#updates + 1] = record end,
+            }
+        })
         local run = { id = "run", processes = {}, message_id = "message", source_device = "desktop" }
         local original, continuation = { id = "first" }, { id = "second" }
         remote:execute("exec_command", {}, {}, run, original)

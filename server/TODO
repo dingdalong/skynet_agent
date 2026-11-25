@@ -4,10 +4,7 @@ lfs要改成子模块的方式引用
 skill
 mcp
 上下文压缩
-把服务器、客户端版本号做好，避免出现版本对不上的问题
 lua、proto代码格式化脚本
 几个tools只剩下描述了
 ---@field extensions table? 当前 Agent 轮次的工具快照，这个注释写的不好，不应该写table这种，要写详细的class
-子应用开发
-app_id用uuid，保证唯一
 图片和大文件走 HTTP

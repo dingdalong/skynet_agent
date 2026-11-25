@@ -20,17 +20,26 @@ end
 function Execution:snapshot()
     local result = {}
     for _, device in pairs(self.devices) do
-        result[#result + 1] = { id = device.id, name = device.name,
-            online = device.connection ~= nil, remote_enabled = device.remote_enabled }
+        result[#result + 1] = {
+            id = device.id,
+            name = device.name,
+            online = device.connection ~= nil,
+            remote_enabled = device.remote_enabled
+        }
     end
     table.sort(result, function(a, b) return a.id < b.id end)
     return result
 end
 
 function Execution:publish(device)
-    self.app:publish("AgentDesktopUpdatedNtf", { device = {
-        id = device.id, name = device.name, online = device.connection ~= nil,
-        remote_enabled = device.remote_enabled } })
+    self.app:publish("AgentDesktopUpdatedNtf", {
+        device = {
+            id = device.id,
+            name = device.name,
+            online = device.connection ~= nil,
+            remote_enabled = device.remote_enabled
+        }
+    })
 end
 
 function Execution:register(args, connection)
@@ -96,11 +105,19 @@ function Execution:invoke(target, operation, args, run, call_id, source_device)
     local pending = { connection = connection }
     self.pending[id] = pending
     local code = self.app:publish("AgentExecutionActionNtf", {
-        request_id = id, session_id = run and run.session_id or "",
-            run_id = run and run.id or "", tool_call_id = call_id or "", operation = operation,
-            arguments = cjson.encode(args), workspace_id = target.workspace_id,
-            remote = source_device ~= target.device_id, authorization_id = device.authorization_id }, connection.id)
-    if code ~= codes.succ then self.pending[id] = nil; error("桌面执行请求发送失败") end
+        request_id = id,
+        session_id = run and run.session_id or "",
+        run_id = run and run.id or "",
+        tool_call_id = call_id or "",
+        operation = operation,
+        arguments = cjson.encode(args),
+        workspace_id = target.workspace_id,
+        remote = source_device ~= target.device_id,
+        authorization_id = device.authorization_id
+    }, connection.id)
+    if code ~= codes.succ then
+        self.pending[id] = nil; error("桌面执行请求发送失败")
+    end
     local timeout = operation == "execute" and args.name == "apply_patch"
         and args.limits and args.limits.timeout_ms or 30000
     local deadline = skynet.now() + math.ceil(timeout / 10) + 1000
@@ -121,8 +138,11 @@ function Execution:result(args, connection)
     assert(type(value) == "table", "执行结果无效")
     local function normalize(item)
         for key, field in pairs(item) do
-            if field == cjson.null then item[key] = nil
-            elseif type(field) == "table" then normalize(field) end
+            if field == cjson.null then
+                item[key] = nil
+            elseif type(field) == "table" then
+                normalize(field)
+            end
         end
     end
     normalize(value)

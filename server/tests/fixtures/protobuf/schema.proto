@@ -5,8 +5,8 @@ package example;
 import "metadata.proto";
 
 message Ping {
-    string text = 1;
-    int32 count = 2;
-    repeated string tags = 3;
-    Metadata metadata = 4;
+  string text = 1;
+  int32 count = 2;
+  repeated string tags = 3;
+  Metadata metadata = 4;
 }

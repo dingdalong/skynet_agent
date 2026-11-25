@@ -35,8 +35,10 @@ function remote.tracecall(tag, address, protocol, message, size)
     return skynet.tracecall(tag, address, protocol, message, size)
 end
 
-local environment = setmetatable({ require = function(name)
-    if name == "skynet" then return remote end
-    return require(name)
-end }, { __index = _ENV })
+local environment = setmetatable({
+    require = function(name)
+        if name == "skynet" then return remote end
+        return require(name)
+    end
+}, { __index = _ENV })
 assert(loadfile("3rd/skynet/service/clusteragent.lua", "t", environment))(...)

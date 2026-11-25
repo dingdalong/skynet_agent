@@ -31,7 +31,10 @@ end
 local ClientService = class()
 
 ClientService.commands = {
-    open = "open", handle_request = "handle_request", disconnect = "disconnect", publish = "publish",
+    open = "open",
+    handle_request = "handle_request",
+    disconnect = "disconnect",
+    publish = "publish",
     sync_routes = "sync_routes",
 }
 ClientService.initializing_commands = { sync_routes = true }

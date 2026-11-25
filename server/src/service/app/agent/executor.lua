@@ -133,7 +133,9 @@ function Executor:patch(action, run, record)
     local argv = { worker, "patch", self.root, input }
     local ok, process = pcall(self.processes.start, self.processes, argv, self.root, false, action.mode,
         self.config.timeout_ms, run, record, { worker, input })
-    if not ok then os.remove(input); error(process, 0) end
+    if not ok then
+        os.remove(input); error(process, 0)
+    end
     process.cleanup_path = input
     local result, output = nil, ""
     repeat

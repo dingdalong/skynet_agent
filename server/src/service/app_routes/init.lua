@@ -20,8 +20,13 @@ local Pool = require("helper.service_pool")
 ---@field refresh boolean
 local Routes = class()
 
-Routes.commands = { subscribe = "subscribe", request = "request", disconnect = "disconnect",
-    update = "update", publish = "publish" }
+Routes.commands = {
+    subscribe = "subscribe",
+    request = "request",
+    disconnect = "disconnect",
+    update = "update",
+    publish = "publish"
+}
 
 function Routes:ctor()
     self.clients = {}
@@ -34,7 +39,9 @@ end
 
 function Routes:_install(snapshot)
     if self.epoch == snapshot.epoch and (self.version > snapshot.revision
-        or self.version == snapshot.revision and not self.refresh) then return true end
+            or self.version == snapshot.revision and not self.refresh) then
+        return true
+    end
     local apps, refresh = {}, false
     for _, app in ipairs(snapshot.apps) do
         if app.app_id == "app-center" then

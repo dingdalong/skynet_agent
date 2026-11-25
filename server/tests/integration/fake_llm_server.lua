@@ -99,9 +99,12 @@ function FakeModel:_stream(request, payload)
         connection = "close",
     }))
     if prompt == "[e2e:error]" then
-        event(request, { type = "response.failed", response = {
-            status = "failed", error = { message = "E2E 假模型失败" },
-        } })
+        event(request, {
+            type = "response.failed",
+            response = {
+                status = "failed", error = { message = "E2E 假模型失败" },
+            }
+        })
         assert(socket.write(request.id, "0\r\n\r\n"))
         request.completed = true
         return true
@@ -141,8 +144,10 @@ function FakeModel:_handle(request)
     end
     if method == "GET" and url == "/health" then
         json_response(id, 200, {
-            status = "ok", requests = self.request_count,
-            active_requests = self.active_requests, cancelled_requests = self.cancelled_requests,
+            status = "ok",
+            requests = self.request_count,
+            active_requests = self.active_requests,
+            cancelled_requests = self.cancelled_requests,
         })
         return
     end

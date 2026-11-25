@@ -32,7 +32,7 @@ else
                 return
             end
             if mode == "login" and (command == "bind_client" or command == "send_response"
-                or command == "close_connection") then
+                    or command == "close_connection") then
                 skynet.retpack(codes.succ, true)
                 return
             end

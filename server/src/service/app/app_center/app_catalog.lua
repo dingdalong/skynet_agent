@@ -47,15 +47,24 @@ end
 
 local function approve(doc, reviewer)
     local pending = doc.pending
-    doc.last = { request_id = pending.request_id, accepted = true, reviewer = reviewer,
-        name = pending.name, image = pending.image, image_id = pending.image_id }
+    doc.last = {
+        request_id = pending.request_id,
+        accepted = true,
+        reviewer = reviewer,
+        name = pending.name,
+        image = pending.image,
+        image_id = pending.image_id
+    }
     if not doc.approved or doc.removed then doc.desired = true end
     doc.approved, doc.removed, doc.pending = pending, nil, nil
 end
 
 local function begin_allocation(center, doc, reviewer)
-    doc.database_request = { seed = allocation_seed(),
-        request_id = reviewer and doc.pending.request_id, reviewer = reviewer }
+    doc.database_request = {
+        seed = allocation_seed(),
+        request_id = reviewer and doc.pending.request_id,
+        reviewer = reviewer
+    }
     save(center, doc)
 end
 
@@ -143,8 +152,14 @@ function AppCatalog.review(center, id, args, reviewer)
         end
         approve(doc, reviewer)
     else
-        doc.last = { request_id = doc.pending.request_id, accepted = false, reviewer = reviewer,
-            name = doc.pending.name, image = doc.pending.image, image_id = doc.pending.image_id }
+        doc.last = {
+            request_id = doc.pending.request_id,
+            accepted = false,
+            reviewer = reviewer,
+            name = doc.pending.name,
+            image = doc.pending.image,
+            image_id = doc.pending.image_id
+        }
         doc.pending = nil
     end
     save(center, doc)

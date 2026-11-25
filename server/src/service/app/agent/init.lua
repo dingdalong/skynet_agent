@@ -76,8 +76,10 @@ function AgentService:_handle(context, identity, id, name, args, draining)
     local ok, result = pcall(app.handle_request, app, id, name, args)
     if ok then return result end
     log.info("agent", "request", "请求未确认 name=%s", name)
-    return { ret = codes.call_fail,
-        error = { message = "操作未确认，请重新同步并重试", retryable = true } }
+    return {
+        ret = codes.call_fail,
+        error = { message = "操作未确认，请重新同步并重试", retryable = true }
+    }
 end
 
 function AgentService:disconnect(context, identity, id)

@@ -7,18 +7,23 @@ describe("rpc", function()
         response, send_error = table.pack(codes.succ, nil, false, "tail", nil), false
         send_result = 0
         scope = Scope.new({
-            ["rpc"] = false, ["log"] = false,
+            ["rpc"] = false,
+            ["log"] = false,
             skynet = {
                 error = function() end,
                 request = function(value)
                     request = value
-                    return { select = function(_, timeout)
-                        ticks = timeout
-                        local once = false
-                        return function()
-                            if not once then once = true; return request, response end
+                    return {
+                        select = function(_, timeout)
+                            ticks = timeout
+                            local once = false
+                            return function()
+                                if not once then
+                                    once = true; return request, response
+                                end
+                            end
                         end
-                    end }
+                    }
                 end,
                 send = function(...)
                     if send_error then error("dead service") end
@@ -63,16 +68,18 @@ describe("rpc", function()
         local count = 0
         package.loaded.skynet.request = function()
             count = count + 1
-            return { select = function(_, timeout)
-                assert.is_nil(timeout)
-                local once = false
-                return function()
-                    if once then return end
-                    once = true
-                    coroutine.yield()
-                    return {}, response
+            return {
+                select = function(_, timeout)
+                    assert.is_nil(timeout)
+                    local once = false
+                    return function()
+                        if once then return end
+                        once = true
+                        coroutine.yield()
+                        return {}, response
+                    end
                 end
-            end }
+            }
         end
         local result
         local waiting = coroutine.create(function() result = table.pack(rpc.call_no_timeout(10, "open")) end)

@@ -11,10 +11,19 @@ local log = require("log")
 ---@field db table? 当前业务库
 local Database = class()
 
-Database.commands = { aggregate = "aggregate", find = "find", find_one = "find_one", insert = "insert",
-    find_page = "find_page", replace_one = "replace_one",
-    store_fields = "store_fields", append_once = "append_once",
-    user_identity = "user_identity", provision = "provision", revoke = "revoke" }
+Database.commands = {
+    aggregate = "aggregate",
+    find = "find",
+    find_one = "find_one",
+    insert = "insert",
+    find_page = "find_page",
+    replace_one = "replace_one",
+    store_fields = "store_fields",
+    append_once = "append_once",
+    user_identity = "user_identity",
+    provision = "provision",
+    revoke = "revoke"
+}
 
 function Database:ctor()
     self.client = nil
@@ -95,8 +104,13 @@ function Database:provision(context, seed)
         user = assert(user_info(users, account.username), "应用数据库账号未就绪")
     end
     check_role(user, account.name)
-    local connection = mongo.client({ host = config.database.host, port = config.database.port,
-        username = account.username, password = account.password, authdb = config.app_center.user_authdb })
+    local connection = mongo.client({
+        host = config.database.host,
+        port = config.database.port,
+        username = account.username,
+        password = account.password,
+        authdb = config.app_center.user_authdb
+    })
     local ok = pcall(ensure_collection, connection:getDB(account.name), "_app_center")
     connection:disconnect()
     assert(ok, "未能创建应用数据库")

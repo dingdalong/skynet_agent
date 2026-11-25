@@ -21,8 +21,14 @@ local codes = require("enum.error_code")
 local Endpoint = class()
 
 Endpoint.commands = {
-    hello = "hello", request = "request", disconnect = "disconnect", publish = "publish",
-    events = "events", drain = "drain", finish = "finish", announce = "announce",
+    hello = "hello",
+    request = "request",
+    disconnect = "disconnect",
+    publish = "publish",
+    events = "events",
+    drain = "drain",
+    finish = "finish",
+    announce = "announce",
 }
 
 function Endpoint:ctor()

@@ -3,5 +3,5 @@ syntax = "proto3";
 package example;
 
 message Metadata {
-    string source = 1;
+  string source = 1;
 }

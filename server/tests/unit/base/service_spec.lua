@@ -6,12 +6,17 @@ describe("service", function()
     before_each(function()
         result, logs = nil, {}
         scope = Scope.new({
-            ["service"] = false, ["log"] = false,
+            ["service"] = false,
+            ["log"] = false,
             ["hotfix"] = { install_debug_command = function() end },
-            skynet = { error = function(message) logs[#logs + 1] = message end,
-                self = function() return 1 end, start = function(callback) callback() end,
-                address = tostring, sleep = function() coroutine.yield() end,
-                retpack = function(...) result = table.pack(...) end },
+            skynet = {
+                error = function(message) logs[#logs + 1] = message end,
+                self = function() return 1 end,
+                start = function(callback) callback() end,
+                address = tostring,
+                sleep = function() coroutine.yield() end,
+                retpack = function(...) result = table.pack(...) end
+            },
         })
         instance = {
             commands = { echo = "echo", failure = "failure" },
@@ -78,7 +83,9 @@ describe("service", function()
         assert.are.equal(1, instance.closes)
     end)
     it("并发关闭等在途命令退出，异常仍释放命令计数", function()
-        instance.echo = function() coroutine.yield(); error("late failure") end
+        instance.echo = function()
+            coroutine.yield(); error("late failure")
+        end
         runtime:invoke({ source = 9 }, "init", {})
         local handler = coroutine.create(function() runtime:dispatch(0, 8, "echo") end)
         assert.is_true(coroutine.resume(handler))
@@ -205,8 +212,12 @@ describe("service", function()
                 local selected
                 -- 使用真实文件和 loader 解析顺序，仅截住入口执行以隔离 Skynet VM。
                 local loader_environment = setmetatable({
-                    LUA_SERVICE = config.luaservice, LUA_PATH = config.lua_path, LUA_CPATH = config.lua_cpath,
-                    LUA_PRELOAD = false, package = {}, _G = {},
+                    LUA_SERVICE = config.luaservice,
+                    LUA_PATH = config.lua_path,
+                    LUA_CPATH = config.lua_cpath,
+                    LUA_PRELOAD = false,
+                    package = {},
+                    _G = {},
                     loadfile = function(path)
                         local chunk, err = loadfile(path)
                         if chunk then return function() selected = path end end

@@ -69,10 +69,12 @@ local function check_history(url)
     print("本机 Gateway 登录、会话列表、最近消息和向前翻页均已通过", url)
 end
 
-return { run = function(config)
-    local client = gateway.AgentSocket:new(config.gateway_url):connect()
-    support.equal(client:request("LoginReq", { username = "local-agent-e2e" }).ret, 1)
-    check_version(client)
-    client:close()
-    check_history(config.gateway_url)
-end }
+return {
+    run = function(config)
+        local client = gateway.AgentSocket:new(config.gateway_url):connect()
+        support.equal(client:request("LoginReq", { username = "local-agent-e2e" }).ret, 1)
+        check_version(client)
+        client:close()
+        check_history(config.gateway_url)
+    end
+}

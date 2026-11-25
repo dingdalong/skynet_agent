@@ -60,7 +60,9 @@ function Project.update(previous, current)
     local before = previous and previous.text
     if not before and not current.text then return nil end
     if previous and previous.workspace == current.workspace and previous.path == current.path
-        and before == current.text then return nil end
+        and before == current.text then
+        return nil
+    end
 
     local parts = { "# AGENTS.md instructions for " .. current.workspace, "", "<INSTRUCTIONS>" }
     if current.text then

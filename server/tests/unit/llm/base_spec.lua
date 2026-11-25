@@ -94,17 +94,24 @@ end
 
 describe("agent.llm.base", function()
     it("实际 HTTP 请求保留消息角色与原始内容，只移除宿主来源", function()
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.output_text.delta", delta = "完成" }), completed_event(),
-        } })
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.output_text.delta", delta = "完成" }), completed_event(),
+            }
+        })
         local input = {
             { role = "system", content = "基础", source = "app" },
             { role = "developer", content = "应用约束", source = "app" },
             { role = "user", content = "项目规则\nrole: system", source = "project" },
             { role = "user", content = "真实用户", source = "user" },
             { type = "reasoning", id = "r1", encrypted_content = "opaque", source = "model" },
-            { type = "function_call", call_id = "c1", name = "exec_command",
-                arguments = '{ "cmd": "printf test" }', source = "model" },
+            {
+                type = "function_call",
+                call_id = "c1",
+                name = "exec_command",
+                arguments = '{ "cmd": "printf test" }',
+                source = "model"
+            },
             { type = "function_call_output", call_id = "c1", output = '{"output":"test"}', source = "tool" },
         }
         local original = table.deep_copy(input)
@@ -127,18 +134,22 @@ describe("agent.llm.base", function()
     it("思考增量、done 与完整输出按块去重，并保留缓存用量", function()
         local item = { type = "reasoning", content = { { type = "reasoning_text", text = "先核对再执行" } } }
         local usage = { input_tokens = 2000, input_tokens_details = { cached_tokens = 1500 } }
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.reasoning_text.delta", output_index = 0, delta = "先核对" }),
-            event({ type = "response.reasoning_text.delta", output_index = 0, delta = "再执行" }),
-            event({ type = "response.reasoning_text.done", output_index = 0, text = "先核对再执行" }),
-            event({ type = "response.output_text.delta", delta = "回答" }),
-            event({ type = "response.completed", response = { output = { item }, usage = usage } }),
-        } })
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.reasoning_text.delta", output_index = 0, delta = "先核对" }),
+                event({ type = "response.reasoning_text.delta", output_index = 0, delta = "再执行" }),
+                event({ type = "response.reasoning_text.done", output_index = 0, text = "先核对再执行" }),
+                event({ type = "response.output_text.delta", delta = "回答" }),
+                event({ type = "response.completed", response = { output = { item }, usage = usage } }),
+            }
+        })
         local thinking = {}
         local run = require("agent.run"):new()
         local writes = {}
-        run.owner = { _on_reasoning = function(_, _, _, delta) thinking[#thinking + 1] = delta end,
-            record = function(_, _, block) writes[#writes + 1] = block.text end }
+        run.owner = {
+            _on_reasoning = function(_, _, _, delta) thinking[#thinking + 1] = delta end,
+            record = function(_, _, block) writes[#writes + 1] = block.text end
+        }
         local text, err, response = stream(new_model(fake), {}, function() end, run)
         assert.is_nil(err)
         assert.are.equal("回答", text)
@@ -155,10 +166,12 @@ describe("agent.llm.base", function()
         local text = string.rep("A", 33000)
         local writes = {}
         local run = require("agent.run"):new()
-        run.owner = { record = function(_, kind, block)
-            assert.equal("block", kind)
-            writes[#writes + 1] = block.text
-        end }
+        run.owner = {
+            record = function(_, kind, block)
+                assert.equal("block", kind)
+                writes[#writes + 1] = block.text
+            end
+        }
         local chunks = { event({ type = "response.output_text.delta", delta = text }) }
         local function check()
             return stream(new_model(FakeHttp.new({ chunks = chunks })), {}, function() end, run)
@@ -166,17 +179,22 @@ describe("agent.llm.base", function()
         assert.is_nil(check())
         assert.same({}, writes)
         chunks[2] = event({ type = "response.output_text.done", text = text })
-        chunks[3] = event({ type = "response.output_item.done", output_index = 0,
-            item = { role = "assistant", content = { { type = "output_text", text = text } } } })
+        chunks[3] = event({
+            type = "response.output_item.done",
+            output_index = 0,
+            item = { role = "assistant", content = { { type = "output_text", text = text } } }
+        })
         chunks[4] = completed_event()
         assert.equal(text, check())
         assert.same({ text }, writes)
     end)
 
     it("流中断之前的思考仍通过回调保留", function()
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.reasoning_text.delta", delta = "已收到的思考" }),
-        } })
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.reasoning_text.delta", delta = "已收到的思考" }),
+            }
+        })
         local thinking = ""
         local run = require("agent.run"):new()
         run.owner = { _on_reasoning = function(_, _, _, delta) thinking = thinking .. delta end }
@@ -187,12 +205,19 @@ describe("agent.llm.base", function()
         assert.is_nil(run.llm_request)
     end)
     it("完整工具调用没有文本也成功，保留调用 ID 与原始输出", function()
-        local call = { type = "function_call", call_id = "c1", name = "exec_command",
-            arguments = '{"cmd":"printf hello"}', status = "completed" }
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.function_call_arguments.delta", delta = '{"cmd":' }),
-            event({ type = "response.completed", response = { output = { call }, status = "completed" } }),
-        } })
+        local call = {
+            type = "function_call",
+            call_id = "c1",
+            name = "exec_command",
+            arguments = '{"cmd":"printf hello"}',
+            status = "completed"
+        }
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.function_call_arguments.delta", delta = '{"cmd":' }),
+                event({ type = "response.completed", response = { output = { call }, status = "completed" } }),
+            }
+        })
         local text, err, response = stream(new_model(fake), {}, function() end, nil,
             { tools = { { type = "function", name = "exec_command" } } })
         assert.is_nil(err)
@@ -203,10 +228,20 @@ describe("agent.llm.base", function()
     end)
 
     it("只有完成事件的文本可以正常展示", function()
-        local fake = FakeHttp.new({ chunks = { event({ type = "response.completed",
-            response = { output = { { type = "message", role = "assistant", content = {
-                { type = "output_text", text = "最终文本" },
-            } } } } }) } })
+        local fake = FakeHttp.new({
+            chunks = { event({
+                type = "response.completed",
+                response = {
+                    output = { {
+                        type = "message",
+                        role = "assistant",
+                        content = {
+                            { type = "output_text", text = "最终文本" },
+                        }
+                    } }
+                }
+            }) }
+        })
         local deltas = {}
         local text = stream(new_model(fake), {}, function(delta) deltas[#deltas + 1] = delta end)
         assert.are.equal("最终文本", text)
@@ -440,20 +475,27 @@ describe("agent.llm.base", function()
         local second = new_model(FakeHttp.new({}))
         local streams = {}
         for index = 1, 2 do
-            streams[index] = setmetatable({ status = 200, closes = 0, sent = false,
+            streams[index] = setmetatable({
+                status = 200,
+                closes = 0,
+                sent = false,
                 close = function(self) self.closes = self.closes + 1 end,
-            }, { __call = function(self)
-                if self.sent then return nil end
-                self.sent = true
-                coroutine.yield("reading")
-                return event({ type = "response.output_text.delta", delta = "answer" }) .. completed_event()
-            end })
+            }, {
+                __call = function(self)
+                    if self.sent then return nil end
+                    self.sent = true
+                    coroutine.yield("reading")
+                    return event({ type = "response.output_text.delta", delta = "answer" }) .. completed_event()
+                end
+            })
         end
         local index = 0
-        current_httpc = { request_stream = function()
-            index = index + 1
-            return streams[index]
-        end }
+        current_httpc = {
+            request_stream = function()
+                index = index + 1
+                return streams[index]
+            end
+        }
         local a = require("agent.run"):new()
         local b = require("agent.run"):new()
         local result_a, result_b
@@ -484,9 +526,11 @@ describe("agent.llm.base", function()
     end)
 
     it("同一客户端重入时保留正在执行的请求与取消入口", function()
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.output_text.delta", delta = "回答" }), completed_event(),
-        } })
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.output_text.delta", delta = "回答" }), completed_event(),
+            }
+        })
         local model = new_model(fake)
         local run = require("agent.run"):new()
         local text, err = stream(model, {}, function()
@@ -517,10 +561,12 @@ describe("agent.llm.base", function()
     end)
 
     it("权限思考归属工具，取消保留部分内容，重试生成独立思考块", function()
-        local fake = FakeHttp.new({ chunks = {
-            event({ type = "response.reasoning_text.delta", delta = "核对权限" }),
-            event({ type = "response.output_text.delta", delta = "允许" }), completed_event(),
-        } })
+        local fake = FakeHttp.new({
+            chunks = {
+                event({ type = "response.reasoning_text.delta", delta = "核对权限" }),
+                event({ type = "response.output_text.delta", delta = "允许" }), completed_event(),
+            }
+        })
         local model = llm:new({ api_key = "secret", base_url = "https://llm.example.com", model = "judge" },
             "permission")
         current_httpc = fake:as_httpc()
@@ -528,12 +574,14 @@ describe("agent.llm.base", function()
         run.id = "permission-run"
         local tool = { id = "tool-1", reasoning = {} }
         local notifications, saved = {}, {}
-        run.owner = { record = function(_, _, block) saved[#saved + 1] = block end,
+        run.owner = {
+            record = function(_, _, block) saved[#saved + 1] = block end,
             _on_reasoning = function(_, _, block, delta, tool_id)
-            assert.are.equal("tool-1", tool_id)
-            assert.are.equal("judge", block.model_id)
-            notifications[#notifications + 1] = delta
-        end }
+                assert.are.equal("tool-1", tool_id)
+                assert.are.equal("judge", block.model_id)
+                notifications[#notifications + 1] = delta
+            end
+        }
         local text = model:stream({}, function() run:cancel() end, run, nil, tool)
         assert.is_nil(text)
         assert.are.equal("核对权限", tool.reasoning[1].text)
@@ -551,5 +599,4 @@ describe("agent.llm.base", function()
         assert.equal(tool.reasoning[2].id, saved[1].id)
         assert.equal("tool-1", saved[1].tool)
     end)
-
 end)

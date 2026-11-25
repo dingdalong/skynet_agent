@@ -75,7 +75,9 @@ function Node:init(start_services)
         assert(io.open("/tmp/skynet-ready", "w")):close()
         skynet.fork(function()
             while not self.closing do
-                if os.remove("/tmp/skynet-stop") then self:shutdown({}); return end
+                if os.remove("/tmp/skynet-stop") then
+                    self:shutdown({}); return
+                end
                 skynet.sleep(20)
             end
         end)

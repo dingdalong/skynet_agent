@@ -115,9 +115,20 @@ function Processes:start(argv, cwd, tty, mode, timeout, run, record, dependencie
     self.sequence = self.sequence + 1
     local id = self.session_id .. ":" .. self.sequence
     local output, errors = handle:fds()
-    local process = { id = id, handle = handle, tty = tty, mode = mode, argv = argv, cwd = cwd,
-        pending = "", record = record, message_id = run.message_id, published_at = skynet.now(),
-        deadline = skynet.now() + math.ceil(timeout / 10), readers = 0 }
+    local process = {
+        id = id,
+        handle = handle,
+        tty = tty,
+        mode = mode,
+        argv = argv,
+        cwd = cwd,
+        pending = "",
+        record = record,
+        message_id = run.message_id,
+        published_at = skynet.now(),
+        deadline = skynet.now() + math.ceil(timeout / 10),
+        readers = 0
+    }
     self.processes[id] = process
     run.processes[id] = self
     record.process_id, record.status = id, "running"
@@ -162,13 +173,20 @@ function Processes:collect(process, duration, max_tokens, input)
     if #output > cap then output = output:sub(1, cap // 2) .. "\n… 输出已截断 …\n" .. output:sub(-cap // 2) end
     output = text_bytes(output, true)
     self:publish(process)
-    return { session_id = not process.done and process.id or nil, output = output,
-        exit_code = process.exit_code, truncated = truncated, error = process.record.error }
+    return {
+        session_id = not process.done and process.id or nil,
+        output = output,
+        exit_code = process.exit_code,
+        truncated = truncated,
+        error = process.record.error
+    }
 end
 
 function Processes:terminate(id)
     local process = self.processes[id]
-    if process and not process.done then process.stopping = true; process.handle:terminate() end
+    if process and not process.done then
+        process.stopping = true; process.handle:terminate()
+    end
 end
 
 function Processes:close()

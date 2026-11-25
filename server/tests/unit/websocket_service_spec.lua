@@ -27,13 +27,19 @@ describe("websocket", function()
         call = function() return codes.succ, true end
         scope = Scope.new({
             ["skynet.crypt"] = { randomkey = function() return "salt" end, hexencode = tostring },
-            ["websocket"] = false, ["log"] = false,
-            ["etc.cfg"] = { agent_gateway = {
-                socket = { path = "/agent", max_message_bytes = 200000 }, login_timeout_ticks = 1000,
-            } },
+            ["websocket"] = false,
+            ["log"] = false,
+            ["etc.cfg"] = {
+                agent_gateway = {
+                    socket = { path = "/agent", max_message_bytes = 200000 }, login_timeout_ticks = 1000,
+                }
+            },
             skynet = {
-                error = function() end, self = function() return 10 end,
-                genid = function() next_id = next_id + 1; return next_id end,
+                error = function() end,
+                self = function() return 10 end,
+                genid = function()
+                    next_id = next_id + 1; return next_id
+                end,
                 timeout = function(_, callback) timers[#timers + 1] = callback end,
             },
             ["skynet.queue"] = function()
@@ -48,11 +54,15 @@ describe("websocket", function()
             },
             ["rpc"] = {
                 call = function(...) return call(...) end,
-                send = function(...) sent[#sent + 1] = { ... }; return codes.succ end,
+                send = function(...)
+                    sent[#sent + 1] = { ... }; return codes.succ
+                end,
             },
             ["http.websocket"] = {
                 is_close = function() return false end,
-                accept = function(fd, handle) handles[fd] = handle; coroutine.yield("accepting"); return true end,
+                accept = function(fd, handle)
+                    handles[fd] = handle; coroutine.yield("accepting"); return true
+                end,
                 close = function(fd, code) closed[#closed + 1] = { fd, code } end,
                 write = function(fd, data)
                     if fail_write then error("write failed") end
@@ -231,5 +241,4 @@ describe("websocket", function()
         assert.same({ 91 }, raw_closed)
         assert.same({}, instance.connections)
     end)
-
 end)

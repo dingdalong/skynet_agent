@@ -8,7 +8,9 @@ describe("node", function()
         instance, runtime, start, dispatch, result = nil, nil, nil, nil, nil
         launched, calls, named, forks, exits, logs = {}, {}, {}, {}, {}, {}
         failure, now, debug_installed = nil, 0, false
-        watcher = { started = false, closed = false,
+        watcher = {
+            started = false,
+            closed = false,
             start = function(self) self.started = true end,
             close = function(self)
                 assert.are.equal(6, #calls)
@@ -17,7 +19,8 @@ describe("node", function()
         }
         local skynet = {
             error = function(message) logs[#logs + 1] = message end,
-            self = function() return 1 end, address = tostring,
+            self = function() return 1 end,
+            address = tostring,
             register = function(name) named[name] = 1 end,
             start = function(callback) start = callback end,
             dispatch = function(protocol, callback)
@@ -62,26 +65,34 @@ describe("node", function()
             end,
         }
         scope = Scope.new({
-            ["node"] = false, ["service"] = false, ["log"] = false,
+            ["node"] = false,
+            ["service"] = false,
+            ["log"] = false,
             ["hotfix"] = { install_debug_command = function() debug_installed = true end },
-            ["helper.hotfix_watch"] = { new = function(_, node_instance)
-                assert.are.equal(instance, node_instance)
-                assert.are.equal(6, #calls)
-                return watcher
-            end },
-            ["skynet.manager"] = skynet, skynet = skynet,
-            ["rpc"] = { call_no_timeout = function(address, command, params)
-                calls[#calls + 1] = { address, command, params }
-                if command == "init" and address == failure then return codes.call_fail end
-                return codes.succ, true
-            end },
+            ["helper.hotfix_watch"] = {
+                new = function(_, node_instance)
+                    assert.are.equal(instance, node_instance)
+                    assert.are.equal(6, #calls)
+                    return watcher
+                end
+            },
+            ["skynet.manager"] = skynet,
+            skynet = skynet,
+            ["rpc"] = {
+                call_no_timeout = function(address, command, params)
+                    calls[#calls + 1] = { address, command, params }
+                    if command == "init" and address == failure then return codes.call_fail end
+                    return codes.succ, true
+                end
+            },
             ["etc.cfg"] = {
                 channel = "test",
                 runtime = { control_port = 18001 },
             },
         })
         -- 节点与服务运行时使用同一 loader 上下文，避免修改测试全局环境。
-        environment = setmetatable({ SERVICE_NAME = "main",
+        environment = setmetatable({
+            SERVICE_NAME = "main",
             os = { exit = function(code) exits[#exits + 1] = code end },
         }, { __index = _ENV })
         local path = assert(package.searchpath("service", package.path))

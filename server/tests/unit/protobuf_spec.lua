@@ -164,10 +164,14 @@ describe("protobuf", function()
         assert.are.equal("alice", args.username)
         assert.are.equal(login_request, protocol:encode_msg(1, "LoginReq", { username = "alice" }))
         local expectations = {
-            chat_request = "AgentChatReq", chat_first_request = "AgentChatReq",
-            login_success = "LoginRes", message_accepted = "AgentChatRes",
-            message_streaming = "AgentMessageDeltaNtf", message_completed = "AgentSessionUpdatedNtf",
-            message_cancelled = "AgentSessionUpdatedNtf", message_failed = "AgentSessionUpdatedNtf",
+            chat_request = "AgentChatReq",
+            chat_first_request = "AgentChatReq",
+            login_success = "LoginRes",
+            message_accepted = "AgentChatRes",
+            message_streaming = "AgentMessageDeltaNtf",
+            message_completed = "AgentSessionUpdatedNtf",
+            message_cancelled = "AgentSessionUpdatedNtf",
+            message_failed = "AgentSessionUpdatedNtf",
         }
         for key, expected in pairs(expectations) do
             local id, decoded_name, payload = protocol:decode_msg(decode_hex(vectors.frames[key]))

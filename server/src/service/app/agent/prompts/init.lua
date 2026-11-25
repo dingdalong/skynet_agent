@@ -88,7 +88,7 @@ function Prompts.permission_messages(templates, evidence)
     assert(type(evidence) == "string", "权限判断证据必须是字符串")
     return {
         { role = "system", source = "app", content = template(templates, "permission_judge") },
-        { role = "user", source = "app", content = evidence },
+        { role = "user",   source = "app", content = evidence },
     }
 end
 

@@ -13,7 +13,8 @@ message AgentSnapshotRes {
   AgentSnapshot snapshot = 4;
 }
 
-// before is the exclusive zero-based message offset. Zero requests the latest page.
+// before is the exclusive zero-based message offset. Zero requests the latest
+// page.
 message AgentSessionHistoryReq {
   string session_id = 1;
   uint32 before = 2;
@@ -40,7 +41,8 @@ message AgentReasoningDeltaNtf {
   string session_id = 1;
   string message_id = 2;
   string tool_call_id = 3;
-  // block.text contains only new text; terminal updates may carry an empty string.
+  // block.text contains only new text; terminal updates may carry an empty
+  // string.
   ReasoningBlock block = 4;
   uint32 revision = 5;
 }

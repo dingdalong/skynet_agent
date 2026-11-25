@@ -30,9 +30,12 @@ end
 
 function App:snapshot()
     return {
-        user_id = self.identity.user_id, username = self.identity.username,
-        desktops = self.execution:snapshot(), chat_sessions = self.chat:snapshot(),
-        models = models.public(config), default_model_id = self.default_model,
+        user_id = self.identity.user_id,
+        username = self.identity.username,
+        desktops = self.execution:snapshot(),
+        chat_sessions = self.chat:snapshot(),
+        models = models.public(config),
+        default_model_id = self.default_model,
         permission_model_id = config.permission.model_id or "",
     }
 end

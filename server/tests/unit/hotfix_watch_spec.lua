@@ -11,8 +11,11 @@ local function remove_tree(path)
     for entry in lfs.dir(path) do
         if entry ~= "." and entry ~= ".." then
             local child = path .. "/" .. entry
-            if lfs.symlinkattributes(child, "mode") == "directory" then remove_tree(child)
-            else assert(os.remove(child)) end
+            if lfs.symlinkattributes(child, "mode") == "directory" then
+                remove_tree(child)
+            else
+                assert(os.remove(child))
+            end
         end
     end
     assert(lfs.rmdir(path))
@@ -49,17 +52,21 @@ describe("hotfix_watch", function()
             return table.pack(true, nil, { updated = names, skipped = {} })
         end
         scope = Scope.new({
-            ["helper.hotfix_watch"] = false, log = false,
+            ["helper.hotfix_watch"] = false,
+            log = false,
             skynet = {
                 error = function(message) logs[#logs + 1] = message end,
-                self = function() return 1 end, now = function() return now end,
+                self = function() return 1 end,
+                now = function() return now end,
                 fork = function(callback) fork = callback end,
                 wakeup = function() end,
                 sleep = function(ticks) coroutine.yield(ticks) end,
                 request = function()
                     local batch = {}
                     return {
-                        add = function(_, request) batch[#batch + 1] = request; calls[#calls + 1] = request end,
+                        add = function(_, request)
+                            batch[#batch + 1] = request; calls[#calls + 1] = request
+                        end,
                         select = function(_, timeout)
                             assert.are.equal(300, timeout)
                             local index = 0
@@ -72,13 +79,15 @@ describe("hotfix_watch", function()
                 end,
             },
         })
-        node = { services = {
-            { name = "debug_console", address = 10 },
-            { name = ".websocket_1", address = 11, ready = true },
-            { name = ".websocket_2", address = 12, ready = true },
-            { name = ".starting", address = 13 },
-            { name = ".closed", address = 14, ready = true, closed = true },
-        } }
+        node = {
+            services = {
+                { name = "debug_console", address = 10 },
+                { name = ".websocket_1",  address = 11, ready = true },
+                { name = ".websocket_2",  address = 12, ready = true },
+                { name = ".starting",     address = 13 },
+                { name = ".closed",       address = 14, ready = true, closed = true },
+            }
+        }
         watch = require("helper.hotfix_watch"):new(node, root)
         watch.snapshot = watch:_snapshot()
     end)
@@ -199,7 +208,7 @@ describe("hotfix_watch", function()
         write(root .. "/service/websocket/websocket.lua", "return { version = 2 }")
         poll_change()
         assert.same({ "[hotfix_watch] reload 失败 error=部分更新 files=" .. root .. "/lualib/base/rpc.lua"
-            .. " errors=.websocket_1: 模块执行失败" }, logs)
+        .. " errors=.websocket_1: 模块执行失败" }, logs)
     end)
 
     it("全部目标均跳过时不输出成功日志", function()
@@ -256,7 +265,9 @@ describe("hotfix_watch", function()
         local path = root .. "/lualib/base/rpc.lua"
         local saved = false
         respond = function()
-            if not saved then write(path, "return { version = 3 }"); saved = true end
+            if not saved then
+                write(path, "return { version = 3 }"); saved = true
+            end
             return table.pack(true, nil, { updated = { "rpc" }, skipped = {} })
         end
         write(path, "return { version = 2 }")
@@ -283,7 +294,9 @@ describe("hotfix_watch", function()
         local loop = coroutine.create(fork)
         assert.same({ true, 50 }, { coroutine.resume(loop) })
         local closed = false
-        local closing = coroutine.create(function() watch:close(); closed = true end)
+        local closing = coroutine.create(function()
+            watch:close(); closed = true
+        end)
         assert.same({ true, 1 }, { coroutine.resume(closing) })
         assert.is_false(closed)
         assert.is_true(coroutine.resume(loop))
@@ -330,7 +343,9 @@ describe("hotfix_watch", function()
         end
         assert.same({ true, "hotfix response" }, { coroutine.resume(loop) })
         local closed = false
-        local closing = coroutine.create(function() watch:close(); closed = true end)
+        local closing = coroutine.create(function()
+            watch:close(); closed = true
+        end)
         assert.same({ true, 1 }, { coroutine.resume(closing) })
         write(root .. "/lualib/base/rpc.lua", "return { version = 3 }")
         for _ = 1, 3 do assert.is_true(coroutine.resume(loop)) end

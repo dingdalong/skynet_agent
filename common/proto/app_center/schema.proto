@@ -39,12 +39,38 @@ message AppCenterListRes {
   bool administrator = 5;
   repeated AppCenterOnlineNode online = 6;
 }
-message AppCenterUnlockReq { string token = 1; }
-message AppCenterUnlockRes { int32 ret = 1; ErrorInfo error = 2; }
-message AppCenterSetReq { string app_id = 1; bool enabled = 2; }
-message AppCenterSetRes { int32 ret = 1; ErrorInfo error = 2; }
-message AppCenterReviewReq { string app_id = 1; string request_id = 2; bool approve = 3; }
-message AppCenterReviewRes { int32 ret = 1; ErrorInfo error = 2; }
-message AppCenterRemoveReq { string app_id = 1; }
-message AppCenterRemoveRes { int32 ret = 1; ErrorInfo error = 2; }
-message AppCenterChangedNtf { string app_id = 1; bool enabled = 2; }
+message AppCenterUnlockReq {
+  string token = 1;
+}
+message AppCenterUnlockRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+}
+message AppCenterSetReq {
+  string app_id = 1;
+  bool enabled = 2;
+}
+message AppCenterSetRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+}
+message AppCenterReviewReq {
+  string app_id = 1;
+  string request_id = 2;
+  bool approve = 3;
+}
+message AppCenterReviewRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+}
+message AppCenterRemoveReq {
+  string app_id = 1;
+}
+message AppCenterRemoveRes {
+  int32 ret = 1;
+  ErrorInfo error = 2;
+}
+message AppCenterChangedNtf {
+  string app_id = 1;
+  bool enabled = 2;
+}

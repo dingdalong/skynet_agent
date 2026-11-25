@@ -23,8 +23,11 @@ function Remote:ctor(options)
     self.closed = false
     self.current_run = nil
     self.current_call_id = nil
-    self.config = { timeout_ms = options.tools.timeout_ms, max_processes = options.tools.max_processes,
-        max_output_bytes = options.tools.max_output_bytes }
+    self.config = {
+        timeout_ms = options.tools.timeout_ms,
+        max_processes = options.tools.max_processes,
+        max_output_bytes = options.tools.max_output_bytes
+    }
 end
 
 function Remote:invoke(operation, args, run, id)

@@ -9,7 +9,7 @@ XCODE_DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 PLATFORM ?= $(shell node -p '({darwin:"macos",win32:"windows",linux:"linux"})[process.platform] || "unknown"')
 
 .NOTPARALLEL:
-.PHONY: help install dev build check check-full client-check client-build client-archive client-test macos-test-app client-core-test client-platforms client-doctor client-preflight
+.PHONY: help install dev build format check check-full client-check client-build client-archive client-test macos-test-app client-core-test client-platforms client-doctor client-preflight
 
 help:
 	@printf '%s\n' \
@@ -18,7 +18,9 @@ help:
 		"  make install        安装项目客户端依赖" \
 		"  make dev            按 PLATFORM 构建并启动客户端（服务端单独启动）" \
 		"  make build          构建服务端和所选平台 Release 客户端" \
-		"  make check          服务端与客户端基础回归" \
+		"  make format         格式化本次改动的 Lua 和 proto 文件" \
+		"  make format SCOPE=all 格式化全部自有 Lua 和 proto 文件" \
+		"  make check          格式化本次改动的 Lua 和 proto，再运行两端基础回归" \
 		"  make check-full     基础回归、服务端集成及客户端原生集成（界面另用 Computer Use 验收）" \
 		"  make client-check   格式、类型、令牌、边界、逻辑和原生集成测试" \
 		"  make client-test    所选平台的原生运行时和生命周期集成测试" \
@@ -47,8 +49,11 @@ build: client-preflight
 	@docker compose build
 	@$(MAKE) client-build
 
+format:
+	@$(MAKE) -C "$(SERVER_DIR)" format
+
 check:
-	@$(MAKE) -C "$(SERVER_DIR)" check-format test
+	@$(MAKE) -C "$(SERVER_DIR)" check-basic
 	@$(MAKE) client-check
 
 check-full: check

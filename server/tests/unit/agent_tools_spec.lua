@@ -18,7 +18,9 @@ describe("Agent 工作区与文件访问", function()
             if lfs.symlinkattributes(path, "mode") == "directory" then
                 for name in lfs.dir(path) do if name ~= "." and name ~= ".." then remove(path .. "/" .. name) end end
                 assert(lfs.rmdir(path))
-            else assert(os.remove(path)) end
+            else
+                assert(os.remove(path))
+            end
         end
         remove(root)
     end)
@@ -51,19 +53,30 @@ describe("Agent 权限判断", function()
         it("规则通过后一律调用 LLM，rules_enabled=" .. tostring(enabled), function()
             local calls = 0
             local arguments = '{ "cmd": "printf hello", "tty": false }'
-            local scope = Scope.new({ ["agent.executor"] = false,
+            local scope = Scope.new({
+                ["agent.executor"] = false,
                 log = { info = function() end, failure = function() end },
                 ["agent.process"] = { new = function() return {} end },
-                ["agent.permission.llm_judge"] = { new = function(_, _, _, prompt_templates)
-                    assert.are.equal(templates, prompt_templates)
-                    return { decide = function(_, action)
-                        calls = calls + 1
-                        assert.are.equal(arguments, action.arguments)
-                        return false, "LLM 拒绝"
-                    end }
-                end }, skynet = {} })
-            local executor = require("agent.executor"):new({ workspace = "/", tools = { timeout_ms = 300000 },
-                permission = { rules_enabled = enabled }, prompt_templates = templates }, {})
+                ["agent.permission.llm_judge"] = {
+                    new = function(_, _, _, prompt_templates)
+                        assert.are.equal(templates, prompt_templates)
+                        return {
+                            decide = function(_, action)
+                                calls = calls + 1
+                                assert.are.equal(arguments, action.arguments)
+                                return false, "LLM 拒绝"
+                            end
+                        }
+                    end
+                },
+                skynet = {}
+            })
+            local executor = require("agent.executor"):new({
+                workspace = "/",
+                tools = { timeout_ms = 300000 },
+                permission = { rules_enabled = enabled },
+                prompt_templates = templates
+            }, {})
             local result = executor:execute({ name = "exec_command", arguments = arguments },
                 {}, { cancelled = false }, { output = "" })
             scope:restore()
@@ -74,14 +87,23 @@ describe("Agent 权限判断", function()
     end
 
     it("规则阻止时不调用 LLM 或启动进程", function()
-        local scope = Scope.new({ ["agent.executor"] = false,
-                log = { info = function() end, failure = function() end },
+        local scope = Scope.new({
+            ["agent.executor"] = false,
+            log = { info = function() end, failure = function() end },
             ["agent.process"] = { new = function() return {} end },
-            ["agent.permission.llm_judge"] = { new = function()
-                return { decide = function() error("规则阻止后不能调用模型") end }
-            end }, skynet = {} })
-        local executor = require("agent.executor"):new({ workspace = "/", tools = { timeout_ms = 300000 },
-            permission = { rules_enabled = true }, prompt_templates = templates }, {})
+            ["agent.permission.llm_judge"] = {
+                new = function()
+                    return { decide = function() error("规则阻止后不能调用模型") end }
+                end
+            },
+            skynet = {}
+        })
+        local executor = require("agent.executor"):new({
+            workspace = "/",
+            tools = { timeout_ms = 300000 },
+            permission = { rules_enabled = true },
+            prompt_templates = templates
+        }, {})
         local result = executor:execute({ name = "exec_command", arguments = '{"cmd":"reboot now"}' },
             {}, { cancelled = false }, { output = "" })
         scope:restore()
@@ -107,18 +129,32 @@ describe("Agent 权限判断", function()
             return '{"decision":"allow","reason":"任务已授权"}'
         end
         local arguments = [[{ "tty": false, "cmd": "printf \"中文\"\n" }]]
-        local action = { name = "exec_command", arguments = arguments, workspace = "/workspace",
-            cwd = "/workspace/sub", mode = "require_escalated", paths = { "/workspace/a", "/workspace/b" },
-            launch_argv = { "/bin/bash", "-c", 'printf "中文"\n' }, timeout = 1000,
-            wait_ms = 100, max_tokens = 4000 }
+        local action = {
+            name = "exec_command",
+            arguments = arguments,
+            workspace = "/workspace",
+            cwd = "/workspace/sub",
+            mode = "require_escalated",
+            paths = { "/workspace/a", "/workspace/b" },
+            launch_argv = { "/bin/bash", "-c", 'printf "中文"\n' },
+            timeout = 1000,
+            wait_ms = 100,
+            max_tokens = 4000
+        }
         local history = {
             { role = "system", source = "app", content = "原始规则" },
             { role = "user", source = "project", content = "项目规则" },
             { role = "user", source = "user", content = "第一行\n引号\"和反斜线\\" },
-            { type = "reasoning", content = { { type = "reasoning_text", text = "思考正文" } },
-                summary = { { type = "summary_text", text = "思考摘要" } } },
-            { role = "assistant", content = { { type = "output_text", text = "助手正文" },
-                { type = "refusal", refusal = "拒绝正文" } } },
+            {
+                type = "reasoning",
+                content = { { type = "reasoning_text", text = "思考正文" } },
+                summary = { { type = "summary_text", text = "思考摘要" } }
+            },
+            {
+                role = "assistant",
+                content = { { type = "output_text", text = "助手正文" },
+                    { type = "refusal", refusal = "拒绝正文" } }
+            },
             { type = "function_call", call_id = "call-1", name = "exec_command", arguments = arguments },
             { type = "function_call_output", call_id = "call-1", output = '{"output":"已执行"}' },
         }
@@ -140,7 +176,7 @@ describe("Agent 权限判断", function()
             "执行超时毫秒:\n1000\n", "等待毫秒:\n100\n", "输出 token 上限:\n4000\n" }) do
             assert.is_not_nil(captured[1]:find(text, 1, true), text)
         end
-        assert.are.equal(arguments .. "\n", captured[2]:sub(-#arguments - 1))
+        assert.are.equal(arguments .. "\n", captured[2]:sub(- #arguments - 1))
         -- 同样的字段以不同顺序写入 table，提示文本保持不变。
         history[#history] = { content = "追加消息", source = "user", role = "user" }
         assert.is_true(judge:decide(action, context, require("agent.run"):new()))

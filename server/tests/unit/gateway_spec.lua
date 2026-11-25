@@ -7,13 +7,16 @@ describe("gateway", function()
         sent, closed = {}, {}
         failure = false
         scope = Scope.new({
-            ["gateway"] = false, ["log"] = false,
+            ["gateway"] = false,
+            ["log"] = false,
             skynet = { error = function() end },
             ["etc.cfg"] = { agent_gateway = { socket = { host = "127.0.0.1", port = 18787 } } },
-            ["rpc"] = { send = function(address, command, ...)
-                sent[#sent + 1] = { address, command, ... }
-                return failure and codes.call_fail or codes.succ
-            end },
+            ["rpc"] = {
+                send = function(address, command, ...)
+                    sent[#sent + 1] = { address, command, ... }
+                    return failure and codes.call_fail or codes.succ
+                end
+            },
             ["skynet.socket"] = {
                 listen = function() return 90 end,
                 start = function(_, callback) listener = callback end,

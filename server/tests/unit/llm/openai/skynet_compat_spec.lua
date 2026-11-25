@@ -441,7 +441,9 @@ describe("HTTP 请求主动取消", function()
             status = 200,
             close = function() closes = closes + 1 end,
         }, {
-            __call = function() coroutine.yield("reading"); return nil end,
+            __call = function()
+                coroutine.yield("reading"); return nil
+            end,
         })
         package.loaded["http.httpc"] = { request_stream = function() return stream end }
         load_compat()
@@ -466,11 +468,17 @@ describe("HTTP 请求主动取消", function()
         local stream = setmetatable({
             status = 200,
             close = function() closes = closes + 1 end,
-        }, { __call = function() reads = reads + 1; return nil end })
-        package.loaded["http.httpc"] = { request_stream = function()
-            request:cancel()
-            return stream
-        end }
+        }, {
+            __call = function()
+                reads = reads + 1; return nil
+            end
+        })
+        package.loaded["http.httpc"] = {
+            request_stream = function()
+                request:cancel()
+                return stream
+            end
+        }
         load_compat()
         local ok, err = compat.request(request_options(ltn12.sink.table({})), request)
         luassert.is_nil(ok)

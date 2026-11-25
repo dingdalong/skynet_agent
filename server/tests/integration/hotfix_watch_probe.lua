@@ -108,7 +108,7 @@ function M.run(config)
             marked(source(protocol_path), "function Frame.unpack(data)", "AUTO_PROTOCOL_V2")
         local client_v3 = marked(client_source, client_signature, "AUTO_CLIENT_V3", true)
         local failed = save_batch({
-            { ws_path, ws_v2 .. "\nsyntax error\n" },
+            { ws_path,     ws_v2 .. "\nsyntax error\n" },
             { client_path, client_v3 }, { protocol_path, protocol_v2 },
         }, "预检查失败")
         support.contains(failed, ws_path)
@@ -130,7 +130,7 @@ function M.run(config)
         local ws_v4 = marked(ws_source, ws_signature, "AUTO_WS_V4")
         local protocol_v3 = replace(protocol_v2, "AUTO_PROTOCOL_V2", "AUTO_PROTOCOL_V3")
         local execution_failure = save_batch({
-            { ws_path, replace(ws_v4, "return Websocket", 'error("AUTO_WS_CANDIDATE_ERROR")\nreturn Websocket') },
+            { ws_path,       replace(ws_v4, "return Websocket", 'error("AUTO_WS_CANDIDATE_ERROR")\nreturn Websocket') },
             { protocol_path, protocol_v3 },
         }, "部分更新")
         for _, name in ipairs({ "websocket_1", "websocket_2" }) do
@@ -171,7 +171,7 @@ function M.run(config)
 
         local shared = save_batch({
             { node_path, marked(node_source, "function Node:status()", "AUTO_NODE_V2") },
-            { rpc_path, marked(rpc_source, rpc_signature, "AUTO_RPC_V3") },
+            { rpc_path,  marked(rpc_source, rpc_signature, "AUTO_RPC_V3") },
         })
         support.same(updated_files(shared), { node_path, rpc_path })
         start = offset()
@@ -190,10 +190,10 @@ function M.run(config)
         local chat_path = "src/service/app/agent/handler.lua"
         local chat_source = source(chat_path)
         local handlers = {
-            { "AgentSnapshotReq", "AUTO_AGENT_SNAPSHOT_V2", "" },
-            { "AgentChatReq", "AUTO_CHAT_REQUEST_V2", "args, connection" },
-            { "AgentMessageCancelReq", "AUTO_CHAT_CANCEL_V2", "args" },
-            { "AgentSessionModelSetReq", "AUTO_CHAT_MODEL_V2", "args" },
+            { "AgentSnapshotReq",        "AUTO_AGENT_SNAPSHOT_V2", "" },
+            { "AgentChatReq",            "AUTO_CHAT_REQUEST_V2",   "args, connection" },
+            { "AgentMessageCancelReq",   "AUTO_CHAT_CANCEL_V2",    "args" },
+            { "AgentSessionModelSetReq", "AUTO_CHAT_MODEL_V2",     "args" },
         }
         for _, handler in ipairs(handlers) do
             chat_source = marked(chat_source, "function REQUEST:" .. handler[1] .. "(" .. handler[3] .. ")",
@@ -239,8 +239,11 @@ function M.run(config)
             }).ret, 1)
         end
         markers(start, {
-            AUTO_AGENT_SERVICE_V2 = 2, AUTO_AGENT_SNAPSHOT_V2 = 2, AUTO_CHAT_REQUEST_V2 = 2,
-            AUTO_CHAT_CANCEL_V2 = 2, AUTO_CHAT_MODEL_V2 = 2,
+            AUTO_AGENT_SERVICE_V2 = 2,
+            AUTO_AGENT_SNAPSHOT_V2 = 2,
+            AUTO_CHAT_REQUEST_V2 = 2,
+            AUTO_CHAT_CANCEL_V2 = 2,
+            AUTO_CHAT_MODEL_V2 = 2,
         }, "四个用户应在两个常驻 Agent 实例中调用热修后的服务与 REQUEST 方法")
         support.control(config, "stop")
         for _, connection in ipairs(connections) do support.equal(connection.client:wait_for_close(), 1001) end

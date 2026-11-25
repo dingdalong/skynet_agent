@@ -23,8 +23,15 @@ function Store.append(session, kind, data)
     assert(not session.read_only and not session.storage_failed, "会话不可写")
     local user = session.owner.app.identity.user_id
     local seq = session.sequence + 1
-    local doc = { _id = user .. "/" .. session.id .. "/" .. seq, user_id = user, session_id = session.id,
-        seq = seq, schema_version = 1, kind = kind, payload = json.encode(data) }
+    local doc = {
+        _id = user .. "/" .. session.id .. "/" .. seq,
+        user_id = user,
+        session_id = session.id,
+        seq = seq,
+        schema_version = 1,
+        kind = kind,
+        payload = json.encode(data)
+    }
     if kind == "ask" then doc.summary = json.encode({ title = data.title, time = data.time }) end
     if kind == "ask" or kind == "finish" then doc.updated_at = data.time end
     session.sequence = seq
@@ -59,13 +66,20 @@ local function settle(s, state)
         if not state.results[tool.id] then
             missing = true
             tool.status, tool.error = "interrupted", tool.error or interrupted()
-            table.insert(s.saved_context, { type = "function_call_output", call_id = tool.id,
-                output = json.encode({ error = interrupted() }), source = "tool" })
+            table.insert(s.saved_context, {
+                type = "function_call_output",
+                call_id = tool.id,
+                output = json.encode({ error = interrupted() }),
+                source = "tool"
+            })
         end
     end
     if missing then
-        table.insert(s.saved_context, { role = "developer", source = "environment",
-            content = "工具结果未确认，继续前先核查副作用，避免重复执行。" })
+        table.insert(s.saved_context, {
+            role = "developer",
+            source = "environment",
+            content = "工具结果未确认，继续前先核查副作用，避免重复执行。"
+        })
     end
     state.calls, state.results = {}, {}
 end
@@ -99,15 +113,30 @@ local function apply(s, state, kind, d)
         if d.retry then
             assert(previous and previous.id == d.message)
             for i, message in ipairs(s.messages) do
-                if message == previous then table.remove(s.messages, i); break end
+                if message == previous then
+                    table.remove(s.messages, i); break
+                end
             end
         else
-            table.insert(s.messages, { id = d.user_message, role = 1, status = 2, content = d.text,
-                created_at = s.updated_at })
+            table.insert(s.messages, {
+                id = d.user_message,
+                role = 1,
+                status = 2,
+                content = d.text,
+                created_at = s.updated_at
+            })
         end
-        state.message = { id = d.message, role = 2, status = 4, created_at = s.updated_at, run_id = d.run,
-            content = "", tool_calls = {}, reasoning = {},
-            error = { message = "服务中断，可发送消息继续" } }
+        state.message = {
+            id = d.message,
+            role = 2,
+            status = 4,
+            created_at = s.updated_at,
+            run_id = d.run,
+            content = "",
+            tool_calls = {},
+            reasoning = {},
+            error = { message = "服务中断，可发送消息继续" }
+        }
         table.insert(s.messages, state.message)
         if d.retry then
             state.message.tool_calls, state.message.reasoning = previous.tool_calls, previous.reasoning
@@ -126,8 +155,11 @@ local function apply(s, state, kind, d)
     elseif kind == "target" then
         assert(not d.target or valid_target(d.target))
         s.execution_target = d.target
-        table.insert(s.saved_context, { role = "developer", source = "environment",
-            content = "执行环境已切换到 " .. assert(d.workspace) })
+        table.insert(s.saved_context, {
+            role = "developer",
+            source = "environment",
+            content = "执行环境已切换到 " .. assert(d.workspace)
+        })
     else
         local msg = assert(state.message)
         assert(d.run == msg.run_id)
@@ -164,8 +196,14 @@ local function apply(s, state, kind, d)
                 local item = assert(calls[call.call_id])
                 assert(item.name == call.name and item.arguments == call.arguments)
                 calls[call.call_id] = nil
-                local tool = { id = call.call_id, name = call.name, arguments = call.arguments,
-                    status = "interrupted", run_id = d.run, error = interrupted() }
+                local tool = {
+                    id = call.call_id,
+                    name = call.name,
+                    arguments = call.arguments,
+                    status = "interrupted",
+                    run_id = d.run,
+                    error = interrupted()
+                }
                 table.insert(msg.tool_calls, tool)
                 table.insert(state.calls, tool)
                 state.seen[call.call_id] = tool
@@ -186,16 +224,24 @@ local function apply(s, state, kind, d)
             if tool.status == "interrupted" then tool.status = d.result.ok == false and "failed" or "completed" end
             if tool.status == "running" then tool.status, tool.error = "interrupted", interrupted() end
             state.results[d.id], state.resolved[d.id] = true, true
-            table.insert(s.saved_context, { type = "function_call_output", call_id = d.id,
-                output = json.encode(d.result), source = "tool" })
+            table.insert(s.saved_context, {
+                type = "function_call_output",
+                call_id = d.id,
+                output = json.encode(d.result),
+                source = "tool"
+            })
         elseif kind == "block" then
             assert(type(d.text) == "string" and type(d.id) == "string")
             if d.reasoning then
                 local target = d.tool and assert(state.seen[d.tool]) or msg
                 target.reasoning = target.reasoning or {}
-                table.insert(target.reasoning, { id = d.id, run_id = d.run,
+                table.insert(target.reasoning, {
+                    id = d.id,
+                    run_id = d.run,
                     model_id = type(d.model_id) == "string" and d.model_id or s.model_id,
-                    text = d.text, status = "completed" })
+                    text = d.text,
+                    status = "completed"
+                })
             else
                 msg.content = msg.content .. d.text
             end
@@ -242,8 +288,13 @@ local function restore_session(chat, id, rows)
                     tool.changed_files, tool.exit_code = {}, nil
                 end
             end
-            table.insert(s.messages, { id = "gap-" .. doc.seq, role = 2, status = 0,
-                content = "部分历史未能恢复", created_at = s.updated_at })
+            table.insert(s.messages, {
+                id = "gap-" .. doc.seq,
+                role = 2,
+                status = 0,
+                content = "部分历史未能恢复",
+                created_at = s.updated_at
+            })
             local reason = gap and "sequence" or doc.kind == "result" and "invalid_result" or "invalid_record"
             log.info("agent.persistence", "restore", "document=%s version=%s reason=%s",
                 expected, tostring(version), reason)
@@ -283,12 +334,25 @@ function Store.restore(app)
     -- Only the latest question can supply a legacy title; larger response/tool payloads stay in MongoDB.
     local history = database("aggregate", "history", {
         { ["$match"] = { user_id = user } },
-        { ["$project"] = { session_id = 1, seq = 1, updated_at = 1,
-            ask = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } }, "$seq", 0 } },
-            question = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } },
-                { ["$ifNull"] = { "$summary", "$payload" } }, "" } } } },
-        { ["$group"] = { _id = "$session_id", updated_at = { ["$max"] = "$updated_at" },
-            question = { ["$top"] = { sortBy = { ask = -1 }, output = "$question" } } } },
+        {
+            ["$project"] = {
+                session_id = 1,
+                seq = 1,
+                updated_at = 1,
+                ask = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } }, "$seq", 0 } },
+                question = {
+                    ["$cond"] = { { ["$eq"] = { "$kind", "ask" } },
+                        { ["$ifNull"] = { "$summary", "$payload" } }, "" }
+                }
+            }
+        },
+        {
+            ["$group"] = {
+                _id = "$session_id",
+                updated_at = { ["$max"] = "$updated_at" },
+                question = { ["$top"] = { sortBy = { ask = -1 }, output = "$question" } }
+            }
+        },
     })
     for _, doc in ipairs(settings) do
         if doc.user_id == user and type(doc._id) == "string" and doc._id:sub(1, #user + 1) == user .. "/" then
@@ -299,7 +363,8 @@ function Store.restore(app)
             if known and doc.schema_version == nil then app.legacy_settings[key] = true end
             if not known or doc.schema_version ~= 1 and not app.legacy_settings[key] then
                 app.blocked_settings[key] = true
-            elseif key == "model" and type(doc.model_id) == "string" then app.default_model = doc.model_id
+            elseif key == "model" and type(doc.model_id) == "string" then
+                app.default_model = doc.model_id
             elseif key:sub(1, 7) == "device/" and type(doc.name) == "string" then
                 local id = key:sub(8)
                 app.execution.devices[id] = { id = id, name = doc.name, remote_enabled = doc.remote_enabled == true }
@@ -349,7 +414,9 @@ function Store.reload(app, old)
         old:close()
         chat.sessions[old.id] = nil
         for i, id in ipairs(chat.session_order) do
-            if id == old.id then table.remove(chat.session_order, i); break end
+            if id == old.id then
+                table.remove(chat.session_order, i); break
+            end
         end
         return
     end

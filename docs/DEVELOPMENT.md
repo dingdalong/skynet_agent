@@ -14,12 +14,20 @@
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
 | Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
 | Lua 5.5、LuaRocks、Busted | 服务端单元测试 |
+| Python 3、VS Code 的 `sumneko.lua` 扩展、clang-format 16 或以上 | 格式化自有 Lua 和 proto 文件 |
 | netcat（nc） | 服务端控制脚本 |
 
 已有仓库补齐子模块：`git submodule update --init --recursive`。
 macOS 可通过 Homebrew 安装 OpenSSL；服务端默认从 Homebrew 查找，其他位置可指定
 `OPENSSL_PREFIX`，或 `OPENSSL_INCLUDE_DIR`、`OPENSSL_LIB_DIR`。
 使用 `luarocks install busted` 安装测试入口，并确认其使用 Lua 5.5。
+
+Lua 格式化调用 VS Code 已安装的 Sumneko 扩展，并按文件位置读取项目的 `.editorconfig`。
+VS Code 中启用 EditorConfig 扩展，可让“格式化文档”也使用项目缩进；编辑器自行猜测缩进时可能产生差异。
+使用自定义扩展目录或无 IDE 的环境时，将 `LUA_LANGUAGE_SERVER` 指向相同版本 LuaLS 发行包中的
+`bin/lua-language-server`。proto 使用 PATH 中的 `clang-format`，macOS 也可通过 `xcrun` 调用，
+自定义安装可用 `CLANG_FORMAT` 指定可执行文件。
+
 原生 Linux 测试使用 autoconf、bubblewrap 和用户 namespace。Docker 中的 Agent 工作目录沙盒使用 Landlock，要求 Docker 的 Linux 内核支持 ABI 6 或更高版本。
 
 ## 目录与日常命令
@@ -152,7 +160,9 @@ dbgcmd .client_1 HOTFIX client client.user
 
 | 命令 | 覆盖 |
 | --- | --- |
-| `make check` | 服务端格式与单元测试（含公共协议和固定二进制向量）、客户端基础检查 |
+| `make format` | 单独格式化本次新增、修改或重命名的自有 Lua 和 proto 文件（含未跟踪文件），结果写入工作区，暂存由开发者处理 |
+| `make format SCOPE=all` | 格式化全部自有 Lua 和 proto，包括未改动及新建未被忽略的文件，跳过第三方库及构建产物 |
+| `make check` | 自动格式化本次改动的 Lua 和 proto，再运行服务端格式检查、单元测试（含公共协议和固定二进制向量）和客户端基础检查 |
 | `make -C server check` | 服务端格式、单元测试及全部服务端集成 |
 | `make client-check` | 格式、TypeScript、令牌、导入边界、几何逻辑与原生进程集成 |
 | `make client-test` | 实际 JSC 子进程、权限、更新、故障、任务与本地 WebSocket 生命周期 |

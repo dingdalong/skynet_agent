@@ -142,6 +142,7 @@ function module.request(options, request, client)
             end
         end
     end
+
     if request then
         request.stream = stream
     end

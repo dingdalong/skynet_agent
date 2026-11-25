@@ -93,7 +93,9 @@ function M.control(config, command, timeout_ticks)
         M.contains(M.console(18004, 'call .main "shutdown"'), "<CMD OK>")
         M.until_true(function()
             local fd = socket.open("127.0.0.1", 18004)
-            if fd then socket.close(fd); return false end
+            if fd then
+                socket.close(fd); return false
+            end
             return true
         end, "应用中心应先排空应用并关闭", 2000)
     end
