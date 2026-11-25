@@ -1,6 +1,6 @@
 local skynet = require("skynet.manager")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 local mode = require("etc.cfg.test_runtime").shutdown_mode
 local port = require("etc.cfg.test_runtime").shutdown_port
@@ -33,7 +33,7 @@ else
             end
             if mode == "login" and (command == "bind_client" or command == "send_response"
                     or command == "close_connection") then
-                skynet.retpack(codes.succ, true)
+                skynet.retpack(error_code.succ, true)
                 return
             end
             callback(session, source, command, ...)
@@ -57,7 +57,7 @@ else
                     logind, "handle_request", "login", 1, "login",
                     codec:encode_body("LoginReq", { username = "shutdown" })
                 )
-                assert(code == codes.succ and handled)
+                assert(code == error_code.succ and handled)
                 login_completed = true
             end)
             while not login_started do

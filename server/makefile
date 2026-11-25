@@ -58,7 +58,7 @@ OPENSSL_INCLUDE_DIR ?= $(OPENSSL_PREFIX)/include
 OPENSSL_LIB_DIR ?= $(OPENSSL_PREFIX)/lib
 endif
 
-BUSTED_LPATH := ./?.lua;./?/init.lua;./../common/?.lua;./../common/?/init.lua;./src/lualib/?.lua;./src/lualib/?/init.lua;./src/lualib/base/?.lua;./src/service/?/?.lua;./src/service/?.lua;./src/service/?/init.lua;./src/service/app/?.lua;./src/service/app/?/init.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/lua-protobuf/?.lua;./3rd/lua-protobuf/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
+BUSTED_LPATH := ./?.lua;./?/init.lua;./../common/enum/?.lua;./../common/?.lua;./../common/?/init.lua;./src/lualib/?.lua;./src/lualib/?/init.lua;./src/lualib/base/?.lua;./src/service/?/?.lua;./src/service/?.lua;./src/service/?/init.lua;./src/service/app/?.lua;./src/service/app/?/init.lua;./3rd/lua-openai/?.lua;./3rd/lua-openai/?/init.lua;./3rd/lua-protobuf/?.lua;./3rd/lua-protobuf/?/init.lua;./3rd/tableshape/?.lua;./3rd/tableshape/?/init.lua;./tests/?.lua;./tests/?/init.lua
 BUSTED_CPATH := ./luaclib/?.so
 
 # 集成测试共用网关端口，构建也会重写 C 模块，不能并行调度这些目标。

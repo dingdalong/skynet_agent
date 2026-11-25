@@ -1,5 +1,5 @@
 local skynet = require("skynet")
-local error_code = require("enum.error_code")
+local error_code = require("error_code")
 local log = require("log")
 
 local Rpc = {}

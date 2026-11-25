@@ -4,7 +4,7 @@ local cluster = require("skynet.cluster")
 local crypt = require("skynet.crypt")
 local nodes = require("network.nodes")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local config = require("etc.cfg")
 local Pool = require("helper.service_pool")
 ---@class gateway.AppRoutes
@@ -58,7 +58,7 @@ function Routes:_install(snapshot)
     end
     self.snapshot = { revision = self.snapshot.revision + 1, apps = apps }
     for client in pairs(self.clients) do
-        assert(rpc.call(client, "sync_routes", self.snapshot) == codes.succ, "网关路由同步失败")
+        assert(rpc.call(client, "sync_routes", self.snapshot) == error_code.succ, "网关路由同步失败")
     end
     self.epoch, self.version, self.refresh = snapshot.epoch, snapshot.revision, refresh
     return true
@@ -83,7 +83,7 @@ function Routes:init()
         if ok then
             self.center = address
             local code, directory = rpc.call(self.center, "directory", self.key, self.boot)
-            if code == codes.succ then snapshot = directory end
+            if code == error_code.succ then snapshot = directory end
         end
         if not snapshot then skynet.sleep(20) end
     until snapshot or skynet.now() >= deadline
@@ -95,7 +95,7 @@ function Routes:init()
             local epoch = self.epoch
             local revision = self.refresh and 0 or self.version
             local result, next_snapshot = rpc.call(self.center, "directory", self.key, self.boot, epoch, revision)
-            if result == codes.succ and next_snapshot and epoch == self.epoch then self:_apply(next_snapshot) end
+            if result == error_code.succ and next_snapshot and epoch == self.epoch then self:_apply(next_snapshot) end
         end
     end)
 end
@@ -120,7 +120,7 @@ function Routes:request(context, generation, identity, id, body)
     assert(self.clients[context.source])
     local code, result = rpc.call_no_timeout(self.center, "request", self.key, self.boot,
         generation, identity, id, body)
-    assert(code == codes.succ)
+    assert(code == error_code.succ)
     return result
 end
 
@@ -135,7 +135,7 @@ function Routes:publish(_, key, boot, app, generation, username, body, connectio
     local target = skynet.localname(".client_" .. slot)
     if not target or not self.clients[target] then return false end
     local code, delivered = rpc.call(target, "publish", app, generation, username, body, connection, cursor)
-    return code == codes.succ and delivered
+    return code == error_code.succ and delivered
 end
 
 function Routes:close()

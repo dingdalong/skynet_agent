@@ -1,5 +1,5 @@
 local class = require("class")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 ---@class agent.DesktopConnections
 ---@field app agent.App
@@ -50,7 +50,7 @@ function DesktopConnections:register(args, connection)
         local ok = pcall(require("agent.persistence").settings, self.app, key,
             { name = args.name, remote_enabled = args.remote_enabled == true })
         if not ok then
-            return nil, { ret = codes.call_fail, error = { message = "设备设置保存未确认", retryable = true } }
+            return nil, { ret = error_code.call_fail, error = { message = "设备设置保存未确认", retryable = true } }
         end
     end
     if not device then

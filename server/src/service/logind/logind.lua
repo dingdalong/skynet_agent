@@ -6,7 +6,7 @@ local Frame = require("network.frame")
 local pool = require("helper.service_pool")
 local rpc = require("rpc")
 local log = require("log")
-local error_code = require("enum.error_code")
+local error_code = require("error_code")
 
 ---@class logind.Service
 ---@field new fun(self: logind.Service): logind.Service

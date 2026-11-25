@@ -6,7 +6,7 @@ local crypt = require("skynet.crypt")
 local Pool = require("helper.service_pool")
 local Protocol = require("network.protocol")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 ---@class app_endpoint.Service
 ---@field app string
 ---@field version string?
@@ -74,7 +74,7 @@ function Endpoint:request(_, generation, identity, connection, body, draining)
     local name, args = self.codec:decode_body(body, "Req")
     local code, result = rpc.call_no_timeout(self.workers:select(identity.username), "handle_request",
         identity, connection, name, args, self.draining or draining)
-    assert(code == codes.succ and type(result) == "table", "应用请求处理失败")
+    assert(code == error_code.succ and type(result) == "table", "应用请求处理失败")
     return self.codec:encode_body(name:gsub("Req$", "Res"), result)
 end
 
@@ -110,7 +110,7 @@ function Endpoint:drain(_, generation)
     self.draining = true
     for _, address in ipairs(self.workers.addresses) do
         local code, done = rpc.call_no_timeout(address, "drain")
-        assert(code == codes.succ and done, "应用排空失败")
+        assert(code == error_code.succ and done, "应用排空失败")
     end
     self.drained = true
     return self.last
@@ -118,7 +118,7 @@ end
 
 function Endpoint:finish(_, generation)
     assert(self.drained and generation == self.generation, "应用尚未完成排空")
-    return rpc.send(".main", "shutdown") == codes.succ
+    return rpc.send(".main", "shutdown") == error_code.succ
 end
 
 return Endpoint

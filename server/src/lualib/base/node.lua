@@ -4,7 +4,7 @@ local Service = require("service")
 local hotfix = require("hotfix")
 local rpc = require("rpc")
 local log = require("log")
-local error_code = require("enum.error_code")
+local error_code = require("error_code")
 local config = require("etc.cfg")
 local HotfixWatch = require("helper.hotfix_watch")
 

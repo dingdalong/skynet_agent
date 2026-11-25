@@ -1,5 +1,5 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 describe("node", function()
     local scope, instance, runtime, start, dispatch, environment, result, start_services
@@ -81,8 +81,8 @@ describe("node", function()
             ["rpc"] = {
                 call_no_timeout = function(address, command, params)
                     calls[#calls + 1] = { address, command, params }
-                    if command == "init" and address == failure then return codes.call_fail end
-                    return codes.succ, true
+                    if command == "init" and address == failure then return error_code.call_fail end
+                    return error_code.succ, true
                 end
             },
             ["etc.cfg"] = {
@@ -170,7 +170,7 @@ describe("node", function()
             assert.are.equal(1, named[".main"])
             assert.are.equal(11, named["." .. name .. "_1"])
             assert.are.equal(1, runs)
-            assert.are.equal(codes.invalid_command, runtime:invoke({ source = 1 }, "init", callback))
+            assert.are.equal(error_code.invalid_command, runtime:invoke({ source = 1 }, "init", callback))
             assert.are.equal(1, runs)
             assert.is_true(instance ~= previous)
             previous = instance
@@ -227,7 +227,7 @@ describe("node", function()
         failure = 14
         local original_call = package.loaded["rpc"].call_no_timeout
         package.loaded["rpc"].call_no_timeout = function(address, command, ...)
-            if command == "close" and address == 14 then return codes.call_fail end
+            if command == "close" and address == 14 then return error_code.call_fail end
             return original_call(address, command, ...)
         end
         start()
@@ -257,7 +257,7 @@ describe("node", function()
                 select = function(_, timeout)
                     assert.are.equal(300, timeout)
                     local index = 0
-                    local responses = { { codes.succ, "ready" }, { codes.call_fail }, false }
+                    local responses = { { error_code.succ, "ready" }, { error_code.call_fail }, false }
                     return function()
                         index = index + 1
                         if index <= 3 then return requests[index], responses[index] end
@@ -269,7 +269,7 @@ describe("node", function()
         assert.same({ { 11, "lua", "status", n = 3 }, { 12, "lua", "status", n = 3 }, { 13, "lua", "status", n = 3 },
             { 14, "lua", "status", n = 3 }, { 15, "lua", "status", n = 3 },
             { 16, "lua", "status", n = 3 } }, requests)
-        assert.same(table.pack(codes.succ, table.concat({
+        assert.same(table.pack(error_code.succ, table.concat({
             ".database 11 ready", ".worker_1 12 failed", ".worker_2 13 failed", ".coordinator_1 14 unavailable",
             ".transport_1 15 unavailable", ".entry 16 unavailable",
         }, "\n")), result)
@@ -278,7 +278,7 @@ describe("node", function()
         start()
         local original_call = package.loaded["rpc"].call_no_timeout
         package.loaded["rpc"].call_no_timeout = function(address, command, ...)
-            if address == 16 then return codes.call_fail end
+            if address == 16 then return error_code.call_fail end
             return original_call(address, command, ...)
         end
         assert.is_false(instance:close())
@@ -288,7 +288,7 @@ describe("node", function()
     it("关服在 fork 前防重入并按清理结果退出", function()
         start()
         dispatch(1, 9, "shutdown")
-        assert.same(table.pack(codes.succ, true), result)
+        assert.same(table.pack(error_code.succ, true), result)
         dispatch(1, 9, "shutdown")
         assert.is_true(instance.closing)
         assert.are.equal(1, #forks)
@@ -298,7 +298,7 @@ describe("node", function()
     it("强制关闭在 fork 前防重入并跳过清理", function()
         start()
         dispatch(1, 9, "force_shutdown")
-        assert.same(table.pack(codes.succ, true), result)
+        assert.same(table.pack(error_code.succ, true), result)
         dispatch(1, 9, "force_shutdown")
         dispatch(1, 9, "shutdown")
         assert.is_true(instance.closing)
@@ -316,11 +316,11 @@ describe("node", function()
         assert.is_false(watcher.started)
         assert.are.equal("debug_console", launched[1][1])
         dispatch(1, 9, "status")
-        assert.same(table.pack(codes.succ, "initializing"), result)
+        assert.same(table.pack(error_code.succ, "initializing"), result)
         dispatch(1, 9, "shutdown")
-        assert.same(table.pack(codes.invalid_command), result)
+        assert.same(table.pack(error_code.invalid_command), result)
         dispatch(1, 9, "force_shutdown")
-        assert.same(table.pack(codes.succ, true), result)
+        assert.same(table.pack(error_code.succ, true), result)
         forks[1]()
         assert.same({ 1 }, exits)
     end)

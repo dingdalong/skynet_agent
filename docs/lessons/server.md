@@ -14,7 +14,7 @@ Verified · Seen: 1× (2026-11-04)
 
 ### L-002 新增 Lua 搜索目录时同时验证运行时和 Busted
 
-目录模块需要 `?/init.lua`，共享枚举需要仓库级 `common` 搜索根。在实际服务和独立测试里用同一模块名加载，才能发现只在一个环境生效的路径改动。 [config.path](../../server/etc/config.path)、[makefile](../../server/makefile)
+目录模块需要 `?/init.lua`，按短名加载的共享枚举需要 `common/enum/?.lua`。在实际服务和独立测试里用同一模块名加载，才能发现只在一个环境生效的路径改动。 [config.path](../../server/etc/config.path)、[makefile](../../server/makefile)
 
 Verified · Seen: 1× (2026-11-04)
 

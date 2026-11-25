@@ -8,7 +8,7 @@ local Frame = require("network.frame")
 local crypt = require("skynet.crypt")
 local rpc = require("rpc")
 local log = require("log")
-local error_code = require("enum.error_code")
+local error_code = require("error_code")
 local config = require("etc.cfg").agent_gateway
 
 ---@class network.Connection

@@ -1,5 +1,5 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local hash = require("helper.hash")
 local protobuf = require("helper.protobuf")
 local Protocol = require("tests.support.wire_protocol")
@@ -24,7 +24,7 @@ describe("websocket", function()
         handles, timers, sent, writes, closed = {}, {}, {}, {}, {}
         raw_closed = {}
         fail_write, wait_write, next_id = false, false, 0
-        call = function() return codes.succ, true end
+        call = function() return error_code.succ, true end
         scope = Scope.new({
             ["skynet.crypt"] = { randomkey = function() return "salt" end, hexencode = tostring },
             ["websocket"] = false,
@@ -55,7 +55,7 @@ describe("websocket", function()
             ["rpc"] = {
                 call = function(...) return call(...) end,
                 send = function(...)
-                    sent[#sent + 1] = { ... }; return codes.succ
+                    sent[#sent + 1] = { ... }; return error_code.succ
                 end,
             },
             ["http.websocket"] = {
@@ -80,7 +80,7 @@ describe("websocket", function()
         call = function(address, command, id, message_id)
             assert.same({ 20, "handle_request", connection.id, 1 }, { address, command, id, message_id })
             instance:bind_client({}, id, 30)
-            return codes.succ, true
+            return error_code.succ, true
         end
         message(1, 1)
         message(1, 2, "AgentChatReq")
@@ -139,7 +139,7 @@ describe("websocket", function()
         call = function()
             coroutine.yield("login")
             instance:bind_client({}, connection.id, 30)
-            return codes.succ, true
+            return error_code.succ, true
         end
         local reader = coroutine.create(function() message(1, 1) end)
         assert.same({ true, "login" }, { coroutine.resume(reader) })
@@ -228,7 +228,7 @@ describe("websocket", function()
     end)
     it("路由失败关闭，迟到 accept 返回不移除新连接", function()
         local first, worker = accept(1)
-        call = function() return codes.timeout end
+        call = function() return error_code.timeout end
         message(1, 1)
         assert.is_nil(instance.connections[first.id])
         local current = accept(1)

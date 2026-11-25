@@ -1,5 +1,5 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 require("helper.protobuf").load("../common/proto")
 local codec = require("network.protocol"):new()
 codec:init("login")
@@ -19,8 +19,8 @@ describe("logind", function()
                 call_timeout = function(_, address, command, name)
                     assert.are.equal(".database", address)
                     assert.are.equal("user_identity", command)
-                    if fail.identity then return codes.call_fail end
-                    return codes.succ, { username = name, user_id = "user" }
+                    if fail.identity then return error_code.call_fail end
+                    return error_code.succ, { username = name, user_id = "user" }
                 end,
                 call = function(address, command, ...)
                     local args = table.pack(...)
@@ -28,7 +28,7 @@ describe("logind", function()
                     if command == "open" and open_callback then open_callback(args[1]) end
                     if command == "send_response" and write_callback then write_callback() end
                     if fail[command] then return table.unpack(fail[command]) end
-                    return codes.succ, command == "open" and { user_id = "user", sessions = {} } or true
+                    return error_code.succ, command == "open" and { user_id = "user", sessions = {} } or true
                 end,
                 send = function(address, command, ...) calls[#calls + 1] = { address, command, ... } end,
             },
@@ -43,7 +43,7 @@ describe("logind", function()
         assert.same({ 12, "open", "c1", 20, { username = "alice", user_id = "user" } }, calls[1])
         assert.same({ 20, "bind_client", "c1", 12 }, calls[2])
         assert.are.equal("send_response", calls[3][2])
-        assert.are.equal(codes.succ, select(2, codec:decode_body(calls[3][7], "Res")).ret)
+        assert.are.equal(error_code.succ, select(2, codec:decode_body(calls[3][7], "Res")).ret)
         instance:handle_request({ source = 20 }, "c2", 1, "login", login)
         assert.are.equal(12, calls[4][1])
     end)
@@ -51,22 +51,22 @@ describe("logind", function()
         fail.identity = true
         instance:handle_request({ source = 20 }, "c", 1, "login", login)
         local _, result = codec:decode_body(calls[1][7], "Res")
-        assert.are.equal(codes.call_fail, result.ret)
+        assert.are.equal(error_code.call_fail, result.ret)
         assert.is_true(result.error.retryable)
         assert.are.equal("close_connection", calls[2][2])
     end)
     it("初始化失败清理客户端上下文后写入失败响应并关闭", function()
-        fail.open = { codes.call_fail }
+        fail.open = { error_code.call_fail }
         instance:handle_request({ source = 20 }, "c", 1, "login", login)
         assert.are.equal("disconnect", calls[2][2])
         assert.are.equal("send_response", calls[3][2])
         assert.are.equal("close_connection", calls[4][2])
     end)
     it("绑定失败回收新连接，绑定后写入失败不重复回收", function()
-        fail.bind_client = { codes.succ, false }
+        fail.bind_client = { error_code.succ, false }
         instance:handle_request({ source = 20 }, "c", 1, "login", login)
         assert.are.equal("disconnect", calls[3][2])
-        calls, fail = {}, { send_response = { codes.call_fail } }
+        calls, fail = {}, { send_response = { error_code.call_fail } }
         assert.is_false(instance:handle_request({ source = 20 }, "d", 1, "login", login))
         assert.are.equal(3, #calls)
     end)

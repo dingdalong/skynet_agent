@@ -3,7 +3,7 @@ local class = require("class")
 local rpc = require("rpc")
 local skynet = require("skynet")
 local log = require("log")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local usernames = require("helper.username")
 local Frame = require("network.frame")
 local pools = require("etc.cfg").agent_gateway.instance
@@ -83,7 +83,7 @@ end
 function ClientService:init()
     self.center = assert(skynet.localname(".app_routes"))
     local code, snapshot = rpc.call(self.center, "subscribe")
-    assert(code == codes.succ and snapshot, "获取应用路由失败")
+    assert(code == error_code.succ and snapshot, "获取应用路由失败")
     self:sync_routes({ source = self.center }, snapshot)
     log.info("client", "init", "应用路由已加载")
 end
@@ -117,13 +117,13 @@ function ClientService:handle_request(context, id, message_id, app_id, body)
     end
     local app = self.apps[app_id]
     if app_id == "login" then
-        rpc.send(state.websocket, "close_connection", id, codes.websocket_policy_violation, "连接已登录")
+        rpc.send(state.websocket, "close_connection", id, error_code.websocket_policy_violation, "连接已登录")
         return
     end
-    if not app then return failed(codes.invalid_param, "未知应用") end
+    if not app then return failed(error_code.invalid_param, "未知应用") end
     local draining = app.transition == "disabling" or app.transition == "disable_failed"
     if not app.address or (not app.enabled and not (draining and state.targets[app_id] == app.generation)) then
-        return failed(codes.server_busy, "应用服务已下线")
+        return failed(error_code.server_busy, "应用服务已下线")
     end
     state.targets[app_id] = app.generation
     local call = app_id == "app-center" and rpc.call_no_timeout or rpc.call
@@ -131,9 +131,9 @@ function ClientService:handle_request(context, id, message_id, app_id, body)
     if self.connections[id] ~= state then return end
     local current = self.apps[app_id]
     if state.targets[app_id] ~= app.generation or not current or current.generation ~= app.generation then
-        return failed(codes.server_busy, "应用服务已下线")
+        return failed(error_code.server_busy, "应用服务已下线")
     end
-    if code ~= codes.succ or type(result) ~= "string" then return failed(codes.call_fail, "应用请求失败") end
+    if code ~= error_code.succ or type(result) ~= "string" then return failed(error_code.call_fail, "应用请求失败") end
     rpc.send(state.websocket, "send_response", id, message_id, app_id, Frame.response, result)
 end
 

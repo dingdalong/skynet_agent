@@ -1,7 +1,7 @@
 local class = require("class")
 local skynet = require("skynet")
 local crypt = require("skynet.crypt")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local cjson = require("cjson")
 
 ---@class agent.ClientRequest
@@ -54,7 +54,7 @@ function Client:invoke(operation, args, run, call_id)
     local requests = self.app.pending_client_requests
     requests[id] = pending
     local sent, code = pcall(self.app.publish, self.app, "AgentExecutionActionNtf", message, connection.id)
-    if not sent or code ~= codes.succ then
+    if not sent or code ~= error_code.succ then
         requests[id] = nil
         error("桌面执行请求发送失败")
     end
@@ -73,9 +73,9 @@ end
 ---@param requests table<string, agent.ClientRequest>
 function Client.receive_result(requests, args, connection)
     local pending = requests[args.request_id]
-    if not pending then return { ret = codes.succ } end
-    if pending.connection ~= connection then return { ret = codes.fail } end
-    if pending.result or pending.error then return { ret = codes.succ } end
+    if not pending then return { ret = error_code.succ } end
+    if pending.connection ~= connection then return { ret = error_code.fail } end
+    if pending.result or pending.error then return { ret = error_code.succ } end
     assert(type(args.result) == "string" and #args.result <= 1048576, "执行结果过大")
     local value = cjson.decode(args.result)
     assert(type(value) == "table", "执行结果无效")
@@ -90,7 +90,7 @@ function Client.receive_result(requests, args, connection)
     end
     normalize(value)
     pending.result = value
-    return { ret = codes.succ }
+    return { ret = error_code.succ }
 end
 
 ---@param requests table<string, agent.ClientRequest>

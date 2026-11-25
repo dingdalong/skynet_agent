@@ -3,7 +3,7 @@ local json = require("cjson")
 local config = require("etc.cfg")
 local Frame = require("network.frame")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local log = require("log")
 local Deployment = {}
 
@@ -26,14 +26,14 @@ function Deployment.collect(center, app)
     local generation = app.generation
     local code, first, events = rpc.call(app.address, "events", generation, app.cursor, app.key)
     if app.generation ~= generation then return false end
-    assert(code == codes.succ and type(events) == "table", "应用节点已断开")
+    assert(code == error_code.succ and type(events) == "table", "应用节点已断开")
     for index, event in ipairs(events) do
         local cursor = first + index - 1
         if cursor > app.cursor then
             if center.boot and skynet.now() - center.gateway_seen < 500 then
                 local delivered, accepted = rpc.call(center.gateway, "publish", center.key, center.boot, app.app_id,
                     generation, event.username, event.body, event.connection, cursor)
-                if delivered ~= codes.succ or not accepted or app.generation ~= generation then return false end
+                if delivered ~= error_code.succ or not accepted or app.generation ~= generation then return false end
             elseif app.transition ~= "disabling" then
                 return false
             end
@@ -71,7 +71,7 @@ end
 function Deployment.stop(center, app)
     if app.address and not app.awaiting_exit then
         local code, last = rpc.call_no_timeout(app.address, "drain", app.generation, app.key)
-        if code ~= codes.succ then
+        if code ~= error_code.succ then
             assert(not Deployment.manage(app, "inspect").running, "运行中的应用未完成清理")
         else
             while app.cursor < last do
@@ -86,7 +86,7 @@ function Deployment.stop(center, app)
                 end
             end
             local result, accepted = rpc.call(app.address, "finish", app.generation, app.key)
-            assert(result == codes.succ and accepted, "应用节点未接受关闭")
+            assert(result == error_code.succ and accepted, "应用节点未接受关闭")
             app.awaiting_exit = true
         end
     end

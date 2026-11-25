@@ -1,3 +1,4 @@
+local enum = require("enum")
 local gateway = require("integration.gateway_socket")
 local support = require("integration.support")
 
@@ -37,7 +38,7 @@ local function check_history(url)
     if not snapshot.chat_sessions[1] then
         -- 首次从业务入口建立样本，以后复用，避免每次调用模型。
         local created = client:send_message(nil, "请只回复：历史验收成功。无需使用工具。", 12000)
-        support.equal(created.messages[#created.messages].status, require("agent.message_status").completed)
+        support.equal(created.messages[#created.messages].status, enum.message_status.completed)
         id = created.id
         client:close()
         client, snapshot = gateway.login(url, "local-agent-e2e")

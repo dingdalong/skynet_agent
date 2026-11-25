@@ -1,7 +1,8 @@
 local json = require("cjson").new()
 json.decode_array_with_array_mt(true)
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
+local enum = require("enum")
 local log = require("log")
 local Session = require("agent.session")
 local config = require("etc.cfg").agent
@@ -12,10 +13,10 @@ local attempt_ticks = 90
 
 local function database(command, collection, ...)
     local code, result = rpc.call_timeout(attempt_ticks, ".database", command, collection, ...)
-    if code ~= codes.succ then
+    if code ~= error_code.succ then
         code, result = rpc.call_timeout(attempt_ticks, ".database", command, collection, ...)
     end
-    assert(code == codes.succ, "数据库操作未确认")
+    assert(code == error_code.succ, "数据库操作未确认")
     return result
 end
 
@@ -121,7 +122,7 @@ local function apply(s, state, kind, d)
             table.insert(s.messages, {
                 id = d.user_message,
                 role = 1,
-                status = 2,
+                status = enum.message_status.completed,
                 content = d.text,
                 created_at = s.updated_at
             })
@@ -129,7 +130,7 @@ local function apply(s, state, kind, d)
         state.message = {
             id = d.message,
             role = 2,
-            status = 4,
+            status = enum.message_status.failed,
             created_at = s.updated_at,
             run_id = d.run,
             content = "",
@@ -246,9 +247,10 @@ local function apply(s, state, kind, d)
                 msg.content = msg.content .. d.text
             end
         elseif kind == "finish" then
-            assert(d.status == 2 or d.status == 3 or d.status == 4)
+            assert(d.status == enum.message_status.completed or d.status == enum.message_status.cancelled or
+            d.status == enum.message_status.failed)
             assert(not d.content or type(d.content) == "string")
-            if d.status == 2 then assert(state.has_response, "缺少模型上下文") end
+            if d.status == enum.message_status.completed then assert(state.has_response, "缺少模型上下文") end
             state.finished = true
             msg.content, msg.status = d.content or msg.content, d.status
             msg.error = d.error and { message = tostring(d.error.message or "请求失败"), retryable = false } or nil
@@ -291,7 +293,7 @@ local function restore_session(chat, id, rows)
             table.insert(s.messages, {
                 id = "gap-" .. doc.seq,
                 role = 2,
-                status = 0,
+                status = enum.message_status.unspecified,
                 content = "部分历史未能恢复",
                 created_at = s.updated_at
             })

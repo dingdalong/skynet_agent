@@ -3,7 +3,7 @@ local skynet = require("skynet")
 local Prompts = require("agent.prompts")
 local App = require("agent.app")
 local log = require("log")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 ---@class agent.Service
 ---@field users table<string, agent.App>
@@ -57,30 +57,30 @@ function AgentService:_handle(context, identity, id, name, args, draining)
     local app = self:_user(identity, context.source)
     local receipt = name == "AgentExecutionResultReq" and app and app.connections[id]
     if (draining or not self.available) and not receipt then
-        return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
+        return { ret = error_code.server_busy, error = { message = "应用服务已下线", retryable = true } }
     end
     if not app then
         self.tool_registry = self.tool_registry or require("agent.tools").discover()
         app = App:new(identity, context.source, self.templates, self.tool_registry)
         if not pcall(Store.restore, app) then
-            return { ret = codes.call_fail, error = { message = "历史读取失败，请重试", retryable = true } }
+            return { ret = error_code.call_fail, error = { message = "历史读取失败，请重试", retryable = true } }
         end
         if not self.available then
-            return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
+            return { ret = error_code.server_busy, error = { message = "应用服务已下线", retryable = true } }
         end
         self.users[identity.username] = app
     end
     local session = app.chat.sessions[args.session_id]
     if session and (session.unloaded or session.storage_failed and not session.run) then
         if not pcall(Store.reload, app, session) then
-            return { ret = codes.call_fail, error = { message = "会话读取失败，请重试", retryable = true } }
+            return { ret = error_code.call_fail, error = { message = "会话读取失败，请重试", retryable = true } }
         end
     end
     local ok, result = pcall(app.handle_request, app, id, name, args)
     if ok then return result end
     log.info("agent", "request", "请求未确认 name=%s", name)
     return {
-        ret = codes.call_fail,
+        ret = error_code.call_fail,
         error = { message = "操作未确认，请重新同步并重试", retryable = true }
     }
 end

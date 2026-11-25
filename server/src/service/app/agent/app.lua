@@ -4,7 +4,7 @@ local Chat = require("agent.chat")
 local DesktopConnections = require("agent.desktop_connections")
 local Client = require("agent.tools.runtime.client")
 local log = require("log")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local handler = require("agent.handler")
 local models = require("agent.models")
 local config = require("etc.cfg").agent
@@ -72,7 +72,7 @@ function App:register_desktop(args, connection)
         end
     end
     self.desktop_connections:publish(device)
-    return { ret = codes.succ, target = self.targets[device.id] }
+    return { ret = error_code.succ, target = self.targets[device.id] }
 end
 
 function App:disconnect_desktop(connection)

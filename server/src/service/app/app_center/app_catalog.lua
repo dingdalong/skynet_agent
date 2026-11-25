@@ -1,5 +1,5 @@
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local queue = require("skynet.queue")
 local crypt = require("skynet.crypt")
 local Deployment = require("app_center.deployment")
@@ -17,7 +17,7 @@ local function save(center, doc)
     else
         code, count = store("replace_one", { _id = doc._id, revision = doc.revision - 1 }, doc)
     end
-    if code ~= codes.succ or count ~= 1 then
+    if code ~= error_code.succ or count ~= 1 then
         center.uncertain[doc._id] = true
         error("数据库写入未确认，请重试", 0)
     end
@@ -27,7 +27,7 @@ end
 function AppCatalog.refresh(center, id)
     if not center.uncertain[id] then return end
     local code, current = store("find_one", { _id = id })
-    assert(code == codes.succ, "数据库暂时不可用")
+    assert(code == error_code.succ, "数据库暂时不可用")
     center.documents[id] = current
     center.uncertain[id] = nil
 end
@@ -75,7 +75,7 @@ function AppCatalog.finish_allocation(center, id)
         assert(doc.pending and doc.pending.request_id == request.request_id, "审批记录与数据库分配不一致")
     end
     local code, account = rpc.call_no_timeout(".database", "provision", request.seed)
-    assert(code == codes.succ, "创建应用数据库未完成，请重试")
+    assert(code == error_code.succ, "创建应用数据库未完成，请重试")
     if request.request_id then approve(doc, request.reviewer) end
     account.state = "ready"
     doc.database, doc.database_request = account, nil
@@ -87,7 +87,7 @@ function AppCatalog.archive_database(center, id)
     if not doc.database then return end
     assert(doc.removed and doc.database.state == "revoking", "应用数据库未进入撤销流程")
     local code = rpc.call_no_timeout(".database", "revoke", doc.database)
-    assert(code == codes.succ, "数据库账号撤销未完成，请重试")
+    assert(code == error_code.succ, "数据库账号撤销未完成，请重试")
     doc.archived_databases = table.copy(doc.archived_databases or {})
     table.insert(doc.archived_databases, doc.database.name)
     doc.database = nil
@@ -96,7 +96,7 @@ end
 
 function AppCatalog.open(center)
     local code, documents = store("find")
-    assert(code == codes.succ, "无法读取应用目录")
+    assert(code == error_code.succ, "无法读取应用目录")
     for _, doc in ipairs(documents) do
         center.documents[doc._id] = doc
         if doc.approved and not doc.removed and not doc.database then

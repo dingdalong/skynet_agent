@@ -1,5 +1,7 @@
----@enum agent.MessageStatus
-local message_status = {
+local enum = {}
+
+---@enum enum.message_status
+enum.message_status = {
     unspecified = 0,
     streaming = 1,
     completed = 2,
@@ -7,4 +9,4 @@ local message_status = {
     failed = 4,
 }
 
-return message_status
+return enum

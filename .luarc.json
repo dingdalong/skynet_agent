@@ -8,6 +8,7 @@
         "app/?/init.lua"
     ],
     "workspace.library": [
+        "common/enum",
         "server/src/lualib",
         "server/src/lualib/base",
         "server/src/service",

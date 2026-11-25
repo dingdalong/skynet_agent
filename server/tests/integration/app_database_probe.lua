@@ -1,7 +1,7 @@
 local skynet = require("skynet")
 require("skynet.manager")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local config = require("etc.cfg")
 local mongo = require("skynet.db.mongo")
 
@@ -11,7 +11,7 @@ local function check()
     skynet.name(".database", skynet.newservice("database"))
     local function call(command, ...)
         local code, result = rpc.call(".database", command, ...)
-        assert(code == codes.succ)
+        assert(code == error_code.succ)
         return result
     end
     call("init", {})

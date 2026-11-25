@@ -1,3 +1,4 @@
+local error_code = require("error_code")
 local config = require("etc.cfg")
 local frame = require("network.frame")
 local rpc = require("rpc")
@@ -12,5 +13,5 @@ require("node").init(function(node)
     local endpoint = node:launch("app_endpoint", 1, { app = app.id, workers = workers }, ".app_endpoint")[1]
     local _, port = require("network.nodes").open(0)
     require("log").info("app", "listen", "app=%s endpoint=127.0.0.1:%d", app.id, port)
-    assert(rpc.call(endpoint, "announce", port) == require("enum.error_code").succ)
+    assert(rpc.call(endpoint, "announce", port) == error_code.succ)
 end)

@@ -1,10 +1,10 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 describe("rpc", function()
     local scope, rpc, response, request, ticks, send_error, send_result
     before_each(function()
-        response, send_error = table.pack(codes.succ, nil, false, "tail", nil), false
+        response, send_error = table.pack(error_code.succ, nil, false, "tail", nil), false
         send_result = 0
         scope = Scope.new({
             ["rpc"] = false,
@@ -47,13 +47,13 @@ describe("rpc", function()
     end)
     it("远端失败与调用异常返回失败码", function()
         response = false
-        assert.are.equal(codes.call_fail, rpc.call(10, "open"))
-        assert.are.equal(codes.call_fail, rpc.call_no_timeout(10, "open"))
+        assert.are.equal(error_code.call_fail, rpc.call(10, "open"))
+        assert.are.equal(error_code.call_fail, rpc.call_no_timeout(10, "open"))
         package.loaded.skynet.request = function() error("dead") end
-        assert.are.equal(codes.call_fail, rpc.call(10, "open"))
-        assert.are.equal(codes.call_fail, rpc.call_no_timeout(10, "open"))
+        assert.are.equal(error_code.call_fail, rpc.call(10, "open"))
+        assert.are.equal(error_code.call_fail, rpc.call_no_timeout(10, "open"))
         send_error = true
-        assert.are.equal(codes.call_fail, rpc.send(10, "close"))
+        assert.are.equal(error_code.call_fail, rpc.send(10, "close"))
     end)
     it("超时只结束等待，不重发命令", function()
         local count = 0
@@ -61,7 +61,7 @@ describe("rpc", function()
             count = count + 1
             return { select = function() return function() end end }
         end
-        assert.are.equal(codes.timeout, rpc.call(10, "open"))
+        assert.are.equal(error_code.timeout, rpc.call(10, "open"))
         assert.are.equal(1, count)
     end)
     it("无超时调用等待远端返回，不重复发送", function()
@@ -90,11 +90,11 @@ describe("rpc", function()
         assert.are.equal(1, count)
     end)
     it("异步发送检查 Skynet 接收结果，拒绝 nil 和 false", function()
-        assert.are.equal(codes.succ, rpc.send(10, "close"))
+        assert.are.equal(error_code.succ, rpc.send(10, "close"))
         assert.same(table.pack(10, "lua", "close"), request)
         send_result = nil
-        assert.are.equal(codes.call_fail, rpc.send(10, "close"))
+        assert.are.equal(error_code.call_fail, rpc.send(10, "close"))
         send_result = false
-        assert.are.equal(codes.call_fail, rpc.send(10, "close"))
+        assert.are.equal(error_code.call_fail, rpc.send(10, "close"))
     end)
 end)

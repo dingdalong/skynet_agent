@@ -1,7 +1,7 @@
 local class = require("class")
 local skynet = require("skynet")
 local rpc = require("rpc")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local config = require("etc.cfg")
 local cluster = require("skynet.cluster")
 local crypt = require("skynet.crypt")
@@ -71,7 +71,7 @@ function Center:_reconcile(id)
     if skynet.now() < (app.retry_at or 0) then return end
     if doc.removed then
         local stopped = self:_change(app, false)
-        if stopped.ret ~= codes.succ then return stopped end
+        if stopped.ret ~= error_code.succ then return stopped end
         Deployment.manage(app, "remove")
         AppCatalog.archive_database(self, id)
         self.retired[id], self.apps[id] = true, nil
@@ -81,7 +81,7 @@ function Center:_reconcile(id)
     self.retired[id] = nil
     if app.image ~= doc.approved.image_id or app.outdated then
         local stopped = self:_change(app, false)
-        if stopped.ret ~= codes.succ then return stopped end
+        if stopped.ret ~= error_code.succ then return stopped end
         app.image, app.outdated = doc.approved.image_id, false
     end
     if app.enabled ~= doc.desired or not app.checked or app.transition then
@@ -165,7 +165,7 @@ function Center:_sync(wait)
     local boot = self.boot
     if boot and skynet.now() - self.gateway_seen < 500 then
         local code, applied = rpc.call(self.gateway, "update", self.key, boot, self:_snapshot())
-        if code == codes.succ and applied and boot == self.boot then
+        if code == error_code.succ and applied and boot == self.boot then
             self.acknowledged = math.max(self.acknowledged, revision)
         end
         while wait and boot == self.boot and self.acknowledged < revision and skynet.now() - self.gateway_seen < 500 do
@@ -185,7 +185,7 @@ function Center:register(_, id, key, port, generation)
     if app.address and app.generation == generation and app.endpoint == endpoint then return true end
     local address = nodes.application(id, endpoint)
     local code, actual, instance, count, cursor, version = rpc.call(address, "hello", key)
-    if code ~= codes.succ or actual ~= id or instance ~= generation or count < 1 or app.key ~= key
+    if code ~= error_code.succ or actual ~= id or instance ~= generation or count < 1 or app.key ~= key
         or self.freezing or not self:_desired(app) or app.transition == "disabling" then
         return false
     end
@@ -208,7 +208,7 @@ end
 
 local function failure(message, retryable)
     log.info("app_center", "request", "%s", message)
-    return { ret = codes.fail, error = { message = message, retryable = retryable } }
+    return { ret = error_code.fail, error = { message = message, retryable = retryable } }
 end
 
 function Center:_manage(id, operation, ...)
@@ -225,7 +225,7 @@ function Center:_manage(id, operation, ...)
         local changing = doc and (doc.database_request ~= nil or (doc.database and doc.database.state ~= "ready"))
         return failure(message:gsub("^.-:%d+: ", ""), self.uncertain[id] == true or changing == true)
     end
-    return type(result) == "table" and result or { ret = codes.succ, request_id = result }
+    return type(result) == "table" and result or { ret = error_code.succ, request_id = result }
 end
 
 function Center:submit(_, key, args)
@@ -279,7 +279,7 @@ function Center:handle_request(context, identity, id, name, args)
         table.sort(online, function(left, right) return left.app_id < right.app_id end)
         table.sort(services, function(left, right) return left.app_id < right.app_id end)
         return {
-            ret = codes.succ,
+            ret = error_code.succ,
             names = names,
             online = online,
             services = services,
@@ -290,7 +290,7 @@ function Center:handle_request(context, identity, id, name, args)
         local token = config.app_center.admin_token
         connection.admin = type(token) == "string" and token ~= "" and args.token == token
         if not connection.admin then return failure("管理令牌无效或管理功能未启用") end
-        return { ret = codes.succ }
+        return { ret = error_code.succ }
     end
     if not connection.admin then return failure("需要管理员权限") end
     if name == "AppCenterReviewReq" then
@@ -328,7 +328,7 @@ function Center:_change(app, enabled)
         app.retry_at = skynet.now() + app.retry_delay
     else
         app.retry_at, app.retry_delay = nil, nil
-        response = { ret = codes.succ }
+        response = { ret = error_code.succ }
     end
     app.changing = nil
     return response
@@ -362,7 +362,7 @@ function Center:freeze(context)
     for id, app in pairs(self.apps) do
         if id ~= "app-center" then
             local result = AppCatalog.lock(self, id)(self._change, self, app, false)
-            if result.ret ~= codes.succ then succeeded = false end
+            if result.ret ~= error_code.succ then succeeded = false end
         end
     end
     self.closed = true

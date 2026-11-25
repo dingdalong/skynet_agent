@@ -1,5 +1,5 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 
 describe("gateway", function()
     local scope, gateway, listener, sent, closed, failure
@@ -14,7 +14,7 @@ describe("gateway", function()
             ["rpc"] = {
                 send = function(address, command, ...)
                     sent[#sent + 1] = { address, command, ... }
-                    return failure and codes.call_fail or codes.succ
+                    return failure and error_code.call_fail or error_code.succ
                 end
             },
             ["skynet.socket"] = {

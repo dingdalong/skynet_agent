@@ -1,10 +1,10 @@
 local Scope = require("tests.support.modules")
-local codes = require("enum.error_code")
+local error_code = require("error_code")
 local cjson = require("cjson")
 local Pool = require("helper.service_pool")
 local function pack(name, args) return cjson.encode({ name, args }) end
 local function unpack_body(body) return table.unpack(cjson.decode(body)) end
-local status = require("agent.message_status")
+local enum = require("enum")
 
 describe("用户与客户端服务", function()
     local scope, service, tasks, events, model, next_id, random_id, templates, template_loads, workspaces
@@ -112,11 +112,11 @@ describe("用户与客户端服务", function()
             log = { info = function() end, failure = function() end },
             rpc = {
                 call_timeout = function(_, _, cmd)
-                    return codes.succ, (cmd == "find" or cmd == "aggregate") and {} or 1
+                    return error_code.succ, (cmd == "find" or cmd == "aggregate") and {} or 1
                 end,
                 call = function(address, command, _, identity, id, body, draining)
                     if command == "subscribe" then
-                        return codes.succ, {
+                        return error_code.succ, {
                             revision = 1,
                             apps = { {
                                 app_id = "agent",
@@ -129,20 +129,20 @@ describe("用户与客户端服务", function()
                     local name, args = unpack_body(body)
                     local worker = address == 1 and Pool:new(agent_addresses):select(identity.username) or address
                     local result = instances[worker]:handle_request({ source = 10 }, identity, id, name, args, draining)
-                    return codes.succ, pack(name:gsub("Req$", "Res"), result)
+                    return error_code.succ, pack(name:gsub("Req$", "Res"), result)
                 end,
                 send = function(address, command, ...)
                     if command == "publish" then
                         local username, name, args, id = ...
                         next_id = next_id + 1
                         service:publish({ source = 80 }, "agent", "generation", username, pack(name, args), id, next_id)
-                        return codes.succ
+                        return error_code.succ
                     end
                     if command == "disconnect" then
                         local _, identity, id = ...
                         local worker = Pool:new(agent_addresses):select(identity.username)
                         instances[worker]:disconnect({ source = 10 }, identity, id)
-                        return codes.succ
+                        return error_code.succ
                     end
                     if command == "send_response" then
                         local id, seq, _, kind, body = ...
@@ -157,10 +157,10 @@ describe("用户与客户端服务", function()
                             command = command,
                             args = table.pack(id, seq, name, args)
                         }
-                        return codes.succ
+                        return error_code.succ
                     end
                     events[#events + 1] = { address = address, command = command, args = table.pack(...) }
-                    return codes.succ
+                    return error_code.succ
                 end
             },
         })
@@ -208,7 +208,7 @@ describe("用户与客户端服务", function()
         database.call_timeout = function(_, _, command)
             assert.equal("find", command)
             attempts = attempts + 1
-            return codes.timeout
+            return error_code.timeout
         end
         local function snapshot()
             return instances[1]:handle_request({ source = 10 }, stored_identity("alice"), "a", "AgentSnapshotReq", {})
@@ -219,7 +219,7 @@ describe("用户与客户端服务", function()
         assert.is_nil(apps.alice)
         assert.equal(2, attempts)
         database.call_timeout = original
-        assert.equal(codes.succ, snapshot().ret)
+        assert.equal(error_code.succ, snapshot().ret)
     end)
 
     it("登录只绑定身份；同名连接与重连按用户名选择同一常驻实例", function()
@@ -277,10 +277,10 @@ describe("用户与客户端服务", function()
         local rpc = require("rpc")
         local call = rpc.call
         service:open({ source = 20 }, "a", 100, stored_identity("alice"))
-        rpc.call = function() return codes.call_fail end
-        assert.are.equal(codes.call_fail, request(2, "AgentSnapshotReq", {}).ret)
+        rpc.call = function() return error_code.call_fail end
+        assert.are.equal(error_code.call_fail, request(2, "AgentSnapshotReq", {}).ret)
         rpc.call = call
-        assert.are.equal(codes.succ, request(3, "AgentSnapshotReq", {}).ret)
+        assert.are.equal(error_code.succ, request(3, "AgentSnapshotReq", {}).ret)
         assert.are.equal(service.users.alice.identity.user_id, apps.alice.identity.user_id)
     end)
 
@@ -297,7 +297,7 @@ describe("用户与客户端服务", function()
         instances[77] = {
             handle_request = function(_, _, identity)
                 requests[#requests + 1] = identity.username
-                return { ret = codes.succ }
+                return { ret = error_code.succ }
             end
         }
         for _, name in ipairs({ "alice", "bob" }) do
@@ -371,11 +371,11 @@ describe("用户与客户端服务", function()
         snapshot.apps[1] = table.copy(snapshot.apps[1])
         snapshot.apps[1].enabled = true
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
-        assert.are.equal(codes.server_busy, request(2, "AgentSnapshotReq", {}).ret)
+        assert.are.equal(error_code.server_busy, request(2, "AgentSnapshotReq", {}).ret)
         snapshot.revision = 4
         snapshot.apps[1].generation = "next-generation"
         assert.is_true(service:sync_routes({ source = 80 }, snapshot))
-        assert.are.equal(codes.succ, request(3, "AgentSnapshotReq", {}).ret)
+        assert.are.equal(error_code.succ, request(3, "AgentSnapshotReq", {}).ret)
         local count = #events
         local body = pack("AgentMessageDeltaNtf", {})
         service:publish({ source = 80 }, "agent", "generation", "alice", body, "a", 100)
@@ -432,7 +432,7 @@ describe("用户与客户端服务", function()
         center.key = "deployment-key"
         for _, id in ipairs({ "login", "app-center", "Invalid" }) do
             local response = center:submit({}, center.key, { app_id = id })
-            assert.are.equal(codes.fail, response.ret)
+            assert.are.equal(error_code.fail, response.ret)
             assert.are.equal("应用 ID 无效", response.error.message)
         end
         assert.same({}, center.documents)
@@ -443,29 +443,29 @@ describe("用户与客户端服务", function()
         for _, args in ipairs({ {}, { text = "" }, { text = string.rep("x", 101) }, { text = "\255" },
             { text = "问题", model_id = "unknown" }, { text = "问题", retry_run_id = "old" } }) do
             local response = request(2, "AgentChatReq", args)
-            assert.are.equal(codes.invalid_param, response.ret)
+            assert.are.equal(error_code.invalid_param, response.ret)
         end
         assert.same({}, apps.alice:snapshot().chat_sessions)
         assert.are.equal(0, #workspaces)
         assert.are.equal(0, #tasks)
         assert.is_nil(next(apps.alice.pending_runs))
-        assert.are.equal(codes.fail, send("unknown", "有效文本").ret)
+        assert.are.equal(error_code.fail, send("unknown", "有效文本").ret)
     end)
 
     it("模型配置与 Agent 构造失败不登记会话，修复后首发可成功", function()
         open("a", 100, "alice")
         local config = require("etc.cfg").agent
         config.llm.api_key = nil
-        assert.are.equal(codes.call_fail, send(nil, "问题").ret)
+        assert.are.equal(error_code.call_fail, send(nil, "问题").ret)
         assert.are.equal(0, #workspaces)
         config.llm.api_key = "test"
         model.create_fail = true
-        assert.are.equal(codes.call_fail, send(nil, "问题").ret)
+        assert.are.equal(error_code.call_fail, send(nil, "问题").ret)
         assert.same({}, apps.alice:snapshot().chat_sessions)
         assert.are.equal(0, #tasks)
         assert.is_nil(next(apps.alice.pending_runs))
         model.create_fail = false
-        assert.are.equal(codes.succ, send("", "问题").ret)
+        assert.are.equal(error_code.succ, send("", "问题").ret)
         assert.are.equal(1, #apps.alice:snapshot().chat_sessions)
     end)
 
@@ -479,7 +479,7 @@ describe("用户与客户端服务", function()
         assert.is_true(coroutine.resume(tasks[1]))
         local run = session.run
         local switched = request(3, "AgentSessionModelSetReq", { session_id = session.id, model_id = "test" })
-        assert.are.equal(codes.succ, switched.ret)
+        assert.are.equal(error_code.succ, switched.ret)
         assert.are.equal("test", switched.chat_session.model_id)
         assert.are.equal("test", switched.chat_session.permission_model_id)
         assert.are.equal(run, session.run)
@@ -489,9 +489,9 @@ describe("用户与客户端服务", function()
         assert.are.equal("pro", session.agent.permission_config.model)
         assert.are.equal("pro", user:snapshot().permission_model_id)
         local denied = request(5, "AgentSessionModelSetReq", { session_id = session.id, model_id = "unknown" })
-        assert.are.equal(codes.invalid_param, denied.ret)
+        assert.are.equal(error_code.invalid_param, denied.ret)
         assert.are.equal("test", session.model_id)
-        assert.are.equal(codes.fail, request(6, "AgentSessionModelSetReq", {
+        assert.are.equal(error_code.fail, request(6, "AgentSessionModelSetReq", {
             session_id = "unknown", model_id = "pro" }).ret)
         assert.is_true(coroutine.resume(tasks[1]))
     end)
@@ -502,7 +502,7 @@ describe("用户与客户端服务", function()
         local response = send(nil, "新会话的问题")
         local created = response.chat_session.session
         assert.are.equal("新会话的问题", created.messages[1].content)
-        assert.are.equal(status.streaming, created.messages[2].status)
+        assert.are.equal(enum.message_status.streaming, created.messages[2].status)
         request(44, "AgentMessageCancelReq", { session_id = created.id, run_id = created.run_id })
         local event = events[#events]
         assert.are.equal(100, event.address)
@@ -548,14 +548,14 @@ describe("用户与客户端服务", function()
     it("离线任务继续完成，快照与模型上下文均恢复", function()
         open("a", 100, "alice")
         local created = first()
-        assert.are.equal(status.streaming, created.messages[2].status)
+        assert.are.equal(enum.message_status.streaming, created.messages[2].status)
         service:disconnect({ source = 20 }, "a")
         assert.is_true(coroutine.resume(tasks[1]))
         local restored = open("b", 200, "alice")
         assert.same({}, restored.chat_sessions[1].session.messages)
         local session = apps.alice.chat.sessions[created.id]
         assert.same({ "问题" }, session.agent.messages)
-        assert.are.equal(status.completed, session.messages[2].status)
+        assert.are.equal(enum.message_status.completed, session.messages[2].status)
         assert.are.equal("回答", session.messages[2].content)
     end)
 
@@ -568,7 +568,7 @@ describe("用户与客户端服务", function()
         assert.are.equal(0, events[1].args[2])
         assert.are.equal("AgentSessionUpdatedNtf", events[1].args[3])
         local response = request(2, "AgentChatReq", { session_id = created.id, text = "越权" }, "c", 300)
-        assert.are.equal(codes.fail, response.ret)
+        assert.are.equal(error_code.fail, response.ret)
         local count = #events
         service:handle_request({ source = 999 }, "a", 3, "AgentChatReq", { text = "伪造" })
         service:handle_request({ source = 100 }, "missing", 4, "AgentChatReq", { text = "无效连接" })
@@ -585,12 +585,12 @@ describe("用户与客户端服务", function()
         end
         assert.has_error(function() snapshot(11, identity) end)
         assert.is_nil(apps.alice)
-        assert.are.equal(codes.succ, snapshot(10, identity).ret)
+        assert.are.equal(error_code.succ, snapshot(10, identity).ret)
         assert.has_error(function() snapshot(10, { username = "alice", user_id = "other" }) end)
         assert.has_error(function() agent:disconnect({ source = 11 }, identity, "a") end)
         assert.is_truthy(apps.alice.connections.a)
         local bob = { username = "bob", user_id = "bob-id" }
-        assert.are.equal(codes.succ, snapshot(10, bob).ret)
+        assert.are.equal(error_code.succ, snapshot(10, bob).ret)
         agent:disconnect({ source = 10 }, bob, "a")
         assert.is_nil(apps.bob.connections.a)
         assert.is_truthy(apps.alice.connections.a)
@@ -600,12 +600,12 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         open("b", 200, "bob")
         local device = { device_id = "desktop", name = "Alice", authorization_id = "auth" }
-        assert.are.equal(codes.succ, request(2, "AgentDesktopRegisterReq", device).ret)
+        assert.are.equal(error_code.succ, request(2, "AgentDesktopRegisterReq", device).ret)
         assert.are.equal(2, #events)
         assert.are.equal("a", events[1].args[1])
         assert.same({}, apps.bob:snapshot().desktops)
         device.name = "Bob"
-        assert.are.equal(codes.succ, request(2, "AgentDesktopRegisterReq", device, "b", 200).ret)
+        assert.are.equal(error_code.succ, request(2, "AgentDesktopRegisterReq", device, "b", 200).ret)
         local pending = { connection = apps.alice.connections.a }
         apps.alice.pending_client_requests.call = pending
         request(3, "AgentExecutionResultReq", { request_id = "call", result = "{}" }, "b", 200)
@@ -620,7 +620,7 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         open("b", 200, "alice")
         local first_id = first("一").id
-        assert.are.equal(codes.server_busy, send(first_id, "重复").ret)
+        assert.are.equal(error_code.server_busy, send(first_id, "重复").ret)
         local second_id = first("二").id
         assert.are.equal(2, #tasks)
         local user = apps.alice
@@ -630,10 +630,10 @@ describe("用户与客户端服务", function()
         assert.are.equal(run, user.chat.sessions[first_id].run)
         assert.is_true(coroutine.resume(tasks[1]))
         assert.is_nil(user.chat.sessions[first_id].run)
-        assert.are.equal(status.cancelled, user.chat.sessions[first_id].messages[2].status)
+        assert.are.equal(enum.message_status.cancelled, user.chat.sessions[first_id].messages[2].status)
         assert.same({}, user.chat.sessions[first_id].agent.messages)
         assert.is_true(coroutine.resume(tasks[2]))
-        assert.are.equal(status.completed, user.chat.sessions[second_id].messages[2].status)
+        assert.are.equal(enum.message_status.completed, user.chat.sessions[second_id].messages[2].status)
         send(first_id, "三")
         assert.are.equal(3, #tasks)
     end)
@@ -645,7 +645,7 @@ describe("用户与客户端服务", function()
         local session = apps.alice.chat.sessions[created.id]
         assert.is_true(coroutine.resume(tasks[1]))
         local failed_id, message_id = session.messages[2].run_id, session.messages[2].id
-        assert.are.equal(status.failed, session.messages[2].status)
+        assert.are.equal(enum.message_status.failed, session.messages[2].status)
         assert.same({}, session.agent.messages)
         model.fail = false
         send(session.id, "", "a", { retry_run_id = failed_id })
@@ -654,7 +654,7 @@ describe("用户与客户端服务", function()
         assert.are_not.equal(failed_id, session.messages[2].run_id)
         assert.is_true(coroutine.resume(tasks[2]))
         assert.same({ "问题" }, session.agent.messages)
-        assert.are.equal(codes.invalid_param, send(session.id, "", "a", { retry_run_id = failed_id }).ret)
+        assert.are.equal(error_code.invalid_param, send(session.id, "", "a", { retry_run_id = failed_id }).ret)
     end)
 
     it("原轮次完成后的工具更新仍定位原消息并复制通知快照", function()
@@ -685,11 +685,11 @@ describe("用户与客户端服务", function()
         open("a", 100, "alice")
         local created = first()
         assert.is_true(coroutine.resume(tasks[1]))
-        assert.are.equal(codes.succ, request(3, "AgentMessageCancelReq", {
+        assert.are.equal(error_code.succ, request(3, "AgentMessageCancelReq", {
             session_id = created.id, run_id = created.run_id }).ret)
-        assert.are.equal(codes.invalid_param, request(4, "AgentMessageCancelReq", {
+        assert.are.equal(error_code.invalid_param, request(4, "AgentMessageCancelReq", {
             session_id = created.id, run_id = "" }).ret)
-        assert.are.equal(codes.fail, request(5, "AgentMessageCancelReq", {
+        assert.are.equal(error_code.fail, request(5, "AgentMessageCancelReq", {
             session_id = "unknown", run_id = created.run_id }).ret)
     end)
 

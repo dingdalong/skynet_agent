@@ -1,7 +1,7 @@
 local Agent = require("agent.agent")
 local class = require("class")
-local codes = require("enum.error_code")
-local status = require("agent.message_status")
+local error_code = require("error_code")
+local enum = require("enum")
 local skynet = require("skynet")
 local Run = require("agent.run")
 local models = require("agent.models")
@@ -158,7 +158,7 @@ end
 function AgentSession:history(before)
     local finish = before == 0 and #self.messages or before
     if finish > #self.messages then
-        return failure(codes.invalid_param, "历史位置已变化，请重新打开会话")
+        return failure(error_code.invalid_param, "历史位置已变化，请重新打开会话")
     end
     local start, bytes = finish, 0
     local protobuf = require("helper.protobuf")
@@ -168,7 +168,7 @@ function AgentSession:history(before)
         if start < finish and bytes + size > 128 * 1024 then break end
         bytes, start = bytes + size, start - 1
     end
-    return { ret = codes.succ, chat_session = self:snapshot(start, finish) }
+    return { ret = error_code.succ, chat_session = self:snapshot(start, finish) }
 end
 
 function AgentSession:_publish()
@@ -182,13 +182,13 @@ function AgentSession:set_model(model_id)
     local ok, main, permission = pcall(function()
         return models.resolve(config, model_id), models.resolve(config, config.permission.model_id or model_id)
     end)
-    if not ok then return failure(codes.invalid_param, "模型不在可选清单中") end
-    if self.read_only or self.storage_failed then return failure(codes.fail, "会话仅可阅读") end
+    if not ok then return failure(error_code.invalid_param, "模型不在可选清单中") end
+    if self.read_only or self.storage_failed then return failure(error_code.fail, "会话仅可阅读") end
     self:record("model", { model_id = model_id })
     if self.agent then self.agent:set_llm(main, permission) end
     self.model_id = model_id
     self:_publish()
-    return { ret = codes.succ, chat_session = self:snapshot() }
+    return { ret = error_code.succ, chat_session = self:snapshot() }
 end
 
 function AgentSession:_on_reasoning(run, block, delta, tool_id)
@@ -207,28 +207,28 @@ end
 ---@param args table
 ---@return table
 function AgentSession:send_message(args, connection)
-    if self.read_only or self.storage_failed then return failure(codes.fail, "历史不完整，请另开会话") end
+    if self.read_only or self.storage_failed then return failure(error_code.fail, "历史不完整，请另开会话") end
     if self.needs_workspace or not self.agent and not pcall(self.open_agent, self) then
-        return failure(codes.fail, "请重新选择可用的模型或工作目录")
+        return failure(error_code.fail, "请重新选择可用的模型或工作目录")
     end
     local text = args.text
-    if self.run then return failure(codes.server_busy, "该会话仍在生成", true) end
+    if self.run then return failure(error_code.server_busy, "该会话仍在生成", true) end
     if self.execution_target then
         local ok, err = pcall(self.owner.app.desktop_connections.available, self.owner.app.desktop_connections,
             self.execution_target, connection and connection.device_id)
-        if not ok then return failure(codes.fail, tostring(err), true) end
+        if not ok then return failure(error_code.fail, tostring(err), true) end
     end
     local retry_id = args.retry_run_id or ""
     local previous = self.messages[#self.messages]
     if retry_id ~= "" then
-        if not previous or previous.run_id ~= retry_id or previous.status ~= status.failed
+        if not previous or previous.run_id ~= retry_id or previous.status ~= enum.message_status.failed
             or not previous.error or not previous.error.retryable then
-            return failure(codes.invalid_param, "该消息已不能重试")
+            return failure(error_code.invalid_param, "该消息已不能重试")
         end
         text = self.messages[#self.messages - 1].content
     end
     if not self.valid_text(text) then
-        return failure(codes.invalid_param, "消息格式无效或内容过长")
+        return failure(error_code.invalid_param, "消息格式无效或内容过长")
     end
     local run = Run:new()
     ---@cast run agent.Run
@@ -239,7 +239,8 @@ function AgentSession:send_message(args, connection)
     run.retry = retry_id ~= ""
     if retry_id == "" then
         self.messages[#self.messages + 1] = {
-            id = make_id("message"), role = 1, content = text, created_at = now_ms(), status = status.completed,
+            id = make_id("message"), role = 1, content = text, created_at = now_ms(), status = enum.message_status
+        .completed,
         }
         run.assistant = { id = make_id("message"), role = 2, created_at = now_ms(), reasoning = {} }
         self.messages[#self.messages + 1] = run.assistant
@@ -248,7 +249,7 @@ function AgentSession:send_message(args, connection)
     end
     run.message_id = run.assistant.id
     run.assistant.content = ""
-    run.assistant.status = status.streaming
+    run.assistant.status = enum.message_status.streaming
     run.assistant.run_id = run.id
     run.assistant.error = nil
     run.assistant.ret = nil
@@ -270,10 +271,10 @@ function AgentSession:send_message(args, connection)
     if not saved then
         self.run = nil
         self.pending_runs[run] = nil
-        return failure(codes.call_fail, "提问未确认，请重新同步会话", true)
+        return failure(error_code.call_fail, "提问未确认，请重新同步会话", true)
     end
     self:_publish()
-    local response = { ret = codes.succ, chat_session = self:snapshot() }
+    local response = { ret = error_code.succ, chat_session = self:snapshot() }
     skynet.fork(function() self:_run_request(run, text) end)
     return response
 end
@@ -318,14 +319,14 @@ function AgentSession:_run_request(run, text)
     -- 终态先释放占用，广播后到达的新请求才能立即开始下一轮。
     local assistant = run.assistant
     if run.cancelled then
-        assistant.status = status.cancelled
+        assistant.status = enum.message_status.cancelled
     elseif not ok or not result then
         log.info("agent.session", "run", "session=%s run=%s 请求失败", self.id, run.id)
-        assistant.status = status.failed
-        assistant.ret = codes.call_fail
+        assistant.status = enum.message_status.failed
+        assistant.ret = error_code.call_fail
         assistant.error = { message = "对话请求失败，请稍后重试", retryable = true }
     else
-        assistant.status = status.completed
+        assistant.status = enum.message_status.completed
         assistant.content = result
     end
     self.updated_at = now_ms()
@@ -333,13 +334,13 @@ function AgentSession:_run_request(run, text)
         status = assistant.status,
         run = run.id,
         time = self.updated_at,
-        content = assistant.status == status.completed and assistant.content or nil,
+        content = assistant.status == enum.message_status.completed and assistant.content or nil,
         error = assistant.error
     })
     self.run = nil
     self.pending_runs[run] = nil
     if not saved then
-        assistant.status = status.failed
+        assistant.status = enum.message_status.failed
         assistant.error = { message = "保存结果未确认，请重新同步", retryable = false }
     end
     self:_publish()
@@ -349,7 +350,7 @@ end
 ---@return table
 function AgentSession:cancel_run(args)
     if type(args.run_id) ~= "string" or args.run_id == "" then
-        return failure(codes.invalid_param, "生成任务 ID 无效")
+        return failure(error_code.invalid_param, "生成任务 ID 无效")
     end
     local run = self.run
     if run and run.id == args.run_id and not run.cancelled then
@@ -357,7 +358,7 @@ function AgentSession:cancel_run(args)
         self:_publish()
         run:cancel()
     end
-    return { ret = codes.succ }
+    return { ret = error_code.succ }
 end
 
 function AgentSession:stop_other_device_runs()
@@ -375,7 +376,7 @@ function AgentSession:set_execution(target, connection)
     local workspace = target and target.directory or require("agent.workspace").create(
         config.tools.workspace_root, self.owner.app.identity.username, self.id)
     if not pcall(self.record, self, "target", { target = target, workspace = workspace }) then
-        return failure(codes.call_fail, "工作目录保存未确认，请重新同步", true)
+        return failure(error_code.call_fail, "工作目录保存未确认，请重新同步", true)
     end
     self.needs_workspace = false
     if not self.agent then
@@ -386,7 +387,7 @@ function AgentSession:set_execution(target, connection)
             content = "执行环境已切换到 " .. workspace
         })
         self:_publish()
-        return { ret = codes.succ, chat_session = self:snapshot() }
+        return { ret = error_code.succ, chat_session = self:snapshot() }
     end
     self.agent:close()
     self.agent.options.workspace, self.agent.options.execution_target = workspace, target
@@ -402,7 +403,7 @@ function AgentSession:set_execution(target, connection)
             .. workspace .. "；操作系统: " .. (target and target.platform or require("agent.sandbox").platform())
     }
     self:_publish()
-    return { ret = codes.succ, chat_session = self:snapshot() }
+    return { ret = error_code.succ, chat_session = self:snapshot() }
 end
 
 function AgentSession:close()

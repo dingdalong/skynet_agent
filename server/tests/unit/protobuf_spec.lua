@@ -1,8 +1,8 @@
 local hash = require("helper.hash")
 local cjson = require("cjson")
-local error_code = require("enum.error_code")
+local error_code = require("error_code")
 local lfs = require("lfs")
-local message_status = require("agent.message_status")
+local enum = require("enum")
 local pb = require("pb")
 local pb_io = require("pb.io")
 local protobuf = require("helper.protobuf")
@@ -102,22 +102,11 @@ describe("protobuf", function()
             "skynet.agent.v1.LoginReq",
             protocol.short_name_to_full_name.LoginReq
         )
-        assert.are.equal(
-            message_status.streaming,
-            pb.enum("skynet.agent.v1.MessageStatus", "MESSAGE_STATUS_STREAMING")
-        )
-        assert.are.equal(
-            message_status.unspecified,
-            pb.enum("skynet.agent.v1.MessageStatus", "MESSAGE_STATUS_UNSPECIFIED")
-        )
-        assert.are.equal(
-            message_status.completed,
-            pb.enum("skynet.agent.v1.MessageStatus", "MESSAGE_STATUS_COMPLETED")
-        )
-        assert.are.equal(
-            message_status.cancelled,
-            pb.enum("skynet.agent.v1.MessageStatus", "MESSAGE_STATUS_CANCELLED")
-        )
+        local statuses = {}
+        for name, value in pb.fields("skynet.agent.v1.MessageStatus") do
+            statuses[name:match("^MESSAGE_STATUS_(.+)$"):lower()] = value
+        end
+        assert.same(statuses, enum.message_status)
     end)
 
     it("编码和解码含应用 ID 的二进制消息头", function()
