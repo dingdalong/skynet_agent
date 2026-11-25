@@ -29,8 +29,8 @@ cleanup() {
             if [ -f "$log" ]; then cat "$log" >&2; fi
         done
     fi
-    if [ -f "$temp_dir/native-container.json" ]; then
-        (cd "$server_root" && python3 deploy/container.py stop agent fixture) >/dev/null || true
+    if [ -f "$temp_dir/native-container" ]; then
+        (cd "$server_root" && ./deploy/container.lua stop agent fixture) >/dev/null || true
     fi
     for pid in "$probe_pid" "$server_pid" "$manager_pid" "$fake_llm_pid"; do
         if [ -z "$pid" ]; then continue; fi
@@ -52,7 +52,7 @@ trap 'exit 143' TERM
 
 server_root="$temp_dir/server"
 mkdir -p "$server_root/deploy"
-cp "$project_root/tests/integration/native_container.py" "$server_root/deploy/container.py"
+cp "$project_root/tests/integration/native_container.sh" "$server_root/deploy/container.lua"
 # 原生节点连接此轮独占的 MongoDB，重启节点时保留同一个数据库。
 mongo_project="skynet-native-${temp_dir##*.}-$$"
 mongo_project=$(printf '%s' "$mongo_project" | tr '[:upper:]' '[:lower:]')
@@ -127,7 +127,7 @@ start_center() {
     done
 }
 start_center
-agent_request=$(printf '%s\n' '{"app_id":"agent","name":"Agent","image":"fixture"}' |
+agent_request=$(printf '%s\0' agent Agent fixture |
     (cd "$server_root" && ./3rd/skynet/skynet etc/config.submit))
 export AGENT_TEST_REQUEST_ID="$agent_request"
 start_gateway() {

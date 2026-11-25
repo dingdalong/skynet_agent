@@ -14,7 +14,7 @@
 | CMake 与 C++17 编译器 | 客户端公共宿主核心的独立编译测试 |
 | Make、C 编译器、归档工具、OpenSSL 开发文件 | Skynet、Lua C 模块与公共 C 核心 |
 | Lua 5.5、LuaRocks、Busted | 服务端单元测试 |
-| Python 3、VS Code 的 `sumneko.lua` 扩展、clang-format 16 或以上 | 格式化自有 Lua 和 proto 文件 |
+| 项目内置 Lua、VS Code 的 `sumneko.lua` 扩展、clang-format 16 或以上 | 格式化自有 Lua 和 proto 文件 |
 | netcat（nc） | 服务端控制脚本 |
 
 已有仓库补齐子模块：`git submodule update --init --recursive`。
@@ -123,11 +123,11 @@ docker build -f server/Dockerfile --target echo-fixture -t skynet-echo:local .
 
 App Center 按已批准的镜像 ID 启动容器，并注入 `APP_ID` 和注册凭据。应用加载协议与 Actor 后在本机回环地址监听随机端口，向 App Center 的 Cluster 端口报到。握手通过后 Gateway 安装路由。已在运行的应用直接与 Gateway 通信。
 
-Agent 更新后运行 `make -C server test-live`。它构建当前工作区的 Agent，连接当前 Compose 项目正在使用的 Gateway，列出本次构建、已批准、运行中的镜像 ID，以及待审申请编号和对应的镜像 ID。版本一致后，用 `local-agent-e2e` 用户打开会话、读取最近一页并请求更早的消息。首次没有历史时会用真实模型创建一轮样本，后续复用同一用户的数据。测试结束后服务继续运行。
+Agent 更新后运行 `make -C server test-live`。它构建当前工作区的 Agent，连接当前 Compose 项目正在使用的 Gateway，列出本次构建、已批准、运行中的镜像 ID，以及待审申请编号和对应的镜像 ID。版本一致后，用 `local-agent-e2e` 用户打开会话、读取最近一页并请求更早的消息。首次没有历史时会用真实模型创建一轮样本，后续复用同一用户的数据。测试结束后服务继续运行。涉及模型调用时，用专用账号发送一条新消息验证本次版本。交付时记录实际 Gateway 地址、版本及客户端打开方式；完成手动验收后可用 `./server/control.sh stop` 停止日常服务。
 
 完成 Agent 端到端验收还需执行 `make macos-test-app`，通过 Computer Use 打开测试客户端，登录上一步输出的 Gateway 地址并操作本次改动涉及的功能。例如验收历史分页时，选择有多页历史的专用测试账号，打开会话，确认首屏显示最近的消息，再向上翻到开头，核对更早的消息和分页终点。记录实际看到的结果。
 
-要专门验证 Agent 重启前后的真实模型续聊，在仓库根目录执行 `server/tests/integration/live_smoke.sh`。该脚本使用独立的 Compose 项目。
+要专门验证 Agent 重启前后的真实模型续聊，在仓库根目录执行 `server/tests/integration/live_smoke.sh`。该脚本使用独立的 Compose 项目和测试端口；结束时只清理本轮资源。
 
 若本次镜像尚未提交，使用上面的 `appctl submit` 命令。若待审申请指向本次镜像，在应用中心批准它。若待审的是其他镜像，先核对那条申请的用途，再决定是否驳回。
 

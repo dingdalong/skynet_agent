@@ -28,7 +28,7 @@ COPY server/src/service/init.lua ./src/service/init.lua
 ENTRYPOINT ["./3rd/skynet/skynet"]
 
 FROM runtime AS app-center
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 COPY common/proto/common.proto ../common/proto/
 COPY common/proto/app_center ../common/proto/app_center
 RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lua,target=/tmp/lua \
@@ -36,7 +36,8 @@ RUN --mount=type=bind,from=build,source=/opt/skynet/server/3rd/skynet/3rd/lua/lu
     /tmp/lua /tmp/check_protocol.lua app-center app_center/schema.proto
 COPY server/src/center_main.lua server/src/submit_app.lua ./src/
 COPY server/src/service/app/app_center ./src/service/app/app_center
-COPY server/deploy/container.py ./deploy/
+COPY --from=build /opt/skynet/server/3rd/skynet/3rd/lua/lua ./3rd/skynet/3rd/lua/lua
+COPY server/deploy/container.lua ./deploy/
 RUN --mount=type=bind,source=server/deploy/stamp-version.sh,target=/tmp/stamp-version.sh \
     sh /tmp/stamp-version.sh src/service/app/app_center/VERSION
 CMD ["etc/config.center"]

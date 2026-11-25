@@ -1,17 +1,28 @@
-#!/usr/bin/env python3
-import argparse
-import json
-import os
-from pathlib import Path
-import subprocess
-
-parser = argparse.ArgumentParser(description="向 App Center 提交本地镜像")
-submit = parser.add_subparsers(dest="command", required=True).add_parser("submit")
-for field in ("app-id", "name", "image"):
-    submit.add_argument("--" + field, required=True)
-args = parser.parse_args()
-root = Path(__file__).resolve().parents[1]
-result = subprocess.run(["docker", "compose", "--env-file", os.environ.get("SKYNET_ENV_FILE", "server/.env"),
-                         "exec", "-T", "app-center", "./3rd/skynet/skynet", "etc/config.submit"],
-                        input=json.dumps(vars(args)), text=True, cwd=root)
-raise SystemExit(result.returncode)
+#!/bin/sh
+set -eu
+usage='用法: appctl submit --app-id ID --name 名称 --image 镜像'
+invalid() { echo "$usage" >&2; exit 2; }
+case "${1:-}" in
+    -h|--help) echo "$usage"; exit 0 ;;
+    submit) ;;
+    *) invalid ;;
+esac
+unset app_id name image
+shift
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -h|--help) echo "$usage"; exit 0 ;;
+        --*=*) option=${1%%=*}; value=${1#*=}; shift ;;
+        *) [ "$#" -ge 2 ] || invalid; option=$1; value=$2; shift 2 ;;
+    esac
+    case "$option" in
+        --app-id) app_id=$value ;;
+        --name) name=$value ;;
+        --image) image=$value ;;
+        *) invalid ;;
+    esac
+done
+[ "${app_id+x}${name+x}${image+x}" = xxx ] || invalid
+cd "$(dirname "$0")/.."
+printf '%s\0' "$app_id" "$name" "$image" |
+    docker compose --env-file "${SKYNET_ENV_FILE:-server/.env}" exec -T app-center ./3rd/skynet/skynet etc/config.submit

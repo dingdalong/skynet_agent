@@ -2,6 +2,11 @@ name: skynet-agent
 x-node: &node
   network_mode: host
   init: true
+  healthcheck:
+    test: ["CMD", "test", "-f", "/tmp/skynet-ready"]
+    interval: 1s
+    timeout: 2s
+    retries: 30
   environment: &cluster
     MONGO_HOST: ${MONGO_HOST:-127.0.0.1}
     MONGO_PORT: ${MONGO_PORT:-18083}
@@ -45,11 +50,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - cluster-key:/cluster
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/skynet-ready"]
-      interval: 1s
-      timeout: 2s
-      retries: 30
   gateway:
     <<: *node
     build: { context: ., dockerfile: server/Dockerfile, target: gateway }

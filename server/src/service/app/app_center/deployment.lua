@@ -11,7 +11,7 @@ local function container_process(app, action, mode)
     assert(Frame.valid_app(app.app_id), "应用 ID 无效")
     assert(type(app.image) == "string" and #app.image <= 255 and app.image:match("^[%w][%w./_:@%-]*$"),
         "镜像名称无效")
-    local command = string.format("python3 deploy/container.py %s '%s' '%s'", action, app.app_id, app.image)
+    local command = string.format("./deploy/container.lua %s '%s' '%s'", action, app.app_id, app.image)
     return assert(io.popen(command, mode))
 end
 

@@ -6,7 +6,9 @@ local config = require("etc.cfg")
 
 skynet.start(function()
     local ok, err = pcall(function()
-        local args = require("cjson").decode(io.read("a"))
+        local id, name, image = io.read("a"):match("^([^%z]*)%z([^%z]*)%z([^%z]*)%z$")
+        assert(id, "应用提交参数无效")
+        local args = { app_id = id, name = name, image = image }
         cluster.reload({ center = "127.0.0.1:" .. config.app_center.port })
         local code, result = cluster.call("center", "@center", "submit", nodes.key(), args)
         assert(code == codes.succ and result, "应用中心无法接收申请")

@@ -2,6 +2,7 @@ local skynet = require("skynet")
 local config = require("integration.config")
 
 local probes = {
+    allocate_ports = true,
     agent_gateway_probe = true,
     local_agent_probe = true,
     fake_llm_server = true,
@@ -19,7 +20,7 @@ skynet.start(function()
     end
     local ok, failure = xpcall(function()
         assert(probes[config.probe], "未知测试探针: " .. config.probe)
-        if config.probe ~= "fake_llm_server" then
+        if config.probe ~= "fake_llm_server" and config.probe ~= "allocate_ports" then
             require("helper.protobuf").load("../common/proto")
             require("pb").option("enum_as_value")
         end

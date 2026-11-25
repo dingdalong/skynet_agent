@@ -2,7 +2,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 compose() { docker compose --env-file "${SKYNET_ENV_FILE:-server/.env}" "$@"; }
-project=$(compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])')
+# Compose 输出的顶级 name 已包含项目名覆盖和规范化。
+project=$(compose config | sed -n '/^name: /{s/^name: //;s/^"//;s/"$//;p;}')
+case "$project" in ''|*[!a-z0-9_-]*) echo '无法读取 Compose 项目名' >&2; exit 1 ;; esac
 apps() { docker ps "$@" --filter "label=io.skynet.project=$project"; }
 case "${1:-status}" in
     status) compose ps -a; apps -a ;;

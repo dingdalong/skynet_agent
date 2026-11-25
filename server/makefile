@@ -214,12 +214,25 @@ test-probe-support:
 test-live:
 	@sh "$(PROJECT_ROOT)/tests/integration/local_agent_smoke.sh"
 
+# 格式化只需仓库内的 Lua、JSON 与文件系统模块。
+FORMAT_TOOLS := $(LUA_DIR)/lua $(LUACLIB_DIR)/cjson.so $(LUACLIB_DIR)/lfs.so
+
+$(LUA_DIR)/lua:
+	@$(MAKE) -C "$(LUA_DIR)" $(DETECTED_PLATFORM)
+
+$(LUACLIB_DIR)/cjson.so:
+	@$(MAKE) cjson
+
+$(LUACLIB_DIR)/lfs.so:
+	@$(MAKE) lfs
+
+format format-changed check-format: $(FORMAT_TOOLS)
 format: SCOPE = changed
 format:
-	@python3 "$(PROJECT_ROOT)/tools/format_sources.py" --scope "$(SCOPE)"
+	@"$(LUA_DIR)/lua" tools/format_sources.lua --scope "$(SCOPE)"
 
 format-changed:
-	@python3 "$(PROJECT_ROOT)/tools/format_sources.py" --scope changed
+	@"$(LUA_DIR)/lua" tools/format_sources.lua --scope changed
 
 check-format:
 	@"$(PROJECT_ROOT)/tools/check_format.sh"

@@ -75,7 +75,8 @@ done <<EOF
 $(find "$common_root/proto" -type f -name '*.json' -print | sort)
 EOF
 
-python3 "$project_root/tools/format_sources.py" --scope all --list0 | (
+cd "$project_root"
+./3rd/skynet/3rd/lua/lua tools/format_sources.lua --scope all --list0 | (
 	while IFS= read -r -d '' file; do
 		check_file "$file"
 	done
