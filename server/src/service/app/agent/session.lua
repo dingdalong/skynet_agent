@@ -92,6 +92,7 @@ function AgentSession:open_agent()
         execution_target = target,
         workspace = workspace,
         tools = config.tools,
+        tool_registry = owner.app.tool_registry,
         project_instructions_max_bytes = config.project_instructions_max_bytes,
         permission_llm = models.resolve(config, config.permission.model_id or model_id),
         permission = config.permission,
@@ -361,23 +362,15 @@ end
 
 function AgentSession:stop_remote()
     if self.run and self.run.source_device ~= self.execution_target.device_id then self.run:cancel() end
-    local executor = self.agent and self.agent.executor
-    if executor and executor.remote then executor.processes:stop_remote(self.execution_target.device_id) end
+    local tools = self.agent and self.agent.tools
+    if tools then tools:stop_remote(self.execution_target.device_id) end
 end
 
 function AgentSession:set_execution(target, connection)
     assert(not self.run, "请先停止当前任务再切换执行目标")
     assert(not self.read_only and not self.storage_failed, "会话仅可阅读")
-    local executor = self.agent and self.agent.executor
-    if executor then
-        if executor.remote then
-            assert(not executor.processes:has_active(), "请先停止后台进程")
-        else
-            for _, process in pairs(executor.processes.processes) do
-                assert(process.done, "请先停止后台进程")
-            end
-        end
-    end
+    local tools = self.agent and self.agent.tools
+    assert(not tools or not tools:has_active(), "请先停止后台进程")
     target = self.owner.app.execution:validate_target(target, connection)
     local workspace = target and target.directory or require("agent.workspace").create(
         config.tools.workspace_root, self.owner.app.identity.username, self.id)
@@ -395,8 +388,7 @@ function AgentSession:set_execution(target, connection)
         self:_publish()
         return { ret = codes.succ, chat_session = self:snapshot() }
     end
-    if executor then executor:close() end
-    self.agent.executor = nil
+    self.agent:close()
     self.agent.options.workspace, self.agent.options.execution_target = workspace, target
     self.execution_target = target
     self.agent.turn = nil
@@ -416,7 +408,6 @@ end
 function AgentSession:close()
     if not self.agent then return end
     self.agent:close()
-    self.agent.executor = nil
 end
 
 return AgentSession

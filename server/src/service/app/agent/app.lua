@@ -7,6 +7,7 @@ local models = require("agent.models")
 local config = require("etc.cfg").agent
 
 ---@class agent.App
+---@field tool_registry agent.ToolRegistry
 ---@field identity table
 ---@field router integer
 ---@field connections table<string, table>
@@ -15,7 +16,8 @@ local config = require("etc.cfg").agent
 ---@field execution agent.Execution
 local App = class()
 
-function App:ctor(identity, router, templates)
+function App:ctor(identity, router, templates, tool_registry)
+    self.tool_registry = tool_registry
     self.identity = identity
     self.router = router
     self.connections = {}

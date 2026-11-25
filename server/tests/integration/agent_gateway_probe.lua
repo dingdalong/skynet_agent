@@ -240,6 +240,30 @@ function M.run(config)
             print("真实节点重启后保持零实例，重新上线按配置注册成功")
             return
         end
+        if config.mode == "live_tools" then
+            local client = login()
+            local prompt = "请按顺序在此会话目录实际调用三个工具。先用 apply_patch 新建 probe.txt，正文为 dispatch-ok。" ..
+                "再用 exec_command 启动 cat probe.txt && read -r line && echo got-$line，设置 tty=true、yield_time_ms=1。" ..
+                "最后用 write_stdin 向该 session_id 输入 done 及换行，等到进程退出。"
+            local session = client:send_message(nil, prompt, 16000)
+            local result = last(session)
+            support.equal(result.status, status.completed)
+            local calls = {}
+            for _, call in ipairs(result.tool_calls) do
+                assert(call.status == "completed", call.name .. " " .. call.status .. " " .. (call.error or ""))
+                calls[call.name] = call
+            end
+            local patch = assert(calls.apply_patch, "缺少补丁记录")
+            assert(table.concat(patch.changed_files, "\n"):find("probe.txt", 1, true), "缺少实际修改的文件")
+            local command = assert(calls.exec_command, "缺少启动记录")
+            local input = assert(calls.write_stdin, "缺少终端输入记录")
+            assert(command.process_id ~= "" and input.process_id == command.process_id, "未续用同一个进程")
+            assert((command.output .. input.output):find("dispatch-ok", 1, true), "未读到补丁内容")
+            assert(input.output:find("got-done", 1, true), "进程未收到输入")
+            support.equal(input.exit_code, 0)
+            print("真实模型已通过网关完成补丁、命令和终端续写")
+            return
+        end
         if config.mode == "live" then
             local client, snapshot, username = login()
             local marker = crypt.hexencode(crypt.randomkey())

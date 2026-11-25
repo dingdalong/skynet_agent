@@ -64,4 +64,5 @@ until "$probe" agent_gateway_probe approve_agent >/dev/null 2>&1; do
     [ "$attempt" -lt 60 ] || { echo "Agent 未通过审批或未就绪" >&2; exit 1; }
     sleep 0.5
 done
+"$probe" agent_gateway_probe live_tools
 "$probe" agent_gateway_probe live

@@ -5,7 +5,7 @@ local workspace = require("agent.workspace")
 local rules = require("agent.permission.rules")
 local Scope = require("tests.support.modules")
 
-describe("Agent 工作区与文件访问", function()
+describe("Agent 工作区与内置工具", function()
     local root
     before_each(function()
         root = os.tmpname()
@@ -23,6 +23,84 @@ describe("Agent 工作区与文件访问", function()
             end
         end
         remove(root)
+    end)
+
+    describe("从服务目录自动注册工具", function()
+        local scope, old_path, directory, Tools
+        local fixture = [[
+            return {
+                spec = { type = "function", name = "probe", description = "工具发现探针",
+                    parameters = { type = "object", properties = {} } },
+                prepare = function(action) action.cwd = action.workspace end,
+                execute = function(action) return { ok = true, output = action.cwd } end,
+            }
+        ]]
+
+        before_each(function()
+            old_path = package.path
+            local entry = assert(filesystem.realpath(assert(package.searchpath("agent.tools", old_path))))
+            local source = entry:match("^(.*/)")
+            directory = root .. "/agent/tools/buildin/"
+            workspace.mkdir(directory:sub(1, -2))
+            filesystem.atomic_write(root .. "/agent/tools/init.lua", filesystem.read_file(entry, 65536), true)
+            for file in lfs.dir(source .. "buildin") do
+                if file:match("%.lua$") then
+                    filesystem.atomic_write(directory .. file, filesystem.read_file(source .. "buildin/" .. file, 65536),
+                        true)
+                end
+            end
+            scope = Scope.new({
+                ["agent.tools"] = false,
+                ["agent.process"] = { new = function() return {} end },
+                ["agent.permission.llm_judge"] = {
+                    new = function()
+                        return { decide = function() return true end }
+                    end
+                },
+                log = { info = function() end, failure = function() end },
+            })
+            package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. old_path
+            Tools = require("agent.tools")
+        end)
+        after_each(function()
+            package.path = old_path
+            if scope then scope:restore() end
+        end)
+
+        it("第四个模块按文件名排序，按声明名调度且执行时读取当前方法", function()
+            filesystem.atomic_write(directory .. "middle.lua", fixture, true)
+            local registry = Tools.discover()
+            local names = {}
+            for _, spec in ipairs(registry.specs) do names[#names + 1] = spec.name end
+            assert.are.same({ "apply_patch", "exec_command", "probe", "write_stdin" }, names)
+            local tools = Tools:new({ tool_registry = registry, workspace = root, tools = {}, permission = {} }, {})
+            local call = { name = "probe", arguments = "{}" }
+            assert.are.equal(root, tools:execute(call, {}, {}, {}).output)
+            local effects = 0
+            require("agent.tools.buildin.middle").execute = function()
+                effects = effects + 1; return { ok = true }
+            end
+            assert.is_false(tools:execute(call, {}, { cancelled = true }, {}).ok)
+            assert.are.equal(0, effects)
+            assert.is_true(tools:execute(call, {}, {}, {}).ok)
+            assert.are.equal(1, effects)
+            assert.matches("未知工具", tools:execute({ name = "unknown", arguments = "{}" }, {}, {}, {}).error)
+        end)
+
+        for _, invalid in ipairs({
+            { fixture:gsub('name = "probe"', 'name = "exec_command"'), "工具名重复" },
+            { fixture:gsub("prepare = function", "other = function"), "工具缺少 prepare 或 execute" },
+            { fixture:gsub("properties = {}", 'properties = { arg = { type = "invalid" } }'), "工具参数类型无效" },
+            { 'error("fixture load error")', "fixture load error" },
+        }) do
+            it("注册失败报告文件与原因: " .. invalid[2], function()
+                filesystem.atomic_write(directory .. "wrong.lua", invalid[1], true)
+                local ok, message = pcall(Tools.discover)
+                assert.is_false(ok)
+                assert.matches("wrong.lua", message, 1, true)
+                assert.matches(invalid[2], message, 1, true)
+            end)
+        end
     end)
 
     it("用户名和会话路径隔离，目录跨大小写及分隔符不冲突", function()
@@ -54,7 +132,7 @@ describe("Agent 权限判断", function()
             local calls = 0
             local arguments = '{ "cmd": "printf hello", "tty": false }'
             local scope = Scope.new({
-                ["agent.executor"] = false,
+                ["agent.tools"] = false,
                 log = { info = function() end, failure = function() end },
                 ["agent.process"] = { new = function() return {} end },
                 ["agent.permission.llm_judge"] = {
@@ -71,13 +149,15 @@ describe("Agent 权限判断", function()
                 },
                 skynet = {}
             })
-            local executor = require("agent.executor"):new({
+            local Tools = require("agent.tools")
+            local tools = Tools:new({
+                tool_registry = Tools.discover(),
                 workspace = "/",
                 tools = { timeout_ms = 300000 },
                 permission = { rules_enabled = enabled },
                 prompt_templates = templates
             }, {})
-            local result = executor:execute({ name = "exec_command", arguments = arguments },
+            local result = tools:execute({ name = "exec_command", arguments = arguments },
                 {}, { cancelled = false }, { output = "" })
             scope:restore()
             assert.are.equal(1, calls)
@@ -88,7 +168,7 @@ describe("Agent 权限判断", function()
 
     it("规则阻止时不调用 LLM 或启动进程", function()
         local scope = Scope.new({
-            ["agent.executor"] = false,
+            ["agent.tools"] = false,
             log = { info = function() end, failure = function() end },
             ["agent.process"] = { new = function() return {} end },
             ["agent.permission.llm_judge"] = {
@@ -98,13 +178,15 @@ describe("Agent 权限判断", function()
             },
             skynet = {}
         })
-        local executor = require("agent.executor"):new({
+        local Tools = require("agent.tools")
+        local tools = Tools:new({
+            tool_registry = Tools.discover(),
             workspace = "/",
             tools = { timeout_ms = 300000 },
             permission = { rules_enabled = true },
             prompt_templates = templates
         }, {})
-        local result = executor:execute({ name = "exec_command", arguments = '{"cmd":"reboot now"}' },
+        local result = tools:execute({ name = "exec_command", arguments = '{"cmd":"reboot now"}' },
             {}, { cancelled = false }, { output = "" })
         scope:restore()
         assert.is_false(result.ok)

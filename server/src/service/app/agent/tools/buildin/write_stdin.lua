@@ -1,4 +1,4 @@
-local Stdin = {}
+local Stdin = { default_wait_ms = 1000 }
 Stdin.spec = {
     type = "function",
     name = "write_stdin",
@@ -17,4 +17,18 @@ Stdin.spec = {
         additionalProperties = false
     }
 }
+
+function Stdin.prepare(action, processes)
+    local process = processes:get(action.args.session_id)
+    assert(#(action.args.chars or "") <= 65536, "终端输入过长")
+    action.mode, action.cwd, action.launch_argv = process.mode, process.cwd, process.argv
+end
+
+function Stdin.execute(action, processes, run, record)
+    local process = processes:get(action.args.session_id)
+    run.processes[process.id] = processes
+    record.process_id, record.status = process.id, "running"
+    return processes:collect_result(process, action, record)
+end
+
 return Stdin

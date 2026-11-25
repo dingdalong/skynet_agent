@@ -182,11 +182,25 @@ function Processes:collect(process, duration, max_tokens, input)
     }
 end
 
+function Processes:collect_result(process, action, record)
+    local response = self:collect(process, action.wait_ms, action.max_tokens, action.args.chars)
+    record.status = response.session_id and "running" or process.record.status
+    record.exit_code, record.output = response.exit_code, response.output
+    return response
+end
+
 function Processes:terminate(id)
     local process = self.processes[id]
     if process and not process.done then
         process.stopping = true; process.handle:terminate()
     end
+end
+
+function Processes:has_active()
+    for _, process in pairs(self.processes) do
+        if not process.done then return true end
+    end
+    return false
 end
 
 function Processes:close()

@@ -7,6 +7,7 @@ local codes = require("enum.error_code")
 
 ---@class agent.Service
 ---@field users table<string, agent.App>
+---@field tool_registry agent.ToolRegistry?
 ---@field templates agent.PromptTemplates?
 ---@field available boolean
 local AgentService = class()
@@ -21,6 +22,7 @@ AgentService.closing_commands = { disconnect = true, handle_request = true }
 function AgentService:ctor()
     self.users = {}
     self.locks = {}
+    self.tool_registry = nil
     self.templates = nil
     self.available = true
 end
@@ -58,7 +60,8 @@ function AgentService:_handle(context, identity, id, name, args, draining)
         return { ret = codes.server_busy, error = { message = "应用服务已下线", retryable = true } }
     end
     if not app then
-        app = App:new(identity, context.source, self.templates)
+        self.tool_registry = self.tool_registry or require("agent.tools").discover()
+        app = App:new(identity, context.source, self.templates, self.tool_registry)
         if not pcall(Store.restore, app) then
             return { ret = codes.call_fail, error = { message = "历史读取失败，请重试", retryable = true } }
         end

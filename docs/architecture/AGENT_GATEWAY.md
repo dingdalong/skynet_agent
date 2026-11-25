@@ -322,6 +322,11 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 判断模型与主模型分别持有客户端，请求超时互不修改。输入或终端输出中的指令不能修改权限策略。
 判断结果只对应本次动作和实际权限；失败、格式无效或信息不足时拒绝执行，不产生人工审批请求。
 
+在 `tools/buildin/` 添加一个 Lua 模块，返回模型可见的 `spec`、准备动作的 `prepare` 和执行动作的 `execute`。
+Agent 服务首次使用时，`agent.tools` 自动扫描该目录，按文件名排序并以 `spec.name` 注册；新增工具随服务重启生效。
+会话共享工具注册表，各自持有工作目录、权限模型和进程。`agent.tools` 检查权限后分发到工具模块或目标桌面。
+新增工具若支持在 Mac 上执行，还需提供对应的宿主实现。
+
 `exec_command` 启动 bash，`write_stdin` 继续访问所属会话的执行进程，`apply_patch` 处理文本补丁。
 `common/native/agent_runtime/` 是服务端使用的公共 C 核心，统一补丁、文件访问、沙盒、进程与 PTY。
 服务端的两个 Lua 绑定位于 `src/service/app/agent/native/`，将文件和进程操作接入 Skynet。

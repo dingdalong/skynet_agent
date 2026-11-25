@@ -8,19 +8,17 @@ describe("Agent 工具循环检查点", function()
     before_each(function()
         effects, calls = 0, 0
         instructions, loads, load_error = { workspace = "/test" }, 0, nil
-        local Executor = require("class")()
-        function Executor:ctor() end
+        local Tools = require("class")()
+        function Tools:ctor() end
 
-        function Executor:specs() return {} end
-
-        function Executor:execute()
+        function Tools:execute()
             effects = effects + 1
             return { ok = true, output = "已写入" }
         end
 
         fake_llm, scope = FakeLlm.new({
             ["agent.agent"] = false,
-            ["agent.executor"] = Executor,
+            ["agent.tools"] = Tools,
             ["agent.sandbox"] = { platform = function() return "macos" end },
             ["agent.prompts.project"] = {
                 update = project.update,
@@ -35,7 +33,8 @@ describe("Agent 工具循环检查点", function()
             calls = calls + 1
             return model(calls, input)
         end
-        agent = require("agent.agent"):new({}, templates, { workspace = "/test", tools = {} })
+        agent = require("agent.agent"):new({}, templates,
+            { workspace = "/test", tools = {}, tool_registry = { specs = {} } })
         request = require("agent.run"):new()
         request.id = "r1"
     end)
@@ -108,8 +107,8 @@ describe("Agent 工具循环检查点", function()
             end
             return "切换完成"
         end
-        local Executor = require("agent.executor")
-        function Executor:set_llm() end
+        local Tools = require("agent.tools")
+        function Tools:set_llm() end
 
         assert.are.equal("切换完成", agent:chat("切换任务", function() end, request))
         assert.are.same({ "old", "new" }, seen)
@@ -197,8 +196,8 @@ describe("Agent 工具循环检查点", function()
         assert.are.equal("初始完成", agent:chat("初始任务", function() end))
         instructions = { workspace = "/test" }
         model = function() return tool_response() end
-        local Executor = require("agent.executor")
-        function Executor:execute()
+        local Tools = require("agent.tools")
+        function Tools:execute()
             request.cancelled = true
             return { ok = false, error = "已停止" }
         end
@@ -263,8 +262,8 @@ describe("Agent 工具循环检查点", function()
             assert.are.equal(1, index)
             return tool_response()
         end
-        local Executor = require("agent.executor")
-        function Executor:execute()
+        local Tools = require("agent.tools")
+        function Tools:execute()
             effects = effects + 1
             request.cancelled = true
             return { ok = false, error = "已停止" }

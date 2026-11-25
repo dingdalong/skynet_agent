@@ -12,7 +12,7 @@ local project = require("agent.prompts.project")
 ---@field project_instructions agent.ProjectInstructions?
 ---@field messages llm.Message[]
 ---@field options agent.Options?
----@field executor agent.Executor?
+---@field tools agent.Tools?
 ---@field running boolean?
 ---@field turn agent.Turn?
 
@@ -26,6 +26,7 @@ local project = require("agent.prompts.project")
 ---@class agent.Options
 ---@field workspace string
 ---@field session_id string
+---@field tool_registry agent.ToolRegistry
 ---@field tools agent.ToolConfig
 ---@field permission agent.PermissionConfig
 ---@field permission_llm llm.Config?
@@ -47,14 +48,14 @@ function Agent:ctor(llm_config, templates, options)
     if self.options then self.options.prompt_templates = templates end
     self.permission_llm_config = table.deep_copy(options and options.permission_llm or llm_config)
     self.llm = Base:new(llm_config, "main")
-    self.executor = nil
+    self.tools = nil
     self.running = false
     self.turn = nil
     local facts = options and {
         workspace = options.workspace,
         platform = options.execution_target and options.execution_target.platform
             or require("agent.sandbox").platform(),
-        tools = require("agent.executor"):specs(),
+        tools = options.tool_registry.specs,
         permission = options.permission,
         tool_config = options.tools
     } or nil
@@ -67,7 +68,7 @@ function Agent:set_llm(llm_config, permission_config)
     assert(type(llm_config) == "table", "Agent 的 LLM 配置必须是 table")
     self.permission_llm_config = table.deep_copy(permission_config or llm_config)
     self.llm:set_config(llm_config)
-    if self.executor then self.executor:set_llm(self.permission_llm_config) end
+    if self.tools then self.tools:set_llm(self.permission_llm_config) end
 end
 
 ---@param user_input string
@@ -82,15 +83,15 @@ function Agent:_chat(user_input, on_text_delta, run)
     )
     assert(type(on_text_delta) == "function", "Agent 的文本回调必须是函数")
 
-    if self.options and not self.executor then
-        self.executor = require("agent.executor"):new(self.options, self.permission_llm_config)
+    if self.options and not self.tools then
+        self.tools = require("agent.tools"):new(self.options, self.permission_llm_config)
     end
     local turn = run and run.retry and self.turn or nil
     if not turn then
         -- 新任务读取失败时也不能误复用上一次失败任务的轮次。
         self.turn = nil
         local instructions = self.options and (self.options.execution_target
-            and self.executor.processes:project(run, self.options.project_instructions_max_bytes or 32768)
+            and self.tools.processes:project(run, self.options.project_instructions_max_bytes or 32768)
             or project.load(self.options.workspace, self.options.project_instructions_max_bytes or 32768)) or nil
         turn = {
             messages = table.copy(self.messages),
@@ -105,7 +106,7 @@ function Agent:_chat(user_input, on_text_delta, run)
     end
     self.turn = turn
     while true do
-        local options = self.executor and { tools = self.executor:specs(), parallel_tool_calls = false } or nil
+        local options = self.tools and { tools = self.options.tool_registry.specs, parallel_tool_calls = false } or nil
         local ok, text, err, response = pcall(self.llm.stream, self.llm,
             table.copy(turn.messages), on_text_delta, run, options)
         if not ok or text == nil then
@@ -141,7 +142,7 @@ function Agent:_chat(user_input, on_text_delta, run)
             self.messages, self.project_instructions, self.turn = turn.messages, turn.project_instructions, nil
             return table.concat(turn.text)
         end
-        assert(self.executor, "Agent 没有启用工具")
+        assert(self.tools, "Agent 没有启用工具")
         -- 从第一条工具调用开始保留事实，失败和取消不再回滚已经发生的动作。
         self.messages, self.project_instructions = turn.messages, turn.project_instructions
         for _, call in ipairs(response.calls) do
@@ -165,7 +166,7 @@ function Agent:_chat(user_input, on_text_delta, run)
                 }
                 run.assistant.tool_calls = run.assistant.tool_calls or {}
                 run.assistant.tool_calls[#run.assistant.tool_calls + 1] = record
-                result = self.executor:execute(call, {
+                result = self.tools:execute(call, {
                     user_input = turn.user_input,
                     history = turn.messages
                 }, run, record)
@@ -211,7 +212,9 @@ function Agent:chat(user_input, on_text_delta, run)
 end
 
 function Agent:close()
-    if self.executor then self.executor:close() end
+    if self.tools then
+        self.tools:close(); self.tools = nil
+    end
 end
 
 return Agent

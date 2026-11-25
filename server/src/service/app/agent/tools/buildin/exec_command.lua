@@ -1,3 +1,5 @@
+local lfs = require("lfs")
+local workspace = require("agent.workspace")
 local Bash = {}
 Bash.spec = {
     type = "function",
@@ -26,4 +28,20 @@ Bash.spec = {
         additionalProperties = false
     }
 }
+
+function Bash.prepare(action)
+    local args = action.args
+    assert(args.cmd:match("%S") and #args.cmd <= 65536, "命令为空或过长")
+    action.cwd = workspace.resolve(args.workdir or ".", action.workspace)
+    assert(lfs.attributes(action.cwd, "mode") == "directory", "命令工作目录不存在")
+    assert(action.mode == "require_escalated" or workspace.inside(action.cwd, action.workspace), "工作目录超出当前会话")
+end
+
+function Bash.execute(action, processes, run, record)
+    local args = action.args
+    local process = processes:start({ "/bin/bash", "--noprofile", "--norc", "-c", args.cmd },
+        action.cwd, args.tty or false, action.mode, action.timeout, run, record)
+    return processes:collect_result(process, action, record)
+end
+
 return Bash

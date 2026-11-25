@@ -66,6 +66,7 @@ describe("用户与客户端服务", function()
                 hexencode = function(value) return value end,
             },
             ["agent.agent"] = Agent,
+            ["agent.tools"] = { discover = function() return { specs = {}, by_name = {} } end },
             ["agent.persistence"] = false,
             ["agent.execution"] = false,
             ["skynet.queue"] = function() return function(f, ...) return f(...) end end,
@@ -338,6 +339,17 @@ describe("用户与客户端服务", function()
         assert.are.equal("AgentChatRes", events[#events].args[3])
         assert.are.equal(created.id, events[1].args[4].chat_session.session.id)
         assert.are.equal(2, #events[1].args[4].chat_session.session.messages)
+    end)
+
+    it("同一服务的会话共享工具注册表，后台进程阻止切换工作目录", function()
+        open("a", 100, "alice")
+        local session = apps.alice.chat.sessions[first("启动任务").id]
+        open("b", 200, "bob")
+        assert.are.equal(session.agent.options.tool_registry, apps.bob.tool_registry)
+        assert.is_table(apps.bob.tool_registry)
+        session.run = nil
+        session.agent.tools = { has_active = function() return true end }
+        assert.has_error(function() session:set_execution(nil, {}) end, "请先停止后台进程")
     end)
 
     it("服务变更整表替换，拒绝过期快照和未授权更新", function()
