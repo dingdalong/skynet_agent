@@ -794,6 +794,7 @@ final class WebViewTests: XCTestCase {
         try await harness.until("typeof window.__skynetTransport?.postMessage === 'function'")
         try await harness.waitForPresentation(1)
         XCTAssertEqual(harness.presentations[0]["section"] as? String, "外观")
+        try await harness.untilToolbar("sidebar", labelContaining: "设置导航")
         try await harness.until(
             "document.documentElement.dataset.astryxTheme==='neutral'"
         )
@@ -801,14 +802,17 @@ final class WebViewTests: XCTestCase {
             "parseFloat(getComputedStyle(document.querySelector('.astryx-card')).borderRadius)>0")
         try await harness.click("深色")
         try await harness.until("document.documentElement.dataset.theme==='dark'")
-        try await harness.activateToolbar("wallpaper")
-        try await harness.until("document.body.innerText.includes('选择壁纸')")
+        try await harness.click("壁纸")
+        try await harness.until(
+            "document.querySelector('h1')?.textContent==='壁纸' && document.body.innerText.includes('选择壁纸')"
+        )
         try await harness.click("暮色")
         try await harness.until(
             "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim()==='暮色' && b.getAttribute('aria-pressed')==='true')"
         )
         try await harness.capture(client.appendingPathComponent("test-artifacts/settings-webkit.png"))
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
+        try await harness.until("document.querySelector('[aria-label=\"设置分类\"]') !== null")
         try await harness.until(
             "document.querySelector('[data-settings-content]').clientWidth <= innerWidth"
         )
@@ -832,10 +836,33 @@ final class WebViewTests: XCTestCase {
         try await harness.until(
             "document.querySelector('[data-settings-content]').scrollWidth <= document.querySelector('[data-settings-content]').clientWidth"
         )
-        try await harness.activateToolbar("motion")
-        try await harness.until("document.body.innerText.includes('减少动态效果')")
+        try await harness.click("动态效果")
+        try await harness.until(
+            "document.querySelector('h1')?.textContent==='动态效果' && document.body.innerText.includes('减少动态效果')"
+        )
         try await harness.until(
             "document.querySelector('input[role=switch]').parentElement.getBoundingClientRect().width>=28")
+        harness.web.setFrameSize(NSSize(width: 1200, height: 780))
+        try await harness.until("document.querySelector('[aria-label=\"设置导航\"]') !== null")
+        try await harness.click("应用管理")
+        try await harness.until(
+            "document.querySelector('h1')?.textContent==='应用管理' && document.querySelectorAll('article').length >= 2"
+        )
+        try await harness.until(
+            "document.querySelectorAll('[aria-label=\"按状态筛选应用\"] button[aria-pressed]').length >= 4"
+        )
+        try await harness.untilToolbar("install", labelContaining: "安装应用")
+        try await harness.click("查看 设置 详情")
+        try await harness.until(
+            "document.querySelector('dialog[open]') !== null && document.querySelector('dialog[open]').innerText.includes('声明权限')"
+        )
+        try await harness.click("关闭")
+        try await harness.until("document.querySelector('dialog[open]') === null")
+        try await harness.click("关于")
+        try await harness.until(
+            "document.querySelector('h1')?.textContent==='关于' && document.body.innerText.includes('复制诊断信息')"
+        )
+        try await harness.untilToolbar("refresh", labelContaining: "刷新版本")
         let agent = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
         defer { agent.close() }
         try await agent.untilToolbar("new", labelContaining: "新建会话")

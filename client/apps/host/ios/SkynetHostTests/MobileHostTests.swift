@@ -44,14 +44,13 @@ final class MobileHostTests: XCTestCase {
         try await eventually("分隔线的键盘操作未调整原生面板") { agent.frame.width > original.width * 0.6 }
         let adjustedWidth = agent.frame.width
         shell.frame.size.width = 750
-        let settingsBar = "document.querySelector('[role=toolbar][aria-label=\"设置工具栏\"]')"
-        let more = "\(settingsBar)?.querySelector('button[aria-label=\"更多\"]')"
+        let agentBar = "document.querySelector('[role=toolbar][aria-label=\"Agent工具栏\"]')"
+        let more = "\(agentBar)?.querySelector('button[aria-label=\"更多\"]')"
         try await waitForWeb(shell, "\(more)?.getBoundingClientRect().width > 0")
-        _ = try await shell.evaluateJavaScript("\(more).click()")
-        let management =
-            "Array.from(document.querySelectorAll('[role=menuitem]')).find(item => item.textContent.trim() === '应用管理')"
-        try await waitForWeb(shell, "!!(\(management))")
-        _ = try await shell.evaluateJavaScript("\(management).click()")
+        let managementTab =
+            "Array.from(document.querySelectorAll('button')).find(item => item.getAttribute('aria-label') === '应用管理' || item.textContent.trim() === '应用管理')"
+        try await waitForWeb(retainedSettings, "!!(\(managementTab))")
+        _ = try await retainedSettings.evaluateJavaScript("\(managementTab).click()")
         try await waitForWeb(retainedSettings, "document.querySelector('h1')?.textContent === '应用管理'")
         shell.frame.size.width = 390
         try await eventually("窄窗口未显示最近使用的应用") {
