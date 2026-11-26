@@ -1,28 +1,42 @@
 import {
     Fragment,
+    useCallback,
+    useEffect,
     useLayoutEffect,
     useRef,
     useState,
     type ReactNode,
 } from "react";
 import {
-    Banner,
+    AlertDialog,
+    Badge,
     Button,
     Card,
+    Center,
+    DropdownMenu,
+    EmptyState,
     Grid,
+    Heading,
     HStack,
     Icon,
     IconButton,
-    DropdownMenu,
     MoreMenu,
     OverflowList,
     ResizeHandle,
+    StatusDot,
     Text,
     Toolbar,
+    useToast,
     VStack,
 } from "@astryxdesign/core";
-import { HomeIcon } from "@heroicons/react/24/outline";
-import { usePanGesture } from "@astryxdesign/core/hooks";
+import {
+    ExclamationTriangleIcon,
+    HomeIcon,
+    MagnifyingGlassIcon,
+    Squares2X2Icon,
+    TrashIcon,
+} from "@heroicons/react/24/outline";
+import { useHotkeys, usePanGesture } from "@astryxdesign/core/hooks";
 import type {
     AppSummary,
     HostSnapshot,
@@ -32,6 +46,7 @@ import type {
     WorkspaceCommandName,
 } from "@skynet/contracts";
 import { tokens } from "@skynet/tokens";
+import { CommandPaletteModal } from "./CommandPaletteModal";
 import { AppArtwork, Launchers } from "./Launchers";
 import {
     beginDividerDrag,
@@ -41,6 +56,14 @@ import {
     type DividerDrag,
     type Placement,
 } from "./geometry";
+import {
+    activePaneId,
+    formatServerHost,
+    overviewSplitPlan,
+    splitRatioPercentages,
+    type CommandStep,
+    type PaletteAction,
+} from "./presentation";
 
 type Execute = (
     name: WorkspaceCommandName,
@@ -56,7 +79,7 @@ type ShellProps = {
 };
 const control = (
     label: string,
-    icon: "chevronLeft" | "close" | "copy",
+    icon: "chevronLeft" | "chevronsLeft" | "chevronsRight" | "close" | "copy",
     click: () => void,
 ) => (
     <IconButton
@@ -68,7 +91,21 @@ const control = (
     />
 );
 
-function RecentApp({ app, execute }: { app: AppSummary; execute: Execute }) {
+function RecentApp({
+    app,
+    execute,
+    wide,
+    canSplit,
+    statusLabel,
+    onSplit,
+}: {
+    app: AppSummary;
+    execute: Execute;
+    wide: boolean;
+    canSplit: boolean;
+    statusLabel?: string;
+    onSplit: () => void;
+}) {
     const ref = useRef<HTMLDivElement>(null);
     usePanGesture(ref, {
         axis: "y",
@@ -78,18 +115,38 @@ function RecentApp({ app, execute }: { app: AppSummary; execute: Execute }) {
         },
     });
     return (
-        <Card ref={ref} padding={3}>
-            <HStack align="center" justify="between">
+        <Card ref={ref} padding={3} elevation="low">
+            <HStack align="center" justify="between" gap={1.5}>
                 <Button
                     label={app.name}
                     variant="ghost"
                     onClick={() => execute("restore", { appId: app.id })}
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        justifyContent: "flex-start",
+                    }}
                 >
-                    <HStack as="span" align="center" gap={2}>
+                    <HStack
+                        as="span"
+                        align="center"
+                        gap={2}
+                        style={{ minWidth: 0 }}
+                    >
                         <AppArtwork app={app} size={24} />
                         <Text maxLines={1}>{app.name}</Text>
                     </HStack>
                 </Button>
+                {statusLabel && <Badge variant="info" label={statusLabel} />}
+                {wide && canSplit && (
+                    <IconButton
+                        icon={<Icon icon="viewColumns" />}
+                        label={`分屏打开${app.name}`}
+                        tooltip="一键分屏"
+                        variant="ghost"
+                        onClick={onSplit}
+                    />
+                )}
                 {control(`关闭${app.name}`, "close", () =>
                     execute("close", { appId: app.id }),
                 )}
@@ -176,12 +233,16 @@ function PanelToolbar({
     wide,
     index,
     width,
+    isSplit,
+    isActive,
 }: Pick<ShellProps, "activate" | "execute"> & {
     app: AppSummary;
     toolbar?: PaneToolbar;
     wide: boolean;
     index: number;
     width: number;
+    isSplit: boolean;
+    isActive: boolean;
 }) {
     const invoke = (id: string) =>
         toolbar && activate(app.id, toolbar.presentationId, id);
@@ -227,6 +288,19 @@ function PanelToolbar({
     });
     const overview = () => execute("overview");
     const close = () => execute("close", { appId: app.id });
+    if (isSplit) {
+        const edge: Placement = index === 0 ? "left" : "right";
+        const collapse = () => execute("collapse", { edge });
+        actions.push({
+            id: "collapse",
+            control: control(
+                "收起此面板",
+                index === 0 ? "chevronsLeft" : "chevronsRight",
+                collapse,
+            ),
+            menu: { label: "收起此面板", onClick: collapse },
+        });
+    }
     actions.push(
         {
             id: "overview",
@@ -242,7 +316,24 @@ function PanelToolbar({
     return (
         <Toolbar
             label={`${app.name}工具栏`}
-            style={{ containerType: "inline-size" }}
+            data-pane-toolbar={app.id}
+            data-active-pane={isSplit && isActive ? "true" : "false"}
+            onFocus={(event) => {
+                const target = event.target as HTMLElement;
+                if (
+                    target.closest('[role="menu"]') ||
+                    target.getAttribute("aria-haspopup") === "menu"
+                ) {
+                    event.preventDefault();
+                }
+            }}
+            style={{
+                containerType: "inline-size",
+                boxShadow:
+                    isSplit && isActive
+                        ? "inset 0 2px 0 0 var(--color-accent)"
+                        : undefined,
+            }}
             dividers={["bottom"]}
             startContent={
                 <HStack
@@ -257,7 +348,24 @@ function PanelToolbar({
                     }}
                 >
                     {control("返回桌面", "chevronLeft", () => execute("home"))}
-                    <Text maxLines={1}>{app.name}</Text>
+                    <HStack
+                        align="center"
+                        gap={1.5}
+                        style={{ flexShrink: 0, minWidth: 0 }}
+                    >
+                        {isSplit && isActive && (
+                            <StatusDot variant="accent" label="当前活动面板" />
+                        )}
+                        <Text
+                            maxLines={1}
+                            weight={isSplit && isActive ? "semibold" : "normal"}
+                            color={
+                                isSplit && !isActive ? "secondary" : "primary"
+                            }
+                        >
+                            {app.name}
+                        </Text>
+                    </HStack>
                     {wide && (
                         <PlacementControl
                             app={app}
@@ -300,6 +408,11 @@ export function Workspace(props: ShellProps) {
     const { snapshot, execute } = props;
     const container = useRef<HTMLElement>(null);
     const [width, setWidth] = useState(window.innerWidth);
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [logoutOpen, setLogoutOpen] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
+    const [closingAll, setClosingAll] = useState(false);
+    const showToast = useToast();
     useLayoutEffect(() => {
         const element = container.current!;
         const measure = () => setWidth(element.clientWidth);
@@ -309,10 +422,98 @@ export function Workspace(props: ShellProps) {
         return () => observer.disconnect();
     }, []);
     const { workspace } = snapshot;
+    const compact = width > 0 && width < 520;
     const wide =
         snapshot.capabilities.splitView &&
         width >= 2 * tokens.shell.comfortablePane + tokens.shell.divider;
     const panes = visiblePanes(workspace, wide);
+    const activePane = activePaneId(workspace, panes);
+    const recentApps = workspace.recent
+        .map((id) => snapshot.apps.find((app) => app.id === id))
+        .filter((app): app is AppSummary => Boolean(app));
+
+    const runSteps = useCallback(
+        async (steps: CommandStep[]) => {
+            for (const step of steps) {
+                const ok = await execute(step.name, step.input);
+                if (!ok) return false;
+            }
+            return true;
+        },
+        [execute],
+    );
+
+    const handleCloseAll = useCallback(async () => {
+        if (closingAll || !workspace.recent.length) return;
+        setClosingAll(true);
+        try {
+            let closed = 0;
+            for (const id of [...workspace.recent]) {
+                const ok = await execute("close", { appId: id });
+                if (!ok) break;
+                closed++;
+            }
+            if (closed > 0) {
+                showToast({
+                    type: "info",
+                    body: "已关闭全部后台应用",
+                    uniqueID: "workspace-close-all",
+                });
+            }
+        } finally {
+            setClosingAll(false);
+        }
+    }, [closingAll, workspace.recent, execute, showToast]);
+
+    const handlePaletteAction = useCallback(
+        (action: PaletteAction) => {
+            if (action.kind === "steps") {
+                void runSteps(action.steps);
+            } else if (action.kind === "closeAll") {
+                void handleCloseAll();
+            } else if (action.kind === "requestLogout") {
+                setLogoutOpen(true);
+            }
+        },
+        [runSteps, handleCloseAll],
+    );
+
+    useHotkeys([
+        {
+            keys: "mod+k",
+            onPress: () => setPaletteOpen((open) => !open),
+            isDisabled: logoutOpen,
+        },
+        {
+            keys: "Escape",
+            onPress: () => {
+                const emptyIndex = panes.indexOf(null);
+                if (panes.length === 2 && emptyIndex >= 0) {
+                    void execute("collapse", {
+                        edge: emptyIndex === 0 ? "left" : "right",
+                    });
+                }
+            },
+            isDisabled:
+                paletteOpen ||
+                logoutOpen ||
+                panes.length !== 2 ||
+                !panes.includes(null),
+        },
+    ]);
+
+    useEffect(() => {
+        const onNativePalette = () => {
+            if (!logoutOpen) setPaletteOpen((open) => !open);
+        };
+        window.addEventListener("workspace:commandPalette", onNativePalette);
+        return () =>
+            window.removeEventListener(
+                "workspace:commandPalette",
+                onNativePalette,
+            );
+    }, [logoutOpen]);
+
     return (
         <VStack
             ref={container}
@@ -321,13 +522,29 @@ export function Workspace(props: ShellProps) {
             style={{ overflow: "hidden" }}
         >
             {workspace.mode === "desktop" ? (
-                <Launchers snapshot={snapshot} execute={execute} />
+                <Launchers
+                    snapshot={snapshot}
+                    execute={execute}
+                    compact={compact}
+                    onOpenPalette={() => setPaletteOpen(true)}
+                    onRequestLogout={() => setLogoutOpen(true)}
+                />
             ) : workspace.mode === "overview" ? (
-                <VStack height="100%" gap={4} padding={4} isScrollable>
+                <VStack
+                    height="100%"
+                    gap={0}
+                    style={{
+                        minHeight: 0,
+                        background: "var(--color-background-body)",
+                    }}
+                >
                     <Toolbar
                         label="后台应用"
+                        dividers={["bottom"]}
                         startContent={
                             <HStack
+                                align="center"
+                                gap={2}
                                 style={{
                                     paddingInlineStart:
                                         "var(--window-controls-end, 0px)",
@@ -336,27 +553,98 @@ export function Workspace(props: ShellProps) {
                                 {control("返回桌面", "chevronLeft", () =>
                                     execute("home"),
                                 )}
+                                <Heading level={3} accessibilityLevel={1}>
+                                    后台应用
+                                </Heading>
+                                {recentApps.length > 0 && (
+                                    <Badge
+                                        variant="neutral"
+                                        label={`${recentApps.length}`}
+                                    />
+                                )}
                             </HStack>
                         }
-                        centerContent={<Text>后台应用</Text>}
+                        endContent={
+                            <HStack align="center" gap={1.5}>
+                                <IconButton
+                                    icon={<Icon icon={MagnifyingGlassIcon} />}
+                                    label="快捷命令"
+                                    tooltip="快捷命令"
+                                    variant="ghost"
+                                    onClick={() => setPaletteOpen(true)}
+                                />
+                                {recentApps.length > 0 && (
+                                    <Button
+                                        label="全部关闭"
+                                        variant="ghost"
+                                        size="sm"
+                                        icon={<Icon icon={TrashIcon} />}
+                                        isLoading={closingAll}
+                                        onClick={() => void handleCloseAll()}
+                                    />
+                                )}
+                            </HStack>
+                        }
                     />
-                    <Grid columns={{ minWidth: 180, max: 5 }} gap={3}>
-                        {workspace.recent
-                            .map((id) =>
-                                snapshot.apps.find((app) => app.id === id),
-                            )
-                            .map(
-                                (app) =>
-                                    app && (
+                    <VStack
+                        padding={5}
+                        isScrollable
+                        style={{ flex: 1, minHeight: 0 }}
+                    >
+                        {recentApps.length > 0 ? (
+                            <Grid columns={{ minWidth: 240, max: 4 }} gap={3}>
+                                {recentApps.map((app) => {
+                                    const inSplit =
+                                        workspace.panes.length === 2 &&
+                                        workspace.panes.includes(app.id);
+                                    const isLatest =
+                                        workspace.recent[0] === app.id;
+                                    const statusLabel = inSplit
+                                        ? "分屏中"
+                                        : isLatest
+                                          ? "最近"
+                                          : undefined;
+                                    return (
                                         <RecentApp
                                             key={app.id}
                                             app={app}
                                             execute={execute}
+                                            wide={wide}
+                                            canSplit={
+                                                snapshot.capabilities.splitView
+                                            }
+                                            statusLabel={statusLabel}
+                                            onSplit={() =>
+                                                void runSteps(
+                                                    overviewSplitPlan(
+                                                        workspace,
+                                                        app.id,
+                                                    ),
+                                                )
+                                            }
                                         />
-                                    ),
-                            )}
-                    </Grid>
-                    {!workspace.recent.length && <Text>暂无后台应用</Text>}
+                                    );
+                                })}
+                            </Grid>
+                        ) : (
+                            <Center height="100%" padding={6}>
+                                <EmptyState
+                                    icon={
+                                        <Icon icon={Squares2X2Icon} size="lg" />
+                                    }
+                                    title="暂无后台应用"
+                                    description="打开的应用会显示在这里，方便随时切换或一键分屏。"
+                                    actions={
+                                        <Button
+                                            label="返回桌面"
+                                            variant="primary"
+                                            onClick={() => void execute("home")}
+                                        />
+                                    }
+                                />
+                            </Center>
+                        )}
+                    </VStack>
                 </VStack>
             ) : (
                 <Panes
@@ -366,9 +654,41 @@ export function Workspace(props: ShellProps) {
                         width,
                         wide,
                         panes,
+                        activePane,
                     }}
                 />
             )}
+            <CommandPaletteModal
+                isOpen={paletteOpen}
+                onOpenChange={setPaletteOpen}
+                snapshot={snapshot}
+                wide={wide}
+                activePane={activePane}
+                onSelectAction={handlePaletteAction}
+            />
+            <AlertDialog
+                isOpen={logoutOpen}
+                onOpenChange={setLogoutOpen}
+                title="确认退出登录？"
+                description={
+                    snapshot.user
+                        ? `将断开与 ${formatServerHost(snapshot.user.url)}（${snapshot.user.username}）的连接并返回登录页。`
+                        : "将断开当前工作区连接并返回登录页。"
+                }
+                cancelLabel="取消"
+                actionLabel="退出登录"
+                actionVariant="destructive"
+                isActionLoading={loggingOut}
+                onAction={async () => {
+                    setLoggingOut(true);
+                    try {
+                        const ok = await execute("logout");
+                        if (ok) setLogoutOpen(false);
+                    } finally {
+                        setLoggingOut(false);
+                    }
+                }}
+            />
         </VStack>
     );
 }
@@ -396,16 +716,26 @@ function Panes({
     width,
     wide,
     panes,
-}: ShellProps & { width: number; wide: boolean; panes: (string | null)[] }) {
+    activePane,
+}: ShellProps & {
+    width: number;
+    wide: boolean;
+    panes: (string | null)[];
+    activePane: string | null;
+}) {
     const drag = useRef<DividerDrag | null>(null);
     const [preview, setPreview] = useState<DividerDrag["preview"]>();
     const { ratio } = snapshot.workspace;
+    const isSplit = panes.length === 2;
     const frames = splitFrames(
         width,
         preview?.ratio ?? ratio,
         preview?.collapse,
     );
     const available = width - tokens.shell.divider;
+    const feedback = preview
+        ? splitRatioPercentages(preview.ratio, preview.collapse)
+        : null;
     const separator = (
         <ResizeHandle
             label="调整分屏比例"
@@ -458,9 +788,15 @@ function Panes({
         />
     );
     return (
-        <HStack gap={0} width="100%" height="100%">
+        <HStack
+            gap={0}
+            width="100%"
+            height="100%"
+            style={{ position: "relative" }}
+        >
             {panes.map((id, index) => {
                 const app = snapshot.apps.find((entry) => entry.id === id);
+                const isActive = Boolean(app && app.id === activePane);
                 return (
                     <Fragment key={id ?? "launcher"}>
                         {index === 1 && (
@@ -474,13 +810,16 @@ function Panes({
                             </HStack>
                         )}
                         <VStack
-                            width={
-                                panes.length === 2
-                                    ? frames.panes[index].width
-                                    : "100%"
-                            }
+                            width={isSplit ? frames.panes[index].width : "100%"}
                             height="100%"
                             gap={0}
+                            data-pane-id={app?.id ?? "empty"}
+                            data-pane-active={String(isActive)}
+                            onPointerDownCapture={() => {
+                                if (isSplit && app && !isActive) {
+                                    void execute("restore", { appId: app.id });
+                                }
+                            }}
                             style={{
                                 minWidth: 0,
                                 overflow: "hidden",
@@ -497,6 +836,8 @@ function Panes({
                                             width,
                                             execute,
                                             activate,
+                                            isSplit,
+                                            isActive,
                                         }}
                                         toolbar={toolbars[app.id]}
                                     />
@@ -505,42 +846,113 @@ function Panes({
                                         style={{ flex: 1, minHeight: 0 }}
                                     >
                                         {errors[app.id] && (
-                                            <>
-                                                <Banner
-                                                    status="error"
+                                            <Center height="100%" padding={6}>
+                                                <EmptyState
+                                                    icon={
+                                                        <Icon
+                                                            icon={
+                                                                ExclamationTriangleIcon
+                                                            }
+                                                            size="lg"
+                                                        />
+                                                    }
                                                     title={errors[app.id]}
-                                                />
-                                                <Button
-                                                    label="重新载入界面"
-                                                    onClick={() =>
-                                                        retry(app.id)
+                                                    description="子应用界面遇到异常，重新载入不会中断正在运行的任务。"
+                                                    actions={
+                                                        <Button
+                                                            label="重新载入界面"
+                                                            variant="primary"
+                                                            onClick={() =>
+                                                                retry(app.id)
+                                                            }
+                                                        />
                                                     }
                                                 />
-                                            </>
+                                            </Center>
                                         )}
                                     </VStack>
                                 </>
                             ) : (
-                                <VStack
-                                    height="100%"
-                                    style={{
-                                        paddingTop:
-                                            index === 0
-                                                ? "var(--window-controls-height, 0px)"
-                                                : undefined,
-                                    }}
-                                >
-                                    <Launchers
-                                        snapshot={snapshot}
-                                        execute={execute}
-                                        embedded
+                                <VStack height="100%" gap={0}>
+                                    <Toolbar
+                                        label="分屏选择工具栏"
+                                        dividers={["bottom"]}
+                                        startContent={
+                                            <HStack
+                                                align="center"
+                                                gap={2}
+                                                style={{
+                                                    paddingInlineStart:
+                                                        index === 0
+                                                            ? "var(--window-controls-end, 0px)"
+                                                            : undefined,
+                                                }}
+                                            >
+                                                <Text
+                                                    weight="semibold"
+                                                    maxLines={1}
+                                                >
+                                                    选择并排应用
+                                                </Text>
+                                            </HStack>
+                                        }
+                                        endContent={
+                                            <Button
+                                                label="取消分屏"
+                                                variant="ghost"
+                                                size="sm"
+                                                icon={<Icon icon="close" />}
+                                                onClick={() =>
+                                                    void execute("collapse", {
+                                                        edge:
+                                                            index === 0
+                                                                ? "left"
+                                                                : "right",
+                                                    })
+                                                }
+                                            />
+                                        }
                                     />
+                                    <VStack style={{ flex: 1, minHeight: 0 }}>
+                                        <Launchers
+                                            snapshot={snapshot}
+                                            execute={execute}
+                                            embedded
+                                        />
+                                    </VStack>
                                 </VStack>
                             )}
                         </VStack>
                     </Fragment>
                 );
             })}
+            {isSplit && feedback && (
+                <Card
+                    padding={1.5}
+                    elevation="med"
+                    role="status"
+                    data-workspace-overlay="split-preview"
+                    style={{
+                        position: "absolute",
+                        left: Math.max(
+                            88,
+                            Math.min(
+                                Math.max(88, width - 88),
+                                frames.divider.left + frames.divider.width / 2,
+                            ),
+                        ),
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
+                        pointerEvents: "none",
+                        zIndex: 20,
+                    }}
+                >
+                    <Badge
+                        variant={feedback.collapsing ? "warning" : "neutral"}
+                        label={feedback.label}
+                    />
+                </Card>
+            )}
         </HStack>
     );
 }

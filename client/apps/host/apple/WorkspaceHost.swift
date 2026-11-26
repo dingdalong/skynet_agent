@@ -80,6 +80,29 @@ final class SurfaceToolbar {
     }
 }
 
+private struct OverlaySurface {
+    let rect: CGRect
+    let radius: CGFloat
+    let capture: Bool
+}
+
+private final class ModalDimView: PlatformView {
+    #if os(macOS)
+        override init(frame: NSRect) {
+            super.init(frame: frame)
+            wantsLayer = true
+        }
+        required init?(coder: NSCoder) { nil }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    #else
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { nil }
+    #endif
+}
+
 final class WorkspaceHost: PlatformView, WKNavigationDelegate {
     private let page = URL(string: "skynet-host://workspace/index.html")!
     private let web: WKWebView
@@ -87,16 +110,36 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
     private var observation: UUID?
     private var snapshot: [String: Any]?
     private var surfaces: [String: AppSurface] = [:]
+    private var dimmers: [String: ModalDimView] = [:]
     private var errors: [String: String] = [:]
-    private var menus: [CGRect] = []
+    private var overlays: [OverlaySurface] = []
+    private var modal = false
+    private var darkAppearance = false
     #if os(macOS)
         private var titlebars: [CGRect] = []
         private var buttons: [CGRect] = []
         private var controlsFrame: CGRect?
+        private var mouseMonitor: Any?
         override var isFlipped: Bool { true }
         override func layout() {
             super.layout()
             updateWindowControls()
+        }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let mouseMonitor {
+                NSEvent.removeMonitor(mouseMonitor)
+                self.mouseMonitor = nil
+            }
+            guard window != nil else { return }
+            mouseMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown]
+            ) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                let local = self.convert(event.locationInWindow, from: nil)
+                self.activateSurfaceIfNeeded(at: local)
+                return event
+            }
         }
         private func updateWindowControls(force: Bool = false) {
             guard let window else { return }
@@ -116,7 +159,9 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
         override func hitTest(_ point: NSPoint) -> NSView? {
             let local = convert(point, from: superview)
             guard bounds.contains(local) else { return nil }
-            if !menus.isEmpty { return web.hitTest(convert(local, to: web.superview)) }
+            if shouldRouteToShell(at: local) {
+                return web.hitTest(convert(local, to: web.superview))
+            }
             if titlebars.contains(where: { $0.contains(local) })
                 && !buttons.contains(where: { $0.contains(local) })
             {
@@ -137,7 +182,12 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
         }
     #else
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            if !menus.isEmpty { return web.hitTest(convert(point, to: web), with: event) }
+            if shouldRouteToShell(at: point) {
+                return web.hitTest(convert(point, to: web), with: event)
+            }
+            if event?.type == .touches {
+                activateSurfaceIfNeeded(at: point)
+            }
             return super.hitTest(point, with: event)
         }
     #endif
@@ -175,8 +225,14 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
     }
     required init?(coder: NSCoder) { nil }
     func reload() {
-        for surface in surfaces.values { visibility(surface, false) }
+        for (id, surface) in surfaces { visibility(id, surface, false) }
         web.load(URLRequest(url: page))
+    }
+    func toggleCommandPalette() {
+        #if os(macOS)
+            window?.makeFirstResponder(web)
+        #endif
+        send("workspace:commandPalette", [:])
     }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { reload() }
     func webView(
@@ -255,14 +311,30 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
                 return CGRect(x: x, y: y, width: width, height: height)
             }
         }
-        menus = rectangles("menus")
+        let wasModal = modal
+        overlays = (body["overlays"] as? [[String: Any]] ?? []).compactMap { item in
+            guard let x = item["x"] as? Double, let y = item["y"] as? Double,
+                let width = item["width"] as? Double, let height = item["height"] as? Double,
+                width > 0, height > 0
+            else { return nil }
+            let radius = CGFloat(item["radius"] as? Double ?? 0)
+            let capture = item["capture"] as? Bool == true
+            return OverlaySurface(
+                rect: CGRect(x: x, y: y, width: width, height: height),
+                radius: max(0, radius),
+                capture: capture)
+        }
+        modal = body["modal"] as? Bool == true
+        darkAppearance = body["lightStatus"] as? Bool == true
         #if os(macOS)
+            if modal && !wasModal { window?.makeFirstResponder(web) }
             titlebars = rectangles("titlebars")
             buttons = rectangles("buttons")
         #endif
         let panes = (workspace["panes"] as? [Any])?.compactMap { $0 as? String } ?? []
         for id in surfaces.keys.filter({ !recent.contains($0) }) {
             surfaces.removeValue(forKey: id)?.removeFromSuperview()
+            dimmers.removeValue(forKey: id)?.removeFromSuperview()
             sendToolbars()
             if errors.removeValue(forKey: id) != nil { send("workspace:errors", errors) }
         }
@@ -272,12 +344,11 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             guard allowed, let frame, let left = frame["x"], let top = frame["y"],
                 let width = frame["width"], let height = frame["height"], width > 0, height > 0
             else {
-                if let surface = surfaces[id] { visibility(surface, false) }
+                if let surface = surfaces[id] { visibility(id, surface, false) }
                 continue
             }
             let surface = surfaces[id] ?? AppSurface(frame: .zero)
             surface.frame = CGRect(x: left, y: top, width: width, height: height).intersection(bounds)
-            maskMenus(on: surface)
             surface.backgroundHex = body["background"] as? String ?? "#fafafa"
             surface.reducedMotion = preferences?["reduceMotion"] as? Bool == true
             if surfaces[id] == nil {
@@ -289,13 +360,16 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
                 surface.onFailure = { [weak self] message in
                     guard let self, let live = self.surfaces[id] else { return }
                     self.errors[id] = message
-                    self.visibility(live, false)
+                    self.visibility(id, live, false)
                     self.send("workspace:errors", self.errors)
                 }
                 addSubview(surface)
                 surface.appId = id
             }
-            visibility(surface, errors[id] == nil)
+            applyOverlayMask(on: surface)
+            let visible = errors[id] == nil
+            visibility(id, surface, visible)
+            updateDimmer(for: id, surface: surface, visible: visible && modal)
         }
         #if os(iOS)
             if let colors = body["chrome"] as? [String], let light = body["lightStatus"] as? Bool {
@@ -303,35 +377,99 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             }
         #endif
     }
-    private func maskMenus(on surface: AppSurface) {
+    private func shouldRouteToShell(at localPoint: CGPoint) -> Bool {
+        modal || overlays.contains(where: { $0.capture || $0.rect.contains(localPoint) })
+    }
+    private func activateSurfaceIfNeeded(at localPoint: CGPoint) {
+        guard !shouldRouteToShell(at: localPoint),
+            let workspace = snapshot?["workspace"] as? [String: Any],
+            workspace["mode"] as? String == "apps",
+            let panes = (workspace["panes"] as? [Any])?.compactMap({ $0 as? String }),
+            panes.count == 2
+        else { return }
+        let active = (workspace["recent"] as? [String])?.first(where: { panes.contains($0) })
+        for id in panes {
+            guard id != active, let surface = surfaces[id], !surface.isHidden,
+                surface.frame.contains(localPoint)
+            else { continue }
+            core.workspace("restore", input: ["appId": id])
+            return
+        }
+    }
+    private func applyOverlayMask(on view: PlatformView) {
         #if os(macOS)
-            surface.wantsLayer = true
-            guard let layer = surface.layer else { return }
+            view.wantsLayer = true
+            guard let layer = view.layer else { return }
         #else
-            let layer = surface.layer
+            let layer = view.layer
         #endif
-        let holes = menus.map { surface.convert($0, from: self).intersection(surface.bounds) }.filter {
-            !$0.isNull
+        layer.masksToBounds = true
+        let holes = overlays.compactMap { overlay -> (CGRect, CGFloat)? in
+            let hole = view.convert(overlay.rect, from: self)
+            guard hole.intersects(view.bounds), hole.width > 0, hole.height > 0 else { return nil }
+            return (hole, overlay.radius)
         }
         guard !holes.isEmpty else {
             layer.mask = nil
             return
         }
         let path = CGMutablePath()
-        path.addRect(surface.bounds)
-        for hole in holes { path.addRect(hole) }
+        path.addRect(view.bounds)
+        for (hole, radius) in holes {
+            let clamped = min(radius, min(hole.width, hole.height) / 2)
+            if clamped > 0 {
+                path.addPath(
+                    CGPath(
+                        roundedRect: hole, cornerWidth: clamped, cornerHeight: clamped,
+                        transform: nil))
+            } else {
+                path.addRect(hole)
+            }
+        }
         let mask = CAShapeLayer()
-        mask.frame = surface.bounds
+        mask.frame = view.bounds
         mask.fillRule = .evenOdd
         mask.path = path
         layer.mask = mask
     }
+    private func updateDimmer(for id: String, surface: AppSurface, visible: Bool) {
+        guard visible else {
+            dimmers[id]?.isHidden = true
+            return
+        }
+        let dimmer =
+            dimmers[id]
+            ?? {
+                let view = ModalDimView(frame: .zero)
+                dimmers[id] = view
+                return view
+            }()
+        if dimmer.superview == nil {
+            #if os(macOS)
+                addSubview(dimmer, positioned: .above, relativeTo: surface)
+            #else
+                insertSubview(dimmer, aboveSubview: surface)
+            #endif
+        }
+        dimmer.frame = surface.frame
+        dimmer.isHidden = false
+        #if os(macOS)
+            dimmer.wantsLayer = true
+            dimmer.layer?.backgroundColor =
+                PlatformColor(white: 0, alpha: darkAppearance ? 0.8 : 0.5).cgColor
+        #else
+            dimmer.layer.backgroundColor =
+                PlatformColor(white: 0, alpha: darkAppearance ? 0.8 : 0.5).cgColor
+        #endif
+        applyOverlayMask(on: dimmer)
+    }
     private func sendToolbars() {
         send("workspace:toolbars", surfaces.compactMapValues { $0.toolbar.publication })
     }
-    private func visibility(_ surface: AppSurface, _ visible: Bool) {
+    private func visibility(_ id: String, _ surface: AppSurface, _ visible: Bool) {
         if surface.active != visible { surface.active = visible }
         surface.isHidden = !visible
+        if !visible { dimmers[id]?.isHidden = true }
         #if os(iOS)
             surface.accessibilityElementsHidden = !visible
         #endif
@@ -341,7 +479,12 @@ final class WorkspaceHost: PlatformView, WKNavigationDelegate {
             "window.dispatchEvent(new CustomEvent(name, {detail: value}));",
             arguments: ["name": name, "value": value], in: nil, in: .page, completionHandler: nil)
     }
-    deinit { if let observation { core.unobserve(observation) } }
+    deinit {
+        #if os(macOS)
+            if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
+        #endif
+        if let observation { core.unobserve(observation) }
+    }
 }
 
 extension AppSurface {

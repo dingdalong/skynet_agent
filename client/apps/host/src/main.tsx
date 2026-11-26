@@ -1,6 +1,17 @@
-import { useLayoutEffect, useState, useSyncExternalStore } from "react";
+import {
+    useEffect,
+    useLayoutEffect,
+    useState,
+    useSyncExternalStore,
+} from "react";
 import { createRoot } from "react-dom/client";
-import { Banner, Spinner, Theme } from "@astryxdesign/core";
+import {
+    Center,
+    LayerProvider,
+    Spinner,
+    Theme,
+    useToast,
+} from "@astryxdesign/core";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
@@ -28,6 +39,8 @@ declare global {
 }
 const post = (value: unknown) =>
     window.webkit.messageHandlers.workspace.postMessage(value);
+const overlaySelector =
+    'dialog[open], [role="menu"], [data-toast-id], [data-workspace-overlay]';
 const store = createHostStore({
     async command(name, input) {
         const next = await post({ kind: "command", name, input });
@@ -49,14 +62,28 @@ function report(error: unknown) {
         new CustomEvent("workspace:error", { detail: String(error) }),
     );
 }
+function ShellErrorToast() {
+    const showToast = useToast();
+    useEffect(() => {
+        const fail = (event: Event) => {
+            const detail = (event as CustomEvent<string>).detail;
+            if (!detail) return;
+            showToast({
+                type: "error",
+                body: `工作区操作失败：${detail}`,
+                uniqueID: "workspace-error",
+            });
+        };
+        window.addEventListener("workspace:error", fail);
+        return () => window.removeEventListener("workspace:error", fail);
+    }, [showToast]);
+    return null;
+}
 function Shell() {
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [toolbars, setToolbars] = useState<Record<string, PaneToolbar>>({});
-    const [error, setError] = useState("");
     useLayoutEffect(() => {
-        const fail = (event: Event) =>
-            setError((event as CustomEvent<string>).detail);
         const surfaces = (event: Event) =>
             setErrors((event as CustomEvent<Record<string, string>>).detail);
         const controls = (event: Event) =>
@@ -76,12 +103,10 @@ function Shell() {
                 `${height}px`,
             );
         };
-        window.addEventListener("workspace:error", fail);
         window.addEventListener("workspace:errors", surfaces);
         window.addEventListener("workspace:toolbars", controls);
         window.addEventListener("workspace:windowControls", windowControls);
         return () => {
-            window.removeEventListener("workspace:error", fail);
             window.removeEventListener("workspace:errors", surfaces);
             window.removeEventListener("workspace:toolbars", controls);
             window.removeEventListener(
@@ -117,6 +142,50 @@ function Shell() {
                 )
                     .filter((rect) => rect.width > 0 && rect.height > 0)
                     .map((rect) => rect.toJSON());
+            const matchedOverlays = Array.from(
+                document.querySelectorAll<HTMLElement>(overlaySelector),
+            ).filter((element) => {
+                const rect = element.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            });
+            const topOverlays = matchedOverlays.filter(
+                (element) =>
+                    !matchedOverlays.some(
+                        (other) => other !== element && other.contains(element),
+                    ),
+            );
+            const overlays = topOverlays.flatMap((element) => {
+                const outer = element.getBoundingClientRect();
+                const surface = element.matches("[data-toast-id]")
+                    ? (element.querySelector<HTMLElement>(".astryx-toast") ??
+                      element)
+                    : element;
+                const inner =
+                    surface === element
+                        ? outer
+                        : surface.getBoundingClientRect();
+                const x = Math.max(outer.x, inner.x);
+                const y = Math.max(outer.y, inner.y);
+                const width = Math.min(outer.right, inner.right) - x;
+                const height = Math.min(outer.bottom, inner.bottom) - y;
+                if (width <= 0 || height <= 0) return [];
+                const radius =
+                    parseFloat(getComputedStyle(surface).borderTopLeftRadius) ||
+                    0;
+                return [
+                    {
+                        x,
+                        y,
+                        width,
+                        height,
+                        radius,
+                        capture: element.matches('dialog[open], [role="menu"]'),
+                    },
+                ];
+            });
+            const modal = topOverlays.some((element) =>
+                element.matches("dialog[open]"),
+            );
             void post({
                 kind: "layout",
                 frames,
@@ -126,9 +195,12 @@ function Shell() {
                     ? tokens.wallpapers[preferences.wallpaper][mode]
                     : [background],
                 lightStatus: dark,
-                menus: rects('[role="menu"]'),
+                overlays,
+                modal,
                 titlebars: rects('[role="toolbar"]:not([aria-label="Dock"])'),
-                buttons: rects('[role="toolbar"] button'),
+                buttons: rects(
+                    '[role="toolbar"] :is(button, a, input, [role="button"])',
+                ),
             }).catch(report);
         };
         const observer = new ResizeObserver(sync);
@@ -139,6 +211,12 @@ function Shell() {
             root.querySelectorAll("[data-app-slot]").forEach((slot) =>
                 observer.observe(slot),
             );
+            document
+                .querySelectorAll(overlaySelector)
+                .forEach((overlay) => observer.observe(overlay));
+            document
+                .querySelectorAll("[data-toast-id] .astryx-toast")
+                .forEach((toast) => observer.observe(toast));
             sync();
         };
         const mutation = new MutationObserver(observe);
@@ -146,14 +224,26 @@ function Shell() {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ["data-app-slot", "style", "aria-expanded"],
+            attributeFilter: [
+                "data-app-slot",
+                "style",
+                "aria-expanded",
+                "open",
+                "class",
+                "data-toast-id",
+                "data-workspace-overlay",
+            ],
         });
         observe();
         media.addEventListener("change", sync);
+        document.addEventListener("transitionend", sync, true);
+        document.addEventListener("animationend", sync, true);
         return () => {
             observer.disconnect();
             mutation.disconnect();
             media.removeEventListener("change", sync);
+            document.removeEventListener("transitionend", sync, true);
+            document.removeEventListener("animationend", sync, true);
         };
     }, [snapshot]);
     return (
@@ -165,50 +255,46 @@ function Shell() {
                 locale="zh-CN"
                 messages={{ "zh-CN": chinese }}
             >
-                {error && (
-                    <Banner
-                        status="error"
-                        title="工作区操作失败"
-                        description={error}
-                    />
-                )}
-                {snapshot && !snapshot.user ? (
-                    <Login
-                        login={(url, username) =>
-                            store.command("login", { url, username })
-                        }
-                    />
-                ) : snapshot ? (
-                    <Workspace
-                        snapshot={snapshot}
-                        errors={errors}
-                        toolbars={toolbars}
-                        activate={(appId, presentationId, action) => {
-                            setError("");
-                            void post({
-                                kind: "toolbarAction",
-                                appId,
-                                presentationId,
-                                action,
-                            }).catch(report);
-                        }}
-                        retry={(id) => {
-                            void post({ kind: "retry", id }).catch(report);
-                        }}
-                        execute={(name, input) => {
-                            setError("");
-                            return store.command(name, input).then(
-                                () => true,
-                                (error) => {
-                                    report(error);
-                                    return false;
-                                },
-                            );
-                        }}
-                    />
-                ) : (
-                    <Spinner label="正在载入工作区" />
-                )}
+                <LayerProvider toast={{ position: "bottomEnd", maxVisible: 3 }}>
+                    <ShellErrorToast />
+                    {snapshot && !snapshot.user ? (
+                        <Login
+                            login={(url, username) =>
+                                store.command("login", { url, username })
+                            }
+                        />
+                    ) : snapshot ? (
+                        <Workspace
+                            snapshot={snapshot}
+                            errors={errors}
+                            toolbars={toolbars}
+                            activate={(appId, presentationId, action) => {
+                                void post({
+                                    kind: "toolbarAction",
+                                    appId,
+                                    presentationId,
+                                    action,
+                                }).catch(report);
+                            }}
+                            retry={(id) => {
+                                void post({ kind: "retry", id }).catch(report);
+                            }}
+                            execute={(name, input) => {
+                                return store.command(name, input).then(
+                                    () => true,
+                                    (error) => {
+                                        report(error);
+                                        return false;
+                                    },
+                                );
+                            }}
+                        />
+                    ) : (
+                        <Center height="100dvh">
+                            <Spinner label="正在载入工作区" />
+                        </Center>
+                    )}
+                </LayerProvider>
             </InternationalizationProvider>
         </Theme>
     );

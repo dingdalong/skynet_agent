@@ -133,6 +133,309 @@ final class WebViewTests: XCTestCase {
         }
     }
 
+    func testWorkspaceShellFlowsAndOverlayBridge() async throws {
+        _ = NSApplication.shared
+        let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let workspace = tests.appendingPathComponent("../../../../dist/workspace").standardizedFileURL
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        config.setURLSchemeHandler(AppAssets(bundledWorkspace: workspace), forURLScheme: "skynet-host")
+        config.userContentController.addUserScript(
+            WKUserScript(
+                source: """
+                    const apps = [
+                        {id:'agent', name:'Agent', version:'1.1.0', builtin:true, permissions:[], status:'running', pid:1, actions:{}},
+                        {id:'settings', name:'设置', version:'1.0.0', builtin:true, permissions:[], status:'running', pid:2, actions:{}},
+                        {id:'app-center', name:'应用中心', version:'1.0.0', builtin:true, permissions:[], status:'stopped', pid:0, actions:{}}
+                    ];
+                    window.__commands = [];
+                    window.__layouts = [];
+                    window.__snapshot = {
+                        revision: 1,
+                        user: null,
+                        apps,
+                        capabilities: {platform:'macos', splitView:true, installApplications:true, localDevelopment:true, runtimeIsolation:'process'},
+                        preferences: {appearance:'light', wallpaper:'coast', reduceMotion:true},
+                        workspace: {mode:'desktop', panes:[], recent:['agent', 'settings'], ratio:0.5, desktop:['settings', 'app-center'], dock:['agent']}
+                    };
+                    const emit = () => {
+                        window.__snapshot = {...window.__snapshot, revision: window.__snapshot.revision + 1};
+                        window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail: window.__snapshot}));
+                        return window.__snapshot;
+                    };
+                    window.webkit = {messageHandlers:{workspace:{postMessage:async (message) => {
+                        if (message.kind === 'initial') return window.__snapshot;
+                        if (message.kind === 'layout') {
+                            window.__layouts.push(message);
+                            return null;
+                        }
+                        if (message.kind === 'command') {
+                            window.__commands.push({name: message.name, input: message.input || {}});
+                            const ws = {...window.__snapshot.workspace};
+                            if (message.name === 'login') {
+                                window.__snapshot = {
+                                    ...window.__snapshot,
+                                    user: {userId:'u1', username: message.input.username, url: message.input.url},
+                                };
+                            } else if (message.name === 'logout') {
+                                window.__snapshot = {...window.__snapshot, user: null};
+                            } else if (message.name === 'home') {
+                                ws.mode = 'desktop';
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'overview') {
+                                ws.mode = 'overview';
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'open') {
+                                const id = message.input.appId;
+                                const empty = ws.panes.indexOf(null);
+                                if (ws.mode === 'apps' && ws.panes.length === 2 && empty >= 0 && !ws.panes.includes(id)) {
+                                    ws.panes = ws.panes.map((p, i) => i === empty ? id : p);
+                                } else {
+                                    ws.panes = [id];
+                                }
+                                ws.recent = [id, ...ws.recent.filter(item => item !== id)];
+                                ws.mode = 'apps';
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'restore') {
+                                const id = message.input.appId;
+                                if (!ws.panes.includes(id)) ws.panes = [id];
+                                ws.recent = [id, ...ws.recent.filter(item => item !== id)];
+                                ws.mode = 'apps';
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'split') {
+                                const id = message.input.appId;
+                                const dest = message.input.edge === 'left' ? 0 : 1;
+                                ws.panes = dest === 0 ? [id, null] : [null, id];
+                                ws.ratio = 0.5;
+                                ws.mode = 'apps';
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'collapse') {
+                                const keep = ws.panes[message.input.edge === 'left' ? 1 : 0];
+                                ws.panes = keep ? [keep] : [];
+                                ws.mode = keep ? 'apps' : 'desktop';
+                                ws.ratio = 0.5;
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            } else if (message.name === 'close') {
+                                const id = message.input.appId;
+                                ws.recent = ws.recent.filter(item => item !== id);
+                                ws.panes = ws.panes.map(p => p === id ? null : p);
+                                if (ws.panes.every(p => !p)) ws.panes = [];
+                                window.__snapshot = {...window.__snapshot, workspace: ws};
+                            }
+                            return emit();
+                        }
+                        return null;
+                    }}}};
+                    """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 760), configuration: config)
+        defer { web.stopLoading() }
+        web.load(URLRequest(url: URL(string: "skynet-host://workspace/index.html")!))
+
+        func until(_ expr: String, message: String = "") async throws {
+            for _ in 0..<60 {
+                if (try? await web.evaluateJavaScript(expr)) as? Bool == true { return }
+                try await Task.sleep(for: .milliseconds(80))
+            }
+            let diag = try? await web.evaluateJavaScript(
+                "JSON.stringify({text:document.body?.innerText?.slice(0,500),toasts:Array.from(document.querySelectorAll('[data-toast-id]')).map(n=>n.textContent),cmds:window.__commands,lastLayout:window.__layouts.at(-1)})"
+            )
+            XCTFail("Timed out: \(message.isEmpty ? expr : message)\n\(diag ?? "")")
+            throw failure("webkit", "Timed out waiting for \(expr)")
+        }
+
+        // 1. Login centered card & pre-submit validation
+        try await until(
+            "document.querySelector('#gateway-url') !== null && document.querySelector('#gateway-username') !== null",
+            message: "Login form mounted")
+        let cardCentered =
+            try await web.evaluateJavaScript(
+                """
+                (() => {
+                    const card = document.querySelector('.astryx-card').getBoundingClientRect();
+                    const center = card.left + card.width / 2;
+                    return card.width <= 401 && Math.abs(center - innerWidth / 2) < 2;
+                })()
+                """) as? Bool
+        XCTAssertEqual(cardCentered, true, "Login card should be centered and max 400px wide")
+        _ = try await web.evaluateJavaScript("document.querySelector('button[type=submit]').click()")
+        try await until(
+            "document.body.innerText.includes('请输入用户名') && window.__commands.length === 0",
+            message: "Empty username rejected client-side")
+        _ = try await web.evaluateJavaScript(
+            """
+            (() => {
+                const set = (el, val) => {
+                    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val);
+                    el.dispatchEvent(new Event('input', {bubbles: true}));
+                };
+                set(document.querySelector('#gateway-url'), 'http://bad-protocol');
+                set(document.querySelector('#gateway-username'), 'tester');
+                document.querySelector('button[type=submit]').click();
+            })()
+            """)
+        try await until(
+            "document.body.innerText.includes('ws://') && window.__commands.length === 0",
+            message: "Non-ws URL rejected client-side")
+        _ = try await web.evaluateJavaScript(
+            """
+            (() => {
+                const set = (el, val) => {
+                    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val);
+                    el.dispatchEvent(new Event('input', {bubbles: true}));
+                };
+                set(document.querySelector('#gateway-url'), 'ws://127.0.0.1:18787/agent');
+                document.querySelector('button[type=submit]').click();
+            })()
+            """)
+        try await until(
+            "document.querySelector('[data-drop-area=desktop]') !== null",
+            message: "Desktop rendered after login")
+
+        // 2. Account menu & logout confirmation dialog (cancel preserves session)
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=toolbar] button')).find(b => b.textContent.includes('tester')).click()"
+        )
+        try await until(
+            "document.querySelector('[role=menu]') !== null && document.body.innerText.includes('127.0.0.1:18787')",
+            message: "Account menu opened with server host")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=menuitem]')).find(i => i.textContent.includes('退出登录')).click()"
+        )
+        try await until(
+            "document.querySelector('dialog[open]') !== null && document.body.innerText.includes('确认退出登录')",
+            message: "Logout confirmation AlertDialog opened")
+        try await until(
+            "window.__layouts.at(-1)?.modal === true && (window.__layouts.at(-1)?.overlays?.length ?? 0) >= 1 && window.__layouts.at(-1).overlays[0].radius > 0 && window.__layouts.at(-1).overlays[0].capture === true",
+            message: "Modal dialog reports overlays + modal=true")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('dialog[open] button')).find(b => b.textContent.trim() === '取消').click()"
+        )
+        try await until(
+            "document.querySelector('dialog[open]') === null && window.__layouts.at(-1)?.modal === false && !window.__commands.some(c => c.name === 'logout')",
+            message: "Canceling logout closes dialog without logging out")
+
+        // 3. CommandPalette open via native event, search, execute, and overlays/modal bridge
+        _ = try await web.evaluateJavaScript(
+            "window.dispatchEvent(new CustomEvent('workspace:commandPalette'))")
+        try await until(
+            "document.querySelector('dialog[open] input') !== null && window.__layouts.at(-1)?.modal === true",
+            message: "CommandPalette opened with modal=true")
+        _ = try await web.evaluateJavaScript(
+            """
+            (() => {
+                const input = document.querySelector('dialog[open] input');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '后台');
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+            })()
+            """)
+        try await until(
+            "Array.from(document.querySelectorAll('[role=option]')).some(o => o.textContent.includes('后台应用'))",
+            message: "CommandPalette filtered options")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=option]')).find(o => o.textContent.includes('后台应用')).click()"
+        )
+        try await until(
+            "document.querySelector('dialog[open]') === null && document.querySelector('[role=toolbar][aria-label=\"后台应用\"]') !== null",
+            message: "CommandPalette navigated to overview")
+
+        // 4. Overview one-click split, active pane switching, empty split cancel
+        _ = try await web.evaluateJavaScript(
+            "document.querySelector('button[aria-label=\"分屏打开设置\"]').click()"
+        )
+        try await until(
+            "document.querySelector('[data-pane-id=agent]') !== null && document.querySelector('[data-pane-id=settings]') !== null && document.querySelector('[data-pane-id=settings]').dataset.paneActive === 'true'",
+            message: "Overview one-click split opened both apps with settings active")
+        _ = try await web.evaluateJavaScript(
+            "document.querySelector('[data-pane-id=agent]').dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}))"
+        )
+        try await until(
+            "document.querySelector('[data-pane-id=agent]').dataset.paneActive === 'true' && document.querySelector('[data-pane-id=settings]').dataset.paneActive === 'false'",
+            message: "Clicking inactive split pane switched active indicator via restore")
+
+        // Empty split pane cancel
+        _ = try await web.evaluateJavaScript(
+            """
+            window.__snapshot = {
+                ...window.__snapshot,
+                revision: window.__snapshot.revision + 1,
+                workspace: {...window.__snapshot.workspace, mode:'apps', panes:['agent', null]}
+            };
+            window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail: window.__snapshot}));
+            """)
+        try await until(
+            "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim() === '取消分屏')",
+            message: "Empty split toolbar rendered cancel button")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '取消分屏').click()"
+        )
+        try await until(
+            "window.__commands.some(c => c.name === 'collapse' && c.input.edge === 'right') && document.querySelector('[data-pane-id=empty]') === null",
+            message: "Cancel split collapsed empty slot")
+
+        // 5. Overview close-all + empty state + Toast
+        _ = try await web.evaluateJavaScript(
+            """
+            window.__snapshot = {
+                ...window.__snapshot,
+                revision: window.__snapshot.revision + 1,
+                workspace: {...window.__snapshot.workspace, mode:'overview', recent:['agent', 'settings']}
+            };
+            window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail: window.__snapshot}));
+            """)
+        try await until(
+            "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim() === '全部关闭')",
+            message: "Overview close-all button visible")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '全部关闭').click()"
+        )
+        try await until(
+            "document.body.innerText.includes('暂无后台应用') && Array.from(document.querySelectorAll('[data-toast-id]')).some(n => n.textContent.includes('已关闭全部后台应用') && n.closest('[popover]')?.matches(':popover-open') === true)",
+            message: "Close-all showed empty state and toast")
+
+        // 6. Narrow viewport (390px) has no horizontal overflow across desktop, overview, and login
+        web.frame = CGRect(x: 0, y: 0, width: 390, height: 760)
+        for mode in ["desktop", "overview"] {
+            _ = try await web.evaluateJavaScript(
+                """
+                window.__snapshot = {
+                    ...window.__snapshot,
+                    revision: window.__snapshot.revision + 1,
+                    workspace: {...window.__snapshot.workspace, mode:'\(mode)', recent:['agent']}
+                };
+                window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail: window.__snapshot}));
+                """)
+            try await until(
+                "innerWidth === 390 && document.documentElement.scrollWidth <= 390",
+                message: "No horizontal overflow at 390px in \(mode)")
+        }
+        // Confirm logout flow returns to login with no overflow at 390px
+        _ = try await web.evaluateJavaScript(
+            """
+            window.__snapshot = {
+                ...window.__snapshot,
+                revision: window.__snapshot.revision + 1,
+                workspace: {...window.__snapshot.workspace, mode:'desktop'}
+            };
+            window.dispatchEvent(new CustomEvent('workspace:snapshot', {detail: window.__snapshot}));
+            """)
+        try await until(
+            "document.querySelector('[data-drop-area=desktop]') !== null", message: "Desktop ready at 390px")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=toolbar] button')).find(b => b.textContent.includes('tester')).click()"
+        )
+        try await until("document.querySelector('[role=menu]') !== null", message: "Account menu at 390px")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=menuitem]')).find(i => i.textContent.includes('退出登录')).click()"
+        )
+        try await until("document.querySelector('dialog[open]') !== null", message: "Logout dialog at 390px")
+        _ = try await web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('dialog[open] button')).find(b => b.textContent.trim() === '退出登录').click()"
+        )
+        try await until(
+            "document.querySelector('#gateway-url') !== null && document.documentElement.scrollWidth <= 390",
+            message: "Confirmed logout returned to login without overflow at 390px")
+    }
+
     func testPackagedAgentChatDraftReloadAndNarrowLayout() async throws {
         _ = NSApplication.shared
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

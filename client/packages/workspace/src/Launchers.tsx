@@ -1,16 +1,24 @@
 import { useRef, useState, type PointerEvent } from "react";
 import {
+    Avatar,
     Button,
     Card,
+    DropdownMenu,
     Grid,
     HStack,
     Icon,
     IconButton,
+    Kbd,
     Text,
     Toolbar,
     VStack,
 } from "@astryxdesign/core";
-import { Cog6ToothIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import {
+    ArrowRightStartOnRectangleIcon,
+    Cog6ToothIcon,
+    MagnifyingGlassIcon,
+    Squares2X2Icon,
+} from "@heroicons/react/24/outline";
 import { SparklesIcon } from "@heroicons/react/24/solid";
 import type {
     AppSummary,
@@ -25,6 +33,7 @@ import {
     type Destination,
     type LauncherArea,
 } from "./launcherLayout";
+import { formatServerHost } from "./presentation";
 import { useLauncherMotion } from "./useLauncherMotion";
 import "./launcher.css";
 
@@ -72,6 +81,9 @@ export function Launchers({
     snapshot,
     execute,
     embedded = false,
+    compact = false,
+    onOpenPalette,
+    onRequestLogout,
 }: {
     snapshot: HostSnapshot;
     execute: (
@@ -79,8 +91,12 @@ export function Launchers({
         input?: Record<string, Json>,
     ) => Promise<boolean>;
     embedded?: boolean;
+    compact?: boolean;
+    onOpenPalette?: () => void;
+    onRequestLogout?: () => void;
 }) {
     const { apps, workspace, preferences } = snapshot;
+    const hasSettings = apps.some((entry) => entry.id === "settings");
     const root = useRef<HTMLElement>(null);
     const gesture = useRef<Gesture | null>(null);
     const suppressClick = useRef(false);
@@ -299,30 +315,151 @@ export function Launchers({
             {!embedded && (
                 <Toolbar
                     label="桌面"
+                    onFocus={(event) => {
+                        const target = event.target as HTMLElement;
+                        if (
+                            target.closest('[role="menu"]') ||
+                            target.getAttribute("aria-haspopup") === "menu"
+                        ) {
+                            event.preventDefault();
+                        }
+                    }}
                     startContent={
                         <HStack
-                            width="100%"
-                            justify="end"
                             align="center"
+                            gap={2}
                             style={{
                                 paddingInlineStart:
                                     "var(--window-controls-end, 0px)",
                             }}
                         >
-                            {snapshot.user && (
+                            {onOpenPalette && (
                                 <Button
-                                    label={`${snapshot.user.username} · 退出登录`}
-                                    variant="ghost"
-                                    onClick={() => void execute("logout")}
+                                    label={compact ? "搜索" : "搜索应用或命令"}
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<Icon icon={MagnifyingGlassIcon} />}
+                                    endContent={
+                                        compact ? undefined : (
+                                            <Kbd keys="mod+k" />
+                                        )
+                                    }
+                                    onClick={onOpenPalette}
                                 />
                             )}
+                        </HStack>
+                    }
+                    endContent={
+                        <HStack align="center" gap={1.5}>
                             <IconButton
                                 icon={<Icon icon="copy" />}
                                 label="后台应用"
-                                tooltip="后台应用"
+                                tooltip={
+                                    workspace.recent.length
+                                        ? `后台应用（${workspace.recent.length} 个运行中）`
+                                        : "后台应用"
+                                }
                                 variant="ghost"
                                 onClick={() => void execute("overview")}
                             />
+                            {snapshot.user && (
+                                <DropdownMenu
+                                    alignment="end"
+                                    hasChevron
+                                    button={{
+                                        label: snapshot.user.username,
+                                        variant: "ghost",
+                                        size: "sm",
+                                        icon: (
+                                            <Avatar
+                                                name={snapshot.user.username}
+                                                size={20}
+                                            />
+                                        ),
+                                    }}
+                                    header={
+                                        <VStack
+                                            gap={0.5}
+                                            paddingInline={3}
+                                            paddingBlock={2}
+                                        >
+                                            <Text
+                                                weight="semibold"
+                                                size="sm"
+                                                maxLines={1}
+                                            >
+                                                {snapshot.user.username}
+                                            </Text>
+                                            <Text
+                                                size="xsm"
+                                                color="secondary"
+                                                maxLines={1}
+                                            >
+                                                {formatServerHost(
+                                                    snapshot.user.url,
+                                                )}
+                                            </Text>
+                                        </VStack>
+                                    }
+                                    items={[
+                                        ...(onOpenPalette
+                                            ? [
+                                                  {
+                                                      id: "palette",
+                                                      label: "快捷命令",
+                                                      icon: (
+                                                          <Icon
+                                                              icon={
+                                                                  MagnifyingGlassIcon
+                                                              }
+                                                          />
+                                                      ),
+                                                      endContent: (
+                                                          <Kbd keys="mod+k" />
+                                                      ),
+                                                      onClick: onOpenPalette,
+                                                  },
+                                              ]
+                                            : []),
+                                        ...(hasSettings
+                                            ? [
+                                                  {
+                                                      id: "settings",
+                                                      label: "打开设置",
+                                                      icon: (
+                                                          <Icon
+                                                              icon={
+                                                                  Cog6ToothIcon
+                                                              }
+                                                          />
+                                                      ),
+                                                      onClick: () =>
+                                                          void execute("open", {
+                                                              appId: "settings",
+                                                          }),
+                                                  },
+                                              ]
+                                            : []),
+                                        { type: "divider" as const },
+                                        {
+                                            id: "logout",
+                                            label: "退出登录",
+                                            icon: (
+                                                <Icon
+                                                    icon={
+                                                        ArrowRightStartOnRectangleIcon
+                                                    }
+                                                />
+                                            ),
+                                            variant: "destructive" as const,
+                                            onClick: () =>
+                                                onRequestLogout
+                                                    ? onRequestLogout()
+                                                    : void execute("logout"),
+                                        },
+                                    ]}
+                                />
+                            )}
                         </HStack>
                     }
                 />

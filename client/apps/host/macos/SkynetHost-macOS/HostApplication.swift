@@ -20,6 +20,8 @@ struct SkynetApplication: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appInfo) {
+                Button("快捷命令") { appDelegate.workspace?.toggleCommandPalette() }.keyboardShortcut(
+                    "k", modifiers: [.command])
                 Button("返回桌面") { appDelegate.core.workspace("home") }.keyboardShortcut(
                     "h", modifiers: [.command, .shift])
                 Button("后台应用") { appDelegate.core.workspace("overview") }.keyboardShortcut(

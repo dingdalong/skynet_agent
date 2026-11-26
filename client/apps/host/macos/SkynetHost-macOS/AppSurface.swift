@@ -26,8 +26,19 @@ final class AppSurface: NSView, WKNavigationDelegate {
     }
     @objc var appId: String = "" { didSet { if oldValue != appId { loadApp() } } }
     @objc var backgroundHex: String = "#fafafa" {
-        didSet { cover?.layer?.backgroundColor = NSColor(hex: backgroundHex).cgColor }
+        didSet {
+            wantsLayer = true
+            let color = NSColor(hex: backgroundHex).cgColor
+            layer?.backgroundColor = color
+            cover?.layer?.backgroundColor = color
+        }
     }
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(hex: backgroundHex).cgColor
+    }
+    required init?(coder: NSCoder) { nil }
     @objc var reducedMotion: Bool = false {
         didSet { if reducedMotion { web?.layer?.removeAnimation(forKey: "surface.ready") } }
     }

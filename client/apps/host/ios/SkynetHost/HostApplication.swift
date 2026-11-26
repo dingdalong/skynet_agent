@@ -107,6 +107,25 @@ private final class WorkspaceController: UIViewController {
     var content: UIView!
     private let chrome = CAGradientLayer()
     private var lightStatus = false
+    override var canBecomeFirstResponder: Bool { true }
+    override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(
+                title: "快捷命令", action: #selector(openCommandPalette),
+                input: "k", modifierFlags: .command),
+            UIKeyCommand(
+                title: "返回桌面", action: #selector(goHome),
+                input: "h", modifierFlags: [.command, .shift]),
+            UIKeyCommand(
+                title: "后台应用", action: #selector(openOverview),
+                input: "e", modifierFlags: .command),
+        ]
+    }
+    @objc private func openCommandPalette() {
+        (content as? WorkspaceHost)?.toggleCommandPalette()
+    }
+    @objc private func goHome() { HostServices.core.workspace("home") }
+    @objc private func openOverview() { HostServices.core.workspace("overview") }
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
