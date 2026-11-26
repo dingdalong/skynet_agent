@@ -673,6 +673,8 @@ final class WebViewTests: XCTestCase {
         let harness = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["app-center"]))
         defer { harness.close() }
         try await harness.until("document.querySelectorAll('article').length === 3")
+        try await harness.untilToolbar("refresh", labelContaining: "刷新")
+        try await harness.untilToolbar("admin", labelContaining: "管理员解锁")
         try await harness.until(
             """
             Array.from(document.images).filter(image => image.naturalWidth > 0).length === 2
@@ -687,20 +689,72 @@ final class WebViewTests: XCTestCase {
             \(positions)[1].top >= \(positions)[0].bottom
                 && document.documentElement.scrollWidth <= innerWidth
             """)
-        try await harness.click("服务管理")
-        try await harness.until("document.querySelector('input[type=password]') !== null")
+        // Discover detail drawer opens on card click and closes cleanly.
+        _ = try await harness.web.evaluateJavaScript(
+            "document.querySelector('[data-discover-app] button, article button')?.click()")
+        try await harness.until(
+            "document.querySelector('dialog[open]')?.innerText.includes('目录信息') === true")
+        try await harness.click("关闭")
+        try await harness.until("document.querySelector('dialog[open]') === null")
+
+        // Discover search filters results and clear restores catalog.
         _ = try await harness.web.evaluateJavaScript(
             """
-            const token = document.querySelector('input[type=password]');
-            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(token, 'app-center-test');
-            token.dispatchEvent(new Event('input', {bubbles:true}));
+            (() => {
+                const search = document.querySelector('input[placeholder*="搜索"]');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(search, '日历');
+                search.dispatchEvent(new Event('input', {bubbles:true}));
+            })()
+            """)
+        try await harness.until("document.querySelectorAll('article').length === 1")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (() => {
+                const search = document.querySelector('input[placeholder*="搜索"]');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(search, '');
+                search.dispatchEvent(new Event('input', {bubbles:true}));
+            })()
+            """)
+        try await harness.until("document.querySelectorAll('article').length === 3")
+
+        try await harness.click("服务管理")
+        try await harness.until("document.querySelector('dialog[open] input[type=password]') !== null")
+        // Empty admin token shows inline Chinese validation without dismissing dialog.
+        try await harness.click("解锁")
+        try await harness.until(
+            "document.querySelector('dialog[open]')?.innerText.includes('请输入管理令牌') === true")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (() => {
+                const token = document.querySelector('dialog[open] input[type=password]');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(token, 'app-center-test');
+                token.dispatchEvent(new Event('input', {bubbles:true}));
+            })()
             """)
         try await harness.click("解锁")
         try await harness.until("document.querySelectorAll('article').length === 6")
+        try await harness.untilToolbar("admin", labelContaining: "待审 · 2")
+        try await harness.until(
+            "document.body.innerText.includes('有 2 项上架或更新申请待审批')")
+
+        // Status filter narrows to pending items and resets back to all.
+        try await harness.click("仅看待审批")
+        try await harness.until("document.querySelectorAll('article').length === 2")
+        try await harness.click("全部 (6)")
+        try await harness.until("document.querySelectorAll('article').length === 6")
+
         let buttons =
-            "Array.from(document.querySelectorAll('article'), row => Array.from(row.querySelectorAll('button'), b => b.textContent.trim()).join(','))"
+            "Array.from(document.querySelectorAll('article'), row => Array.from(row.querySelectorAll('button'), b => b.textContent.trim()).filter(Boolean).join(','))"
         try await harness.until(
             "JSON.stringify(\(buttons)) === JSON.stringify(['','停用,下架','批准,拒绝','','','批准,拒绝,启用,下架'])")
+
+        // Service detail drawer shows metadata for selected service.
+        try await harness.click("查看 Agent 详情")
+        try await harness.until(
+            "document.querySelector('dialog[open]')?.innerText.includes('运行状态') === true")
+        try await harness.click("关闭")
+        try await harness.until("document.querySelector('dialog[open]') === null")
+
         try await harness.click("停用")
         try await harness.until("document.querySelector('[role=alertdialog]') !== null")
         _ = try await harness.web.evaluateJavaScript(
@@ -708,8 +762,10 @@ final class WebViewTests: XCTestCase {
         )
         try await harness.until("\(buttons)[1] === '启用,下架'")
         _ = try await harness.web.evaluateJavaScript(
-            "document.querySelectorAll('article')[1].querySelector('button').click()")
+            "Array.from(document.querySelectorAll('article')[1].querySelectorAll('button')).find(b => b.textContent.trim() === '启用')?.click()"
+        )
         try await harness.until("\(buttons)[1] === '停用,下架'")
+        try await harness.until("document.documentElement.scrollWidth <= innerWidth")
     }
 
     func testPackagedSettingsBridgeThemeAndResponsiveLayout() async throws {
@@ -915,7 +971,15 @@ private final class WebHarness: NSObject, WKScriptMessageHandler, WKNavigationDe
         let found =
             try await web.evaluateJavaScript(
                 """
-                (()=>{const b=Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')===\(json)||b.textContent.trim()===\(json)); if(!b)return false;b.click();return true})()
+                (()=>{
+                    const dialogs=Array.from(document.querySelectorAll('dialog[open]'));
+                    const root=dialogs[dialogs.length-1]??document;
+                    const match=b=>!b.closest('dialog:not([open])')&&b.getClientRects().length>0&&(b.getAttribute('aria-label')===\(json)||b.textContent.trim()===\(json));
+                    const b=Array.from(root.querySelectorAll('button')).find(match)??Array.from(document.querySelectorAll('button')).find(match);
+                    if(!b)return false;
+                    b.click();
+                    return true;
+                })()
                 """) as? Bool
         XCTAssertEqual(found, true, "Missing WebKit control: \(label)")
     }

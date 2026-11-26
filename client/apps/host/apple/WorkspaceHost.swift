@@ -47,7 +47,8 @@ final class SurfaceToolbar {
     }
 
     func publish(_ body: [String: Any], appId: String, document: String) throws {
-        guard ["settings", "agent"].contains(appId), body["presentationId"] as? String == document,
+        guard ["settings", "agent", "app-center"].contains(appId),
+            body["presentationId"] as? String == document,
             let input = body["input"] as? [String: Any], let items = input["items"] as? [[String: Any]],
             items.count <= 16
         else { throw HostError("toolbar", "工具栏声明无效") }
