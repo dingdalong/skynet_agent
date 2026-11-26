@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     AppShell,
@@ -6,7 +6,8 @@ import {
     Button,
     ChatLayout,
     ChatMessageList,
-    EmptyState,
+    ChatSystemMessage,
+    LayerProvider,
     Layout,
     LayoutHeader,
     Spinner,
@@ -21,26 +22,28 @@ import {
 import { app } from "@skynet/app-sdk";
 import { isSending, latestAssistant } from "@skynet/agent-client/selectors";
 import type { AgentState } from "@skynet/agent-client/types";
-import { Composer, type Send } from "./Composer";
+import { Composer, type ComposerHandle, type Send } from "./Composer";
 import { Connection } from "./Connection";
+import { ConversationHeader } from "./ConversationHeader";
 import { MessageRow } from "./Messages";
+import { SessionDrawer, SessionSideNav } from "./SessionSidebar";
+import { WelcomeView } from "./WelcomeView";
+import {
+    connectionStatusMeta,
+    messageDateLabel,
+    shouldShowDateDivider,
+    sortSessions,
+} from "./format";
 import "./styles.css";
-
-const statusLabels = {
-    offline: "未连接",
-    unavailable: "服务已下线",
-    connecting: "连接中",
-    restoring: "恢复会话",
-    online: "已连接",
-    retrying: "重新连接中",
-    error: "连接失败",
-};
 
 function Agent() {
     const snapshot = useAppSnapshot<AgentState>();
     const [connectionOpen, setConnectionOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [drawerOpen, setDrawerOpen] = useState(false);
     const [bridgeError, setBridgeError] = useState("");
-    const wide = useMediaQuery("(min-width: 760px)");
+    const wide = useMediaQuery("(min-width: 768px)");
+    const composerHandle = useRef<ComposerHandle>(null);
     const send: Send = async (name, payload = {}) => {
         try {
             await app.command(name, payload);
@@ -51,11 +54,7 @@ function Agent() {
         }
     };
     const state = snapshot?.state;
-    const sessions = Object.values(state?.sessions ?? {}).sort(
-        (left, right) =>
-            right.session.updated_at - left.session.updated_at ||
-            right.session.id.localeCompare(left.session.id),
-    );
+    const sessions = sortSessions(Object.values(state?.sessions ?? {}));
     const session = state?.sessions?.[state.selectedId];
     const scroll = useRef<HTMLDivElement>(null);
     const anchor = useRef<{
@@ -64,6 +63,8 @@ function Agent() {
         start: number;
     } | null>(null);
     const previousTop = useRef(0);
+    const historyRequestedForStart = useRef<number | null>(null);
+    const wasLoadingHistory = useRef(false);
     const start = session?.session.message_start ?? 0;
     const loading = Object.values(state?.connection.pending ?? {}).some(
         (request) =>
@@ -71,8 +72,14 @@ function Agent() {
             request.target === state?.selectedId,
     );
     const loadHistory = () => {
-        if (!session || loading || state?.connection.status !== "online")
+        if (
+            !session ||
+            loading ||
+            historyRequestedForStart.current === start ||
+            state?.connection.status !== "online"
+        )
             return;
+        historyRequestedForStart.current = start;
         const element = scroll.current?.querySelector<HTMLElement>(
             "[data-history-message]",
         );
@@ -100,34 +107,48 @@ function Agent() {
                 saved.offset;
         }
         anchor.current = null;
+        historyRequestedForStart.current = null;
         previousTop.current = scroll.current?.scrollTop ?? 0;
     }, [state?.selectedId, start]);
+    useLayoutEffect(() => {
+        if (wasLoadingHistory.current && !loading) {
+            historyRequestedForStart.current = null;
+        }
+        wasLoadingHistory.current = loading;
+    }, [loading]);
+    const connection = state
+        ? connectionStatusMeta(state.connection.status, state.syncing)
+        : null;
+    const toggleSidebar = () => {
+        if (wide) setSidebarCollapsed((collapsed) => !collapsed);
+        else setDrawerOpen((open) => !open);
+    };
+    const createSession = () => {
+        setDrawerOpen(false);
+        void send("session.new");
+    };
+    const selectSession = (sessionId: string) => {
+        void send("session.select", { id: sessionId });
+    };
     usePaneToolbar(
-        state?.version === 1
+        state?.version === 1 && connection
             ? [
                   {
-                      id: "sessions",
-                      label: session?.session.title || "切换会话",
-                      choices: sessions.map(({ session }) => ({
-                          id: `session:${session.id}`,
-                          label: session.title || "新会话",
-                          selected: session.id === state.selectedId,
-                      })),
+                      id: "sidebar",
+                      label: "会话列表",
+                      selected: wide ? !sidebarCollapsed : drawerOpen,
                   },
                   { id: "new", label: "新建会话" },
                   {
                       id: "connection",
-                      label: `连接设置 · ${state.syncing ? "同步会话" : statusLabels[state.connection.status]}`,
+                      label: `连接与设备 · ${connection.label}`,
                   },
               ]
             : [],
         (id) => {
             if (id === "connection") setConnectionOpen(true);
-            else if (id === "new") void send("session.new");
-            else if (id.startsWith("session:"))
-                void send("session.select", {
-                    id: id.slice("session:".length),
-                });
+            else if (id === "new") createSession();
+            else if (id === "sidebar") toggleSidebar();
         },
     );
     if (state?.version !== 1)
@@ -148,162 +169,230 @@ function Agent() {
     const last = latestAssistant(session);
     const error = bridgeError || state.error;
     const online = state.connection.status === "online";
-    const canConnect =
-        state.connection.status === "offline" ||
-        state.connection.status === "error";
+    const canRetryLast =
+        !!last &&
+        last.status === 4 &&
+        !!last.error?.retryable &&
+        !session?.session.run_id &&
+        online &&
+        !isSending(state, state.selectedId);
+    const retryLast = () => {
+        if (!last) return;
+        void send("chat.retry", {
+            target: state.selectedId,
+            runId: last.run_id,
+        });
+    };
+    const reduceMotion = snapshot?.preferences.reduceMotion ?? false;
+    const showConversationHeader = !!session || !wide;
     return (
-        <AppShell variant="wash" mobileNav={{ breakpoint: "none" }}>
-            <Layout
-                padding={0}
-                header={
-                    <LayoutHeader padding={0}>
-                        {session?.recovery_notice && (
-                            <Banner
-                                status="warning"
-                                title={session.recovery_notice}
-                                description={
-                                    session.read_only
-                                        ? "可阅读已恢复的消息，请另开会话继续。"
-                                        : undefined
-                                }
-                            />
-                        )}
-                        {(error || state.notice) && (
-                            <Banner
-                                status={error ? "error" : "warning"}
-                                title={error ? "需要处理" : "发送结果未确认"}
-                                description={error || state.notice}
-                                isDismissable
-                                dismissLabel="关闭提示"
-                                onDismiss={() => {
-                                    setBridgeError("");
-                                    void send("error.dismiss");
-                                }}
-                                endContent={
-                                    ["retrying", "error"].includes(
-                                        state.connection.status,
-                                    ) && (
-                                        <Button
-                                            label="重新连接"
-                                            variant="secondary"
-                                            onClick={() =>
-                                                void send(
-                                                    "connection.reconnect",
-                                                )
-                                            }
-                                        />
-                                    )
-                                }
-                            />
-                        )}
-                    </LayoutHeader>
+        <Fragment>
+            <AppShell
+                variant="section"
+                height="fill"
+                mobileNav={{ breakpoint: "none" }}
+                sideNav={
+                    wide ? (
+                        <SessionSideNav
+                            state={state}
+                            sessions={sessions}
+                            isCollapsed={sidebarCollapsed}
+                            onCollapsedChange={setSidebarCollapsed}
+                            onSelectSession={selectSession}
+                            onCreateSession={createSession}
+                            onOpenConnection={() => setConnectionOpen(true)}
+                        />
+                    ) : undefined
                 }
             >
-                <ChatLayout
-                    key={state.selectedId}
-                    ref={scroll}
-                    onScroll={(event) => {
-                        const top = event.currentTarget.scrollTop;
-                        if (top < previousTop.current && top <= 64 && start > 0)
-                            loadHistory();
-                        previousTop.current = top;
-                    }}
-                    className="agent-chat"
-                    aria-label="消息记录"
-                    density={wide ? "spacious" : "compact"}
-                    composer={
-                        <VStack gap={1}>
-                            {last?.status === 4 &&
-                                last.error?.retryable &&
-                                !session?.session.run_id && (
-                                    <Button
-                                        label="重试本轮任务"
-                                        variant="secondary"
-                                        isDisabled={
-                                            !online ||
-                                            isSending(state, state.selectedId)
-                                        }
-                                        onClick={() =>
-                                            void send("chat.retry", {
-                                                target: state.selectedId,
-                                                runId: last.run_id,
-                                            })
-                                        }
-                                    />
-                                )}
-                            <Composer state={state} send={send} />
-                        </VStack>
-                    }
-                    emptyState={
-                        <EmptyState
-                            isCompact={!wide}
-                            role="status"
-                            title={
-                                state.connection.status === "unavailable"
-                                    ? "Agent 服务已下线"
-                                    : online
-                                      ? "开始一个新任务"
-                                      : "正在连接 Agent"
-                            }
-                            description={
-                                state.connection.status === "unavailable"
-                                    ? "服务上线后，此窗口会自动恢复。"
-                                    : undefined
-                            }
-                            actions={
-                                canConnect && (
-                                    <Button
-                                        label="重新连接"
-                                        onClick={() =>
-                                            void send("connection.reconnect")
-                                        }
-                                    />
-                                )
-                            }
-                        />
+                <Layout
+                    padding={0}
+                    header={
+                        <LayoutHeader padding={0}>
+                            {showConversationHeader && (
+                                <ConversationHeader
+                                    state={state}
+                                    session={session}
+                                    wide={wide}
+                                    showSidebarToggle={!wide}
+                                    onToggleSidebar={toggleSidebar}
+                                    onCreateSession={createSession}
+                                    onReconnect={() =>
+                                        void send("connection.reconnect")
+                                    }
+                                />
+                            )}
+                            {session?.recovery_notice && (
+                                <Banner
+                                    status="warning"
+                                    title={session.recovery_notice}
+                                    description={
+                                        session.read_only
+                                            ? "可阅读已恢复的消息，请另开会话继续。"
+                                            : undefined
+                                    }
+                                />
+                            )}
+                            {(error || state.notice) && (
+                                <Banner
+                                    status={error ? "error" : "warning"}
+                                    title={
+                                        error ? "需要处理" : "发送结果未确认"
+                                    }
+                                    description={error || state.notice}
+                                    isDismissable
+                                    dismissLabel="关闭提示"
+                                    onDismiss={() => {
+                                        setBridgeError("");
+                                        void send("error.dismiss");
+                                    }}
+                                    endContent={
+                                        ["retrying", "error"].includes(
+                                            state.connection.status,
+                                        ) && (
+                                            <Button
+                                                label="重新连接"
+                                                variant="secondary"
+                                                onClick={() =>
+                                                    void send(
+                                                        "connection.reconnect",
+                                                    )
+                                                }
+                                            />
+                                        )
+                                    }
+                                />
+                            )}
+                        </LayoutHeader>
                     }
                 >
-                    {session ? (
-                        <ChatMessageList isStreaming={last?.status === 1}>
-                            {loading && !messages.length ? (
-                                <Spinner label="正在加载历史消息…" />
-                            ) : (
-                                (start > 0 || (!messages.length && error)) && (
-                                    <Button
-                                        label={
-                                            loading
-                                                ? "正在加载…"
-                                                : messages.length
-                                                  ? "加载更早消息"
-                                                  : "重新加载历史"
-                                        }
-                                        variant="secondary"
-                                        isDisabled={!online || loading}
-                                        onClick={loadHistory}
-                                    />
-                                )
-                            )}
-                            {messages.map((message) => (
-                                <MessageRow
-                                    key={message.id}
-                                    message={message}
-                                />
-                            ))}
-                        </ChatMessageList>
-                    ) : null}
-                </ChatLayout>
-            </Layout>
+                    <ChatLayout
+                        key={state.selectedId}
+                        ref={scroll}
+                        onWheel={(event) => {
+                            const top = event.currentTarget.scrollTop;
+                            previousTop.current = top;
+                            if (event.deltaY < 0 && top <= 64 && start > 0)
+                                loadHistory();
+                        }}
+                        onScroll={(event) => {
+                            const top = event.currentTarget.scrollTop;
+                            if (
+                                top < previousTop.current &&
+                                top <= 64 &&
+                                start > 0
+                            )
+                                loadHistory();
+                            previousTop.current = top;
+                        }}
+                        className="agent-chat"
+                        aria-label="消息记录"
+                        density={wide ? "spacious" : "compact"}
+                        composer={
+                            <Composer
+                                state={state}
+                                send={send}
+                                wide={wide}
+                                handleRef={composerHandle}
+                            />
+                        }
+                        emptyState={
+                            <WelcomeView
+                                state={state}
+                                wide={wide}
+                                onPickPrompt={(prompt) =>
+                                    composerHandle.current?.applyDraft(prompt)
+                                }
+                                onReconnect={() =>
+                                    void send("connection.reconnect")
+                                }
+                            />
+                        }
+                    >
+                        {session ? (
+                            <ChatMessageList isStreaming={last?.status === 1}>
+                                {loading && !messages.length ? (
+                                    <Spinner label="正在加载历史消息…" />
+                                ) : (
+                                    (start > 0 ||
+                                        (!messages.length && error)) && (
+                                        <Button
+                                            label={
+                                                loading
+                                                    ? "正在加载…"
+                                                    : messages.length
+                                                      ? "加载更早消息"
+                                                      : "重新加载历史"
+                                            }
+                                            variant="secondary"
+                                            isDisabled={!online || loading}
+                                            onClick={loadHistory}
+                                        />
+                                    )
+                                )}
+                                {messages.map((message, index) => {
+                                    const previous =
+                                        index > 0
+                                            ? messages[index - 1]
+                                            : undefined;
+                                    const dateLabel = shouldShowDateDivider(
+                                        previous,
+                                        message,
+                                    )
+                                        ? messageDateLabel(message.created_at)
+                                        : null;
+                                    const isRetryableLast =
+                                        canRetryLast && message.id === last?.id;
+                                    return (
+                                        <Fragment key={message.id}>
+                                            {dateLabel && (
+                                                <ChatSystemMessage variant="divider">
+                                                    {dateLabel}
+                                                </ChatSystemMessage>
+                                            )}
+                                            <MessageRow
+                                                message={message}
+                                                reduceMotion={reduceMotion}
+                                                canRetry={isRetryableLast}
+                                                onRetry={
+                                                    isRetryableLast
+                                                        ? retryLast
+                                                        : undefined
+                                                }
+                                            />
+                                        </Fragment>
+                                    );
+                                })}
+                            </ChatMessageList>
+                        ) : null}
+                    </ChatLayout>
+                </Layout>
+            </AppShell>
+            {!wide && (
+                <SessionDrawer
+                    state={state}
+                    sessions={sessions}
+                    isOpen={drawerOpen}
+                    onOpenChange={setDrawerOpen}
+                    onSelectSession={selectSession}
+                    onCreateSession={createSession}
+                    onOpenConnection={() => setConnectionOpen(true)}
+                />
+            )}
             {connectionOpen && (
                 <Connection
                     state={state}
+                    send={send}
                     close={() => setConnectionOpen(false)}
                 />
             )}
-        </AppShell>
+        </Fragment>
     );
 }
 createRoot(document.getElementById("root")!).render(
     <AppBoundary>
-        <Agent />
+        <LayerProvider toast={{ position: "bottomEnd", maxVisible: 3 }}>
+            <Agent />
+        </LayerProvider>
     </AppBoundary>,
 );

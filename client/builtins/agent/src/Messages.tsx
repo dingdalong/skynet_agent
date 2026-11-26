@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
     Avatar,
     Banner,
+    Button,
+    Card,
     ChatMessage,
     ChatMessageBubble,
     ChatMessageMetadata,
@@ -9,19 +11,28 @@ import {
     ChatToolCalls,
     CodeBlock,
     Collapsible,
+    HStack,
+    Icon,
+    IconButton,
     Markdown,
     MetadataList,
     MetadataListItem,
+    Spinner,
     Text,
     Timestamp,
     VStack,
+    useClipboard,
+    useToast,
     type MarkdownComponents,
 } from "@astryxdesign/core";
+import { useStreamingText } from "@astryxdesign/core/hooks";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import type {
     ChatMessage as Message,
     ReasoningBlock,
     ToolCall,
 } from "@skynet/agent-client/types";
+import { presentToolCall, type ToolCallPresentation } from "./format";
 
 const safeContent: Partial<MarkdownComponents> = {
     link: ({ href, children }) => (
@@ -49,37 +60,60 @@ function Reasoning({
             failed: "思考中断",
         }[block.status] ?? "思考记录";
     if (!block.text) return null;
+    const triggerText = toolName ? `${toolName} · ${label}` : label;
     return (
         <Collapsible
             isOpen={open ?? streaming}
             onOpenChange={setOpen}
             chevronPosition="start"
-            trigger={toolName ? `${toolName} · ${label}` : label}
+            trigger={
+                <HStack gap={1.5} vAlign="center">
+                    {streaming && <Spinner size="sm" />}
+                    <Text type="supporting" weight="medium">
+                        {triggerText}
+                    </Text>
+                </HStack>
+            }
         >
-            <Markdown components={safeContent}>{block.text}</Markdown>
+            <Card variant="muted" padding={3}>
+                <Markdown
+                    density="compact"
+                    headingLevelStart={4}
+                    components={safeContent}
+                >
+                    {block.text}
+                </Markdown>
+            </Card>
         </Collapsible>
     );
 }
-const toolStatus: Record<string, string> = {
-    interrupted: "执行中断",
-    pending: "等待执行",
-    judging: "检查权限",
-    running: "执行中",
-    completed: "已完成",
-    failed: "执行失败",
-    denied: "权限拒绝",
-    cancelled: "已取消",
-};
-function ToolDetails({ tool }: { tool: ToolCall }) {
+
+function ToolDetails({
+    tool,
+    presentation,
+}: {
+    tool: ToolCall;
+    presentation: ToolCallPresentation;
+}) {
     return (
         <VStack gap={2}>
             <MetadataList label={{ position: "top" }}>
                 <MetadataListItem label="执行状态">
-                    {toolStatus[tool.status] ?? tool.status}
+                    {presentation.statusLabel}
                 </MetadataListItem>
                 {tool.working_directory && (
                     <MetadataListItem label="工作目录">
                         {tool.working_directory}
+                    </MetadataListItem>
+                )}
+                {presentation.terminalSessionId && (
+                    <MetadataListItem label="终端会话">
+                        {presentation.terminalSessionId}
+                    </MetadataListItem>
+                )}
+                {presentation.justification && (
+                    <MetadataListItem label="申请原因">
+                        {presentation.justification}
                     </MetadataListItem>
                 )}
                 {tool.permission_reason && (
@@ -104,12 +138,19 @@ function ToolDetails({ tool }: { tool: ToolCall }) {
                     </MetadataListItem>
                 )}
             </MetadataList>
-            {tool.arguments && (
+            {presentation.detailCode && (
                 <CodeBlock
-                    title="调用参数"
-                    language="json"
-                    code={tool.arguments}
+                    title={presentation.detailCode.title}
+                    language={presentation.detailCode.language}
+                    isDiff={presentation.detailCode.isDiff}
+                    code={presentation.detailCode.code}
                     width="100%"
+                    size="sm"
+                    maxHeight={presentation.detailCode.isDiff ? 360 : 280}
+                    isCollapsible
+                    collapsibleThreshold={
+                        presentation.detailCode.isDiff ? 20 : 16
+                    }
                     isWrapped
                 />
             )}
@@ -118,6 +159,10 @@ function ToolDetails({ tool }: { tool: ToolCall }) {
                     title="输出"
                     code={tool.output}
                     width="100%"
+                    size="sm"
+                    maxHeight={320}
+                    isCollapsible
+                    collapsibleThreshold={16}
                     isWrapped
                 />
             )}
@@ -132,26 +177,70 @@ function ToolDetails({ tool }: { tool: ToolCall }) {
         </VStack>
     );
 }
-function toolTarget(tool: ToolCall) {
-    if (tool.arguments) {
-        try {
-            const args = JSON.parse(tool.arguments);
-            if (typeof args?.cmd === "string") return args.cmd;
-        } catch {
-            return tool.working_directory || undefined;
-        }
-    }
-    return tool.working_directory || undefined;
-}
-export function MessageRow({ message }: { message: Message }) {
+
+export function MessageRow({
+    message,
+    reduceMotion = false,
+    canRetry,
+    onRetry,
+}: {
+    message: Message;
+    reduceMotion?: boolean;
+    canRetry?: boolean;
+    onRetry?: () => void;
+}) {
+    const showToast = useToast();
+    const { copy, isCopied } = useClipboard({ announce: "已复制到剪贴板" });
     const user = message.role === 1;
-    const status =
-        message.status === 1
-            ? "正在生成"
-            : message.status === 3
-              ? "已取消"
-              : undefined;
-    const metadata = (message.created_at > 0 || status) && (
+    const streaming = message.status === 1;
+    const displayedText = useStreamingText(
+        user ? "" : message.content,
+        !user && streaming,
+        { speed: reduceMotion ? "instant" : "fast" },
+    );
+    const status = streaming
+        ? "正在生成"
+        : message.status === 3
+          ? "已取消"
+          : undefined;
+    const canCopy = !!message.content && !streaming;
+    const footer =
+        status || canCopy ? (
+            <HStack gap={1} vAlign="center">
+                {status && (
+                    <Text type="supporting" color="secondary">
+                        {status}
+                    </Text>
+                )}
+                {canCopy && (
+                    <IconButton
+                        label={isCopied ? "已复制" : "复制消息"}
+                        tooltip={isCopied ? "已复制" : "复制"}
+                        variant="ghost"
+                        size="sm"
+                        icon={
+                            <Icon
+                                icon={isCopied ? "check" : "copy"}
+                                size="sm"
+                            />
+                        }
+                        onClick={() => {
+                            void copy(message.content).then((copied) =>
+                                showToast({
+                                    uniqueID: "agent-copy",
+                                    body: copied
+                                        ? "已复制到剪贴板"
+                                        : "复制失败，请手动选择文本",
+                                    type: copied ? "info" : "error",
+                                    autoHideDuration: 2200,
+                                }),
+                            );
+                        }}
+                    />
+                )}
+            </HStack>
+        ) : undefined;
+    const metadata = (message.created_at > 0 || footer) && (
         <ChatMessageMetadata
             timestamp={
                 message.created_at > 0 && (
@@ -161,7 +250,7 @@ export function MessageRow({ message }: { message: Message }) {
                     />
                 )
             }
-            footer={status}
+            footer={footer}
         />
     );
     return (
@@ -176,28 +265,25 @@ export function MessageRow({ message }: { message: Message }) {
             ))}
             {message.tool_calls.length > 0 && (
                 <ChatToolCalls
-                    calls={message.tool_calls.map((tool) => ({
-                        key: tool.id,
-                        name: tool.name,
-                        target: toolTarget(tool),
-                        errorMessage:
-                            tool.error ||
-                            (tool.status === "cancelled"
-                                ? "已取消"
-                                : undefined),
-                        status:
-                            tool.error ||
-                            ["failed", "denied", "cancelled"].includes(
-                                tool.status,
-                            )
-                                ? "error"
-                                : tool.status === "pending"
-                                  ? "pending"
-                                  : ["running", "judging"].includes(tool.status)
-                                    ? "running"
-                                    : "complete",
-                        resultDetail: <ToolDetails tool={tool} />,
-                    }))}
+                    calls={message.tool_calls.map((tool) => {
+                        const presentation = presentToolCall(tool);
+                        return {
+                            key: tool.id,
+                            name: tool.name,
+                            target: presentation.target,
+                            node: presentation.node,
+                            additions: presentation.additions,
+                            deletions: presentation.deletions,
+                            errorMessage: presentation.errorMessage,
+                            status: presentation.status,
+                            resultDetail: (
+                                <ToolDetails
+                                    tool={tool}
+                                    presentation={presentation}
+                                />
+                            ),
+                        };
+                    })}
                 />
             )}
             {message.tool_calls.flatMap((tool) =>
@@ -220,10 +306,11 @@ export function MessageRow({ message }: { message: Message }) {
                         </ChatTokenizedText>
                     ) : (
                         <Markdown
+                            headingLevelStart={3}
                             components={safeContent}
-                            isStreaming={message.status === 1}
+                            isStreaming={streaming}
                         >
-                            {message.content}
+                            {displayedText}
                         </Markdown>
                     )}
                 </ChatMessageBubble>
@@ -233,6 +320,17 @@ export function MessageRow({ message }: { message: Message }) {
                     status="error"
                     title="任务失败"
                     description={message.error?.message || "服务器任务执行失败"}
+                    endContent={
+                        canRetry && onRetry ? (
+                            <Button
+                                label="重试本轮任务"
+                                variant="secondary"
+                                size="sm"
+                                icon={<Icon icon={ArrowPathIcon} size="sm" />}
+                                onClick={onRetry}
+                            />
+                        ) : undefined
+                    }
                 />
             )}
         </ChatMessage>

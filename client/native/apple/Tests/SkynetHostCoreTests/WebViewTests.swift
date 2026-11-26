@@ -167,7 +167,14 @@ final class WebViewTests: XCTestCase {
             core.shutdown()
             try? FileManager.default.removeItem(at: data)
         }
-        try await harness.untilToolbar("connection", labelContaining: "已连接")
+        try await harness.untilToolbar("connection", labelContaining: "连接与设备 · 已连接")
+        try await harness.untilToolbar("sidebar", labelContaining: "会话列表")
+        try await harness.untilToolbar("new", labelContaining: "新建会话")
+        try await harness.until("document.body.innerText.includes('与 Agent 开始一个新任务')")
+        try await harness.click("梳理项目结构与入口")
+        try await harness.until(
+            "document.querySelector('#agent-message [contenteditable]')?.textContent?.includes('梳理当前工作目录') === true"
+        )
         _ = try await harness.web.evaluateJavaScript(
             """
             (()=>{ const e=document.querySelector('#agent-message [contenteditable]');
@@ -191,7 +198,9 @@ final class WebViewTests: XCTestCase {
         try await harness.until("(\(thoughtButton))('思考记录')?.getAttribute('aria-expanded') === 'false'")
         try await harness.click("思考记录")
         try await harness.until("document.body.innerText.includes('先检查会话目录。')")
-        try await harness.untilToolbar("sessions", labelContaining: "Native Agent")
+        try await harness.until(
+            "document.querySelector('nav[aria-label=\"会话列表\"]')?.textContent?.includes('Native Agent') === true"
+        )
         let callRow =
             "Array.from(document.querySelectorAll('[role=button]')).find(row=>row.textContent.includes('exec_command') && row.textContent.includes('pwd'))"
         try await harness.until("\(callRow)?.getAttribute('aria-expanded') === 'false'")
@@ -203,6 +212,21 @@ final class WebViewTests: XCTestCase {
             "document.body.innerText.includes('background✓') && document.body.innerText.includes('/workspace')"
         )
         _ = try await harness.web.evaluateJavaScript("\(callRow).click()")
+        try await harness.until("document.querySelector('button[aria-label=\"复制消息\"]') !== null")
+        try await harness.activateToolbar("sidebar")
+        try await harness.until(
+            "(document.querySelector('nav[aria-label=\"会话列表\"]')?.getBoundingClientRect().width ?? 999) < 100"
+        )
+        try await harness.activateToolbar("sidebar")
+        try await harness.until(
+            "(document.querySelector('nav[aria-label=\"会话列表\"]')?.getBoundingClientRect().width ?? 0) >= 200"
+        )
+        try await harness.activateToolbar("connection")
+        try await harness.until(
+            "document.body.innerText.includes('网关连接') && document.body.innerText.includes('webkit-agent')"
+        )
+        try await harness.click("完成")
+        try await harness.until("!document.body.innerText.includes('网关连接')")
         _ = try await harness.web.evaluateJavaScript(
             """
             (()=>{const e=document.querySelector('.agent-chat');
@@ -217,10 +241,10 @@ final class WebViewTests: XCTestCase {
         XCTAssertGreaterThan(before, 0)
         _ = try await harness.web.evaluateJavaScript("document.getElementById('agent-model').click()")
         try await harness.until(
-            "Array.from(document.querySelectorAll('[role=option]')).some(e=>e.textContent.trim()==='Fixture 2')"
+            "Array.from(document.querySelectorAll('[role=option]')).some(e=>e.textContent.includes('Fixture 2'))"
         )
         _ = try await harness.web.evaluateJavaScript(
-            "Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.trim()==='Fixture 2').click()"
+            "Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.includes('Fixture 2')).click()"
         )
         try await harness.until(
             "document.getElementById('agent-model').textContent.includes('Fixture 2')")
@@ -256,11 +280,28 @@ final class WebViewTests: XCTestCase {
         try await harness.until("document.body.textContent.includes('binary✓')")
         harness.web.setFrameSize(NSSize(width: 420, height: 700))
         try await harness.activateToolbar("new")
-        try await harness.until("document.body.innerText.includes('开始一个新任务')")
-        try await harness.activateToolbar("session:session")
+        try await harness.until("document.body.innerText.includes('与 Agent 开始一个新任务')")
+        try await harness.activateToolbar("sidebar")
+        try await harness.until(
+            "Array.from(document.querySelectorAll('button')).some(button => button.textContent.trim() === 'Native Agent')"
+        )
+        try await harness.click("Native Agent")
+        try await harness.until("!document.querySelector('dialog[open]')")
         try await harness.until("document.body.textContent.includes('binary✓')")
         try await harness.until("document.documentElement.scrollWidth<=420")
         try await harness.capture(client.appendingPathComponent("test-artifacts/agent-narrow-webkit.png"))
+        harness.web.setFrameSize(NSSize(width: 420, height: 300))
+        try await harness.until(
+            "getComputedStyle(document.querySelector('.agent-conversation-header')).display === 'none'")
+        _ = try await harness.web.evaluateJavaScript(
+            "(()=>{ document.querySelector('#agent-message [contenteditable]')?.focus(); return true; })()")
+        try await harness.until(
+            """
+            (()=>{ const input = document.querySelector('#agent-message [contenteditable]');
+            const rect = input?.getBoundingClientRect();
+            return Boolean(input && rect && document.activeElement === input && rect.top >= 0 && rect.bottom <= 300); })()
+            """
+        )
     }
 
     func testLargeHistoryCanOpenAndContinueInTheMacRuntime() async throws {
@@ -282,8 +323,11 @@ final class WebViewTests: XCTestCase {
             username: "fragment-history")
         let harness = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
         defer { harness.close() }
-        try await harness.untilToolbar("connection", labelContaining: "已连接")
-        try await harness.activateToolbar("session:wire-history-fixture")
+        try await harness.untilToolbar("connection", labelContaining: "连接与设备 · 已连接")
+        try await harness.until(
+            "Array.from(document.querySelectorAll('nav[aria-label=\"会话列表\"] button')).some(button => button.textContent.trim() === '大消息验收')"
+        )
+        try await harness.click("大消息验收")
         try await harness.until("document.body.innerText.includes('已记住代号青舟17。')")
         try await harness.until("document.querySelectorAll('[data-history-message]').length === 20")
         _ = try await harness.web.evaluateJavaScript(
