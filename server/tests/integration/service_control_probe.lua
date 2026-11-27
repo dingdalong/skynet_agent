@@ -74,7 +74,8 @@ function M.run(config)
         end)
         local header_waiting = login("control-peer")
         assert(header_waiting:request("AgentChatReq", { session_id = saved.id, text = "跨用户" }).ret ~= 1)
-        header_waiting:request("AgentChatReq", { text = "[e2e:header-stall]" })
+        header_waiting:request("AgentChatReq",
+            { cloud_project = header_waiting:cloud_project(), text = "[e2e:header-stall]" })
         support.same(agents(support.console(18003, 'call .main "status"')), initial)
         support.until_true(function() return support.health(config.model_url).active_requests == 2 end,
             "关服前必须已有流读取和响应头等待中的模型 HTTP 请求")

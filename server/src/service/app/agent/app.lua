@@ -28,7 +28,6 @@ function App:ctor(identity, router, templates, tool_registry)
     self.default_model = config.default_model_id
     self.blocked_settings = {}
     self.legacy_settings = {}
-    self.targets = {}
     self.pending_runs = {}
     self.desktop_connections = DesktopConnections:new(self)
     self.pending_client_requests = {}
@@ -36,10 +35,17 @@ function App:ctor(identity, router, templates, tool_registry)
 end
 
 function App:snapshot()
+    local projects = require("agent.workspace").list(config.tools.workspace_root, self.identity.user_id)
+    local available = {}
+    for _, name in ipairs(projects) do available[name] = true end
+    for _, session in pairs(self.chat.sessions) do
+        if session.cloud_project then session.needs_workspace = not available[session.cloud_project] end
+    end
     return {
         user_id = self.identity.user_id,
         username = self.identity.username,
         desktops = self.desktop_connections:snapshot(),
+        cloud_projects = projects,
         chat_sessions = self.chat:snapshot(),
         models = models.public(config),
         default_model_id = self.default_model,
@@ -72,7 +78,7 @@ function App:register_desktop(args, connection)
         end
     end
     self.desktop_connections:publish(device)
-    return { ret = error_code.succ, target = self.targets[device.id] }
+    return { ret = error_code.succ }
 end
 
 function App:disconnect_desktop(connection)

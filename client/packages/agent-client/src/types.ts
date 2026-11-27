@@ -39,6 +39,7 @@ export interface ChatMessage {
     reasoning: ReasoningBlock[];
 }
 export interface ChatSession {
+    cloud_project?: string;
     recovery_notice?: string;
     read_only?: boolean;
     needs_workspace?: boolean;
@@ -67,6 +68,7 @@ export interface ModelOption {
     model: string;
 }
 export interface AgentSnapshot {
+    cloud_projects?: string[];
     user_id: string;
     username: string;
     chat_sessions: ChatSession[];
@@ -102,6 +104,15 @@ export interface PendingRequest {
     text: string;
     before?: number;
     age: number;
+}
+export interface ProjectPreference {
+    location: "local" | "cloud";
+    localId?: string;
+    cloudId?: string;
+}
+export interface ProjectSelection {
+    location: "local" | "cloud";
+    id: string;
 }
 export interface AgentState {
     version: 1;
@@ -146,6 +157,7 @@ export interface AgentState {
     local: LocalContext | null;
     localRequest: string;
     localEffects: Record<string, { epoch: number; requestId: string }>;
-    draftTarget: ExecutionTarget | null;
+    cloudProjects: string[];
+    projectPreferences: Record<string, ProjectPreference>;
     desktops: DesktopDevice[];
 }

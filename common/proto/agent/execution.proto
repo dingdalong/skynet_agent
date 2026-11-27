@@ -11,31 +11,28 @@ message AgentDesktopRegisterReq {
 message AgentDesktopRegisterRes {
   int32 ret = 1;
   ErrorInfo error = 2;
-  ExecutionTarget target = 3;
 }
 message AgentPreferenceSetReq {
   string model_id = 1;
-  bool set_target = 2;
-  ExecutionTarget target = 3;
 }
 message AgentPreferenceSetRes {
   int32 ret = 1;
   ErrorInfo error = 2;
   string model_id = 3;
-  bool set_target = 4;
-  ExecutionTarget target = 5;
 }
 message AgentDesktopUpdatedNtf {
   DesktopDevice device = 1;
 }
-message AgentSessionExecutionSetReq {
-  string session_id = 1;
-  ExecutionTarget target = 2;
+message AgentCloudProjectCreateReq {
+  string name = 1;
 }
-message AgentSessionExecutionSetRes {
+message AgentCloudProjectCreateRes {
   int32 ret = 1;
   ErrorInfo error = 2;
-  ChatSession chat_session = 3;
+  string name = 3;
+}
+message AgentCloudProjectCreatedNtf {
+  string name = 1;
 }
 message AgentExecutionActionNtf {
   string request_id = 1;

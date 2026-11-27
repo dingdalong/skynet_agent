@@ -43,7 +43,7 @@ flowchart LR
 `config.agent`、`agent_gateway`、`skynet.agent.v1` 和 `/agent` 继续用于智能体业务配置或协议命名。
 登录返回用户身份。Agent 客户端随后请求 `AgentSnapshotReq`，实例在首个请求时建立该用户的应用上下文。
 每个实例在节点启动时读取一次提示词模板。收到没有 `session_id` 的
-首条 `AgentChatReq` 后，才创建 AgentSession、工作目录和 Agent，并立即开始该轮生成。
+首条 `AgentChatReq` 后，才创建绑定所选项目的 AgentSession 和 Agent，并立即开始该轮生成。
 模板在创建 Agent 时与工具、权限和工作目录配置一起传入。
 基础行为、运行时环境与项目规则分别组装，详见 [Agent 提示词](PROMPTS.md)。
 
@@ -102,7 +102,7 @@ Skynet 每个服务 VM 和 Busted 都先执行统一预加载脚本，将 `luaex
 
 关服与用户取消都会主动关闭模型和权限判断响应流，并终止当前轮涉及的命令，等待生成协程收尾。
 工具调用与结果属于会话历史；副作用发生后失败或取消不会丢弃执行事实，重试从检查点继续。
-会话文件独立保存在服务端配置的工作根目录，重启后 Agent 重新打开原目录。原目录不可用时，用户须重新选择执行目标。
+云端项目位于配置的工作根目录下，按账号隔离。重启后会话按保存的项目重新打开目录，目录丢失时保留历史。
 交互式进程由会话执行器持有，跨轮次保留并受到执行期限限制；关服同时回收所有后台进程。
 底层 HTTP 在连接建立及响应头返回前没有可用流句柄，此阶段先标记取消，取得流后立即释放；
 模型请求超时仍生效，关服等待不另设截止时间。请求上下文通过稳定 Client 类传给 HTTP 兼容层，
@@ -260,7 +260,7 @@ WebSocket 负责消息边界、长度和分片重组，业务层不再增加长�
 | 请求                                                   | 成功内容                           |
 | ------------------------------------------------------ | ---------------------------------- |
 | `LoginReq(username)`                                   | `identity` 中的用户名和用户 ID |
-| `AgentSnapshotReq`                                     | 用户设置、设备和会话摘要 |
+| `AgentSnapshotReq`                                     | 用户设置、设备、云端项目和会话摘要 |
 | `AgentSessionHistoryReq(session_id, before?)` | 按时间从早到晚排列的一页消息 |
 | `AgentChatReq(session_id?, text, retry_run_id?, model_id?)` | 接受确认和 `ChatSession`           |
 | `AgentMessageCancelReq(session_id, run_id)`                 | 取消已确认，任务退出后再推送终态   |
@@ -338,10 +338,9 @@ macOS 客户端通过 Swift 绑定同一 C ABI，在原生宿主授权的本机�
 `agent_worker` 在沙盒子进程执行补丁，私有临时输入随任务回收；
 `process_launcher` 监督进程组，在控制连接关闭时终止子进程。C 变更需重新构建和重启。
 
-会话 `execution_target` 为空时使用云端工作区，否则路由到指定桌面和工作区绑定。
-桌面通过 `AgentDesktopRegisterReq` 登记在线状态、远程开关和本次授权标识；只有目标桌面连接可以设置目录。
-`AgentSessionExecutionSetReq` 切换目标，保留历史并追加环境变更，不复制文件；执行中和后台进程未退出时拒绝切换。
-首发草稿可通过 `AgentChatReq.execution_target` 提交目标。项目规则由实际执行端读取。
+首条 `AgentChatReq` 通过 `cloud_project` 指定已创建的云端项目，或通过 `execution_target` 指定授权桌面目录。服务端校验身份并锁定会话项目，续聊和重试只需会话 ID。
+`AgentCloudProjectCreateReq` 按账号创建命名项目，重复请求复用目录。项目名通过响应和 `AgentCloudProjectCreatedNtf` 返回，重连通过快照同步。项目文件可跨会话使用，历史、任务和进程按会话隔离。
+桌面通过 `AgentDesktopRegisterReq` 登记在线状态、远程开关和本次授权标识。项目规则由实际执行端读取。
 
 云端在准备动作后执行规则及独立模型判断，再通过 `AgentExecutionActionNtf` 定向下发工具操作，
 桌面用 `AgentExecutionResultReq` 回传结构化结果。工作区从本机绑定查找，不接受远程传入任意路径；

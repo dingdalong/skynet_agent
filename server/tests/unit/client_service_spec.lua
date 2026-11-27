@@ -54,7 +54,10 @@ describe("用户与客户端服务", function()
             ["agent.chat"] = false,
             ["agent.handler"] = false,
             ["agent.workspace"] = {
-                create = function(_, username, id)
+                valid_name = function(name) return name == "项目" end,
+                list = function() return { "项目" } end,
+                existing = function(_, username, id)
+                    assert(id == "项目")
                     workspaces[#workspaces + 1] = { username = username, id = id }
                     return "/test"
                 end
@@ -194,6 +197,7 @@ describe("用户与客户端服务", function()
     local function send(session_id, text, connection, extra)
         local args = extra or {}
         args.session_id, args.text = session_id, text
+        if not session_id or session_id == "" then args.cloud_project = args.cloud_project or "项目" end
         return request(2, "AgentChatReq", args, connection)
     end
 
@@ -314,7 +318,7 @@ describe("用户与客户端服务", function()
         assert.are.equal("alice", events[1].args[1])
     end)
 
-    it("首次快照只创建用户上下文，首条有效消息才创建会话及工作区", function()
+    it("首次快照列出项目，首条有效消息才创建会话并绑定项目", function()
         local snapshot = open("a", 100, "alice")
         assert.same({}, snapshot.chat_sessions)
         assert.are.equal("test", snapshot.default_model_id)
@@ -329,7 +333,7 @@ describe("用户与客户端服务", function()
         assert.are.equal(require("agent.app"), getmetatable(apps.alice))
         assert.are.equal(require("agent.chat"), getmetatable(apps.alice.chat))
         assert.are.equal(require("agent.session"), getmetatable(session))
-        assert.are.equal(1, #workspaces)
+        assert.are.equal("项目", session:snapshot().cloud_project)
         assert.are.equal(1, #tasks)
         assert.are.equal("pro", session.model_id)
         assert.are.equal(session, session.agent.options.owner)
@@ -342,15 +346,14 @@ describe("用户与客户端服务", function()
         assert.are.equal(2, #events[1].args[4].chat_session.session.messages)
     end)
 
-    it("同一服务的会话共享工具注册表，后台进程阻止切换工作目录", function()
+    it("同一服务的会话共享工具注册表，已绑定的项目不能更换", function()
         open("a", 100, "alice")
         local session = apps.alice.chat.sessions[first("启动任务").id]
         open("b", 200, "bob")
         assert.are.equal(session.agent.options.tool_registry, apps.bob.tool_registry)
         assert.is_table(apps.bob.tool_registry)
-        session.run = nil
-        session.agent.tools = { has_active = function() return true end }
-        assert.has_error(function() session:set_execution(nil, {}) end, "请先停止后台进程")
+        local refused = send(session.id, "切换", nil, { cloud_project = "另一个" })
+        assert.are.equal(error_code.invalid_param, refused.ret)
     end)
 
     it("服务变更整表替换，拒绝过期快照和未授权更新", function()
@@ -440,7 +443,7 @@ describe("用户与客户端服务", function()
 
     it("首发拒绝无效文本、模型与重试组合，不生成会话工作区或任务", function()
         open("a", 100, "alice")
-        for _, args in ipairs({ {}, { text = "" }, { text = string.rep("x", 101) }, { text = "\255" },
+        for _, args in ipairs({ {}, { text = "缺少项目" }, { text = "无效项目", cloud_project = "不存在" }, { text = "" }, { text = string.rep("x", 101) }, { text = "\255" },
             { text = "问题", model_id = "unknown" }, { text = "问题", retry_run_id = "old" } }) do
             local response = request(2, "AgentChatReq", args)
             assert.are.equal(error_code.invalid_param, response.ret)

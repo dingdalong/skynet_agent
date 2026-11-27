@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Button,
     ClickableCard,
@@ -21,57 +21,55 @@ import {
     VStack,
 } from "@astryxdesign/core";
 import {
-    ChatBubbleLeftRightIcon,
+    CloudIcon,
     ComputerDesktopIcon,
     FolderIcon,
     PencilSquareIcon,
-    ServerStackIcon,
+    PlusIcon,
     SignalIcon,
     SparklesIcon,
 } from "@heroicons/react/24/outline";
-import {
-    ChatBubbleLeftRightIcon as ChatBubbleLeftRightSolidIcon,
-    ComputerDesktopIcon as ComputerDesktopSolidIcon,
-    FolderIcon as FolderSolidIcon,
-    ServerStackIcon as ServerStackSolidIcon,
-} from "@heroicons/react/24/solid";
-import type {
-    AgentState,
-    ChatSession,
-    ExecutionTarget,
-} from "@skynet/agent-client/types";
+import { draftProject } from "@skynet/agent-client/selectors";
+import type { AgentState, ChatSession } from "@skynet/agent-client/types";
 import {
     connectionStatusMeta,
-    filterSessions,
-    groupSessionsByDate,
-    sessionExecutionKind,
+    groupSessionsByProject,
+    projectGroupKey,
+    projectGroupStatusKind,
     sessionStatusKind,
-    type SessionExecutionKind,
+    type ProjectGroupKind,
 } from "./format";
 
-const SESSION_ICONS: Record<
-    SessionExecutionKind,
-    { outline: typeof FolderIcon; solid: typeof FolderSolidIcon }
-> = {
-    local: { outline: FolderIcon, solid: FolderSolidIcon },
-    remote: { outline: ComputerDesktopIcon, solid: ComputerDesktopSolidIcon },
-    server: { outline: ServerStackIcon, solid: ServerStackSolidIcon },
-    default: {
-        outline: ChatBubbleLeftRightIcon,
-        solid: ChatBubbleLeftRightSolidIcon,
-    },
-};
+const VISIBLE_SESSIONS_LIMIT = 5;
+
+export interface ProjectTarget {
+    location: "local" | "cloud";
+    id: string;
+}
 
 interface SidebarSharedProps {
     state: AgentState;
     sessions: ChatSession[];
     onSelectSession: (sessionId: string) => void;
     onCreateSession: () => void;
+    onCreateSessionInProject: (project: ProjectTarget) => void;
     onOpenConnection: () => void;
 }
 
-function sessionEndIndicator(chat: ChatSession) {
-    const status = sessionStatusKind(chat);
+function projectGroupIcon(kind: ProjectGroupKind) {
+    switch (kind) {
+        case "cloud":
+            return CloudIcon;
+        case "remote":
+            return ComputerDesktopIcon;
+        case "local":
+        default:
+            return FolderIcon;
+    }
+}
+
+function sessionEndIndicator(chat: ChatSession, local: AgentState["local"]) {
+    const status = sessionStatusKind(chat, local);
     if (status === "running") {
         return <StatusDot variant="accent" isPulsing label="任务运行中" />;
     }
@@ -82,90 +80,308 @@ function sessionEndIndicator(chat: ChatSession) {
         return (
             <StatusDot
                 variant="warning"
-                label={chat.read_only ? "只读会话" : "需选择工作目录"}
+                label={chat.read_only ? "只读会话" : "原目录不可用"}
             />
         );
     }
     return undefined;
 }
 
+function projectGroupEndIndicator(
+    sessions: ChatSession[],
+    local: AgentState["local"],
+) {
+    const status = projectGroupStatusKind(sessions, local);
+    if (status === "running") {
+        return (
+            <StatusDot variant="accent" isPulsing label="包含运行中的任务" />
+        );
+    }
+    if (status === "error") {
+        return <StatusDot variant="error" label="包含失败的任务" />;
+    }
+    if (status === "warning") {
+        return <StatusDot variant="warning" label="包含需处理的会话" />;
+    }
+    return undefined;
+}
+
 function SessionGroups({
     sessions,
-    localWorkspaces,
+    state,
     selectedId,
     query,
     onClearQuery,
     onSelectSession,
+    onCreateSessionInProject,
     isCollapsed,
 }: {
     sessions: ChatSession[];
-    localWorkspaces: ExecutionTarget[];
+    state: AgentState;
     selectedId: string;
     query: string;
     onClearQuery: () => void;
     onSelectSession: (sessionId: string) => void;
+    onCreateSessionInProject: (project: ProjectTarget) => void;
     isCollapsed: boolean;
 }) {
-    const filtered = useMemo(
-        () => filterSessions(sessions, query),
-        [sessions, query],
+    const groups = useMemo(
+        () =>
+            groupSessionsByProject(
+                sessions,
+                state.cloudProjects,
+                state.local?.workspaces ?? [],
+                query,
+                state.local?.deviceId,
+                state.desktops,
+            ),
+        [sessions, state.cloudProjects, state.local, state.desktops, query],
     );
-    const groups = useMemo(() => groupSessionsByDate(filtered), [filtered]);
-
-    if (!sessions.length) {
-        if (isCollapsed) return null;
-        return (
-            <EmptyState
-                isCompact
-                title="暂无会话"
-                description="在右侧输入任务即可开始。"
-            />
+    const searching = query.trim().length > 0;
+    const activeGroupKey = groups.find((group) =>
+        group.sessions.some((chat) => chat.session.id === selectedId),
+    )?.key;
+    const draft = draftProject(state);
+    const activeDraftKey = useMemo(() => {
+        if (!draft.id) return null;
+        if (draft.location === "cloud") return projectGroupKey(null, draft.id);
+        const workspace = state.local?.workspaces.find(
+            (item) => item.workspace_id === draft.id,
         );
-    }
+        return workspace ? projectGroupKey(workspace) : null;
+    }, [draft.location, draft.id, state.local]);
+    const firstNonEmptyKey = groups.find(
+        (group) => group.sessions.length > 0,
+    )?.key;
+    const draftGroupHasSessions = Boolean(
+        activeDraftKey &&
+        groups.some(
+            (group) =>
+                group.key === activeDraftKey && group.sessions.length > 0,
+        ),
+    );
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const [searchCollapsed, setSearchCollapsed] = useState<
+        Record<string, boolean>
+    >({});
+    const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>(
+        {},
+    );
+    useEffect(() => {
+        setSearchCollapsed({});
+    }, [query]);
+    useEffect(() => {
+        if (!activeGroupKey) return;
+        setExpanded((previous) =>
+            previous[activeGroupKey]
+                ? previous
+                : { ...previous, [activeGroupKey]: true },
+        );
+        const activeGroup = groups.find(
+            (group) => group.key === activeGroupKey,
+        );
+        const selectedIndex = activeGroup
+            ? activeGroup.sessions.findIndex(
+                  (chat) => chat.session.id === selectedId,
+              )
+            : -1;
+        if (selectedIndex >= VISIBLE_SESSIONS_LIMIT) {
+            setExpandedLists((previous) =>
+                previous[activeGroupKey]
+                    ? previous
+                    : { ...previous, [activeGroupKey]: true },
+            );
+        }
+    }, [activeGroupKey, groups, selectedId]);
+    useEffect(() => {
+        if (searching || selectedId) return;
+        if (draftGroupHasSessions && activeDraftKey) {
+            setExpanded((previous) =>
+                previous[activeDraftKey] === undefined
+                    ? { ...previous, [activeDraftKey]: true }
+                    : previous,
+            );
+            return;
+        }
+        if (firstNonEmptyKey) {
+            setExpanded((previous) =>
+                Object.keys(previous).length === 0
+                    ? { [firstNonEmptyKey]: true }
+                    : previous,
+            );
+        }
+    }, [
+        searching,
+        selectedId,
+        draftGroupHasSessions,
+        activeDraftKey,
+        firstNonEmptyKey,
+    ]);
 
     if (!groups.length) {
         if (isCollapsed) return null;
         return (
             <EmptyState
                 isCompact
-                title="未找到匹配会话"
-                description="尝试更换关键词或新建会话。"
+                title={searching ? "未找到匹配项目或会话" : "暂无项目"}
+                description={
+                    searching
+                        ? "试试其他项目名或会话标题。"
+                        : "在输入栏上方选择或创建项目。"
+                }
                 actions={
-                    <Button
-                        label="清除搜索"
-                        size="sm"
-                        variant="ghost"
-                        onClick={onClearQuery}
-                    />
+                    searching ? (
+                        <Button
+                            label="清除搜索"
+                            size="sm"
+                            variant="ghost"
+                            onClick={onClearQuery}
+                        />
+                    ) : undefined
                 }
             />
         );
     }
 
     return (
-        <>
-            {groups.map((group) => (
-                <SideNavSection key={group.key} title={group.title}>
-                    {group.sessions.map((chat) => {
-                        const icons =
-                            SESSION_ICONS[
-                                sessionExecutionKind(chat, localWorkspaces)
-                            ];
-                        return (
-                            <SideNavItem
-                                key={chat.session.id}
-                                label={chat.session.title || "新会话"}
-                                icon={icons.outline}
-                                selectedIcon={icons.solid}
-                                isSelected={chat.session.id === selectedId}
-                                endContent={sessionEndIndicator(chat)}
-                                onClick={() => onSelectSession(chat.session.id)}
-                            />
-                        );
-                    })}
-                </SideNavSection>
-            ))}
-        </>
+        <SideNavSection title="项目">
+            {groups.map((group) => {
+                const hasSessions = group.sessions.length > 0;
+                const isGroupExpanded = searching
+                    ? !searchCollapsed[group.key]
+                    : !!expanded[group.key];
+                const showAll =
+                    searching || isCollapsed || !!expandedLists[group.key];
+                const visibleSessions = showAll
+                    ? group.sessions
+                    : group.sessions.slice(0, VISIBLE_SESSIONS_LIMIT);
+                const hiddenCount =
+                    group.sessions.length - visibleSessions.length;
+                const canToggleLimit =
+                    !searching &&
+                    !isCollapsed &&
+                    group.sessions.length > VISIBLE_SESSIONS_LIMIT;
+                const isDraftSelected =
+                    !selectedId && group.key === activeDraftKey;
+                const isCollapsedActive =
+                    group.key === activeGroupKey &&
+                    (!isGroupExpanded || isCollapsed);
+                const groupProject = group.project;
+                return (
+                    <SideNavItem
+                        key={group.key}
+                        label={group.name}
+                        isSelected={isDraftSelected || isCollapsedActive}
+                        isDisabled={!hasSessions && !groupProject}
+                        icon={projectGroupIcon(group.kind)}
+                        endContent={
+                            hasSessions && !isGroupExpanded
+                                ? projectGroupEndIndicator(
+                                      group.sessions,
+                                      state.local,
+                                  )
+                                : undefined
+                        }
+                        actions={
+                            hasSessions && groupProject && !isCollapsed ? (
+                                <IconButton
+                                    className="agent-project-action"
+                                    label={`在 ${group.name} 中新建会话`}
+                                    tooltip="在此项目新建会话"
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={<Icon icon={PlusIcon} size="sm" />}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onCreateSessionInProject(groupProject);
+                                    }}
+                                />
+                            ) : undefined
+                        }
+                        onClick={
+                            !hasSessions && groupProject
+                                ? () => onCreateSessionInProject(groupProject)
+                                : undefined
+                        }
+                        collapsible={
+                            hasSessions
+                                ? {
+                                      isCollapsed: !isGroupExpanded,
+                                      onCollapsedChange: (collapsed) => {
+                                          if (searching) {
+                                              setSearchCollapsed(
+                                                  (previous) => ({
+                                                      ...previous,
+                                                      [group.key]: collapsed,
+                                                  }),
+                                              );
+                                          } else {
+                                              setExpanded((previous) => ({
+                                                  ...previous,
+                                                  [group.key]: !collapsed,
+                                              }));
+                                          }
+                                      },
+                                  }
+                                : false
+                        }
+                    >
+                        {hasSessions
+                            ? [
+                                  ...visibleSessions.map((chat) => (
+                                      <SideNavItem
+                                          key={chat.session.id}
+                                          label={chat.session.title || "新会话"}
+                                          isSelected={
+                                              chat.session.id === selectedId
+                                          }
+                                          endContent={sessionEndIndicator(
+                                              chat,
+                                              state.local,
+                                          )}
+                                          onClick={() =>
+                                              onSelectSession(chat.session.id)
+                                          }
+                                      />
+                                  )),
+                                  ...(canToggleLimit
+                                      ? [
+                                            <SideNavItem
+                                                key={`${group.key}:toggle`}
+                                                label={
+                                                    hiddenCount > 0
+                                                        ? "展开显示"
+                                                        : "收起"
+                                                }
+                                                endContent={
+                                                    hiddenCount > 0 ? (
+                                                        <Text
+                                                            type="supporting"
+                                                            color="secondary"
+                                                        >
+                                                            +{hiddenCount}
+                                                        </Text>
+                                                    ) : undefined
+                                                }
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setExpandedLists(
+                                                        (previous) => ({
+                                                            ...previous,
+                                                            [group.key]:
+                                                                hiddenCount > 0,
+                                                        }),
+                                                    );
+                                                }}
+                                            />,
+                                        ]
+                                      : []),
+                              ]
+                            : undefined}
+                    </SideNavItem>
+                );
+            })}
+        </SideNavSection>
     );
 }
 
@@ -215,6 +431,7 @@ export function SessionSideNav({
     onCollapsedChange,
     onSelectSession,
     onCreateSession,
+    onCreateSessionInProject,
     onOpenConnection,
 }: SidebarSharedProps & {
     isCollapsed: boolean;
@@ -225,7 +442,6 @@ export function SessionSideNav({
         state.connection.status,
         state.syncing,
     );
-    const localWorkspaces = state.local?.workspaces ?? [];
 
     return (
         <SideNav
@@ -261,13 +477,15 @@ export function SessionSideNav({
                             icon={<Icon icon={PencilSquareIcon} size="sm" />}
                             onClick={onCreateSession}
                         />
-                        {sessions.length >= 5 && (
+                        {(sessions.length > 0 ||
+                            state.cloudProjects.length > 0 ||
+                            !!state.local?.workspaces.length) && (
                             <TextInput
                                 type="search"
-                                label="搜索会话"
+                                label="搜索项目或会话"
                                 isLabelHidden
                                 size="sm"
-                                placeholder="搜索会话…"
+                                placeholder="搜索项目或会话…"
                                 startIcon="search"
                                 hasClear
                                 width="100%"
@@ -313,11 +531,12 @@ export function SessionSideNav({
         >
             <SessionGroups
                 sessions={sessions}
-                localWorkspaces={localWorkspaces}
+                state={state}
                 selectedId={state.selectedId}
                 query={searchQuery}
                 onClearQuery={() => setSearchQuery("")}
                 onSelectSession={onSelectSession}
+                onCreateSessionInProject={onCreateSessionInProject}
                 isCollapsed={isCollapsed}
             />
         </SideNav>
@@ -331,13 +550,13 @@ export function SessionDrawer({
     onOpenChange,
     onSelectSession,
     onCreateSession,
+    onCreateSessionInProject,
     onOpenConnection,
 }: SidebarSharedProps & {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
     const [searchQuery, setSearchQuery] = useState("");
-    const localWorkspaces = state.local?.workspaces ?? [];
 
     return (
         <Drawer
@@ -379,13 +598,15 @@ export function SessionDrawer({
                                         onOpenChange(false);
                                     }}
                                 />
-                                {sessions.length >= 5 && (
+                                {(sessions.length > 0 ||
+                                    state.cloudProjects.length > 0 ||
+                                    !!state.local?.workspaces.length) && (
                                     <TextInput
                                         type="search"
-                                        label="搜索会话"
+                                        label="搜索项目或会话"
                                         isLabelHidden
                                         size="sm"
-                                        placeholder="搜索会话…"
+                                        placeholder="搜索项目或会话…"
                                         startIcon="search"
                                         hasClear
                                         width="100%"
@@ -394,18 +615,24 @@ export function SessionDrawer({
                                     />
                                 )}
                             </VStack>
-                            <SessionGroups
-                                sessions={sessions}
-                                localWorkspaces={localWorkspaces}
-                                selectedId={state.selectedId}
-                                query={searchQuery}
-                                onClearQuery={() => setSearchQuery("")}
-                                onSelectSession={(sessionId) => {
-                                    onSelectSession(sessionId);
-                                    onOpenChange(false);
-                                }}
-                                isCollapsed={false}
-                            />
+                            <VStack as="nav" aria-label="会话列表" gap={2}>
+                                <SessionGroups
+                                    sessions={sessions}
+                                    state={state}
+                                    selectedId={state.selectedId}
+                                    query={searchQuery}
+                                    onClearQuery={() => setSearchQuery("")}
+                                    onSelectSession={(sessionId) => {
+                                        onSelectSession(sessionId);
+                                        onOpenChange(false);
+                                    }}
+                                    onCreateSessionInProject={(project) => {
+                                        onCreateSessionInProject(project);
+                                        onOpenChange(false);
+                                    }}
+                                    isCollapsed={false}
+                                />
+                            </VStack>
                         </VStack>
                     </LayoutContent>
                 }

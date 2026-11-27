@@ -8,17 +8,16 @@ import type {
 import {
     connectionStatusMeta,
     directoryBasename,
-    filterSessions,
     formatWorkspaceLabel,
-    groupSessionsByDate,
+    groupSessionsByProject,
     messageDateLabel,
     parsePatchSummary,
     presentToolCall,
-    sessionDateGroup,
-    sessionExecutionKind,
+    projectGroupStatusKind,
     sessionStatusKind,
     shouldShowDateDivider,
     sortSessions,
+    validateCloudProjectName,
 } from "../builtins/agent/src/format";
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
@@ -104,117 +103,148 @@ describe("agent UI presentation helpers", () => {
         expect(connectionStatusMeta("offline").dotVariant).toBe("neutral");
     });
 
-    it("groups sessions by local calendar day and omits empty buckets", () => {
-        const today = makeSession("today", {
-            session: { updated_at: new Date(2026, 10, 26, 0, 5, 0).getTime() },
+    it("groups by project identity, sorts activity, and searches child sessions", () => {
+        const dir = {
+            device_id: "mac",
+            workspace_id: "one",
+            directory: "/work/demo",
+            platform: "macos",
+        };
+        const a = makeSession("a", {
+            cloud_project: "demo",
+            session: { updated_at: 4 },
         });
-        const yesterday = makeSession("yesterday", {
-            session: {
-                updated_at: new Date(2026, 10, 25, 23, 55, 0).getTime(),
-            },
+        const b = makeSession("b", {
+            cloud_project: "demo",
+            session: { updated_at: 2 },
         });
-        const recent = makeSession("recent", {
-            session: { updated_at: new Date(2026, 10, 20, 12, 0, 0).getTime() },
+        const c = makeSession("c", {
+            execution_target: dir,
+            session: { updated_at: 3 },
         });
-        const older = makeSession("older", {
-            session: { updated_at: new Date(2026, 10, 19, 12, 0, 0).getTime() },
-        });
-        const invalid = makeSession("invalid", {
-            session: { updated_at: 0 },
-        });
-
-        expect(sessionDateGroup(NaN, now)).toBe("older");
-        expect(sessionDateGroup(now + 60_000, now)).toBe("today");
-
-        const groups = groupSessionsByDate(
-            [today, yesterday, recent, older, invalid],
-            now,
-        );
-        expect(groups.map((group) => [group.key, group.title])).toEqual([
-            ["today", "今天"],
-            ["yesterday", "昨天"],
-            ["recent", "近 7 天"],
-            ["older", "更早"],
-        ]);
-        expect(groups[3].sessions.map((item) => item.session.id)).toEqual([
-            "older",
-            "invalid",
-        ]);
-
-        expect(groupSessionsByDate([today], now)).toHaveLength(1);
+        const groups = (query: string) =>
+            groupSessionsByProject([b, c, a], ["demo", "空项目"], [dir], query);
+        expect(
+            groups("").map((g) => g.sessions.map((s) => s.session.id)),
+        ).toEqual([["a", "b"], ["c"], []]);
+        expect(groups("demo")).toHaveLength(2);
+        expect(groups("会话 b")[0].sessions).toEqual([b]);
+        expect(groups("缺失")).toEqual([]);
+        expect(sortSessions([b, c, a])).toEqual([a, c, b]);
     });
-
-    it("sorts and filters sessions by title, untitled fallback, and directory", () => {
-        const alpha = makeSession("a", {
-            session: { title: "Alpha Bug", updated_at: 2_000_000_000_000 },
-            execution_target: {
-                device_id: "mac",
-                workspace_id: "w1",
-                directory: "/Users/dev/skynet_agent",
-                platform: "macos",
-            },
+    it("distinguishes local, remote, and cloud groups without leaking raw device ids", () => {
+        const localTarget: ExecutionTarget = {
+            device_id: "mac-local",
+            workspace_id: "ws-local",
+            directory: "/work/skynet_agent",
+            platform: "macos",
+        };
+        const remoteTarget: ExecutionTarget = {
+            device_id: "mac-studio-raw-id",
+            workspace_id: "ws-remote",
+            directory: "/work/skynet_agent",
+            platform: "macos",
+        };
+        const localChat = makeSession("s-local", {
+            execution_target: localTarget,
+            session: { updated_at: 4 },
         });
-        const beta = makeSession("b", {
-            session: { title: "", updated_at: 2_000_000_000_000 },
+        const remoteChat = makeSession("s-remote", {
+            execution_target: remoteTarget,
+            session: { updated_at: 3 },
         });
-        const older = makeSession("c", {
-            session: { title: "Older", updated_at: 1_900_000_000_000 },
-        });
-
-        expect(
-            sortSessions([older, alpha, beta]).map((item) => item.session.id),
-        ).toEqual(["b", "a", "c"]);
-        expect(filterSessions([alpha, beta], "   ")).toHaveLength(2);
-        expect(filterSessions([alpha, beta], "SKYNET_AGENT")).toEqual([alpha]);
-        expect(filterSessions([alpha, beta], "新会话")).toEqual([beta]);
-        expect(filterSessions([alpha, beta], "不存在")).toEqual([]);
-    });
-
-    it("classifies session execution kind and status dot priority", () => {
-        const localWorkspaces: ExecutionTarget[] = [
-            {
-                device_id: "mac-1",
-                workspace_id: "ws-1",
-                directory: "/Users/dev/app",
-                platform: "macos",
-            },
-        ];
-        expect(sessionExecutionKind(makeSession("d"), localWorkspaces)).toBe(
-            "default",
+        const groups = groupSessionsByProject(
+            [localChat, remoteChat],
+            ["云端演示"],
+            [],
+            "",
+            "mac-local",
+            [
+                {
+                    id: "mac-studio-raw-id",
+                    name: "Studio Mac",
+                    online: true,
+                    remote_enabled: true,
+                },
+            ],
         );
-        expect(
-            sessionExecutionKind(
-                makeSession("s", {
-                    execution_target: {
-                        device_id: "",
-                        workspace_id: "",
-                        directory: "/workspace",
-                        platform: "linux",
-                    },
-                }),
-                localWorkspaces,
-            ),
-        ).toBe("server");
-        expect(
-            sessionExecutionKind(
-                makeSession("l", { execution_target: localWorkspaces[0] }),
-                localWorkspaces,
-            ),
-        ).toBe("local");
-        expect(
-            sessionExecutionKind(
-                makeSession("r", {
-                    execution_target: {
-                        device_id: "mac-2",
-                        workspace_id: "ws-9",
-                        directory: "/Users/other/repo",
-                        platform: "macos",
-                    },
-                }),
-                localWorkspaces,
-            ),
-        ).toBe("remote");
-
+        const localGroup = groups.find((item) => item.kind === "local");
+        const remoteGroup = groups.find((item) => item.kind === "remote");
+        const cloudGroup = groups.find((item) => item.kind === "cloud");
+        expect(localGroup).toMatchObject({
+            name: "skynet_agent · 此计算机",
+            detail: "/work/skynet_agent",
+            selectable: false,
+        });
+        expect(remoteGroup).toMatchObject({
+            name: "skynet_agent · Studio Mac",
+            detail: "Studio Mac · /work/skynet_agent",
+            selectable: false,
+        });
+        expect(remoteGroup?.name).not.toContain("mac-studio-raw-id");
+        expect(cloudGroup).toMatchObject({
+            selectable: true,
+            project: { location: "cloud", id: "云端演示" },
+        });
+    });
+    it("disambiguates duplicate directory basenames using shortest unique parent path", () => {
+        const wsA: ExecutionTarget = {
+            device_id: "mac-local",
+            workspace_id: "ws-a",
+            directory: "/private/tmp/alpha-run/workspace",
+            platform: "macos",
+        };
+        const wsB: ExecutionTarget = {
+            device_id: "mac-local",
+            workspace_id: "ws-b",
+            directory: "/private/tmp/beta-run/workspace",
+            platform: "macos",
+        };
+        const wsC: ExecutionTarget = {
+            device_id: "mac-local",
+            workspace_id: "ws-c",
+            directory: "/Users/alice/team/app",
+            platform: "macos",
+        };
+        const wsD: ExecutionTarget = {
+            device_id: "mac-local",
+            workspace_id: "ws-d",
+            directory: "/Users/bob/team/app",
+            platform: "macos",
+        };
+        const groups = groupSessionsByProject(
+            [],
+            ["app"],
+            [wsA, wsB, wsC, wsD],
+            "",
+            "mac-local",
+        );
+        const names = groups.map((group) => group.name);
+        expect(names).toContain("workspace · alpha-run");
+        expect(names).toContain("workspace · beta-run");
+        expect(names).toContain("app · alice/team");
+        expect(names).toContain("app · bob/team");
+        expect(names).toContain("app · 云端");
+    });
+    it("validates and trims cloud project names and blocks duplicates", () => {
+        expect(validateCloudProjectName("  项目 A  ", ["演示"])).toEqual({
+            value: "项目 A",
+            error: "",
+        });
+        expect(validateCloudProjectName("   ", ["演示"]).error).toContain(
+            "有效",
+        );
+        expect(validateCloudProjectName("..", ["演示"]).error).toContain(
+            "有效",
+        );
+        expect(validateCloudProjectName("a/b", ["演示"]).error).toContain(
+            "有效",
+        );
+        expect(validateCloudProjectName(" 演示 ", ["演示"]).error).toContain(
+            "已存在",
+        );
+    });
+    it("classifies session status dot priority", () => {
         expect(
             sessionStatusKind(
                 makeSession("run", {
@@ -253,6 +283,46 @@ describe("agent UI presentation helpers", () => {
         expect(
             sessionStatusKind(makeSession("nw", { needs_workspace: true })),
         ).toBe("warning");
+        const localTarget: ExecutionTarget = {
+            device_id: "mac-1",
+            workspace_id: "ws-1",
+            directory: "/work/demo",
+            platform: "macos",
+        };
+        const localContext = {
+            deviceId: "mac-1",
+            name: "Mac",
+            authorizationId: "auth-1",
+            remoteEnabled: false,
+            workspaces: [],
+        };
+        const revokedLocal = makeSession("revoked", {
+            execution_target: localTarget,
+        });
+        expect(sessionStatusKind(revokedLocal, localContext)).toBe("warning");
+        expect(
+            projectGroupStatusKind(
+                [
+                    revokedLocal,
+                    makeSession("err", {
+                        session: {
+                            messages: [makeMessage({ role: 2, status: 4 })],
+                        },
+                    }),
+                ],
+                localContext,
+            ),
+        ).toBe("error");
+        expect(
+            projectGroupStatusKind([
+                makeSession("err", {
+                    session: {
+                        messages: [makeMessage({ role: 2, status: 4 })],
+                    },
+                }),
+                makeSession("run", { session: { run_id: "run-1" } }),
+            ]),
+        ).toBe("running");
     });
 
     it("computes message date dividers and formatted labels across days and years", () => {
@@ -298,20 +368,26 @@ describe("agent UI presentation helpers", () => {
                 platform: "macos",
             },
         ];
-        expect(formatWorkspaceLabel(null, local, true)).toBe("原目录不可用");
-        expect(formatWorkspaceLabel(null, local)).toBe("服务器工作目录");
-        expect(formatWorkspaceLabel(local[0], local)).toBe("skynet_agent");
         expect(
-            formatWorkspaceLabel(
+            formatWorkspaceLabel(makeSession("1", { cloud_project: "演示" })),
+        ).toBe("云端 · 演示");
+        const chat = makeSession("1", { execution_target: local[0] });
+        expect(formatWorkspaceLabel(chat, "mac")).toBe(
+            "此计算机 · skynet_agent",
+        );
+        expect(formatWorkspaceLabel(chat, "other")).toBe(
+            "远程桌面 · skynet_agent",
+        );
+        expect(
+            formatWorkspaceLabel(chat, "other", [
                 {
-                    device_id: "remote-mac",
-                    workspace_id: "ws-2",
-                    directory: "/work/demo",
-                    platform: "macos",
+                    id: "mac",
+                    name: "开发机",
+                    online: true,
+                    remote_enabled: true,
                 },
-                local,
-            ),
-        ).toBe("远程桌面 · demo");
+            ]),
+        ).toBe("开发机 · skynet_agent");
     });
 
     it("parses apply_patch file headers and line addition/deletion counts", () => {

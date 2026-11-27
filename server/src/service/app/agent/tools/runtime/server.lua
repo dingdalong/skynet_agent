@@ -219,13 +219,6 @@ function Server:terminate(id)
     end
 end
 
-function Server:has_active()
-    for _, process in pairs(self.processes) do
-        if not process.done then return true end
-    end
-    return false
-end
-
 function Server:close()
     self.closed = true
     for id in pairs(self.processes) do self:terminate(id) end

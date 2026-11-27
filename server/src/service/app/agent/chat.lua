@@ -47,6 +47,9 @@ function Chat:chat(args, connection)
     if args.session_id and args.session_id ~= "" then
         local session = self.sessions[args.session_id]
         if not session then return failure(error_code.fail, "会话不存在或已经失效") end
+        if args.execution_target or (args.cloud_project or "") ~= "" then
+            return failure(error_code.invalid_param, "已有会话的项目已固定")
+        end
         return session:send_message(args, connection)
     end
     if args.retry_run_id and args.retry_run_id ~= "" then
@@ -66,7 +69,19 @@ function Chat:chat(args, connection)
     local valid, target = pcall(self.app.desktop_connections.validate_target, self.app.desktop_connections,
         args.execution_target, connection)
     if not valid then return failure(error_code.invalid_param, tostring(target)) end
-    local ok, session = pcall(AgentSession.new, AgentSession, self, model_id, target)
+    local project = args.cloud_project ~= "" and args.cloud_project or nil
+    if (project ~= nil) == (target ~= nil) or args.execution_target and not target then
+        return failure(error_code.invalid_param, "请选择一个工作项目")
+    end
+    local workspace
+    if project then
+        local found
+        found, workspace = pcall(require("agent.workspace").existing, config.tools.workspace_root,
+            self.app.identity.user_id,
+            project)
+        if not found then return failure(error_code.invalid_param, "云端项目不可用，请重新选择") end
+    end
+    local ok, session = pcall(AgentSession.new, AgentSession, self, model_id, target, nil, project, workspace)
     if not ok then
         log.failure("agent.chat", "chat 创建 Agent 失败", session)
         return failure(error_code.call_fail, "创建 Agent 失败", true)

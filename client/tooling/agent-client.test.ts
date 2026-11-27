@@ -16,6 +16,10 @@ import type {
     AgentState,
     ChatSession,
 } from "../packages/agent-client/src/types";
+import {
+    draftProject,
+    isLocalDirectoryUnavailable,
+} from "../packages/agent-client/src/selectors";
 import type { Json, Transition } from "@skynet/contracts";
 
 const origin = "ws://127.0.0.1:18787";
@@ -59,6 +63,7 @@ function session(revision = 1, status = 1): ChatSession {
         model_id: "model1",
         permission_model_id: "",
         execution_target: null,
+        cloud_project: "演示",
     };
 }
 class Client {
@@ -90,6 +95,7 @@ class Client {
         return {
             username: "alice",
             user_id: "u1",
+            cloud_projects: ["演示"],
             chat_sessions: sessions.map((chat) => ({
                 ...chat,
                 session: { ...chat.session, messages: [] },
@@ -358,16 +364,13 @@ describe("native Agent development", () => {
             { ret: 1 },
             client.pending("AgentDesktopRegisterReq"),
         );
-        client.command("execution.select", { workspaceId: "forged" });
+        client.command("project.select", { location: "local", id: "forged" });
         expect(client.state.error).toContain("尚未授权");
-        client.command("execution.select", { workspaceId: "work-1" });
-        expect(client.state.draftTarget).toBeNull();
-        client.resource(
-            "AgentPreferenceSetRes",
-            { ret: 1, set_target: true, target: nativeContext.workspaces[0] },
-            client.pending("AgentPreferenceSetReq"),
-        );
-        expect(client.state.draftTarget?.workspace_id).toBe("work-1");
+        client.command("project.select", { location: "local", id: "work-1" });
+        expect(draftProject(client.state)).toEqual({
+            location: "local",
+            id: "work-1",
+        });
         const result = client.command("chat.send", {
             target: "",
             text: "local task",
@@ -376,6 +379,152 @@ describe("native Agent development", () => {
             result.effects?.some((effect) => effect.kind === "socket.send"),
         ).toBe(true);
         expect(client.pending("AgentChatReq")).toBeGreaterThan(0);
+    });
+    it("creates a named project, preserves drafts on rejection and locks selection on first send", () => {
+        const client = new Client();
+        client.login();
+        client.command("draft.set", { target: "", text: "first" });
+        client.command("chat.send", { target: "", text: "first" });
+        expect(client.state.error).toContain("选择项目");
+        client.command("project.create", { location: "cloud", id: "项目 A" });
+        client.resource(
+            "AgentCloudProjectCreateRes",
+            { ret: 2 },
+            client.pending("AgentCloudProjectCreateReq"),
+        );
+        expect(client.state.drafts[""]).toBe("first");
+        client.command("project.create", { location: "cloud", id: "项目 A" });
+        client.resource("AgentCloudProjectCreatedNtf", { name: "项目 A" });
+        client.resource(
+            "AgentCloudProjectCreateRes",
+            { ret: 1, name: "项目 A" },
+            client.pending("AgentCloudProjectCreateReq"),
+        );
+        expect(client.state.cloudProjects).toEqual(["演示", "项目 A"]);
+        expect(draftProject(client.state).id).toBe("项目 A");
+        client.command("chat.send", { target: "", text: "first" });
+        client.command("project.select", { location: "cloud", id: "演示" });
+        expect(draftProject(client.state).id).toBe("项目 A");
+        const chat = { ...session(1, 2), cloud_project: "项目 A" };
+        client.resource(
+            "AgentChatRes",
+            { ret: 1, chat_session: chat },
+            client.pending("AgentChatReq"),
+        );
+        client.command("project.select", { location: "cloud", id: "演示" });
+        expect(client.state.error).toContain("固定");
+        client.command("session.new");
+        expect(draftProject(client.state).id).toBe("项目 A");
+    });
+    it("remembers local and cloud project selections independently and supports direct project new-session", () => {
+        const client = new Client();
+        client.login();
+        client.command("$agent.context", nativeContext);
+        client.resource("AgentDesktopUpdatedNtf", {
+            device: { id: "mac-1", name: "Mac", online: true },
+        });
+        client.resource(
+            "AgentDesktopRegisterRes",
+            { ret: 1 },
+            client.pending("AgentDesktopRegisterReq"),
+        );
+        client.command("project.select", { location: "local", id: "work-1" });
+        expect(draftProject(client.state)).toEqual({
+            location: "local",
+            id: "work-1",
+        });
+        client.command("project.select", { location: "cloud" });
+        expect(draftProject(client.state)).toEqual({
+            location: "cloud",
+            id: "",
+        });
+        client.command("project.select", { location: "cloud", id: "演示" });
+        expect(draftProject(client.state)).toEqual({
+            location: "cloud",
+            id: "演示",
+        });
+        client.command("project.select", { location: "local" });
+        expect(draftProject(client.state)).toEqual({
+            location: "local",
+            id: "work-1",
+        });
+        client.command("project.select", { location: "cloud" });
+        expect(draftProject(client.state)).toEqual({
+            location: "cloud",
+            id: "演示",
+        });
+        client.command("session.new", { location: "local", id: "work-1" });
+        expect(client.state.selectedId).toBe("");
+        expect(draftProject(client.state)).toEqual({
+            location: "local",
+            id: "work-1",
+        });
+        client.command("project.select", { location: "cloud" });
+        expect(draftProject(client.state)).toEqual({
+            location: "cloud",
+            id: "演示",
+        });
+        client.command("session.new", { location: "cloud", id: "不存在" });
+        expect(client.state.error).toContain("不可用");
+    });
+    it("trims project creation names, restores missing cloud workspaces, and detects revoked local folders", () => {
+        const client = new Client();
+        client.login();
+        client.command("project.create", {
+            location: "cloud",
+            id: "  项目 B  ",
+        });
+        const createId = client.pending("AgentCloudProjectCreateReq");
+        client.resource("AgentCloudProjectCreatedNtf", { name: "项目 B" });
+        client.resource(
+            "AgentCloudProjectCreateRes",
+            { ret: 1, name: "项目 B" },
+            createId,
+        );
+        expect(client.state.cloudProjects).toContain("项目 B");
+        expect(draftProject(client.state)).toEqual({
+            location: "cloud",
+            id: "项目 B",
+        });
+
+        const missingCloud = {
+            ...session(2, 2),
+            cloud_project: "丢失项目",
+            needs_workspace: true,
+            recovery_notice: "原项目目录不可用，请恢复原目录或新建会话",
+        };
+        client.resource("AgentSessionUpdatedNtf", {
+            chat_session: missingCloud,
+        });
+        client.command("session.select", { id: "s1" });
+        client.command("project.restore");
+        const restoreId = client.pending("AgentCloudProjectCreateReq");
+        client.resource("AgentCloudProjectCreatedNtf", { name: "丢失项目" });
+        client.resource(
+            "AgentCloudProjectCreateRes",
+            { ret: 1, name: "丢失项目" },
+            restoreId,
+        );
+        expect(client.state.sessions.s1.needs_workspace).toBe(false);
+        expect(client.state.sessions.s1.recovery_notice).toBeUndefined();
+        client.command("project.restore");
+        expect(client.state.error).toContain("无需恢复");
+
+        client.command("$agent.context", {
+            ...nativeContext,
+            workspaces: [],
+        });
+        const revokedLocal = {
+            ...session(3, 2),
+            execution_target: nativeContext.workspaces[0],
+        };
+        expect(isLocalDirectoryUnavailable(client.state, revokedLocal)).toBe(
+            true,
+        );
+        client.command("$agent.context", nativeContext);
+        expect(isLocalDirectoryUnavailable(client.state, revokedLocal)).toBe(
+            false,
+        );
     });
     it("binds the Agent transport to the identity confirmed by the host", () => {
         const client = new Client();
@@ -595,6 +744,7 @@ describe("Agent actor", () => {
     it("keeps draft and selection ownership when a new-session response arrives late", () => {
         const client = new Client();
         client.login([session(1, 2)]);
+        client.command("project.select", { location: "cloud", id: "演示" });
         client.command("draft.set", { target: "", text: "新任务" });
         client.command("chat.send", { target: "", text: "新任务" });
         const id = client.pending("AgentChatReq");
@@ -610,6 +760,7 @@ describe("Agent actor", () => {
     it("moves a next-message draft into the server session after first-send acknowledgment", () => {
         const client = new Client();
         client.login();
+        client.command("project.select", { location: "cloud", id: "演示" });
         client.command("chat.send", { target: "", text: "第一条" });
         const id = client.pending("AgentChatReq");
         client.command("draft.set", { target: "", text: "准备的下一条" });
@@ -697,6 +848,7 @@ describe("Agent actor", () => {
     it("bounds timeouts, rejects stale identities and never automatically replays chat", () => {
         const client = new Client();
         client.login();
+        client.command("project.select", { location: "cloud", id: "演示" });
         client.command("chat.send", { target: "", text: "hello" });
         const connection = { ...client.state.connection };
         for (let i = 0; i < 15; i++)

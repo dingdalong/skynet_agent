@@ -126,8 +126,18 @@ function AgentSocket:wait_run(run_id, timeout_ticks)
     end, timeout_ticks).payload.chat_session.session
 end
 
+function AgentSocket:cloud_project()
+    local result = self:request("AgentCloudProjectCreateReq", { name = "验收项目" })
+    support.equal(result.ret, 1, "创建项目失败")
+    return result.name
+end
+
 function AgentSocket:send_message(session_id, text, timeout_ticks)
-    local result = self:request("AgentChatReq", { session_id = session_id, text = text })
+    local result = self:request("AgentChatReq", {
+        session_id = session_id,
+        text = text,
+        cloud_project = not session_id and self:cloud_project() or nil
+    })
     support.equal(result.ret, 1, "发送消息失败")
     return self:wait_run(result.chat_session.session.run_id, timeout_ticks)
 end

@@ -2,34 +2,14 @@ import type {
     AgentState,
     ChatMessage,
     ChatSession,
+    DesktopDevice,
     ExecutionTarget,
+    LocalContext,
     ToolCall,
 } from "@skynet/agent-client/types";
 
 const VALID_TIMESTAMP_FLOOR_MS = 946_684_800_000;
 const DAY_MS = 86_400_000;
-
-export type SessionGroupKey = "today" | "yesterday" | "recent" | "older";
-
-export interface SessionGroup {
-    key: SessionGroupKey;
-    title: string;
-    sessions: ChatSession[];
-}
-
-const GROUP_TITLES: Record<SessionGroupKey, string> = {
-    today: "今天",
-    yesterday: "昨天",
-    recent: "近 7 天",
-    older: "更早",
-};
-
-const GROUP_ORDER: SessionGroupKey[] = [
-    "today",
-    "yesterday",
-    "recent",
-    "older",
-];
 
 export interface StarterPrompt {
     id: string;
@@ -163,25 +143,6 @@ function startOfLocalDay(timestampMs: number): number {
     ).getTime();
 }
 
-export function sessionDateGroup(
-    updatedAtMs: number,
-    nowMs: number = Date.now(),
-): SessionGroupKey {
-    if (
-        !Number.isFinite(updatedAtMs) ||
-        updatedAtMs < VALID_TIMESTAMP_FLOOR_MS
-    ) {
-        return "older";
-    }
-    const todayStart = startOfLocalDay(nowMs);
-    const itemDayStart = startOfLocalDay(updatedAtMs);
-    const diffDays = Math.floor((todayStart - itemDayStart) / DAY_MS);
-    if (diffDays <= 0) return "today";
-    if (diffDays === 1) return "yesterday";
-    if (diffDays < 7) return "recent";
-    return "older";
-}
-
 export function sortSessions(sessions: ChatSession[]): ChatSession[] {
     return sessions
         .slice()
@@ -192,39 +153,216 @@ export function sortSessions(sessions: ChatSession[]): ChatSession[] {
         );
 }
 
-export function filterSessions(
-    sessions: ChatSession[],
-    query: string,
-): ChatSession[] {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return sessions;
-    return sessions.filter((chat) => {
-        const title = (chat.session.title || "新会话").toLowerCase();
-        const directory = (
-            chat.execution_target?.directory || ""
-        ).toLowerCase();
-        return title.includes(keyword) || directory.includes(keyword);
-    });
+export type ProjectGroupKind = "local" | "remote" | "cloud";
+
+export interface ProjectGroup {
+    key: string;
+    kind: ProjectGroupKind;
+    name: string;
+    detail: string;
+    selectable: boolean;
+    project?: { location: "local" | "cloud"; id: string };
+    sessions: ChatSession[];
 }
 
-export function groupSessionsByDate(
-    sessions: ChatSession[],
-    nowMs: number = Date.now(),
-): SessionGroup[] {
-    const buckets: Record<SessionGroupKey, ChatSession[]> = {
-        today: [],
-        yesterday: [],
-        recent: [],
-        older: [],
-    };
-    for (const chat of sessions) {
-        buckets[sessionDateGroup(chat.session.updated_at, nowMs)].push(chat);
+function remoteDeviceLabel(
+    deviceId: string,
+    desktops?: DesktopDevice[],
+): string {
+    return (
+        desktops?.find((device) => device.id === deviceId)?.name || "远程桌面"
+    );
+}
+
+function parentPathSegments(directory: string): string[] {
+    const trimmed = directory.replace(/[\\/]+$/u, "");
+    const parts = trimmed.split(/[\\/]+/u).filter(Boolean);
+    return parts.slice(0, -1);
+}
+
+function uniqueParentSuffix(
+    directory: string,
+    peers: readonly string[],
+): string {
+    const own = parentPathSegments(directory);
+    if (!own.length) return directory;
+    const others = peers
+        .filter((peer) => peer !== directory)
+        .map(parentPathSegments);
+    for (let depth = 1; depth <= own.length; depth += 1) {
+        const candidate = own.slice(-depth).join("/");
+        const collides = others.some(
+            (segments) => segments.slice(-depth).join("/") === candidate,
+        );
+        if (!collides) return candidate;
     }
-    return GROUP_ORDER.filter((key) => buckets[key].length > 0).map((key) => ({
-        key,
-        title: GROUP_TITLES[key],
-        sessions: buckets[key],
-    }));
+    return directory;
+}
+
+export function projectGroupKey(
+    target: ExecutionTarget | null,
+    cloud?: string,
+): string {
+    return target
+        ? JSON.stringify(["local", target.device_id, target.workspace_id])
+        : JSON.stringify(["cloud", cloud || null]);
+}
+
+export function validateCloudProjectName(
+    rawName: string,
+    existingProjects: readonly string[],
+): { value: string; error: string } {
+    const value = rawName.trim();
+    if (
+        !value ||
+        value === "." ||
+        value === ".." ||
+        /[\\/\u0000-\u001f\u007f]/u.test(value) ||
+        new TextEncoder().encode(value).length > 255
+    ) {
+        return {
+            value,
+            error: "请输入有效的项目名，例如「演示项目」。",
+        };
+    }
+    if (existingProjects.includes(value)) {
+        return {
+            value,
+            error: `云端项目「${value}」已存在，请直接选择或换一个名称。`,
+        };
+    }
+    return { value, error: "" };
+}
+
+export function groupSessionsByProject(
+    sessions: ChatSession[],
+    cloudProjects: string[],
+    localWorkspaces: ExecutionTarget[],
+    query: string,
+    localDeviceId?: string,
+    desktops?: DesktopDevice[],
+): ProjectGroup[] {
+    type InternalGroup = ProjectGroup & {
+        directory?: string;
+        deviceLabel?: string;
+    };
+    const groups = new Map<string, InternalGroup>();
+    const localDevice = localDeviceId || localWorkspaces[0]?.device_id;
+    const cloudSet = new Set(cloudProjects);
+    function group(target: ExecutionTarget | null, cloud?: string) {
+        const key = projectGroupKey(target, cloud);
+        let item = groups.get(key);
+        if (!item) {
+            const isLocal = Boolean(target && target.device_id === localDevice);
+            const kind: ProjectGroupKind = target
+                ? isLocal
+                    ? "local"
+                    : "remote"
+                : "cloud";
+            const selectable =
+                kind === "local"
+                    ? localWorkspaces.some(
+                          (workspace) =>
+                              workspace.device_id === target!.device_id &&
+                              workspace.workspace_id === target!.workspace_id &&
+                              workspace.directory === target!.directory,
+                      )
+                    : cloudSet.has(cloud!);
+            const deviceLabel =
+                target && !isLocal
+                    ? remoteDeviceLabel(target.device_id, desktops)
+                    : undefined;
+            item = {
+                key,
+                kind,
+                name: target ? directoryBasename(target.directory) : cloud!,
+                detail: target
+                    ? isLocal
+                        ? target.directory
+                        : `${deviceLabel} · ${target.directory}`
+                    : "云端",
+                selectable,
+                project: selectable
+                    ? kind === "local"
+                        ? { location: "local", id: target!.workspace_id }
+                        : { location: "cloud", id: cloud! }
+                    : undefined,
+                sessions: [],
+                directory: target?.directory,
+                deviceLabel,
+            };
+            groups.set(key, item);
+        }
+        return item;
+    }
+    for (const target of localWorkspaces) group(target);
+    for (const name of cloudProjects) group(null, name);
+    for (const chat of sortSessions(sessions)) {
+        if (!chat.execution_target && !chat.cloud_project) continue;
+        group(chat.execution_target, chat.cloud_project).sessions.push(chat);
+    }
+    const byName = new Map<string, InternalGroup[]>();
+    for (const item of groups.values()) {
+        const list = byName.get(item.name);
+        if (list) list.push(item);
+        else byName.set(item.name, [item]);
+    }
+    function disambiguator(item: InternalGroup): string {
+        const siblings = byName.get(item.name) ?? [];
+        if (siblings.length <= 1) return "";
+        if (item.kind === "cloud") return "云端";
+        if (item.kind === "local") {
+            const localPeers = siblings.filter(
+                (peer) => peer.kind === "local" && peer.directory,
+            );
+            if (localPeers.length <= 1) return "此计算机";
+            return uniqueParentSuffix(
+                item.directory ?? item.detail,
+                localPeers.map((peer) => peer.directory!),
+            );
+        }
+        const sameDevicePeers = siblings.filter(
+            (peer) =>
+                peer.kind === "remote" &&
+                peer.deviceLabel === item.deviceLabel &&
+                peer.directory,
+        );
+        const device = item.deviceLabel || "远程桌面";
+        if (sameDevicePeers.length <= 1) return device;
+        return `${device} · ${uniqueParentSuffix(
+            item.directory ?? item.detail,
+            sameDevicePeers.map((peer) => peer.directory!),
+        )}`;
+    }
+    const keyword = query.trim().toLowerCase();
+    return [...groups.values()]
+        .sort(
+            (left, right) =>
+                (right.sessions[0]?.session.updated_at ?? -1) -
+                    (left.sessions[0]?.session.updated_at ?? -1) ||
+                left.name.localeCompare(right.name),
+        )
+        .flatMap((item) => {
+            const suffix = disambiguator(item);
+            const name = suffix ? `${item.name} · ${suffix}` : item.name;
+            const result: ProjectGroup = {
+                key: item.key,
+                kind: item.kind,
+                name,
+                detail: item.detail,
+                selectable: item.selectable,
+                project: item.project,
+                sessions: item.sessions,
+            };
+            if ((name + " " + item.detail).toLowerCase().includes(keyword))
+                return [result];
+            const matches = item.sessions.filter((chat) =>
+                (chat.session.title || "新会话")
+                    .toLowerCase()
+                    .includes(keyword),
+            );
+            return matches.length ? [{ ...result, sessions: matches }] : [];
+        });
 }
 
 export function messageDateLabel(
@@ -280,23 +418,20 @@ export function directoryBasename(directory: string): string {
 }
 
 export function formatWorkspaceLabel(
-    target: ExecutionTarget | null | undefined,
-    localWorkspaces: ExecutionTarget[],
-    needsWorkspace?: boolean,
+    chat: ChatSession,
+    localDevice?: string,
+    desktops?: DesktopDevice[],
 ): string {
-    if (needsWorkspace && !target?.device_id) {
-        return "原目录不可用";
-    }
-    if (!target?.device_id) {
-        return "服务器工作目录";
-    }
-    const matched = localWorkspaces.find(
-        (item) =>
-            item.workspace_id === target.workspace_id &&
-            item.device_id === target.device_id,
+    const target = chat.execution_target;
+    if (!target)
+        return chat.cloud_project ? "云端 · " + chat.cloud_project : "";
+    return (
+        (target.device_id === localDevice
+            ? "此计算机"
+            : remoteDeviceLabel(target.device_id, desktops)) +
+        " · " +
+        directoryBasename(target.directory)
     );
-    const folder = directoryBasename(matched?.directory || target.directory);
-    return matched ? folder : `远程桌面 · ${folder}`;
 }
 
 function truncateLine(text: string, maxLength = 88): string {
@@ -364,25 +499,25 @@ export interface ToolCallPresentation {
     terminalSessionId?: string;
 }
 
-export type SessionExecutionKind = "local" | "remote" | "server" | "default";
 export type SessionStatusKind = "running" | "error" | "warning" | null;
 
-export function sessionExecutionKind(
+function isSessionLocalDirectoryMissing(
     chat: ChatSession,
-    localWorkspaces: ExecutionTarget[],
-): SessionExecutionKind {
+    local?: LocalContext | null,
+): boolean {
     const target = chat.execution_target;
-    if (!target) return "default";
-    if (!target.device_id) return "server";
-    const isLocal = localWorkspaces.some(
-        (item) =>
-            item.workspace_id === target.workspace_id &&
-            item.device_id === target.device_id,
+    if (!target || !local || target.device_id !== local.deviceId) return false;
+    return !local.workspaces.some(
+        (workspace) =>
+            workspace.workspace_id === target.workspace_id &&
+            workspace.directory === target.directory,
     );
-    return isLocal ? "local" : "remote";
 }
 
-export function sessionStatusKind(chat: ChatSession): SessionStatusKind {
+export function sessionStatusKind(
+    chat: ChatSession,
+    local?: LocalContext | null,
+): SessionStatusKind {
     if (chat.session.run_id) return "running";
     const messages = chat.session.messages;
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -392,8 +527,27 @@ export function sessionStatusKind(chat: ChatSession): SessionStatusKind {
             break;
         }
     }
-    if (chat.read_only || chat.needs_workspace) return "warning";
+    if (
+        chat.read_only ||
+        chat.needs_workspace ||
+        isSessionLocalDirectoryMissing(chat, local)
+    )
+        return "warning";
     return null;
+}
+
+export function projectGroupStatusKind(
+    sessions: ChatSession[],
+    local?: LocalContext | null,
+): SessionStatusKind {
+    let result: SessionStatusKind = null;
+    for (const chat of sessions) {
+        const status = sessionStatusKind(chat, local);
+        if (status === "running") return "running";
+        if (status === "error") result = "error";
+        else if (status === "warning" && !result) result = "warning";
+    }
+    return result;
 }
 
 const TOOL_STATUS_LABELS: Record<string, string> = {

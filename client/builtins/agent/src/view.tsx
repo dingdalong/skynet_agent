@@ -9,11 +9,13 @@ import {
     ChatMessageList,
     ChatSystemMessage,
     EmptyState,
+    HStack,
     Icon,
     LayerProvider,
     Layout,
     LayoutHeader,
     Spinner,
+    useToast,
     VStack,
 } from "@astryxdesign/core";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -23,20 +25,28 @@ import {
     useAppSnapshot,
     usePaneToolbar,
 } from "@skynet/app-sdk/react";
-import { app } from "@skynet/app-sdk";
-import { isSending, latestAssistant } from "@skynet/agent-client/selectors";
+import { app, request } from "@skynet/app-sdk";
+import {
+    creatingProject,
+    isLocalDirectoryUnavailable,
+    isSending,
+    latestAssistant,
+} from "@skynet/agent-client/selectors";
 import type { AgentState } from "@skynet/agent-client/types";
 import { Composer, type ComposerHandle, type Send } from "./Composer";
 import { Connection } from "./Connection";
 import { ConversationHeader } from "./ConversationHeader";
 import { MessageRow } from "./Messages";
-import { SessionDrawer, SessionSideNav } from "./SessionSidebar";
+import {
+    SessionDrawer,
+    SessionSideNav,
+    type ProjectTarget,
+} from "./SessionSidebar";
 import { WelcomeView } from "./WelcomeView";
 import {
     connectionStatusMeta,
     messageDateLabel,
     shouldShowDateDivider,
-    sortSessions,
 } from "./format";
 import "./styles.css";
 
@@ -46,8 +56,10 @@ function Agent() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [bridgeError, setBridgeError] = useState("");
+    const [authorizingDirectory, setAuthorizingDirectory] = useState(false);
     const wide = useMediaQuery("(min-width: 720px)");
     const composerHandle = useRef<ComposerHandle>(null);
+    const showToast = useToast();
     const send: Send = async (name, payload = {}) => {
         try {
             await app.command(name, payload);
@@ -58,7 +70,7 @@ function Agent() {
         }
     };
     const state = snapshot?.state;
-    const sessions = sortSessions(Object.values(state?.sessions ?? {}));
+    const sessions = Object.values(state?.sessions ?? {});
     const session = state?.sessions?.[state.selectedId];
     const scroll = useRef<HTMLDivElement>(null);
     const anchor = useRef<{
@@ -131,6 +143,14 @@ function Agent() {
         setDrawerOpen(false);
         void send("session.new");
     };
+    const createSessionInProject = (project: ProjectTarget) => {
+        setDrawerOpen(false);
+        void send("session.new", {
+            location: project.location,
+            id: project.id,
+        });
+        requestAnimationFrame(() => composerHandle.current?.focus());
+    };
     const selectSession = (sessionId: string) => {
         void send("session.select", { id: sessionId });
     };
@@ -187,6 +207,35 @@ function Agent() {
     const last = latestAssistant(session);
     const error = bridgeError || state.error;
     const online = state.connection.status === "online";
+    const localDirectoryMissing = isLocalDirectoryUnavailable(state, session);
+    const restoringProject = creatingProject(state);
+    const reauthorizeLocalDirectory = async () => {
+        if (authorizingDirectory) return;
+        setAuthorizingDirectory(true);
+        try {
+            const result = await request("agent.directory.choose");
+            if (!result.cancelled) {
+                const chosen = result.target as
+                    { directory?: string } | undefined;
+                const matched =
+                    chosen?.directory === session?.execution_target?.directory;
+                showToast({
+                    uniqueID: "agent-directory-reauthorized",
+                    body: matched
+                        ? "已恢复原项目目录授权"
+                        : "已授权新目录，如需继续当前会话请授权原目录或新建会话",
+                    type: "info",
+                    autoHideDuration: 2800,
+                });
+            }
+        } catch (failure) {
+            setBridgeError(
+                failure instanceof Error ? failure.message : String(failure),
+            );
+        } finally {
+            setAuthorizingDirectory(false);
+        }
+    };
     const canRetryLast =
         !!last &&
         last.status === 4 &&
@@ -218,6 +267,7 @@ function Agent() {
                             onCollapsedChange={setSidebarCollapsed}
                             onSelectSession={selectSession}
                             onCreateSession={createSession}
+                            onCreateSessionInProject={createSessionInProject}
                             onOpenConnection={() => setConnectionOpen(true)}
                         />
                     ) : undefined
@@ -246,6 +296,66 @@ function Agent() {
                                         session.read_only
                                             ? "可阅读已恢复的消息，请另开会话继续。"
                                             : undefined
+                                    }
+                                    endContent={
+                                        session.read_only ||
+                                        session.needs_workspace ? (
+                                            <HStack gap={1.5}>
+                                                {session.needs_workspace &&
+                                                    !session.read_only &&
+                                                    session.cloud_project && (
+                                                        <Button
+                                                            label="重建项目目录"
+                                                            variant="primary"
+                                                            size="sm"
+                                                            isLoading={
+                                                                restoringProject
+                                                            }
+                                                            isDisabled={
+                                                                !online ||
+                                                                state.syncing
+                                                            }
+                                                            onClick={() =>
+                                                                void send(
+                                                                    "project.restore",
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                <Button
+                                                    label="新建会话"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={createSession}
+                                                />
+                                            </HStack>
+                                        ) : undefined
+                                    }
+                                />
+                            )}
+                            {!session?.read_only && localDirectoryMissing && (
+                                <Banner
+                                    status="warning"
+                                    title="原项目目录未授权"
+                                    description="重新授权原本地目录后可继续对话，或新建会话。"
+                                    endContent={
+                                        <HStack gap={1.5}>
+                                            <Button
+                                                label="重新授权目录"
+                                                variant="primary"
+                                                size="sm"
+                                                isLoading={authorizingDirectory}
+                                                onClick={() =>
+                                                    void reauthorizeLocalDirectory()
+                                                }
+                                            />
+                                            <Button
+                                                label="新建会话"
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={createSession}
+                                            />
+                                        </HStack>
                                     }
                                 />
                             )}
@@ -392,6 +502,7 @@ function Agent() {
                     onOpenChange={setDrawerOpen}
                     onSelectSession={selectSession}
                     onCreateSession={createSession}
+                    onCreateSessionInProject={createSessionInProject}
                     onOpenConnection={() => setConnectionOpen(true)}
                 />
             )}

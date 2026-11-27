@@ -48,6 +48,7 @@ message AgentReasoningDeltaNtf {
 }
 
 message AgentChatReq {
+  string cloud_project = 7;
   ExecutionTarget execution_target = 6;
   string session_id = 2;
   string text = 3;

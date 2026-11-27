@@ -76,6 +76,7 @@ message SessionState {
 }
 
 message ChatSession {
+  string cloud_project = 8;
   string recovery_notice = 5;
   bool read_only = 6;
   bool needs_workspace = 7;
@@ -86,6 +87,7 @@ message ChatSession {
 }
 
 message AgentSnapshot {
+  repeated string cloud_projects = 8;
   repeated DesktopDevice desktops = 7;
   string user_id = 1;
   string username = 2;

@@ -4,7 +4,7 @@
   "stateVersion": 1,
   "id": "agent",
   "name": "Agent",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "permissions": ["network", "user.identity"],
   "networkOrigins": ["ws://127.0.0.1:18787", "ws://localhost:18787"],
   "actions": {}

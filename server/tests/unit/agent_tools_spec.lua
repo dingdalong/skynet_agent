@@ -106,9 +106,18 @@ describe("Agent 工作区与内置工具", function()
         end
     end)
 
-    it("用户名和会话路径隔离，目录跨大小写及分隔符不冲突", function()
+    it("账号隔离，同名项目复用目录和文件", function()
         local a = workspace.create(root, "a/../b", "session-a")
         local b = workspace.create(root, "A/../b", "session-a")
+        local project = workspace.create(root, "a/../b", "中文 项目")
+        filesystem.atomic_write(project .. "/sample", "保留", true)
+        assert.are.equal(project, workspace.create(root, "a/../b", "中文 项目"))
+        assert.are.equal("保留", filesystem.read_file(workspace.existing(root, "a/../b", "中文 项目") .. "/sample", 32))
+        assert.same({ "session-a", "中文 项目" }, workspace.list(root, "a/../b"))
+        assert.same({}, workspace.list(root, "another"))
+        for _, invalid in ipairs({ "", ".", "..", "../outside", "a/b", "  " }) do
+            assert.has_error(function() workspace.create(root, "a/../b", invalid) end)
+        end
         assert.is_true(workspace.inside(a, root))
         assert.are_not.equal(a:lower(), b:lower())
         assert.is_true(workspace.inside(a .. "/x", a))

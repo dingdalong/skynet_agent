@@ -14,8 +14,6 @@ import {
 import {
     BeakerIcon,
     BugAntIcon,
-    FolderIcon,
-    ServerStackIcon,
     SparklesIcon,
     Squares2X2Icon,
     WrenchScrewdriverIcon,
@@ -23,7 +21,6 @@ import {
 import type { AgentState } from "@skynet/agent-client/types";
 import {
     connectionStatusMeta,
-    formatWorkspaceLabel,
     STARTER_PROMPTS,
     type StarterPrompt,
 } from "./format";
@@ -87,11 +84,6 @@ export function WelcomeView({
     const modelName = state.models.find(
         (model) => model.id === state.defaultModelId,
     )?.name;
-    const workspaceLabel = formatWorkspaceLabel(
-        state.draftTarget,
-        state.local?.workspaces ?? [],
-    );
-
     return (
         <VStack
             gap={wide ? 6 : 4}
@@ -123,22 +115,6 @@ export function WelcomeView({
                         <Badge
                             variant="neutral"
                             label={`模型 · ${modelName}`}
-                        />
-                    )}
-                    {state.supportsLocal && (
-                        <Badge
-                            variant="neutral"
-                            icon={
-                                <Icon
-                                    icon={
-                                        state.draftTarget?.device_id
-                                            ? FolderIcon
-                                            : ServerStackIcon
-                                    }
-                                    size="xsm"
-                                />
-                            }
-                            label={workspaceLabel}
                         />
                     )}
                 </HStack>

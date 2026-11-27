@@ -525,6 +525,10 @@ final class ProcessTests: XCTestCase {
         }
         host.request(
             lease: first, kind: "command",
+            input: ["name": "project.select", "payload": ["location": "cloud", "id": "原生验收项目"]]
+        ) { _ in }
+        host.request(
+            lease: first, kind: "command",
             input: [
                 "name": "chat.send", "payload": ["target": "", "text": "native integration"],
             ]

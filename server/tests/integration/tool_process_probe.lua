@@ -64,17 +64,15 @@ skynet.start(function()
         assert(not pcall(processes.start, processes, { "/bin/bash", "-c", "printf never" }, directory,
             false, "use_default", 5000, timed_run, { output = "" }), "运行进程数量限制失效")
         local other = Runtime.new({
-            workspace = workspace.create(root, "probe", "session-other"),
+            workspace = directory,
             tools = config,
             session_id = "other"
         })
-        assert(processes:has_active() and not other:has_active(), "后台进程状态跨会话混用")
         assert(not pcall(other.get, other, limit_process.id), "其他会话能访问本会话的进程")
         other:close()
         timed_run:cancel()
         repeat result = processes:collect(limit_process, 100, 4000) until not result.session_id
         assert(result.exit_code ~= 0 and limit_process.record.status == "cancelled", "取消未终止进程")
-        assert(not processes:has_active(), "已结束的进程仍阻止切换目录")
         processes.config.max_output_bytes = 4096
         local output_process = processes:start({ "/bin/bash", "-c", "printf '%8192s' x" }, directory,
             false, "use_default", 5000, timed_run, { output = "" })

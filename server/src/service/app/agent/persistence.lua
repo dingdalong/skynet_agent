@@ -33,7 +33,10 @@ function Store.append(session, kind, data)
         kind = kind,
         payload = json.encode(data)
     }
-    if kind == "ask" then doc.summary = json.encode({ title = data.title, time = data.time }) end
+    if kind == "ask" then
+        doc.summary = json.encode({ title = data.title, time = data.time })
+        doc.binding = json.encode({ target = data.target, cloud_project = data.cloud_project })
+    end
     if kind == "ask" or kind == "finish" then doc.updated_at = data.time end
     session.sequence = seq
     if seq == 1 then doc.session_schema_version = 1 end
@@ -106,8 +109,14 @@ local function apply(s, state, kind, d)
         if not d.retry then close_question(s, state) end
         settle(s, state)
         s.model_id = d.model_id
-        assert(not d.target or valid_target(d.target))
-        s.execution_target = d.target
+        assert((d.cloud_project ~= nil) ~= (d.target ~= nil), "缺少会话项目")
+        if d.cloud_project ~= nil then
+            assert(require("agent.workspace").valid_name(d.cloud_project))
+            s.cloud_project, s.execution_target = d.cloud_project, nil
+        else
+            assert(valid_target(d.target))
+            s.execution_target, s.cloud_project = d.target, nil
+        end
         s.updated_at = math.tointeger(d.time) or 0
         s.title = type(d.title) == "string" and d.title or d.text:match("^[^\n]+") or "会话"
         local previous = state.message
@@ -153,14 +162,6 @@ local function apply(s, state, kind, d)
     elseif kind == "model" then
         assert(type(d.model_id) == "string")
         s.model_id = d.model_id
-    elseif kind == "target" then
-        assert(not d.target or valid_target(d.target))
-        s.execution_target = d.target
-        table.insert(s.saved_context, {
-            role = "developer",
-            source = "environment",
-            content = "执行环境已切换到 " .. assert(d.workspace)
-        })
     else
         local msg = assert(state.message)
         assert(d.run == msg.run_id)
@@ -248,7 +249,7 @@ local function apply(s, state, kind, d)
             end
         elseif kind == "finish" then
             assert(d.status == enum.message_status.completed or d.status == enum.message_status.cancelled or
-            d.status == enum.message_status.failed)
+                d.status == enum.message_status.failed)
             assert(not d.content or type(d.content) == "string")
             if d.status == enum.message_status.completed then assert(state.has_response, "缺少模型上下文") end
             state.finished = true
@@ -275,7 +276,7 @@ local function restore_session(chat, id, rows)
         s.sequence = doc.seq
         local ok = pcall(function()
             assert(doc._id == expected and doc.seq > 0)
-            assert((version == 1 or version == nil)
+            assert(version == 1
                 and (not doc.session_schema_version or doc.session_schema_version == 1))
             local d = json.decode(doc.payload)
             assert(type(d) == "table")
@@ -309,9 +310,11 @@ local function restore_session(chat, id, rows)
     settle(s, state)
     close_question(s, state)
     if not state.message then warn(s, "当前版本无法完整读取", true) end
-    if not s.execution_target and not s.read_only then
+    if s.cloud_project then
         s.needs_workspace = not pcall(require("agent.workspace").existing, config.tools.workspace_root,
-            chat.app.identity.username, id)
+            chat.app.identity.user_id, s.cloud_project)
+    elseif not s.execution_target then
+        warn(s, "当前版本无法完整读取", true)
     end
     s.revision = s.sequence
     return s
@@ -342,6 +345,10 @@ function Store.restore(app)
                 seq = 1,
                 updated_at = 1,
                 ask = { ["$cond"] = { { ["$eq"] = { "$kind", "ask" } }, "$seq", 0 } },
+                binding = {
+                    ["$cond"] = { { ["$eq"] = { "$kind", "ask" } },
+                        { ["$ifNull"] = { "$binding", "$payload" } }, "" }
+                },
                 question = {
                     ["$cond"] = { { ["$eq"] = { "$kind", "ask" } },
                         { ["$ifNull"] = { "$summary", "$payload" } }, "" }
@@ -352,6 +359,7 @@ function Store.restore(app)
             ["$group"] = {
                 _id = "$session_id",
                 updated_at = { ["$max"] = "$updated_at" },
+                binding = { ["$top"] = { sortBy = { ask = -1 }, output = "$binding" } },
                 question = { ["$top"] = { sortBy = { ask = -1 }, output = "$question" } }
             }
         },
@@ -374,22 +382,28 @@ function Store.restore(app)
                     name = doc.name,
                     remote_enabled = doc.remote_enabled == true,
                 }
-                if valid_target(doc.target) and doc.target.device_id == id then app.targets[id] = doc.target end
             end
         end
     end
     for _, row in ipairs(history) do
         local id = row._id
         if type(id) == "string" and #id <= 128 and id:match("^[%w_-]+$") then
-            local session = Session:new(app.chat, config.default_model_id, nil, id)
-            local ok, ask = pcall(json.decode, row.question)
-            if not ok or type(ask) ~= "table" then ask = {} end
-            session.title = type(ask.title) == "string" and ask.title
-                or type(ask.text) == "string" and ask.text:match("^[^\n]+") or "会话"
-            session.updated_at = tonumber(row.updated_at) or tonumber(ask.time) or 0
-            session.unloaded = true
-            app.chat.sessions[id] = session
-            table.insert(app.chat.session_order, id)
+            local decoded, binding = pcall(json.decode, row.binding)
+            local cloud_project = decoded and type(binding) == "table"
+                and require("agent.workspace").valid_name(binding.cloud_project) and binding.cloud_project or nil
+            local target = decoded and type(binding) == "table"
+                and valid_target(binding.target) and binding.target or nil
+            if (cloud_project ~= nil) ~= (target ~= nil) then
+                local session = Session:new(app.chat, config.default_model_id, target, id, cloud_project)
+                local ok, ask = pcall(json.decode, row.question)
+                if not ok or type(ask) ~= "table" then ask = {} end
+                session.title = type(ask.title) == "string" and ask.title
+                    or type(ask.text) == "string" and ask.text:match("^[^\n]+") or "会话"
+                session.updated_at = tonumber(row.updated_at) or tonumber(ask.time) or 0
+                session.unloaded = true
+                app.chat.sessions[id] = session
+                table.insert(app.chat.session_order, id)
+            end
         end
     end
     table.sort(app.chat.session_order, function(a, b)

@@ -117,10 +117,6 @@ function Client:prepare(tool, action, run, record)
     return result.action
 end
 
-function Client:has_active()
-    return next(self.records) ~= nil
-end
-
 function Client:execute(tool, action, run, record)
     self.runs[run.id] = { run = run, call_id = record.id }
     run.executions[run.id] = self

@@ -89,11 +89,13 @@ describe("protobuf", function()
             text = "你好",
             retry_run_id = "",
             model_id = "",
+            cloud_project = "",
         }, {
             session_id = "session-1",
             text = "你好",
             retry_run_id = "",
             model_id = "",
+            cloud_project = "",
         })
 
         local login_hash = hash.fnv1a32("skynet.agent.v1.LoginReq")
@@ -118,6 +120,7 @@ describe("protobuf", function()
             text = "你好",
             retry_run_id = "",
             model_id = "",
+            cloud_project = "",
         })
         local kind, message_id, app, body = require("network.frame").unpack(frame)
         local type_hash = string.unpack(">I4", body)
@@ -137,6 +140,7 @@ describe("protobuf", function()
             text = "你好",
             retry_run_id = "",
             model_id = "",
+            cloud_project = "",
         }, args)
     end)
 
@@ -170,6 +174,7 @@ describe("protobuf", function()
             if key == "chat_first_request" then
                 assert.are.equal("", payload.session_id)
                 assert.are.equal("model-1", payload.model_id)
+                assert.are.equal("demo", payload.cloud_project)
             end
             if key == "message_streaming" then assert.are.equal("你好", payload.delta) end
             if key == "message_failed" then

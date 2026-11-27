@@ -30,26 +30,53 @@ function Workspace.mkdir(path)
     assert(ok or lfs.attributes(path, "mode") == "directory", err)
 end
 
-local function session_directory(root, username, session_id)
-    assert(session_id:match("^[%w_-]+$"), "会话目录身份无效")
-    local encoded = username:gsub(".", function(byte) return string.format("%02x", byte:byte()) end)
-    root = Workspace.resolve(root)
-    local path = root .. "/" .. encoded .. "/" .. session_id
-    assert(Workspace.resolve(path) == path, "会话目录已变更")
+local function projects_root(root, user_id)
+    assert(type(user_id) == "string" and user_id ~= "", "缺少账号身份")
+    local encoded = user_id:gsub(".", function(byte) return string.format("%02x", byte:byte()) end)
+    local path = Workspace.resolve(root) .. "/" .. encoded .. "/projects"
+    assert(Workspace.resolve(path) == path, "项目根目录已变更")
     return path
 end
 
-function Workspace.existing(root, username, session_id)
-    local path = session_directory(root, username, session_id)
-    assert(lfs.attributes(path, "mode") == "directory", "原工作目录不可用，请重新选择")
+function Workspace.valid_name(name)
+    return type(name) == "string" and #name <= 255 and utf8.len(name) and name:match("%S")
+        and name ~= "." and name ~= ".." and not name:find("[/%c]") and not name:find("\\", 1, true)
+end
+
+local function project_path(root, user_id, name)
+    assert(Workspace.valid_name(name), "请输入有效的单个项目名称")
+    local path = projects_root(root, user_id) .. "/" .. name
+    assert(not lfs.symlinkattributes(path) or lfs.symlinkattributes(path, "mode") == "directory", "项目目录不可用")
     return path
 end
 
-function Workspace.create(root, username, session_id)
-    local path = session_directory(root, username, session_id)
+function Workspace.list(root, user_id)
+    local path = projects_root(root, user_id)
+    local names = {}
+    if not lfs.attributes(path) then return names end
+    for name in lfs.dir(path) do
+        if Workspace.valid_name(name) and lfs.symlinkattributes(path .. "/" .. name, "mode") == "directory" then
+            names[#names + 1] = name
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+function Workspace.existing(root, user_id, name)
+    local path = project_path(root, user_id, name)
+    assert(lfs.symlinkattributes(path, "mode") == "directory", "原项目目录不可用，请恢复目录或新建会话")
+    return path
+end
+
+function Workspace.create(root, user_id, name)
+    local path = project_path(root, user_id, name)
     Workspace.mkdir(path)
-    Workspace.mkdir(path .. "/.agent-tmp")
-    Workspace.mkdir(path .. "/.agent-home")
+    for _, suffix in ipairs({ "/.agent-tmp", "/.agent-home" }) do
+        local dir = path .. suffix
+        assert(not lfs.symlinkattributes(dir) or lfs.symlinkattributes(dir, "mode") == "directory", "项目运行目录不可用")
+        Workspace.mkdir(dir)
+    end
     return path
 end
 

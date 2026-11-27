@@ -38,7 +38,7 @@ Verified · Seen: 1× (2026-11-08)
 
 ### L-064 异步模式切换验收要等业务结果
 
-选项的即时值会早于宿主授权和服务器确认。切换执行目标时检查实际会话目标，拒绝时检查失败结果，取消时等待对应运行的终态。 [agent-client.test.ts](../../client/tooling/agent-client.test.ts)、[CLIENT_AGENT.md](../../docs/architecture/CLIENT_AGENT.md)
+选项的即时值会早于宿主授权和服务器确认。在草稿选择项目后，检查首条消息确认的实际会话项目，拒绝时检查失败结果，取消时等待对应运行的终态。 [agent-client.test.ts](../../client/tooling/agent-client.test.ts)、[CLIENT_AGENT.md](../../docs/architecture/CLIENT_AGENT.md)
 
 Verified · Seen: 1× (2026-11-09)
 

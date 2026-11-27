@@ -390,6 +390,32 @@ try {
             .ret,
         1,
     );
+    const projectName = "恢复验收";
+    const createProject = (name) =>
+        request("AgentCloudProjectCreateReq", { name });
+    const createdProjects = await Promise.all([
+        createProject(projectName),
+        createProject(projectName),
+    ]);
+    assert.ok(
+        createdProjects.every((packet) => packet.body.name === projectName),
+    );
+    const projectFile = [
+        "/work",
+        Buffer.from(loginId).toString("hex"),
+        "projects",
+        projectName,
+        "resume.txt",
+    ].join("/");
+    await docker(
+        "exec",
+        container("agent"),
+        "sh",
+        "-ec",
+        'printf kept > "$1"',
+        "probe",
+        projectFile,
+    );
     const historyCollection =
         'db.getSiblingDB(apps.findOne({_id:"agent"}).database.name).history';
     const fixtureSource = `const history = ${historyCollection};`;
@@ -403,11 +429,15 @@ try {
             if (version !== null) doc.schema_version = version;
             history.insertOne(doc);
         }
-        const ask = {run:"r", message:"m", user_message:"q", text:"恢复检查", model_id, time:1000};
+        const ask = {run:"r", message:"m", user_message:"q", text:"恢复检查", model_id, time:1000, cloud_project:"恢复验收"};
+        const desktopAsk = {...ask, target:{device_id:"mac",workspace_id:"w1",directory:"/local",platform:"macos"}};
+        delete desktopAsk.cloud_project;
+        add("missing-project",1,"ask",{...ask,cloud_project:"待恢复项目"});
+        add("desktop-history",1,"ask",desktopAsk);
         const call = {type:"function_call", call_id:"tool", name:"exec_command", arguments:"{}"};
         const response = {run:"r", text:"", items:[{role:"user",content:ask.text}, call], calls:[call]};
-        for (const id of ["legacy","unknown","gap","no-result","has-result","conflict","corrupt","display"]) {
-            add(id, 1, "ask", ask, id === "legacy" ? null : 1);
+        for (const id of ["unknown","gap","no-result","has-result","conflict","corrupt","display"]) {
+            add(id, 1, "ask", ask);
         }
         for (let i = 1; i <= 72; i++) {
             add("pages", i, "ask", {...ask, run:"r"+i, message:"m"+i, user_message:"q"+i});
@@ -437,6 +467,10 @@ try {
     await until(agentReady, "整套服务重启后恢复已启用的 Agent");
     const restoredSnapshot = (await request("AgentSnapshotReq")).body.snapshot;
     assert.equal(restoredSnapshot.default_model_id, preferred);
+    assert.equal(
+        (await docker("exec", container("agent"), "cat", projectFile)).stdout,
+        "kept",
+    );
     const sessions = Object.fromEntries(
         restoredSnapshot.chat_sessions.map((item) => [item.session.id, item]),
     );
@@ -481,8 +515,16 @@ try {
             "m" + (i + 1),
         ]).flat(),
     );
-    assert.equal(sessions.legacy.session.title, "恢复检查");
-    assert.ok(!sessions.legacy.read_only && !sessions.display.read_only);
+    assert.equal(sessions.display.session.title, "恢复检查");
+    assert.ok(!sessions.display.read_only);
+    assert.equal(sessions.display.cloud_project, projectName);
+    assert.deepEqual(restoredSnapshot.cloud_projects, [projectName]);
+    assert.equal(
+        restoredSnapshot.chat_sessions.find(
+            (item) => item.session.id === "display",
+        ).cloud_project,
+        projectName,
+    );
     assert.ok(sessions.unknown.read_only && sessions.gap.read_only);
     assert.match(
         sessions.gap.session.messages.map((item) => item.content).join(""),
@@ -511,6 +553,22 @@ try {
         1,
     );
     assert.equal(await originalHistory(), originalRows);
+    assert.equal(
+        restoredSnapshot.chat_sessions.find(
+            (chat) => chat.session.id === "desktop-history",
+        ).execution_target.workspace_id,
+        "w1",
+    );
+    assert.equal(sessions["desktop-history"].read_only, false);
+    assert.equal(sessions["missing-project"].needs_workspace, true);
+    assert.equal((await createProject("待恢复项目")).body.ret, 1);
+    const repaired = (
+        await request("AgentSnapshotReq")
+    ).body.snapshot.chat_sessions.find(
+        (chat) => chat.session.id === "missing-project",
+    );
+    assert.equal(repaired.needs_workspace, false);
+    assert.equal(repaired.cloud_project, "待恢复项目");
     const restoredAgent = (await list()).find((app) => app.app_id === "agent");
     assert.equal(restoredAgent.approved.request_id, resubmission);
     assert.equal(restoredAgent.desired, true);

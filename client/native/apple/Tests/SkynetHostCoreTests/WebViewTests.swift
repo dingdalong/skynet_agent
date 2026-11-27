@@ -474,6 +474,21 @@ final class WebViewTests: XCTestCase {
         try await harness.untilToolbar("sidebar", labelContaining: "会话列表")
         try await harness.untilToolbar("new", labelContaining: "新建会话")
         try await harness.until("document.body.innerText.includes('与 Agent 开始一个新任务')")
+        try await harness.until("document.body.innerText.includes('请先选择项目')")
+        try await harness.click("选择项目")
+        _ = try await harness.web.evaluateJavaScript(
+            "Array.from(document.querySelectorAll('[role=menuitem]')).find(e=>e.textContent.includes('新建项目')).click()"
+        )
+        try await harness.until("document.querySelector('dialog[open] input') !== null")
+        _ = try await harness.web.evaluateJavaScript(
+            """
+            (()=>{const input = document.querySelector('dialog[open] input');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'交互验收');
+            input.dispatchEvent(new Event('input',{bubbles:true}));})()
+            """)
+        try await harness.click("创建项目")
+        try await harness.until(
+            "!document.querySelector('dialog[open]') && document.body.innerText.includes('交互验收')")
         try await harness.click("梳理项目结构与入口")
         try await harness.until(
             "document.querySelector('#agent-message [contenteditable]')?.textContent?.includes('梳理当前工作目录') === true"
@@ -586,7 +601,7 @@ final class WebViewTests: XCTestCase {
         try await harness.until("document.body.innerText.includes('与 Agent 开始一个新任务')")
         try await harness.activateToolbar("sidebar")
         try await harness.until(
-            "Array.from(document.querySelectorAll('button')).some(button => button.textContent.trim() === 'Native Agent')"
+            "Array.from(document.querySelectorAll('dialog[open] nav[aria-label=\"会话列表\"] button')).some(button => button.textContent.trim() === 'Native Agent')"
         )
         try await harness.click("Native Agent")
         try await harness.until("!document.querySelector('dialog[open]')")

@@ -15,7 +15,13 @@ import type {
     LocalContext,
 } from "./types";
 export type * from "./types";
-import { isSending } from "./selectors";
+import {
+    isSending,
+    draftProject,
+    projectPreferenceKey,
+    creatingProject,
+    isLocalDirectoryUnavailable,
+} from "./selectors";
 
 export function initialAgentState(): AgentState {
     return {
@@ -54,7 +60,8 @@ export function initialAgentState(): AgentState {
         local: null,
         localRequest: "",
         localEffects: {},
-        draftTarget: null,
+        cloudProjects: [],
+        projectPreferences: {},
         desktops: [],
     };
 }
@@ -289,6 +296,7 @@ class Turn {
         this.state.sessions = {};
         for (const chat of snapshot.chat_sessions)
             this.updateSession(chat, false);
+        this.state.cloudProjects = snapshot.cloud_projects ?? [];
         this.state.models = snapshot.models;
         this.state.defaultModelId = snapshot.default_model_id;
         this.state.desktops = snapshot.desktops ?? [];
@@ -328,6 +336,7 @@ class Turn {
         this.state.sessions = {};
         this.state.selectedId = "";
         this.state.desktops = [];
+        this.state.cloudProjects = [];
         this.state.buffered = [];
         this.state.syncing = false;
         this.state.error = "";
@@ -385,6 +394,10 @@ class Turn {
         }
         if (packet.name === "AgentSessionUpdatedNtf") {
             this.updateSession(body.chat_session as ChatSession);
+            return;
+        }
+        if (packet.name === "AgentCloudProjectCreatedNtf") {
+            this.addCloudProject(String(body.name));
             return;
         }
         if (packet.name === "AgentDesktopUpdatedNtf") {
@@ -475,6 +488,36 @@ class Turn {
                 throw Error("不支持的服务端通知");
         }
         session.session.revision = revision;
+    }
+    addCloudProject(name: string) {
+        if (!name) return;
+        if (!this.state.cloudProjects.includes(name))
+            this.state.cloudProjects.push(name);
+        for (const chat of Object.values(this.state.sessions)) {
+            if (chat.cloud_project === name && chat.needs_workspace) {
+                chat.needs_workspace = false;
+                if (
+                    chat.recovery_notice ===
+                    "原项目目录不可用，请恢复原目录或新建会话"
+                )
+                    chat.recovery_notice = undefined;
+            }
+        }
+    }
+    rememberProject(location: "local" | "cloud", id?: string) {
+        const key = projectPreferenceKey(this.state);
+        const existing = this.state.projectPreferences[key];
+        this.state.projectPreferences[key] = {
+            location,
+            localId:
+                location === "local" && id !== undefined
+                    ? id
+                    : existing?.localId,
+            cloudId:
+                location === "cloud" && id !== undefined
+                    ? id
+                    : existing?.cloudId,
+        };
     }
     response(packet: Packet) {
         const connection = this.state.connection;
@@ -598,21 +641,23 @@ class Turn {
                 break;
             }
             case "AgentSessionModelSetReq":
-            case "AgentSessionExecutionSetReq":
                 this.updateSession(packet.body.chat_session as ChatSession);
                 break;
             case "AgentPreferenceSetReq": {
-                if (packet.body.set_target)
-                    this.state.draftTarget =
-                        (packet.body
-                            .target as ChatSession["execution_target"]) ?? null;
-                else this.state.defaultModelId = String(packet.body.model_id);
+                this.state.defaultModelId = String(packet.body.model_id);
+                break;
+            }
+            case "AgentCloudProjectCreateReq": {
+                const name = String(packet.body.name);
+                this.addCloudProject(name);
+                if (
+                    !this.state.selectedId &&
+                    this.state.draftVersion === pending.draftVersion
+                )
+                    this.rememberProject("cloud", name);
                 break;
             }
             case "AgentDesktopRegisterReq": {
-                this.state.draftTarget =
-                    (packet.body.target as ChatSession["execution_target"]) ??
-                    null;
                 connection.status = "online";
                 const buffered = this.state.buffered;
                 this.state.buffered = [];
@@ -793,7 +838,7 @@ export function reduceAgent(
                     state.defaultModelId = "";
                     state.selectedId = "";
                     state.drafts = { "": "" };
-                    state.draftTarget = null;
+                    state.cloudProjects = [];
                     state.draftVersion++;
                     state.notice = "";
                 }
@@ -801,48 +846,73 @@ export function reduceAgent(
                 turn.connect();
                 break;
             }
-            case "execution.select": {
-                const id = String(body.workspaceId ?? "");
-                const target = id
-                    ? state.local?.workspaces.find(
-                          (item) => item.workspace_id === id,
-                      )
-                    : null;
-                if (id && !target) throw Error("此本地目录尚未授权");
-                const session = state.sessions[state.selectedId];
-                if (!session) {
-                    if (state.connection.status !== "online")
-                        throw Error("请先连接服务器");
-                    turn.request("AgentPreferenceSetReq", {
-                        set_target: true,
-                        target: target ?? {},
+            case "project.select":
+            case "project.create": {
+                if (
+                    state.selectedId ||
+                    isSending(state, "") ||
+                    creatingProject(state)
+                )
+                    throw Error("当前会话的项目已固定");
+                if (state.connection.status !== "online" || state.syncing)
+                    throw Error("请等待连接和会话恢复");
+                if (
+                    body.draftVersion !== undefined &&
+                    body.draftVersion !== state.draftVersion
+                )
+                    break;
+                const location = body.location;
+                if (
+                    location !== "cloud" &&
+                    (location !== "local" || !state.supportsLocal)
+                )
+                    throw Error("工作位置不可用");
+                const hasId = body.id !== undefined;
+                const id = hasId ? String(body.id ?? "") : "";
+                if (command.type === "project.create") {
+                    const trimmed = id.trim();
+                    if (location !== "cloud" || !trimmed)
+                        throw Error("请输入项目名称");
+                    turn.request("AgentCloudProjectCreateReq", {
+                        name: trimmed,
                     });
                 } else {
-                    if (state.connection.status !== "online" || state.syncing)
-                        throw Error("请等待连接和会话恢复");
-                    if (session.session.run_id)
-                        throw Error("任务运行中不能切换工作目录");
-                    const changing = Object.values(
-                        state.connection.pending,
-                    ).find(
-                        (request) =>
-                            request.name === "AgentSessionExecutionSetReq" &&
-                            request.target === state.selectedId,
-                    );
-                    if (changing?.text === id) break;
-                    if (changing) throw Error("工作目录切换正在进行");
                     if (
-                        !session.needs_workspace &&
-                        (session.execution_target?.workspace_id ?? "") === id
+                        location === "cloud" &&
+                        id &&
+                        !state.cloudProjects.includes(id)
                     )
-                        break;
-                    turn.request(
-                        "AgentSessionExecutionSetReq",
-                        { session_id: state.selectedId, target: target ?? {} },
-                        state.selectedId,
-                        id,
-                    );
+                        throw Error("云端项目不可用");
+                    if (
+                        location === "local" &&
+                        id &&
+                        !state.local?.workspaces.some(
+                            (item) => item.workspace_id === id,
+                        )
+                    )
+                        throw Error("此本地目录尚未授权");
+                    turn.rememberProject(location, hasId ? id : undefined);
+                    state.draftVersion++;
                 }
+                state.error = "";
+                break;
+            }
+            case "project.restore": {
+                if (state.connection.status !== "online" || state.syncing)
+                    throw Error("请等待连接和会话恢复");
+                if (creatingProject(state)) throw Error("请等待项目创建完成");
+                const current = state.sessions[state.selectedId];
+                if (
+                    !current ||
+                    current.read_only ||
+                    !current.needs_workspace ||
+                    !current.cloud_project
+                )
+                    throw Error("当前会话无需恢复云端项目目录");
+                turn.request("AgentCloudProjectCreateReq", {
+                    name: current.cloud_project,
+                });
+                state.error = "";
                 break;
             }
             case "connection.reconnect":
@@ -855,9 +925,68 @@ export function reduceAgent(
                 state.configuration.enabled = false;
                 turn.lost("", false);
                 break;
-            case "session.new":
+            case "session.new": {
+                const explicitLocation = body.location;
+                if (explicitLocation !== undefined) {
+                    if (
+                        !state.selectedId &&
+                        (isSending(state, "") || creatingProject(state))
+                    )
+                        throw Error("请等待当前请求完成");
+                    if (
+                        explicitLocation !== "cloud" &&
+                        (explicitLocation !== "local" || !state.supportsLocal)
+                    )
+                        throw Error("工作位置不可用");
+                    const hasId = body.id !== undefined;
+                    const id = hasId ? String(body.id ?? "") : "";
+                    if (
+                        explicitLocation === "cloud" &&
+                        id &&
+                        !state.cloudProjects.includes(id)
+                    )
+                        throw Error("云端项目不可用");
+                    if (
+                        explicitLocation === "local" &&
+                        id &&
+                        !state.local?.workspaces.some(
+                            (item) => item.workspace_id === id,
+                        )
+                    )
+                        throw Error("此本地目录尚未授权");
+                    state.draftVersion++;
+                    turn.rememberProject(
+                        explicitLocation,
+                        hasId ? id : undefined,
+                    );
+                    state.error = "";
+                } else {
+                    const current = state.sessions[state.selectedId];
+                    if (current) {
+                        state.draftVersion++;
+                        const target = current.execution_target;
+                        if (
+                            target &&
+                            state.local?.workspaces.some(
+                                (item) =>
+                                    item.device_id === target.device_id &&
+                                    item.workspace_id === target.workspace_id,
+                            )
+                        )
+                            turn.rememberProject("local", target.workspace_id);
+                        else if (
+                            current.cloud_project &&
+                            state.cloudProjects.includes(current.cloud_project)
+                        )
+                            turn.rememberProject(
+                                "cloud",
+                                current.cloud_project,
+                            );
+                    }
+                }
                 turn.select("");
                 break;
+            }
             case "session.select":
                 if (typeof body.id !== "string" || !state.sessions[body.id])
                     throw Error("会话不存在");
@@ -936,19 +1065,16 @@ export function reduceAgent(
                 )
                     throw Error("请等待设置保存完成");
                 if (session?.session.run_id) throw Error("请等待当前任务结束");
+                const choice = draftProject(state);
                 const target = session
                     ? session.execution_target
-                    : state.draftTarget;
-                if (
-                    target &&
-                    target.device_id === state.local?.deviceId &&
-                    !state.local.workspaces.some(
-                        (item) =>
-                            item.workspace_id === target.workspace_id &&
-                            item.directory === target.directory,
-                    )
-                )
-                    throw Error("原目录尚未授权，请重新选择工作目录");
+                    : choice.location === "local"
+                      ? state.local?.workspaces.find(
+                            (item) => item.workspace_id === choice.id,
+                        )
+                      : null;
+                if (session && isLocalDirectoryUnavailable(state, session))
+                    throw Error("原目录尚未授权，请恢复原目录授权或新建会话");
                 if (
                     target?.device_id &&
                     !state.desktops.some(
@@ -989,6 +1115,8 @@ export function reduceAgent(
                         body.runId !== last!.run_id)
                 )
                     throw Error("失败轮次已变化，请重新选择重试");
+                if (!session && (!choice.id || creatingProject(state)))
+                    throw Error("请先选择项目");
                 if (!retry && !text.trim()) throw Error("请输入消息");
                 if (!retry) state.drafts[state.selectedId] = text;
                 state.error = "";
@@ -999,6 +1127,9 @@ export function reduceAgent(
                         text: retry ? "" : text,
                         retry_run_id: retry ? last!.run_id : "",
                         model_id: modelId,
+                        ...(!session && choice.location === "cloud"
+                            ? { cloud_project: choice.id }
+                            : {}),
                         ...(!session && target
                             ? { execution_target: target }
                             : {}),

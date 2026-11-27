@@ -140,10 +140,6 @@ function Tools:execute(call, context, run, record)
     return result
 end
 
-function Tools:has_active()
-    return self.runtime:has_active()
-end
-
 function Tools:close()
     self.runtime:close()
 end

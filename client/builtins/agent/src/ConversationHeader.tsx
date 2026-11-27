@@ -10,6 +10,7 @@ import {
     VStack,
 } from "@astryxdesign/core";
 import { Bars3BottomLeftIcon } from "@heroicons/react/24/outline";
+import { isLocalDirectoryUnavailable } from "@skynet/agent-client/selectors";
 import type { AgentState, ChatSession } from "@skynet/agent-client/types";
 import { connectionStatusMeta, formatWorkspaceLabel } from "./format";
 
@@ -33,20 +34,13 @@ export function ConversationHeader({
     const modelId = session?.model_id || state.defaultModelId;
     const modelName =
         state.models.find((model) => model.id === modelId)?.name || "";
-    const target = session ? session.execution_target : state.draftTarget;
-    const workspaceLabel = formatWorkspaceLabel(
-        target,
-        state.local?.workspaces ?? [],
-        session?.needs_workspace,
-    );
-    const showWorkspace =
-        state.supportsLocal ||
-        !!target?.device_id ||
-        !!session?.needs_workspace;
-    const subtitleParts = [
-        showWorkspace ? workspaceLabel : "",
-        modelName,
-    ].filter(Boolean);
+    const workspaceLabel = session
+        ? formatWorkspaceLabel(session, state.local?.deviceId, state.desktops)
+        : "";
+    const subtitleParts = [workspaceLabel, modelName].filter(Boolean);
+    const directoryUnavailable =
+        !!session?.needs_workspace ||
+        isLocalDirectoryUnavailable(state, session);
     const showConnectionStatus =
         state.syncing || state.connection.status !== "online";
     const canReconnect = ["offline", "error"].includes(state.connection.status);
@@ -113,8 +107,8 @@ export function ConversationHeader({
                     {session?.read_only && (
                         <Badge variant="neutral" label="只读" />
                     )}
-                    {session?.needs_workspace && (
-                        <Badge variant="warning" label="需选目录" />
+                    {directoryUnavailable && (
+                        <Badge variant="warning" label="原目录不可用" />
                     )}
                     {showConnectionStatus && (
                         <Badge

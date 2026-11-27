@@ -24,6 +24,7 @@ const names = [
     "AgentSnapshotReq",
     "AgentSessionHistoryReq",
     "AgentDesktopRegisterReq",
+    "AgentCloudProjectCreateReq",
     "AgentChatReq",
     "AgentSessionModelSetReq",
 ];
@@ -72,6 +73,7 @@ server.on("connection", (socket, upgrade) => {
         ],
         default_model_id: "fixture",
         chat_sessions: [],
+        cloud_projects: ["原生验收项目"],
     };
     socket.on("message", (data, binary) => {
         if (!binary) {
@@ -100,6 +102,7 @@ server.on("connection", (socket, upgrade) => {
             if (request.username === "fragment-history") {
                 snapshot.chat_sessions.push({
                     model_id: "fixture",
+                    cloud_project: "原生验收项目",
                     session: {
                         id: "wire-history-fixture",
                         title: "大消息验收",
@@ -191,6 +194,14 @@ server.on("connection", (socket, upgrade) => {
             send(socket, "AgentSnapshotRes", requestId, {
                 ret: 1,
                 snapshot: { ...snapshot, chat_sessions: summaries },
+            });
+            return;
+        }
+        if (name === "AgentCloudProjectCreateReq") {
+            snapshot.cloud_projects.push(request.name);
+            send(socket, "AgentCloudProjectCreateRes", requestId, {
+                ret: 1,
+                name: request.name,
             });
             return;
         }
@@ -297,6 +308,7 @@ server.on("connection", (socket, upgrade) => {
             },
             model_id: "fixture",
         };
+        session.cloud_project = request.cloud_project;
         snapshot.chat_sessions = [session];
         const accepted = structuredClone(session);
         send(socket, "AgentSessionUpdatedNtf", 0, { chat_session: session });

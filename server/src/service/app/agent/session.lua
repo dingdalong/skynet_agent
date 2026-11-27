@@ -33,6 +33,8 @@ local config = require("etc.cfg").agent
 ---@field model_id string
 ---@field run agent.Run?
 ---@field pending_runs table<agent.Run, boolean>
+---@field cloud_project string? 云端项目名称，桌面会话使用 execution_target
+---@field needs_workspace boolean
 ---@field execution_target table?
 local AgentSession = class()
 
@@ -60,11 +62,12 @@ end
 
 ---@param owner agent.Chat
 ---@param model_id string
-function AgentSession:ctor(owner, model_id, target, existing_id)
+function AgentSession:ctor(owner, model_id, target, existing_id, cloud_project, workspace)
     self.owner = owner
     self.id = existing_id or make_id("session")
     self.sequence = 0
-    self.restored = existing_id ~= nil
+    self.cloud_project = cloud_project
+    self.needs_workspace = false
     self.write_lock = require("skynet.queue")()
     self.recovery_notice = nil
     self.read_only = false
@@ -80,14 +83,14 @@ function AgentSession:ctor(owner, model_id, target, existing_id)
     self.pending_runs = owner.pending_runs
     self.agent = nil
     self.execution_target = target
-    if not existing_id then self:open_agent() end
+    if not existing_id then self:open_agent(workspace) end
 end
 
-function AgentSession:open_agent()
+function AgentSession:open_agent(workspace)
     local target, owner, model_id = self.execution_target, self.owner, self.model_id
     local directories = require("agent.workspace")
-    local workspace = target and target.directory or (self.restored and directories.existing or directories.create)(
-        config.tools.workspace_root, owner.app.identity.username, self.id)
+    workspace = workspace or (target and target.directory) or directories.existing(
+        config.tools.workspace_root, owner.app.identity.user_id, self.cloud_project)
     self.agent = Agent:new(models.resolve(config, model_id), owner.prompt_templates, {
         execution_target = target,
         workspace = workspace,
@@ -133,7 +136,7 @@ function AgentSession:snapshot(start, finish)
     if not notice and not pcall(models.resolve, config, self.model_id) then
         notice = "原模型不可用，请重新选择"
     end
-    if not notice and self.needs_workspace then notice = "原工作目录不可用，请重新选择工作目录" end
+    if not notice and self.needs_workspace then notice = "原项目目录不可用，请恢复原目录或新建会话" end
     return {
         needs_workspace = self.needs_workspace,
         session = {
@@ -149,6 +152,7 @@ function AgentSession:snapshot(start, finish)
         recovery_notice = notice,
         read_only = self.read_only or self.storage_failed,
         execution_target = self.execution_target,
+        cloud_project = self.cloud_project,
         model_id = self.model_id,
         permission_model_id = config.permission.model_id or self.model_id,
     }
@@ -208,8 +212,12 @@ end
 ---@return table
 function AgentSession:send_message(args, connection)
     if self.read_only or self.storage_failed then return failure(error_code.fail, "历史不完整，请另开会话") end
+    if self.sequence > 0 and self.cloud_project then
+        self.needs_workspace = not pcall(require("agent.workspace").existing, config.tools.workspace_root,
+            self.owner.app.identity.user_id, self.cloud_project)
+    end
     if self.needs_workspace or not self.agent and not pcall(self.open_agent, self) then
-        return failure(error_code.fail, "请重新选择可用的模型或工作目录")
+        return failure(error_code.fail, "请检查模型、恢复原项目目录或新建会话")
     end
     local text = args.text
     if self.run then return failure(error_code.server_busy, "该会话仍在生成", true) end
@@ -239,8 +247,12 @@ function AgentSession:send_message(args, connection)
     run.retry = retry_id ~= ""
     if retry_id == "" then
         self.messages[#self.messages + 1] = {
-            id = make_id("message"), role = 1, content = text, created_at = now_ms(), status = enum.message_status
-        .completed,
+            id = make_id("message"),
+            role = 1,
+            content = text,
+            created_at = now_ms(),
+            status = enum.message_status
+                .completed,
         }
         run.assistant = { id = make_id("message"), role = 2, created_at = now_ms(), reasoning = {} }
         self.messages[#self.messages + 1] = run.assistant
@@ -265,6 +277,7 @@ function AgentSession:send_message(args, connection)
         time = self.updated_at,
         model_id = self.model_id,
         target = self.execution_target,
+        cloud_project = self.cloud_project,
         title = self.title,
         retry = run.retry
     })
@@ -365,45 +378,6 @@ function AgentSession:stop_other_device_runs()
     if self.run and self.run.source_device ~= self.execution_target.device_id then self.run:cancel() end
     local tools = self.agent and self.agent.tools
     if tools then tools.runtime:stop_other_device_runs() end
-end
-
-function AgentSession:set_execution(target, connection)
-    assert(not self.run, "请先停止当前任务再切换执行目标")
-    assert(not self.read_only and not self.storage_failed, "会话仅可阅读")
-    local tools = self.agent and self.agent.tools
-    assert(not tools or not tools:has_active(), "请先停止后台进程")
-    target = self.owner.app.desktop_connections:validate_target(target, connection)
-    local workspace = target and target.directory or require("agent.workspace").create(
-        config.tools.workspace_root, self.owner.app.identity.username, self.id)
-    if not pcall(self.record, self, "target", { target = target, workspace = workspace }) then
-        return failure(error_code.call_fail, "工作目录保存未确认，请重新同步", true)
-    end
-    self.needs_workspace = false
-    if not self.agent then
-        self.execution_target = target
-        table.insert(self.saved_context, {
-            role = "developer",
-            source = "environment",
-            content = "执行环境已切换到 " .. workspace
-        })
-        self:_publish()
-        return { ret = error_code.succ, chat_session = self:snapshot() }
-    end
-    self.agent:close()
-    self.agent.options.workspace, self.agent.options.execution_target = workspace, target
-    self.execution_target = target
-    self.agent.turn = nil
-    local previous = self.messages[#self.messages]
-    if previous and previous.error then previous.error.retryable = false end
-    self.agent.messages[#self.agent.messages + 1] = {
-        role = "developer",
-        source = "environment",
-        content = "执行环境已切换，后续工具仅作用于新目标；"
-            .. "此前目录文件不会自动同步。工作目录: "
-            .. workspace .. "；操作系统: " .. (target and target.platform or require("agent.sandbox").platform())
-    }
-    self:_publish()
-    return { ret = error_code.succ, chat_session = self:snapshot() }
 end
 
 function AgentSession:close()

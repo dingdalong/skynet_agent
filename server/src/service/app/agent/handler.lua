@@ -29,17 +29,8 @@ function REQUEST:AgentSessionModelSetReq(args)
     return self.chat:set_session_model(args)
 end
 
-function REQUEST:AgentPreferenceSetReq(args, connection)
+function REQUEST:AgentPreferenceSetReq(args)
     local store = require("agent.persistence")
-    if args.set_target then
-        if not connection.device_id then return { ret = error_code.invalid_param } end
-        local ok, target = pcall(self.desktop_connections.validate_target, self.desktop_connections, args.target,
-            connection)
-        if not ok then return { ret = error_code.invalid_param, error = { message = "工作目录无效" } } end
-        store.settings(self, "device/" .. connection.device_id, { target = target or {} })
-        self.targets[connection.device_id] = target
-        return { ret = error_code.succ, target = target, set_target = true }
-    end
     if not pcall(require("agent.models").resolve, require("etc.cfg").agent, args.model_id) then
         return { ret = error_code.invalid_param, error = { message = "模型不可用" } }
     end
@@ -62,13 +53,19 @@ function REQUEST:AgentExecutionResultReq(args, connection)
     return attempt(Client.receive_result, self.pending_client_requests, args, connection)
 end
 
-function REQUEST:AgentSessionExecutionSetReq(args, connection)
-    local session = self.chat.sessions[args.session_id]
-    if not session then return { ret = error_code.fail } end
-    local ok, result = pcall(session.set_execution, session, args.target, connection)
-    if ok then return result end
-    log.failure("execution", "set_execution", result)
-    return { ret = error_code.invalid_param, error = { message = tostring(result), retryable = false } }
+function REQUEST:AgentCloudProjectCreateReq(args)
+    local workspace = require("agent.workspace")
+    if not workspace.valid_name(args.name) then
+        return { ret = error_code.invalid_param, error = { message = "请输入有效的单个项目名称" } }
+    end
+    local ok, err = pcall(workspace.create, require("etc.cfg").agent.tools.workspace_root, self.identity.user_id,
+        args.name)
+    if not ok then
+        log.failure("agent.workspace", "create", err)
+        return { ret = error_code.call_fail, error = { message = "云端项目目录创建失败" } }
+    end
+    self:publish("AgentCloudProjectCreatedNtf", { name = args.name })
+    return { ret = error_code.succ, name = args.name }
 end
 
 return { REQUEST = REQUEST }

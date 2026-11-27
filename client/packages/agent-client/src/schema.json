@@ -8,6 +8,7 @@
               "nested": {
                 "AgentChatReq": {
                   "fields": {
+                    "cloud_project": { "id": 7, "type": "string" },
                     "execution_target": { "id": 6, "type": "ExecutionTarget" },
                     "model_id": { "id": 5, "type": "string" },
                     "retry_run_id": { "id": 4, "type": "string" },
@@ -22,6 +23,19 @@
                     "ret": { "id": 2, "type": "int32" }
                   }
                 },
+                "AgentCloudProjectCreateReq": {
+                  "fields": { "name": { "id": 1, "type": "string" } }
+                },
+                "AgentCloudProjectCreateRes": {
+                  "fields": {
+                    "error": { "id": 2, "type": "ErrorInfo" },
+                    "name": { "id": 3, "type": "string" },
+                    "ret": { "id": 1, "type": "int32" }
+                  }
+                },
+                "AgentCloudProjectCreatedNtf": {
+                  "fields": { "name": { "id": 1, "type": "string" } }
+                },
                 "AgentDesktopRegisterReq": {
                   "fields": {
                     "authorization_id": { "id": 4, "type": "string" },
@@ -33,8 +47,7 @@
                 "AgentDesktopRegisterRes": {
                   "fields": {
                     "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" },
-                    "target": { "id": 3, "type": "ExecutionTarget" }
+                    "ret": { "id": 1, "type": "int32" }
                   }
                 },
                 "AgentDesktopUpdatedNtf": {
@@ -87,19 +100,13 @@
                   }
                 },
                 "AgentPreferenceSetReq": {
-                  "fields": {
-                    "model_id": { "id": 1, "type": "string" },
-                    "set_target": { "id": 2, "type": "bool" },
-                    "target": { "id": 3, "type": "ExecutionTarget" }
-                  }
+                  "fields": { "model_id": { "id": 1, "type": "string" } }
                 },
                 "AgentPreferenceSetRes": {
                   "fields": {
                     "error": { "id": 2, "type": "ErrorInfo" },
                     "model_id": { "id": 3, "type": "string" },
-                    "ret": { "id": 1, "type": "int32" },
-                    "set_target": { "id": 4, "type": "bool" },
-                    "target": { "id": 5, "type": "ExecutionTarget" }
+                    "ret": { "id": 1, "type": "int32" }
                   }
                 },
                 "AgentReasoningDeltaNtf": {
@@ -109,19 +116,6 @@
                     "revision": { "id": 5, "type": "uint32" },
                     "session_id": { "id": 1, "type": "string" },
                     "tool_call_id": { "id": 3, "type": "string" }
-                  }
-                },
-                "AgentSessionExecutionSetReq": {
-                  "fields": {
-                    "session_id": { "id": 1, "type": "string" },
-                    "target": { "id": 2, "type": "ExecutionTarget" }
-                  }
-                },
-                "AgentSessionExecutionSetRes": {
-                  "fields": {
-                    "chat_session": { "id": 3, "type": "ChatSession" },
-                    "error": { "id": 2, "type": "ErrorInfo" },
-                    "ret": { "id": 1, "type": "int32" }
                   }
                 },
                 "AgentSessionHistoryReq": {
@@ -161,6 +155,11 @@
                       "id": 3,
                       "rule": "repeated",
                       "type": "ChatSession"
+                    },
+                    "cloud_projects": {
+                      "id": 8,
+                      "rule": "repeated",
+                      "type": "string"
                     },
                     "default_model_id": { "id": 5, "type": "string" },
                     "desktops": {
@@ -218,6 +217,7 @@
                 },
                 "ChatSession": {
                   "fields": {
+                    "cloud_project": { "id": 8, "type": "string" },
                     "execution_target": { "id": 4, "type": "ExecutionTarget" },
                     "model_id": { "id": 2, "type": "string" },
                     "needs_workspace": { "id": 7, "type": "bool" },

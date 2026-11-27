@@ -41,7 +41,10 @@ local function multi_user_flow(login)
     local other = login()
     support.equal(#snapshot.chat_sessions, 0)
     support.equal(#b_snapshot.chat_sessions, 0)
-    local ack = a:request("AgentChatReq", { text = "[e2e:slow]" })
+    local project = a:cloud_project()
+    support.equal(other:request("AgentChatReq", { text = "跨账号", cloud_project = project }).ret, 12)
+    support.equal(b:request("AgentSnapshotReq").snapshot.cloud_projects[1], project)
+    local ack = a:request("AgentChatReq", { cloud_project = project, text = "[e2e:slow]" })
     local session_id, run_id = ack.chat_session.session.id, ack.chat_session.session.run_id
     local started = b:wait_for(function(event)
         return event.name == "AgentSessionUpdatedNtf" and event.payload.chat_session.session.run_id == run_id
@@ -89,7 +92,8 @@ local function app_center_flow(login, config)
     support.equal(admin:request("AppCenterUnlockReq", { token = "fixture-registry-token" }).ret, 1)
     support.equal(#admin:request("AppCenterListReq").services, 2)
     assert(peer:request("AppCenterSetReq", change).ret ~= 1)
-    local active = reader:request("AgentChatReq", { text = "[e2e:header-stall]" }).chat_session.session
+    local active = reader:request("AgentChatReq", { cloud_project = reader:cloud_project(), text = "[e2e:header-stall]" })
+        .chat_session.session
     support.equal(observer:request("AgentDesktopRegisterReq", {
         device_id = "desktop", name = "Desktop", authorization_id = "app-center-auth",
     }).ret, 1)
@@ -124,6 +128,7 @@ local function app_center_flow(login, config)
     support.equal(admin:request("AppCenterSetReq", change).ret, 1)
     support.same(agent_addresses(), current)
     local restored = reader:request("AgentSnapshotReq").snapshot.chat_sessions[1]
+    support.equal(restored.cloud_project, "验收项目")
     support.equal(restored.session.id, active.id)
     support.equal(last(reader:history(active.id)).status, enum.message_status.cancelled)
     support.equal(last(reader:send_message(active.id, "[e2e:success]")).status, enum.message_status.completed)
@@ -155,7 +160,7 @@ local function protocol_flow(connect)
     support.equal(prelogin:wait_for_close(), 1008)
     local ordered = connect()
     ordered:send_request(1, "LoginReq", { username = "ordered-" .. crypt.hexencode(crypt.randomkey()) })
-    ordered:send_request(2, "AgentChatReq", { text = "[e2e:success]" })
+    ordered:send_request(2, "AgentCloudProjectCreateReq", { name = "有序请求" })
     support.equal(ordered:wait_for(function(event) return event.message_id == 1 end).payload.ret, 1)
     support.equal(ordered:wait_for(function(event) return event.message_id == 2 end).payload.ret, 1)
     ordered:send_request(3, "LoginReq", { username = "second" })
