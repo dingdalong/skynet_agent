@@ -96,7 +96,7 @@ function WorkspaceSelector({
         {
             value: "server",
             label: "服务器工作目录",
-            description: "在服务端受管环境中执行任务",
+            description: "在服务器受管环境中执行任务",
         },
         ...(target?.device_id && !local
             ? [

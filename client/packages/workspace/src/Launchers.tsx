@@ -16,7 +16,9 @@ import {
 import {
     ArrowRightStartOnRectangleIcon,
     Cog6ToothIcon,
+    CubeIcon,
     MagnifyingGlassIcon,
+    RectangleStackIcon,
     Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import { SparklesIcon } from "@heroicons/react/24/solid";
@@ -51,7 +53,9 @@ export function AppArtwork({
         ? SparklesIcon
         : app.builtin && app.id === "settings"
           ? Cog6ToothIcon
-          : Squares2X2Icon;
+          : app.builtin && app.id === "app-center"
+            ? Squares2X2Icon
+            : CubeIcon;
     return (
         <HStack
             as="span"
@@ -352,7 +356,7 @@ export function Launchers({
                     endContent={
                         <HStack align="center" gap={1.5}>
                             <IconButton
-                                icon={<Icon icon="copy" />}
+                                icon={<Icon icon={RectangleStackIcon} />}
                                 label="后台应用"
                                 tooltip={
                                     workspace.recent.length

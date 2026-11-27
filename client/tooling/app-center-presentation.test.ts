@@ -297,6 +297,6 @@ describe("app-center presentation helpers", () => {
         ).toEqual(["broken"]);
         expect(serviceDisplayName(services[2])).toBe("回显服务");
         expect(localStatusLabel("running")).toBe("本地运行中");
-        expect(localStatusLabel(undefined)).toBe("服务端可用");
+        expect(localStatusLabel(undefined)).toBe("服务器可用");
     });
 });

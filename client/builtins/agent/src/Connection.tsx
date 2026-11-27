@@ -68,7 +68,7 @@ export function Connection({
                     uniqueID: "agent-directory-added",
                     body: "已授权本地目录",
                     type: "info",
-                    autoHideDuration: 2400,
+                    autoHideDuration: 2200,
                 });
             }
         } catch (err) {
@@ -117,7 +117,7 @@ export function Connection({
                                                 type="label"
                                                 weight="semibold"
                                             >
-                                                网关连接
+                                                服务器连接
                                             </Text>
                                             <Badge
                                                 variant={
@@ -158,7 +158,7 @@ export function Connection({
                                             {state.configuration.username ||
                                                 "未登录"}
                                         </MetadataListItem>
-                                        <MetadataListItem label="网关地址">
+                                        <MetadataListItem label="服务器地址">
                                             <Text type="code">
                                                 {state.configuration.url ||
                                                     "未配置"}
@@ -309,7 +309,7 @@ export function Connection({
                                                         >
                                                             {desktop.remote_enabled && (
                                                                 <Badge
-                                                                    variant="blue"
+                                                                    variant="info"
                                                                     label="远程可用"
                                                                 />
                                                             )}

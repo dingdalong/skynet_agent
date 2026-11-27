@@ -75,7 +75,7 @@ export type ConnectionStatus = AgentState["connection"]["status"];
 export interface ConnectionStatusMeta {
     label: string;
     dotVariant: "success" | "warning" | "error" | "accent" | "neutral";
-    badgeVariant: "success" | "warning" | "error" | "blue" | "neutral";
+    badgeVariant: "success" | "warning" | "error" | "info" | "neutral";
     pulsing: boolean;
     description: string;
 }
@@ -88,7 +88,7 @@ export function connectionStatusMeta(
         return {
             label: "同步会话",
             dotVariant: "accent",
-            badgeVariant: "blue",
+            badgeVariant: "info",
             pulsing: true,
             description: "正在与服务器同步最新会话状态。",
         };
@@ -100,21 +100,21 @@ export function connectionStatusMeta(
                 dotVariant: "success",
                 badgeVariant: "success",
                 pulsing: false,
-                description: "已连接到网关，可以发送任务并接收实时响应。",
+                description: "已连接到服务器，可以发送任务并接收实时响应。",
             };
         case "connecting":
             return {
                 label: "连接中",
                 dotVariant: "accent",
-                badgeVariant: "blue",
+                badgeVariant: "info",
                 pulsing: true,
-                description: "正在建立与网关的安全连接。",
+                description: "正在建立与服务器的安全连接。",
             };
         case "restoring":
             return {
                 label: "恢复会话",
                 dotVariant: "accent",
-                badgeVariant: "blue",
+                badgeVariant: "info",
                 pulsing: true,
                 description: "正在恢复会话快照与任务状态。",
             };
@@ -140,7 +140,7 @@ export function connectionStatusMeta(
                 dotVariant: "error",
                 badgeVariant: "error",
                 pulsing: false,
-                description: "无法连接到网关，请检查网络或手动重新连接。",
+                description: "无法连接到服务器，请检查网络或手动重新连接。",
             };
         case "offline":
         default:

@@ -24,11 +24,12 @@ import {
     VStack,
     useToast,
 } from "@astryxdesign/core";
+import { useClipboard } from "@astryxdesign/core/hooks";
 import {
     AdjustmentsHorizontalIcon,
     CheckIcon,
     ClipboardDocumentIcon,
-    Squares2X2Icon,
+    CubeIcon,
 } from "@heroicons/react/24/outline";
 import {
     coverForApp,
@@ -49,8 +50,10 @@ function CopyableValue({
     copyLabel: string;
     toastLabel: string;
 }) {
-    const [copied, setCopied] = useState(false);
     const showToast = useToast();
+    const { copy, isCopied } = useClipboard({
+        announce: `已复制${toastLabel}`,
+    });
     const display = value?.trim();
     if (!display) {
         return (
@@ -61,22 +64,19 @@ function CopyableValue({
     }
 
     async function handleCopy() {
-        try {
-            await navigator.clipboard.writeText(display!);
-            setCopied(true);
+        const copied = await copy(display!);
+        if (copied) {
             showToast({
                 uniqueID: `copy-${toastLabel}`,
                 body: `已复制${toastLabel}`,
                 type: "info",
                 autoHideDuration: 2200,
             });
-            window.setTimeout(() => setCopied(false), 1800);
-        } catch {
+        } else {
             showToast({
                 uniqueID: `copy-error-${toastLabel}`,
-                body: "复制失败，请手动选中复制",
+                body: "无法写入剪贴板，请手动复制",
                 type: "error",
-                autoHideDuration: 2600,
             });
         }
     }
@@ -92,13 +92,13 @@ function CopyableValue({
                 {display}
             </Text>
             <IconButton
-                label={copied ? `已复制${copyLabel}` : `复制${copyLabel}`}
-                tooltip={copied ? "已复制" : `复制${copyLabel}`}
+                label={isCopied ? `已复制${copyLabel}` : `复制${copyLabel}`}
+                tooltip={isCopied ? "已复制" : `复制${copyLabel}`}
                 size="sm"
                 variant="ghost"
                 icon={
                     <Icon
-                        icon={copied ? CheckIcon : ClipboardDocumentIcon}
+                        icon={isCopied ? CheckIcon : ClipboardDocumentIcon}
                         size="sm"
                     />
                 }
@@ -188,7 +188,7 @@ export function DiscoverDetailDrawer({
                                                     height="100%"
                                                 >
                                                     <Icon
-                                                        icon={Squares2X2Icon}
+                                                        icon={CubeIcon}
                                                         size="lg"
                                                         color="secondary"
                                                     />
@@ -209,7 +209,7 @@ export function DiscoverDetailDrawer({
                                                 label="已启用"
                                             />
                                             <Text type="supporting">
-                                                已在服务端启用
+                                                已在服务器启用
                                             </Text>
                                         </HStack>
                                     </MetadataListItem>

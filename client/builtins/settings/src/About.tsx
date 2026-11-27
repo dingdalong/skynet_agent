@@ -16,6 +16,7 @@ import {
     VStack,
     useToast,
 } from "@astryxdesign/core";
+import { useClipboard } from "@astryxdesign/core/hooks";
 import {
     CheckIcon,
     ClipboardDocumentIcon,
@@ -44,20 +45,14 @@ export function About({
 }) {
     const { about, apps, capabilities } = snapshot;
     const showToast = useToast();
+    const { copy, isCopied } = useClipboard({
+        announce: "已复制版本与环境信息",
+    });
     const [localRefresh, setLocalRefresh] = useState(0);
     const [online, setOnline] = useState<OnlineNode[]>();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [copied, setCopied] = useState(false);
-    const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const loadedOnce = useRef(false);
-
-    useEffect(
-        () => () => {
-            if (copyTimer.current) clearTimeout(copyTimer.current);
-        },
-        [],
-    );
 
     const loadVersions = useCallback(
         (notifySuccess: boolean) => {
@@ -76,7 +71,7 @@ export function About({
                             uniqueID: "settings-versions-refreshed",
                             body: "版本信息已刷新",
                             type: "info",
-                            autoHideDuration: 2000,
+                            autoHideDuration: 2200,
                         });
                     }
                     loadedOnce.current = true;
@@ -116,23 +111,19 @@ export function About({
 
     const handleCopyDiagnostics = async () => {
         const summary = formatDiagnosticSummary({ about, capabilities, rows });
-        try {
-            await navigator.clipboard.writeText(summary);
-            setCopied(true);
-            if (copyTimer.current) clearTimeout(copyTimer.current);
-            copyTimer.current = setTimeout(() => setCopied(false), 1800);
+        const copied = await copy(summary);
+        if (copied) {
             showToast({
                 uniqueID: "settings-copy-diagnostics",
                 body: "已复制版本与环境信息",
                 type: "info",
                 autoHideDuration: 2200,
             });
-        } catch {
+        } else {
             showToast({
                 uniqueID: "settings-copy-diagnostics-failed",
                 body: "无法写入剪贴板，请手动复制",
                 type: "error",
-                autoHideDuration: 2800,
             });
         }
     };
@@ -176,13 +167,13 @@ export function About({
                             </VStack>
                         </HStack>
                         <Button
-                            label={copied ? "已复制信息" : "复制诊断信息"}
+                            label={isCopied ? "已复制信息" : "复制诊断信息"}
                             variant="secondary"
                             size="sm"
                             icon={
                                 <Icon
                                     icon={
-                                        copied
+                                        isCopied
                                             ? CheckIcon
                                             : ClipboardDocumentIcon
                                     }

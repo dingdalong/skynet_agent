@@ -158,7 +158,10 @@ export function CommandPaletteModal({
                                 style={{ flexShrink: 0 }}
                             >
                                 {meta.badge && (
-                                    <Badge variant="info" label={meta.badge} />
+                                    <Badge
+                                        variant="success"
+                                        label={meta.badge}
+                                    />
                                 )}
                                 {meta.shortcut && <Kbd keys={meta.shortcut} />}
                             </HStack>

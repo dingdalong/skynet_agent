@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import {
     Badge,
     Button,
-    Card,
+    ClickableCard,
     EmptyState,
     HStack,
     Icon,
+    IconButton,
     SideNav,
     SideNavHeading,
     SideNavItem,
@@ -119,7 +120,13 @@ export function SettingsSideNav({
             }
             footer={
                 !isCollapsed ? (
-                    <Card variant="muted" padding={2} width="100%">
+                    <ClickableCard
+                        label={`${platform} · ${clientVersion}，查看关于`}
+                        variant="muted"
+                        padding={2}
+                        width="100%"
+                        onClick={() => onSelectSection("about")}
+                    >
                         <HStack gap={2} vAlign="center" width="100%">
                             <Icon
                                 icon={PlatformIcon}
@@ -144,14 +151,32 @@ export function SettingsSideNav({
                                 </Text>
                             </VStack>
                         </HStack>
-                    </Card>
+                    </ClickableCard>
+                ) : undefined
+            }
+            footerIcons={
+                isCollapsed ? (
+                    <IconButton
+                        label={`关于本机（${platform} · ${clientVersion}）`}
+                        tooltip={`${platform} · ${clientVersion}`}
+                        variant="ghost"
+                        size="sm"
+                        icon={<Icon icon={PlatformIcon} size="sm" />}
+                        onClick={() => onSelectSection("about")}
+                    />
                 ) : undefined
             }
             collapsible={{
-                isCollapsed,
-                onCollapsedChange,
                 hasButton: true,
                 buttonLabel: isCollapsed ? "展开设置导航" : "收起设置导航",
+            }}
+            resizable={{
+                defaultWidth: 240,
+                minWidth: 210,
+                maxWidth: 320,
+                autoSaveId: "skynet.settings.sidebar",
+                isCollapsed,
+                onCollapseChange: onCollapsedChange,
             }}
         >
             {trimmedQuery && !isCollapsed ? (
@@ -196,7 +221,7 @@ export function SettingsSideNav({
                         description="试试搜索外观、壁纸、动态效果、应用或版本"
                         actions={
                             <Button
-                                label="清空搜索"
+                                label="清除搜索"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setSearchQuery("")}

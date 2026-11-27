@@ -9,25 +9,21 @@ import {
     Toolbar,
     VStack,
 } from "@astryxdesign/core";
-import { Bars3BottomLeftIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { Bars3BottomLeftIcon } from "@heroicons/react/24/outline";
 import type { AgentState, ChatSession } from "@skynet/agent-client/types";
 import { connectionStatusMeta, formatWorkspaceLabel } from "./format";
 
 export function ConversationHeader({
     state,
     session,
-    wide,
     showSidebarToggle,
     onToggleSidebar,
-    onCreateSession,
     onReconnect,
 }: {
     state: AgentState;
     session?: ChatSession;
-    wide: boolean;
     showSidebarToggle: boolean;
     onToggleSidebar: () => void;
-    onCreateSession: () => void;
     onReconnect: () => void;
 }) {
     const connection = connectionStatusMeta(
@@ -103,7 +99,7 @@ export function ConversationHeader({
                 <HStack gap={1.5} vAlign="center" wrap="nowrap">
                     {session?.session.run_id && (
                         <Badge
-                            variant="blue"
+                            variant="info"
                             icon={
                                 <StatusDot
                                     variant="accent"
@@ -139,16 +135,6 @@ export function ConversationHeader({
                             variant="secondary"
                             size="sm"
                             onClick={onReconnect}
-                        />
-                    )}
-                    {!wide && session && (
-                        <IconButton
-                            label="新建会话"
-                            tooltip="新建会话"
-                            variant="ghost"
-                            size="sm"
-                            icon={<Icon icon={PlusIcon} size="sm" />}
-                            onClick={onCreateSession}
                         />
                     )}
                 </HStack>

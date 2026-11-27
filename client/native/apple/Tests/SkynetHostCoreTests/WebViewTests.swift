@@ -526,10 +526,10 @@ final class WebViewTests: XCTestCase {
         )
         try await harness.activateToolbar("connection")
         try await harness.until(
-            "document.body.innerText.includes('网关连接') && document.body.innerText.includes('webkit-agent')"
+            "document.body.innerText.includes('服务器连接') && document.body.innerText.includes('webkit-agent')"
         )
         try await harness.click("完成")
-        try await harness.until("!document.body.innerText.includes('网关连接')")
+        try await harness.until("!document.body.innerText.includes('服务器连接')")
         _ = try await harness.web.evaluateJavaScript(
             """
             (()=>{const e=document.querySelector('.agent-chat');
@@ -851,18 +851,30 @@ final class WebViewTests: XCTestCase {
         try await harness.until(
             "document.querySelectorAll('[aria-label=\"按状态筛选应用\"] button[aria-pressed]').length >= 4"
         )
-        try await harness.untilToolbar("install", labelContaining: "安装应用")
+        try await harness.until(
+            "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim() === '安装应用')"
+        )
         try await harness.click("查看 设置 详情")
         try await harness.until(
             "document.querySelector('dialog[open]') !== null && document.querySelector('dialog[open]').innerText.includes('声明权限')"
         )
         try await harness.click("关闭")
         try await harness.until("document.querySelector('dialog[open]') === null")
+        try await harness.activateToolbar("sidebar")
+        try await harness.until(
+            "(document.querySelector('nav[aria-label=\"设置导航\"]')?.getBoundingClientRect().width ?? 999) < 100"
+        )
+        try await harness.activateToolbar("sidebar")
+        try await harness.until(
+            "(document.querySelector('nav[aria-label=\"设置导航\"]')?.getBoundingClientRect().width ?? 0) >= 200"
+        )
         try await harness.click("关于")
         try await harness.until(
             "document.querySelector('h1')?.textContent==='关于' && document.body.innerText.includes('复制诊断信息')"
         )
-        try await harness.untilToolbar("refresh", labelContaining: "刷新版本")
+        try await harness.until(
+            "Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim() === '刷新版本')"
+        )
         let agent = WebHarness(core: core, entry: try XCTUnwrap(core.appCatalog.entries["agent"]))
         defer { agent.close() }
         try await agent.untilToolbar("new", labelContaining: "新建会话")

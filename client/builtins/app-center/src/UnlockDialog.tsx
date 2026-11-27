@@ -92,7 +92,7 @@ export function UnlockDialog({
                                     ref={inputRef}
                                     label="管理令牌"
                                     type="password"
-                                    placeholder="输入服务端配置的管理令牌"
+                                    placeholder="输入服务器配置的管理令牌"
                                     startIcon={KeyIcon}
                                     value={token}
                                     hasAutoFocus

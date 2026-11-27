@@ -143,6 +143,9 @@ describe("settings presentation helpers", () => {
                 (a) => a.id,
             ),
         ).toEqual(["notes"]);
+        expect(
+            filterInstalledApps(apps, "all", "扩展").map((a) => a.id),
+        ).toEqual(["notes", "timer"]);
         expect(filterInstalledApps(apps, "all", "不存在")).toEqual([]);
     });
 
@@ -167,7 +170,7 @@ describe("settings presentation helpers", () => {
             "独立进程隔离",
         );
         expect(capabilitiesSummary(macCapabilities)).toBe(
-            "支持分屏 · 允许安装外部应用 · 支持本机执行",
+            "支持分屏 · 允许安装扩展应用 · 支持本机执行",
         );
         expect(platformLabel(iosCapabilities.platform)).toBe("iOS");
         expect(isolationLabel(iosCapabilities.runtimeIsolation)).toBe(

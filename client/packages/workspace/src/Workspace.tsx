@@ -33,7 +33,7 @@ import {
     ExclamationTriangleIcon,
     HomeIcon,
     MagnifyingGlassIcon,
-    Squares2X2Icon,
+    RectangleStackIcon,
     TrashIcon,
 } from "@heroicons/react/24/outline";
 import { useHotkeys, usePanGesture } from "@astryxdesign/core/hooks";
@@ -79,11 +79,22 @@ type ShellProps = {
 };
 const control = (
     label: string,
-    icon: "chevronLeft" | "chevronsLeft" | "chevronsRight" | "close" | "copy",
+    icon:
+        "chevronLeft" | "chevronsLeft" | "chevronsRight" | "close" | "overview",
     click: () => void,
 ) => (
     <IconButton
-        icon={<Icon icon={icon === "chevronLeft" ? HomeIcon : icon} />}
+        icon={
+            <Icon
+                icon={
+                    icon === "chevronLeft"
+                        ? HomeIcon
+                        : icon === "overview"
+                          ? RectangleStackIcon
+                          : icon
+                }
+            />
+        }
         label={label}
         tooltip={label}
         variant="ghost"
@@ -304,7 +315,7 @@ function PanelToolbar({
     actions.push(
         {
             id: "overview",
-            control: control("后台应用", "copy", overview),
+            control: control("后台应用", "overview", overview),
             menu: { label: "后台应用", onClick: overview },
         },
         {
@@ -458,6 +469,7 @@ export function Workspace(props: ShellProps) {
                     type: "info",
                     body: "已关闭全部后台应用",
                     uniqueID: "workspace-close-all",
+                    autoHideDuration: 2200,
                 });
             }
         } finally {
@@ -630,7 +642,10 @@ export function Workspace(props: ShellProps) {
                             <Center height="100%" padding={6}>
                                 <EmptyState
                                     icon={
-                                        <Icon icon={Squares2X2Icon} size="lg" />
+                                        <Icon
+                                            icon={RectangleStackIcon}
+                                            size="lg"
+                                        />
                                     }
                                     title="暂无后台应用"
                                     description="打开的应用会显示在这里，方便随时切换或一键分屏。"

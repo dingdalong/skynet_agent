@@ -7,7 +7,15 @@ import {
     type ErrorInfo,
     type ReactNode,
 } from "react";
-import { Banner, Button, Theme, VStack } from "@astryxdesign/core";
+import {
+    Button,
+    Center,
+    EmptyState,
+    Icon,
+    Theme,
+    VStack,
+} from "@astryxdesign/core";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import chinese from "@astryxdesign/core/locales/zh-CN.generated.js";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
@@ -122,16 +130,21 @@ class ViewBoundary extends Component<
     render() {
         if (!this.state.error) return this.props.children;
         return (
-            <VStack as="main" padding={6} gap={4}>
-                <Banner
-                    status="error"
-                    title="应用界面遇到问题"
-                    description={this.state.error}
-                />
-                <Button
-                    label="重新载入界面"
-                    onClick={() => location.reload()}
-                />
+            <VStack as="main" height="100dvh" width="100%">
+                <Center axis="both" height="100%" padding={6}>
+                    <EmptyState
+                        icon={<Icon icon={ExclamationTriangleIcon} size="lg" />}
+                        title="应用界面遇到问题"
+                        description={this.state.error}
+                        actions={
+                            <Button
+                                label="重新载入界面"
+                                variant="primary"
+                                onClick={() => location.reload()}
+                            />
+                        }
+                    />
+                </Center>
             </VStack>
         );
     }

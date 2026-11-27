@@ -19,7 +19,7 @@ import {
     Thumbnail,
     VStack,
 } from "@astryxdesign/core";
-import { ChevronRightIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { ChevronRightIcon, CubeIcon } from "@heroicons/react/24/outline";
 import {
     coverForApp,
     formatVersionBadge,
@@ -90,7 +90,7 @@ export function AppGallery({
                         : item.appId
                     : item.localApp
                       ? localStatusLabel(item.localApp.status)
-                      : "服务端已启用";
+                      : "服务器已启用";
                 return (
                     <VStack
                         as="article"
@@ -124,7 +124,7 @@ export function AppGallery({
                                     >
                                         <Center axis="both" height="100%">
                                             <Icon
-                                                icon={Squares2X2Icon}
+                                                icon={CubeIcon}
                                                 size="lg"
                                                 color="secondary"
                                             />
@@ -334,7 +334,7 @@ export function ServiceCard({
                                         elevation="none"
                                     >
                                         <Icon
-                                            icon={Squares2X2Icon}
+                                            icon={CubeIcon}
                                             size="md"
                                             color="secondary"
                                         />

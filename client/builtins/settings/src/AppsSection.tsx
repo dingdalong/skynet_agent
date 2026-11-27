@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Badge,
     Banner,
@@ -30,6 +30,7 @@ import {
     VStack,
     useToast,
 } from "@astryxdesign/core";
+import { useClipboard } from "@astryxdesign/core/hooks";
 import {
     CheckIcon,
     ChevronRightIcon,
@@ -61,34 +62,22 @@ function iconForApp(appId: string) {
 
 function CopyableField({ value, label }: { value: string; label: string }) {
     const showToast = useToast();
-    const [copied, setCopied] = useState(false);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(
-        () => () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-        },
-        [],
-    );
+    const { copy, isCopied } = useClipboard({ announce: `已复制${label}` });
 
     const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(value);
-            setCopied(true);
-            if (timerRef.current) clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => setCopied(false), 1800);
+        const copied = await copy(value);
+        if (copied) {
             showToast({
                 uniqueID: `settings-copy-${label}`,
                 body: `已复制${label}`,
                 type: "info",
-                autoHideDuration: 2000,
+                autoHideDuration: 2200,
             });
-        } catch {
+        } else {
             showToast({
                 uniqueID: "settings-copy-failed",
-                body: "无法写入剪贴板，请手动选择复制",
+                body: "无法写入剪贴板，请手动复制",
                 type: "error",
-                autoHideDuration: 2800,
             });
         }
     };
@@ -103,13 +92,13 @@ function CopyableField({ value, label }: { value: string; label: string }) {
                 {value}
             </Text>
             <IconButton
-                label={`复制${label}`}
-                tooltip={copied ? "已复制" : `复制${label}`}
+                label={isCopied ? `已复制${label}` : `复制${label}`}
+                tooltip={isCopied ? "已复制" : `复制${label}`}
                 variant="ghost"
                 size="sm"
                 icon={
                     <Icon
-                        icon={copied ? CheckIcon : ClipboardDocumentIcon}
+                        icon={isCopied ? CheckIcon : ClipboardDocumentIcon}
                         size="sm"
                     />
                 }
@@ -439,7 +428,7 @@ export function AppsSection({
                 <Banner
                     status="info"
                     title="当前平台仅运行内置应用"
-                    description="此设备运行随安装包交付的受信任内置应用，不支持动态安装第三方应用包。"
+                    description="此设备运行随安装包交付的受信任内置应用，不支持动态安装扩展应用包。"
                 />
             )}
 
@@ -566,7 +555,7 @@ export function AppsSection({
                             />
                         }
                         title="没有匹配的应用"
-                        description="尝试调整筛选条件或清空搜索关键词。"
+                        description="尝试调整筛选条件或清除搜索关键词。"
                         actions={
                             <Button
                                 label="重置筛选"

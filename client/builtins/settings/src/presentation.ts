@@ -415,7 +415,7 @@ export function filterInstalledApps(
             entry.version,
             entry.build ?? "",
             appStatusMeta(entry.status).label,
-            entry.builtin ? "内置" : "第三方",
+            entry.builtin ? "内置" : "扩展 第三方",
             ...entry.permissions,
             ...entry.permissions.map(permissionLabel),
         ]
@@ -465,7 +465,7 @@ export function capabilitiesSummary(capabilities?: HostCapabilities): string {
     if (!capabilities) return "未上报";
     const parts = [
         capabilities.splitView ? "支持分屏" : "单窗模式",
-        capabilities.installApplications ? "允许安装外部应用" : "仅内置应用",
+        capabilities.installApplications ? "允许安装扩展应用" : "仅内置应用",
     ];
     if (capabilities.localDevelopment) parts.push("支持本机执行");
     return parts.join(" · ");

@@ -355,7 +355,7 @@ export function localStatusLabel(status?: AppSummary["status"]): string {
     if (status === "starting") return "本地启动中";
     if (status === "failed") return "本地异常";
     if (status === "stopped") return "本地已内置";
-    return "服务端可用";
+    return "服务器可用";
 }
 
 export const DISCOVER_SORT_LABELS: Record<DiscoverSort, string> = {

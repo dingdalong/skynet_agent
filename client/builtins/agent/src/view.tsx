@@ -4,9 +4,12 @@ import {
     AppShell,
     Banner,
     Button,
+    Center,
     ChatLayout,
     ChatMessageList,
     ChatSystemMessage,
+    EmptyState,
+    Icon,
     LayerProvider,
     Layout,
     LayoutHeader,
@@ -14,6 +17,7 @@ import {
     VStack,
 } from "@astryxdesign/core";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import {
     AppBoundary,
     useAppSnapshot,
@@ -42,7 +46,7 @@ function Agent() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [bridgeError, setBridgeError] = useState("");
-    const wide = useMediaQuery("(min-width: 768px)");
+    const wide = useMediaQuery("(min-width: 720px)");
     const composerHandle = useRef<ComposerHandle>(null);
     const send: Send = async (name, payload = {}) => {
         try {
@@ -153,16 +157,30 @@ function Agent() {
     );
     if (state?.version !== 1)
         return (
-            <VStack as="main" aria-label="Agent" padding={4}>
-                {snapshot?.error ? (
-                    <Banner
-                        status="error"
-                        title="应用运行时已停止"
-                        description={snapshot.error}
-                    />
-                ) : (
-                    <Spinner label="正在载入对话…" />
-                )}
+            <VStack as="main" aria-label="Agent" height="100dvh" width="100%">
+                <Center axis="both" height="100%" padding={6}>
+                    {snapshot?.error ? (
+                        <EmptyState
+                            icon={
+                                <Icon
+                                    icon={ExclamationTriangleIcon}
+                                    size="lg"
+                                />
+                            }
+                            title="应用运行时已停止"
+                            description={snapshot.error}
+                            actions={
+                                <Button
+                                    label="重新载入界面"
+                                    variant="primary"
+                                    onClick={() => location.reload()}
+                                />
+                            }
+                        />
+                    ) : (
+                        <Spinner label="正在载入对话…" />
+                    )}
+                </Center>
             </VStack>
         );
     const messages = session?.session.messages ?? [];
@@ -213,10 +231,8 @@ function Agent() {
                                 <ConversationHeader
                                     state={state}
                                     session={session}
-                                    wide={wide}
                                     showSidebarToggle={!wide}
                                     onToggleSidebar={toggleSidebar}
-                                    onCreateSession={createSession}
                                     onReconnect={() =>
                                         void send("connection.reconnect")
                                     }

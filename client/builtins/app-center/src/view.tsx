@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     AlertDialog,
+    AppShell,
     Badge,
     Banner,
     Button,
@@ -10,12 +11,12 @@ import {
     Heading,
     HStack,
     Icon,
-    IconButton,
     LayerProvider,
     Layout,
     LayoutContent,
     LayoutHeader,
     OverflowList,
+    Spinner,
     StackItem,
     Tab,
     TabList,
@@ -28,7 +29,6 @@ import {
 } from "@astryxdesign/core";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import {
-    ArrowPathIcon,
     ArrowsUpDownIcon,
     LockClosedIcon,
     MagnifyingGlassIcon,
@@ -41,6 +41,7 @@ import {
     useAppSnapshot,
     usePaneToolbar,
 } from "@skynet/app-sdk/react";
+import type { PaneToolbarItem } from "@skynet/contracts";
 import {
     AppGallery,
     DiscoverSkeletonGrid,
@@ -74,7 +75,7 @@ const SERVICE_FILTER_ORDER: ServiceFilter[] = [
 
 function AppCenter() {
     const snapshot = useAppSnapshot<{ revision: number }>();
-    const wide = useMediaQuery("(min-width: 560px)");
+    const wide = useMediaQuery("(min-width: 720px)");
     const showToast = useToast();
 
     const [directory, setDirectory] = useState<Directory>();
@@ -90,7 +91,6 @@ function AppCenter() {
     const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
     const [changing, setChanging] = useState(false);
     const [busyAppId, setBusyAppId] = useState("");
-    const [initialLoading, setInitialLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [loadError, setLoadError] = useState("");
     const [changeError, setChangeError] = useState("");
@@ -115,7 +115,6 @@ function AppCenter() {
                     if (!active) return;
                     setDirectory(value as unknown as Directory);
                     setLoadError("");
-                    setInitialLoading(false);
                     setRefreshing(false);
                 },
                 (failure) => {
@@ -125,7 +124,6 @@ function AppCenter() {
                             ? failure.message
                             : String(failure),
                     );
-                    setInitialLoading(false);
                     setRefreshing(false);
                 },
             );
@@ -218,36 +216,35 @@ function AppCenter() {
         [directory?.administrator, navigate],
     );
 
-    usePaneToolbar(
-        [
-            { id: "refresh", label: "刷新" },
-            directory?.administrator
-                ? {
-                      id: "admin",
-                      label:
-                          summary.pending > 0
-                              ? `待审 · ${summary.pending}`
-                              : "服务管理",
-                      selected: managing,
-                  }
-                : { id: "admin", label: "管理员解锁" },
-        ],
-        (id) => {
-            if (id === "refresh") {
-                reload(true);
-                return;
+    const toolbarItems: PaneToolbarItem[] = useMemo(() => {
+        const items: PaneToolbarItem[] = [{ id: "refresh", label: "刷新" }];
+        if (!directory?.administrator) {
+            items.push({ id: "admin", label: "管理员解锁" });
+        } else if (summary.pending > 0) {
+            items.push({
+                id: "admin",
+                label: `待审 · ${summary.pending}`,
+                selected: managing && serviceFilter === "pending",
+            });
+        }
+        return items;
+    }, [directory?.administrator, summary.pending, managing, serviceFilter]);
+
+    usePaneToolbar(toolbarItems, (id) => {
+        if (id === "refresh") {
+            reload(true);
+            return;
+        }
+        if (id === "admin") {
+            if (!directory?.administrator) {
+                setUnlockOpen(true);
+            } else if (summary.pending > 0) {
+                navigate("manage", { filter: "pending" });
+            } else {
+                navigate("manage");
             }
-            if (id === "admin") {
-                if (!directory?.administrator) {
-                    setUnlockOpen(true);
-                } else if (summary.pending > 0) {
-                    navigate("manage", { filter: "pending" });
-                } else {
-                    navigate("manage");
-                }
-            }
-        },
-    );
+        }
+    });
 
     async function performServiceChange(
         action: string,
@@ -265,7 +262,7 @@ function AppCenter() {
                 uniqueID: `app-center-${action}-${appId}`,
                 body: successToast,
                 type: "info",
-                autoHideDuration: 2800,
+                autoHideDuration: 2200,
             });
         } catch (failure) {
             setChangeError(
@@ -331,7 +328,7 @@ function AppCenter() {
                     description={
                         hasQuery
                             ? "试试更换关键词，或清除搜索查看全部应用。"
-                            : "当前服务端没有启用的应用，可刷新目录或进入服务管理启用。"
+                            : "当前服务器没有启用的应用，可刷新目录或进入服务管理启用。"
                     }
                     icon={
                         <Icon
@@ -401,7 +398,7 @@ function AppCenter() {
                     description={
                         filtered
                             ? "调整筛选分类或清除搜索词即可查看全部应用服务。"
-                            : "服务端尚未登记任何应用服务。"
+                            : "服务器尚未登记任何应用服务。"
                     }
                     icon={<Icon icon={MagnifyingGlassIcon} />}
                     actions={
@@ -442,7 +439,7 @@ function AppCenter() {
     }
 
     return (
-        <VStack width="100%" height="100dvh" gap={0}>
+        <AppShell variant="section" height="fill" mobileNav={false}>
             <Layout
                 height="fill"
                 contentWidth="64rem"
@@ -460,31 +457,30 @@ function AppCenter() {
                                 gap={3}
                             >
                                 <VStack gap={0.5}>
-                                    <Heading level={1} weight="bold">
-                                        应用中心
-                                    </Heading>
-                                    <Text type="supporting" color="secondary">
+                                    <Heading level={1}>应用中心</Heading>
+                                    <Text
+                                        type="supporting"
+                                        size="sm"
+                                        color="secondary"
+                                    >
                                         {managing
                                             ? "查看容器状态、审批上架申请并管理服务启停"
-                                            : "发现并浏览当前服务端已启用的应用"}
+                                            : "发现并浏览当前服务器已启用的应用"}
                                     </Text>
                                 </VStack>
                                 <HStack gap={2} vAlign="center">
+                                    {refreshing && (
+                                        <Spinner
+                                            size="sm"
+                                            label="正在刷新目录"
+                                        />
+                                    )}
                                     {directory?.administrator && (
                                         <Badge
                                             variant="success"
                                             label="管理员"
                                         />
                                     )}
-                                    <IconButton
-                                        label="刷新目录"
-                                        tooltip="刷新目录"
-                                        variant="ghost"
-                                        icon={<Icon icon={ArrowPathIcon} />}
-                                        isLoading={refreshing}
-                                        isDisabled={initialLoading}
-                                        onClick={() => reload(true)}
-                                    />
                                 </HStack>
                             </HStack>
 
@@ -542,11 +538,7 @@ function AppCenter() {
                     </LayoutHeader>
                 }
                 content={
-                    <LayoutContent
-                        isScrollable
-                        role="main"
-                        padding={wide ? 6 : 4}
-                    >
+                    <LayoutContent isScrollable padding={wide ? 6 : 4}>
                         <VStack gap={5}>
                             {loadError && (
                                 <Banner
@@ -583,12 +575,12 @@ function AppCenter() {
                                     <HStack gap={3} vAlign="center" wrap="wrap">
                                         <StackItem size="fill">
                                             <TextInput
+                                                type="search"
                                                 label="搜索应用"
                                                 isLabelHidden
                                                 placeholder="按应用名称、标识或版本搜索…"
-                                                startIcon={MagnifyingGlassIcon}
+                                                startIcon="search"
                                                 hasClear
-                                                size="lg"
                                                 value={query}
                                                 onChange={setQuery}
                                             />
@@ -598,7 +590,6 @@ function AppCenter() {
                                                 label: DISCOVER_SORT_LABELS[
                                                     discoverSort
                                                 ],
-                                                size: "lg",
                                                 variant: "secondary",
                                                 icon: (
                                                     <Icon
@@ -679,12 +670,11 @@ function AppCenter() {
 
                                             <VStack gap={3}>
                                                 <TextInput
+                                                    type="search"
                                                     label="搜索服务"
                                                     isLabelHidden
                                                     placeholder="按服务名称、应用标识、镜像或审批人搜索…"
-                                                    startIcon={
-                                                        MagnifyingGlassIcon
-                                                    }
+                                                    startIcon="search"
                                                     hasClear
                                                     value={query}
                                                     onChange={setQuery}
@@ -803,7 +793,7 @@ function AppCenter() {
                         uniqueID: "app-center-unlocked",
                         body: "管理员权限已解锁",
                         type: "info",
-                        autoHideDuration: 2400,
+                        autoHideDuration: 2200,
                     });
                     navigate("manage");
                     reload(false);
@@ -876,7 +866,7 @@ function AppCenter() {
                     }
                 />
             )}
-        </VStack>
+        </AppShell>
     );
 }
 

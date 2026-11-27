@@ -4,7 +4,7 @@
   "stateVersion": 1,
   "id": "app-center",
   "name": "应用中心",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "permissions": ["user.identity"],
   "networkOrigins": [],
   "actions": {}

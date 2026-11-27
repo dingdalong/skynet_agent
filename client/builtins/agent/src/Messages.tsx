@@ -225,16 +225,22 @@ export function MessageRow({
                             />
                         }
                         onClick={() => {
-                            void copy(message.content).then((copied) =>
-                                showToast({
-                                    uniqueID: "agent-copy",
-                                    body: copied
-                                        ? "已复制到剪贴板"
-                                        : "复制失败，请手动选择文本",
-                                    type: copied ? "info" : "error",
-                                    autoHideDuration: 2200,
-                                }),
-                            );
+                            void copy(message.content).then((copied) => {
+                                if (copied) {
+                                    showToast({
+                                        uniqueID: "agent-copy",
+                                        body: "已复制到剪贴板",
+                                        type: "info",
+                                        autoHideDuration: 2200,
+                                    });
+                                } else {
+                                    showToast({
+                                        uniqueID: "agent-copy",
+                                        body: "无法写入剪贴板，请手动复制",
+                                        type: "error",
+                                    });
+                                }
+                            });
                         }}
                     />
                 )}

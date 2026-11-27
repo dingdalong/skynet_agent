@@ -94,8 +94,10 @@ describe("agent UI presentation helpers", () => {
         expect(connectionStatusMeta("online", true)).toMatchObject({
             label: "同步会话",
             dotVariant: "accent",
+            badgeVariant: "info",
             pulsing: true,
         });
+        expect(connectionStatusMeta("connecting").badgeVariant).toBe("info");
         expect(connectionStatusMeta("retrying").dotVariant).toBe("warning");
         expect(connectionStatusMeta("unavailable").label).toBe("服务已下线");
         expect(connectionStatusMeta("error").dotVariant).toBe("error");

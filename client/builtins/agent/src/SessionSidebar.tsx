@@ -12,6 +12,7 @@ import {
     LayoutContent,
     LayoutFooter,
     SideNav,
+    SideNavHeading,
     SideNavItem,
     SideNavSection,
     StatusDot,
@@ -26,6 +27,7 @@ import {
     PencilSquareIcon,
     ServerStackIcon,
     SignalIcon,
+    SparklesIcon,
 } from "@heroicons/react/24/outline";
 import {
     ChatBubbleLeftRightIcon as ChatBubbleLeftRightSolidIcon,
@@ -228,6 +230,17 @@ export function SessionSideNav({
     return (
         <SideNav
             aria-label="会话列表"
+            header={
+                <SideNavHeading
+                    heading="Agent"
+                    subheading={
+                        sessions.length
+                            ? `共 ${sessions.length} 个会话`
+                            : "智能体工作区"
+                    }
+                    icon={<Icon icon={SparklesIcon} size="md" />}
+                />
+            }
             topContent={
                 isCollapsed ? (
                     <IconButton

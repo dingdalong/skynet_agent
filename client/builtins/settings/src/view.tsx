@@ -160,31 +160,19 @@ function Settings() {
     }, []);
 
     const toolbarItems: PaneToolbarItem[] = useMemo(() => {
-        if (!snapshot?.state) return [];
-        const items: PaneToolbarItem[] = [];
-        if (wide) {
-            items.push({
+        if (!snapshot?.state || !wide) return [];
+        return [
+            {
                 id: "sidebar",
                 label: "设置导航",
                 selected: !sidebarCollapsed,
-            });
-        }
-        if (section === "apps" && canInstall) {
-            items.push({ id: "install", label: "安装应用" });
-        }
-        if (section === "about") {
-            items.push({ id: "refresh", label: "刷新版本" });
-        }
-        return items;
-    }, [snapshot?.state, wide, sidebarCollapsed, section, canInstall]);
+            },
+        ];
+    }, [snapshot?.state, wide, sidebarCollapsed]);
 
     usePaneToolbar(toolbarItems, (id) => {
         if (id === "sidebar") {
             setSidebarCollapsed((collapsed) => !collapsed);
-        } else if (id === "install") {
-            handleInstall();
-        } else if (id === "refresh") {
-            handleRefreshVersions();
         }
     });
 
